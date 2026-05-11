@@ -2,15 +2,45 @@
   <PageContainer class="bed-cockpit-page" title="智慧床态全景指挥中心" subTitle="3D床态全景 / 智慧养老数字孪生驾驶舱">
     <template #extra>
       <div class="cockpit-topbar">
+        <div class="topbar-brand">
+          <div class="brand-mark">
+            <span></span>
+          </div>
+          <div class="brand-copy">
+            <strong>智慧养老数字孪生指挥中心</strong>
+            <small>{{ lifecycleContext.active ? '入住联动模式已开启' : '长者床态与护理监测联动中' }}</small>
+          </div>
+        </div>
         <div class="topbar-status">
           <span class="status-dot"></span>
-          <span>系统运行正常</span>
+          <span>系统平稳运行</span>
           <span class="status-divider"></span>
-          <span>{{ lifecycleContext.active ? '入住联动模式' : '床态实时监控' }}</span>
+          <span>{{ commandCenterStatus }}</span>
         </div>
         <div class="topbar-clock">
           <div class="clock-date">{{ currentDateText }}</div>
           <div class="clock-time">{{ currentTimeText }}</div>
+        </div>
+        <div class="topbar-actions">
+          <button class="top-action-pill">
+            <strong>{{ notificationCount }}</strong>
+            <span>通知</span>
+          </button>
+          <button class="top-action-pill">
+            <strong>{{ todoCount }}</strong>
+            <span>待办</span>
+          </button>
+          <button class="top-action-pill">
+            <strong>{{ chatCount }}</strong>
+            <span>智护会话</span>
+          </button>
+          <div class="operator-card">
+            <a-avatar class="operator-avatar">{{ operatorInitial }}</a-avatar>
+            <div>
+              <strong>{{ operatorName }}</strong>
+              <span>{{ operatorRole }}</span>
+            </div>
+          </div>
         </div>
       </div>
     </template>
@@ -19,7 +49,9 @@
       <div class="hero-metrics">
         <div v-for="item in overviewCards" :key="item.label" class="hero-metric-card" :class="item.tone">
           <span class="metric-label">{{ item.label }}</span>
-          <strong class="metric-value">{{ item.value }}</strong>
+          <strong class="metric-value">
+            <AnimatedMetricNumber :value="item.numericValue" :suffix="item.suffix || ''" />
+          </strong>
           <span class="metric-meta">{{ item.meta }}</span>
         </div>
       </div>
@@ -165,7 +197,7 @@
           <div class="section-head">
             <div>
               <h3>重点床位</h3>
-              <p>优先关注告警与重点照护对象</p>
+              <p>优先关注需关怀、风险上升与护理节奏变化的长者</p>
             </div>
           </div>
           <div class="focus-bed-list">
@@ -193,8 +225,8 @@
                 <strong>{{ matrixFloors.length }}</strong>
               </div>
               <div>
-                <span>实时告警</span>
-                <strong>{{ emergencyCount }}</strong>
+                <span>实时风险提醒</span>
+                <strong>{{ concernCount }}</strong>
               </div>
             </div>
           </div>
@@ -274,8 +306,8 @@
           <div class="tech-panel chart-panel">
             <div class="section-head compact">
               <div>
-                <h3>床位占用趋势</h3>
-                <p>根据当前床位状态推演近 7 日变化</p>
+                <h3>24小时床态趋势</h3>
+                <p>在住长者、空床调配与即时状态联动观察</p>
               </div>
             </div>
             <v-chart class="chart-view" :option="occupancyTrendOption" autoresize />
@@ -284,8 +316,8 @@
           <div class="tech-panel chart-panel">
             <div class="section-head compact">
               <div>
-                <h3>睡眠质量趋势</h3>
-                <p>基于在住与低风险床位的稳定度估算</p>
+                <h3>夜间离床统计</h3>
+                <p>基于离床观察与睡眠稳定度生成夜巡参考</p>
               </div>
             </div>
             <v-chart class="chart-view" :option="sleepTrendOption" autoresize />
@@ -294,8 +326,8 @@
           <div class="tech-panel chart-panel">
             <div class="section-head compact">
               <div>
-                <h3>告警趋势</h3>
-                <p>高风险、异常体征与锁定状态综合观察</p>
+                <h3>护理响应效率</h3>
+                <p>需关注长者提醒、任务闭环与响应效率趋势</p>
               </div>
             </div>
             <v-chart class="chart-view" :option="alertTrendOption" autoresize />
@@ -304,8 +336,8 @@
           <div class="tech-panel chart-panel">
             <div class="section-head compact">
               <div>
-                <h3>设备健康趋势</h3>
-                <p>根据可监测床位占比生成设备健康视图</p>
+                <h3>风险热力趋势</h3>
+                <p>守护设备在线率与风险热区变化联合参考</p>
               </div>
             </div>
             <v-chart class="chart-view" :option="deviceTrendOption" autoresize />
@@ -317,8 +349,8 @@
         <section class="tech-panel">
           <div class="section-head">
             <div>
-              <h3>实时告警流</h3>
-              <p>风险事件、体征异常与设备状态联动</p>
+              <h3>实时风险提醒</h3>
+              <p>风险事件、离床观察与守护设备状态联动推送</p>
             </div>
           </div>
           <div class="event-list">
@@ -337,18 +369,37 @@
         <section class="tech-panel">
           <div class="section-head">
             <div>
-              <h3>最新状态变化</h3>
-              <p>房间、楼层和床位视角的即时动态</p>
+              <h3>AI护理建议</h3>
+              <p>基于床态、风险与护理任务自动生成值守提示</p>
             </div>
           </div>
-          <div class="timeline-list">
-            <div v-for="item in timelineFeed" :key="item.key" class="timeline-item">
+          <div class="timeline-list ai-suggestion-list">
+            <div v-for="item in aiSuggestionFeed" :key="item.key" class="timeline-item ai-suggestion-item">
               <span class="timeline-dot" :class="item.tone"></span>
               <div>
                 <strong>{{ item.title }}</strong>
                 <p>{{ item.description }}</p>
               </div>
             </div>
+          </div>
+        </section>
+
+        <section class="tech-panel">
+          <div class="section-head">
+            <div>
+              <h3>设备异常提醒</h3>
+              <p>优先确认离线、维修与待复位的守护设备</p>
+            </div>
+          </div>
+          <div class="timeline-list">
+            <div v-for="item in deviceAlertFeed" :key="item.key" class="timeline-item">
+              <span class="timeline-dot" :class="item.tone"></span>
+              <div>
+                <strong>{{ item.title }}</strong>
+                <p>{{ item.description }}</p>
+              </div>
+            </div>
+            <a-empty v-if="!deviceAlertFeed.length" description="当前暂无设备异常提醒" />
           </div>
         </section>
 
@@ -495,10 +546,12 @@ import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../../components/PageContainer.vue'
 import BedInfoCard from '../../../components/bed/BedInfoCard.vue'
+import AnimatedMetricNumber from '../../../components/dashboard/AnimatedMetricNumber.vue'
 import Panorama3D from './Panorama3D.vue'
 import { getBedMap, getRoomList } from '../../../api/bed'
 import { getElderDetail } from '../../../api/elder'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
+import { useUserStore } from '../../../stores/user'
 import type { BedItem, ElderItem, RoomItem } from '../../../types'
 
 type RoomScene = {
@@ -517,6 +570,7 @@ type RoomScene = {
 
 const router = useRouter()
 const route = useRoute()
+const userStore = useUserStore()
 const beds = ref<BedItem[]>([])
 const roomTypeMap = ref<Record<string, string>>({})
 const roomCapacityMap = ref<Record<string, number>>({})
@@ -631,9 +685,12 @@ const alertBeds = computed(() => [...sourceBeds.value]
   .sort((a, b) => Number(b.riskLevel === 'HIGH') - Number(a.riskLevel === 'HIGH') || Number(b.abnormalVital24hCount || 0) - Number(a.abnormalVital24hCount || 0)))
 
 const emergencyCount = computed(() => alertBeds.value.filter((bed) => bed.riskLevel === 'HIGH' || bed.status === 0).length)
+const concernCount = computed(() => alertBeds.value.length)
 const occupiedRate = computed(() => beds.value.length ? Math.round((stats.value.occupied / beds.value.length) * 100) : 0)
 const deviceOnlineRate = computed(() => beds.value.length ? Math.max(0, Math.round(((beds.value.length - stats.value.locked - stats.value.maintenance) / beds.value.length) * 100)) : 100)
 const sleepStableCount = computed(() => beds.value.filter((bed) => bed.elderId && bed.riskLevel !== 'HIGH' && Number(bed.abnormalVital24hCount || 0) === 0).length)
+const awayObservationCount = computed(() => beds.value.filter((bed) => bed.riskLevel === 'MEDIUM' || bed.occupancySource === 'CLEANING').length)
+const aiFocusCount = computed(() => beds.value.filter((bed) => bed.riskLevel === 'MEDIUM' || bed.riskSource).length)
 
 const roomSceneLookup = computed(() => {
   const lookup = new Map<string, RoomScene[]>()
@@ -691,21 +748,38 @@ const roomSceneLookup = computed(() => {
 
 const currentDateText = computed(() => currentTime.value.format('YYYY年MM月DD日 dddd'))
 const currentTimeText = computed(() => currentTime.value.format('HH:mm:ss'))
+const operatorName = computed(() => {
+  const realName = String(userStore.staffInfo?.realName || '').trim()
+  if (realName) return realName
+  const username = String(userStore.staffInfo?.username || '').trim()
+  if (username) return username
+  return '值班护理长'
+})
+const operatorRole = computed(() => {
+  const role = String((userStore.roles || [])[0] || '').trim()
+  return role || '智慧床态调度员'
+})
+const operatorInitial = computed(() => operatorName.value.slice(0, 1) || '护')
+const notificationCount = computed(() => concernCount.value + stats.value.maintenance)
+const todoCount = computed(() => Math.max(2, focusBeds.value.length + bedGuardBlockers.value.length))
+const chatCount = computed(() => Math.max(1, aiSuggestionFeed.value.length))
+const commandCenterStatus = computed(() => lifecycleContext.value.active ? '入住状态联动中' : '全院床态守护中')
 
 const overviewCards = computed(() => ([
-  { label: '总床位数', value: `${beds.value.length}`, meta: `${matrixBuildings.value.length} 栋 ${matrixFloors.value.length} 层`, tone: 'tone-cyan' },
-  { label: '已占用床位', value: `${stats.value.occupied}`, meta: `占用率 ${occupiedRate.value}%`, tone: 'tone-green' },
-  { label: '紧急告警数', value: `${emergencyCount.value}`, meta: `${alertBeds.value.length} 个重点关注`, tone: 'tone-red' },
-  { label: '设备在线率', value: `${deviceOnlineRate.value}%`, meta: `可监测床位 ${Math.max(0, beds.value.length - stats.value.maintenance)}`, tone: 'tone-blue' }
+  { label: '总床位数', numericValue: beds.value.length, meta: `${matrixBuildings.value.length} 栋 ${matrixFloors.value.length} 层`, tone: 'tone-cyan' },
+  { label: '在住长者', numericValue: stats.value.occupied, meta: `在住率 ${occupiedRate.value}%`, tone: 'tone-green' },
+  { label: '空床位', numericValue: stats.value.idle, meta: `可立即调配 ${Math.max(0, stats.value.idle - stats.value.cleaning)} 张`, tone: 'tone-gray' },
+  { label: '今日需关注', numericValue: concernCount.value, meta: `${emergencyCount.value} 条高优先提醒`, tone: 'tone-red' },
+  { label: '守护设备在线率', numericValue: deviceOnlineRate.value, suffix: '%', meta: `在线设备 ${Math.max(0, beds.value.length - stats.value.maintenance - stats.value.locked)}`, tone: 'tone-blue' }
 ]))
 
 const leftStatCards = computed(() => ([
-  { label: '空床位', value: stats.value.idle, meta: '待分配', tone: 'tone-cyan' },
-  { label: '在住床位', value: stats.value.occupied, meta: '实时监测', tone: 'tone-green' },
-  { label: '异常床位', value: alertBeds.value.length, meta: '需要关注', tone: 'tone-orange' },
-  { label: '锁定/离线', value: stats.value.locked, meta: '弱化显示', tone: 'tone-gray' },
-  { label: '维修床位', value: stats.value.maintenance, meta: '需恢复', tone: 'tone-orange' },
-  { label: '睡眠稳定', value: sleepStableCount.value, meta: '低异常波动', tone: 'tone-purple' }
+  { label: '空床位', value: stats.value.idle, meta: '待迎接入住', tone: 'tone-gray' },
+  { label: '在住长者', value: stats.value.occupied, meta: '持续守护中', tone: 'tone-cyan' },
+  { label: '离床观察', value: awayObservationCount.value, meta: '夜巡重点', tone: 'tone-orange' },
+  { label: '需关注长者', value: concernCount.value, meta: '风险与异常联动', tone: 'tone-red' },
+  { label: '维修设备', value: stats.value.maintenance, meta: '待恢复上线', tone: 'tone-orange' },
+  { label: '睡眠稳定', value: sleepStableCount.value, meta: '夜间状态平稳', tone: 'tone-deep-blue' }
 ]))
 
 const buildingScopeOptions = computed(() => matrixBuildings.value.slice(0, 6))
@@ -720,11 +794,11 @@ const floorScopeOptions = computed(() => {
 const statusDistributionRows = computed(() => {
   const total = Math.max(1, beds.value.length)
   return [
-    { label: '空闲', value: stats.value.idle, percent: Math.round((stats.value.idle / total) * 100), tone: 'fill-cyan' },
-    { label: '在住', value: stats.value.occupied, percent: Math.round((stats.value.occupied / total) * 100), tone: 'fill-green' },
-    { label: '预定', value: stats.value.reserved, percent: Math.round((stats.value.reserved / total) * 100), tone: 'fill-blue' },
-    { label: '清洁/维修', value: stats.value.cleaning + stats.value.maintenance, percent: Math.round(((stats.value.cleaning + stats.value.maintenance) / total) * 100), tone: 'fill-orange' },
-    { label: '锁定', value: stats.value.locked, percent: Math.round((stats.value.locked / total) * 100), tone: 'fill-red' }
+    { label: '空床位', value: stats.value.idle, percent: Math.round((stats.value.idle / total) * 100), tone: 'fill-gray' },
+    { label: '在住长者', value: stats.value.occupied, percent: Math.round((stats.value.occupied / total) * 100), tone: 'fill-cyan' },
+    { label: 'AI关注', value: aiFocusCount.value, percent: Math.round((aiFocusCount.value / total) * 100), tone: 'fill-purple' },
+    { label: '离床观察', value: awayObservationCount.value, percent: Math.round((awayObservationCount.value / total) * 100), tone: 'fill-orange' },
+    { label: '实时风险提醒', value: concernCount.value, percent: Math.round((concernCount.value / total) * 100), tone: 'fill-red' }
   ]
 })
 
@@ -735,32 +809,37 @@ const focusBeds = computed(() => {
 
 const alertFeed = computed(() => alertBeds.value.slice(0, 6).map((bed, index) => ({
   key: `alert-${bed.id}`,
-  type: bed.riskLevel === 'HIGH' ? '紧急告警' : '实时异常',
+  type: bed.riskLevel === 'HIGH' ? '高优先提醒' : '实时提醒',
   time: dayjs().subtract(index * 4, 'minute').format('HH:mm'),
   title: `${bed.roomNo || '-'} / ${bed.bedNo || '-'} ${bed.elderName || '空床'}`,
-  description: `${bed.riskLabel || '体征波动'}，24h异常 ${bed.abnormalVital24hCount || 0} 次，当前状态 ${resolveStatus(bed)}`,
+  description: `${bed.riskLabel || '体征波动'}，24h异常 ${bed.abnormalVital24hCount || 0} 次，当前床态 ${resolveStatus(bed)}`,
   tone: bed.riskLevel === 'HIGH' ? 'tone-red' : 'tone-orange'
 })))
 
-const timelineFeed = computed(() => {
-  const buildingPulse = matrixBuildings.value.slice(0, 2).map((building, index) => ({
-    key: `building-${building}`,
-    title: `${building} 监测刷新`,
-    description: `${roomsAt(building, matrixFloors.value[index] || matrixFloors.value[0] || '').length} 个房间已完成床态同步`,
-    tone: 'dot-cyan'
+const aiSuggestionFeed = computed(() => {
+  const source = alertBeds.value.length ? alertBeds.value.slice(0, 3) : sourceBeds.value.filter((bed) => bed.elderId).slice(0, 3)
+  return source.map((bed, index) => ({
+    key: `ai-${bed.id || index}`,
+    title: `${bed.elderName || '待关怀长者'} · ${bed.roomNo || '-'} ${bed.bedNo || '-'}`,
+    description: bed.riskLevel === 'HIGH'
+      ? '建议立即通知当班护理员复核生命体征，并发起 15 分钟内回访。'
+      : bed.riskLevel === 'MEDIUM'
+        ? '建议加入夜巡优先名单，关注离床频次、翻身节奏与睡眠连续性。'
+        : '建议保持当前照护节奏，并在下一班交接时同步睡眠稳定观察结果。',
+    tone: bed.riskLevel === 'HIGH' ? 'dot-red' : bed.riskLevel === 'MEDIUM' ? 'dot-purple' : 'dot-cyan'
   }))
+})
 
-  const roomPulse = Array.from(roomSceneLookup.value.values())
-    .flat()
-    .slice(0, 3)
-    .map((room) => ({
-      key: room.key,
-      title: `${room.roomNo} 房间态势更新`,
-      description: `在住 ${room.occupiedBeds} / ${room.totalBeds}，空床 ${room.emptyBeds}，房型 ${room.roomType}`,
-      tone: room.emptyBeds === 0 ? 'dot-orange' : 'dot-green'
-    }))
-
-  return [...buildingPulse, ...roomPulse]
+const deviceAlertFeed = computed(() => {
+  const deviceBeds = beds.value.filter((bed) => bed.status === 0 || bed.status === 3 || bed.occupancySource === 'MAINTENANCE').slice(0, 4)
+  return deviceBeds.map((bed, index) => ({
+    key: `device-${bed.id || index}`,
+    title: `${bed.roomNo || '-'} / ${bed.bedNo || '-'} 守护设备待处理`,
+    description: bed.status === 3 || bed.occupancySource === 'MAINTENANCE'
+      ? '设备正在维修，请确认替代监测方案是否已到位。'
+      : '设备离线或冻结，请核查网关、电量与床旁传感器连接状态。',
+    tone: bed.status === 3 || bed.occupancySource === 'MAINTENANCE' ? 'dot-orange' : 'dot-red'
+  }))
 })
 
 const bedGuardCurrentIndex = computed(() => {
@@ -863,14 +942,14 @@ const occupancyTrendOption = computed(() => buildLineOption({
 
 const sleepTrendOption = computed(() => buildLineOption({
   labels: trendLabels.value,
-  data: buildTrend(sleepStableCount.value, [0.76, 0.8, 0.82, 0.85, 0.88, 0.92, 1]),
-  color: '#9e88ff',
-  areaColor: 'rgba(155, 123, 255, 0.22)'
+  data: buildTrend(Math.max(1, awayObservationCount.value), [0.72, 0.76, 0.8, 0.84, 0.9, 0.96, 1]),
+  color: '#ffbf74',
+  areaColor: 'rgba(255, 191, 116, 0.22)'
 }))
 
 const alertTrendOption = computed(() => buildLineOption({
   labels: trendLabels.value,
-  data: buildTrend(Math.max(1, alertBeds.value.length), [1.34, 1.2, 1.12, 0.92, 0.98, 1.05, 1]),
+  data: buildTrend(Math.max(1, concernCount.value), [1.34, 1.2, 1.12, 0.92, 0.98, 1.05, 1]),
   color: '#ff6d89',
   areaColor: 'rgba(255, 93, 124, 0.2)'
 }))
@@ -1478,6 +1557,7 @@ watch(
 
 .cockpit-topbar,
 .topbar-status,
+.topbar-actions,
 .hero-metrics,
 .metric-grid,
 .distribution-top,
@@ -1493,8 +1573,55 @@ watch(
 }
 
 .cockpit-topbar {
-  gap: 20px;
+  gap: 16px;
   justify-content: space-between;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 280px;
+}
+
+.brand-mark {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 16px;
+  border: 1px solid rgba(87, 215, 255, 0.28);
+  background:
+    radial-gradient(circle at 40% 35%, rgba(123, 239, 255, 0.9), rgba(87, 215, 255, 0.18) 58%, transparent 62%),
+    linear-gradient(180deg, rgba(10, 26, 49, 0.96), rgba(7, 18, 35, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(163, 236, 255, 0.18),
+    0 0 24px rgba(87, 215, 255, 0.18);
+}
+
+.brand-mark span {
+  position: absolute;
+  inset: 9px;
+  border-radius: 12px;
+  border: 1px solid rgba(87, 215, 255, 0.28);
+}
+
+.brand-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.brand-copy strong,
+.operator-card strong {
+  color: #eefcff;
+  font-size: 15px;
+}
+
+.brand-copy small,
+.operator-card span {
+  color: #8db2cf;
+  line-height: 1.5;
 }
 
 .topbar-status {
@@ -1521,6 +1648,7 @@ watch(
 
 .topbar-clock {
   text-align: right;
+  min-width: 180px;
 }
 
 .clock-date {
@@ -1535,20 +1663,69 @@ watch(
   letter-spacing: 0.12em;
 }
 
-.hero-metrics {
-  gap: 14px;
+.topbar-actions {
+  gap: 10px;
+  margin-left: auto;
   flex-wrap: wrap;
 }
 
+.top-action-pill,
+.operator-card {
+  min-height: 52px;
+  padding: 10px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(87, 215, 255, 0.16);
+  background: rgba(7, 19, 35, 0.72);
+  backdrop-filter: blur(12px);
+  box-shadow: inset 0 1px 0 rgba(163, 236, 255, 0.08);
+}
+
+.top-action-pill {
+  display: grid;
+  gap: 2px;
+  min-width: 84px;
+  text-align: left;
+}
+
+.top-action-pill strong {
+  color: #f2fdff;
+  font-size: 18px;
+}
+
+.top-action-pill span {
+  color: #8db2cf;
+  font-size: 12px;
+}
+
+.operator-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 170px;
+}
+
+.operator-avatar {
+  background: linear-gradient(135deg, #31d6ff, #7f86ff);
+  color: #04111f;
+  font-weight: 700;
+}
+
+.hero-metrics {
+  gap: 14px;
+  flex-wrap: nowrap;
+}
+
 .hero-metric-card {
-  min-width: 168px;
-  flex: 1 1 168px;
+  min-width: 160px;
+  flex: 1 1 0;
   display: grid;
   gap: 6px;
   padding: 16px 18px;
   border-radius: 18px;
   border: 1px solid rgba(87, 215, 255, 0.16);
-  background: rgba(7, 19, 35, 0.68);
+  background:
+    linear-gradient(180deg, rgba(8, 23, 42, 0.74), rgba(5, 14, 28, 0.92));
+  backdrop-filter: blur(12px);
 }
 
 .metric-label {
@@ -1560,8 +1737,9 @@ watch(
 
 .metric-value {
   color: #f5fdff;
-  font-size: 30px;
+  font-size: 32px;
   line-height: 1;
+  text-shadow: 0 0 18px rgba(87, 215, 255, 0.14);
 }
 
 .metric-meta {
@@ -1593,13 +1771,17 @@ watch(
   box-shadow: inset 0 0 0 1px rgba(140, 160, 181, 0.08), 0 0 24px rgba(140, 160, 181, 0.08);
 }
 
+.tone-deep-blue {
+  box-shadow: inset 0 0 0 1px rgba(83, 124, 255, 0.1), 0 0 24px rgba(83, 124, 255, 0.1);
+}
+
 .tone-red {
   box-shadow: inset 0 0 0 1px rgba(255, 93, 124, 0.1), 0 0 28px rgba(255, 93, 124, 0.12);
 }
 
 .bed-cockpit-shell {
   display: grid;
-  grid-template-columns: 340px minmax(0, 1fr) 340px;
+  grid-template-columns: 280px minmax(0, 1.5fr) 320px;
   gap: 18px;
   min-height: 0;
 }
@@ -1721,12 +1903,12 @@ watch(
   background: linear-gradient(90deg, #2bcfff, #57d7ff);
 }
 
-.fill-green {
-  background: linear-gradient(90deg, #27ce94, #52f3c4);
+.fill-gray {
+  background: linear-gradient(90deg, #68849d, #89a4bd);
 }
 
-.fill-blue {
-  background: linear-gradient(90deg, #4d7cff, #68a7ff);
+.fill-purple {
+  background: linear-gradient(90deg, #7967ff, #b287ff);
 }
 
 .fill-orange {
@@ -1791,6 +1973,7 @@ watch(
 .stage-panel {
   display: grid;
   gap: 14px;
+  padding: 20px;
 }
 
 .stage-command-bar {
@@ -1892,15 +2075,15 @@ watch(
 
 .stage-shell {
   position: relative;
-  min-height: 620px;
+  min-height: 720px;
 }
 
 .stage-shell :deep(.panorama-container) {
-  height: 620px;
+  height: 720px;
 }
 
 .stage-empty {
-  min-height: 620px;
+  min-height: 720px;
   display: grid;
   place-items: center;
 }
@@ -2026,6 +2209,10 @@ watch(
   background: rgba(4, 14, 26, 0.56);
 }
 
+.event-card.tone-red {
+  animation: alertPulse 2.4s ease-in-out infinite;
+}
+
 .event-top {
   justify-content: space-between;
   gap: 8px;
@@ -2065,6 +2252,16 @@ watch(
 .dot-orange {
   color: #ffbf74;
   background: #ffbf74;
+}
+
+.dot-red {
+  color: #ff7d96;
+  background: #ff7d96;
+}
+
+.dot-purple {
+  color: #a78bff;
+  background: #a78bff;
 }
 
 .selected-panel {
@@ -2148,9 +2345,22 @@ watch(
   color: #86a9c4;
 }
 
+@keyframes alertPulse {
+  0%, 100% {
+    box-shadow: inset 0 0 0 1px rgba(255, 93, 124, 0.12), 0 0 0 rgba(255, 93, 124, 0);
+  }
+  50% {
+    box-shadow: inset 0 0 0 1px rgba(255, 93, 124, 0.22), 0 0 24px rgba(255, 93, 124, 0.14);
+  }
+}
+
 @media (max-width: 1600px) {
   .bed-cockpit-shell {
-    grid-template-columns: 300px minmax(0, 1fr) 300px;
+    grid-template-columns: 260px minmax(0, 1.4fr) 300px;
+  }
+
+  .hero-metrics {
+    flex-wrap: wrap;
   }
 }
 
@@ -2170,6 +2380,13 @@ watch(
     margin-top: 14px;
     max-width: none;
   }
+
+  .stage-shell,
+  .stage-shell :deep(.panorama-container),
+  .stage-empty {
+    min-height: 620px;
+    height: 620px;
+  }
 }
 
 @media (max-width: 768px) {
@@ -2186,6 +2403,10 @@ watch(
   .stage-command-bar {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .topbar-actions {
+    margin-left: 0;
   }
 
   .clock-time {

@@ -13,11 +13,12 @@
         <strong>{{ breadcrumbText }}</strong>
       </div>
       <div class="toolbar-right">
-        <div class="legend-chip status-normal">正常</div>
-        <div class="legend-chip status-occupied">在床</div>
-        <div class="legend-chip status-sleep">睡眠</div>
-        <div class="legend-chip status-alert">告警</div>
-        <div class="legend-chip status-offline">离线</div>
+        <div class="legend-chip status-occupied">正常守护</div>
+        <div class="legend-chip status-empty">空床待命</div>
+        <div class="legend-chip status-warning">离床观察</div>
+        <div class="legend-chip status-sleep">睡眠稳定</div>
+        <div class="legend-chip status-ai">AI关注</div>
+        <div class="legend-chip status-alert">异常提醒</div>
       </div>
     </div>
 
@@ -93,7 +94,7 @@ const controls = shallowRef<OrbitControls | null>(null)
 
 const objectsMap = new Map<string, THREE.Object3D>()
 const interactableObjects: THREE.Object3D[] = []
-const animatedBeds: Array<{ mesh: THREE.Mesh; type: 'pulse' | 'blink' | 'sleep'; baseIntensity: number }> = []
+const animatedBeds: Array<{ mesh: THREE.Mesh; type: 'pulse' | 'blink' | 'sleep' | 'ai'; baseIntensity: number }> = []
 let particles: THREE.Points | null = null
 let animationFrameId = 0
 let rebuildSceneTimer = 0
@@ -109,10 +110,11 @@ const materials = {
   room: new THREE.MeshStandardMaterial({ color: 0x163859, transparent: true, opacity: 0.7, roughness: 0.55, metalness: 0.2 }),
   roomHover: new THREE.MeshStandardMaterial({ color: 0x2bcfff, emissive: 0x2bcfff, emissiveIntensity: 0.4, transparent: true, opacity: 0.85 }),
   hover: new THREE.MeshStandardMaterial({ color: 0x63e3ff, emissive: 0x2bcfff, emissiveIntensity: 0.6, transparent: true, opacity: 0.85 }),
-  bedNormal: new THREE.MeshStandardMaterial({ color: 0x2bcfff, emissive: 0x2bcfff, emissiveIntensity: 0.36, metalness: 0.48, roughness: 0.28 }),
-  bedOccupied: new THREE.MeshStandardMaterial({ color: 0x24cc93, emissive: 0x24cc93, emissiveIntensity: 0.42, metalness: 0.38, roughness: 0.3 }),
-  bedSleep: new THREE.MeshStandardMaterial({ color: 0x8f74ff, emissive: 0x8f74ff, emissiveIntensity: 0.44, metalness: 0.36, roughness: 0.32 }),
-  bedWarning: new THREE.MeshStandardMaterial({ color: 0xffa556, emissive: 0xffa556, emissiveIntensity: 0.48, metalness: 0.34, roughness: 0.3 }),
+  bedNormal: new THREE.MeshStandardMaterial({ color: 0x728aa3, emissive: 0x728aa3, emissiveIntensity: 0.22, metalness: 0.42, roughness: 0.34 }),
+  bedOccupied: new THREE.MeshStandardMaterial({ color: 0x39d4ff, emissive: 0x39d4ff, emissiveIntensity: 0.44, metalness: 0.38, roughness: 0.28 }),
+  bedSleep: new THREE.MeshStandardMaterial({ color: 0x456dff, emissive: 0x456dff, emissiveIntensity: 0.4, metalness: 0.36, roughness: 0.3 }),
+  bedAi: new THREE.MeshStandardMaterial({ color: 0xa27dff, emissive: 0xa27dff, emissiveIntensity: 0.42, metalness: 0.34, roughness: 0.32 }),
+  bedWarning: new THREE.MeshStandardMaterial({ color: 0xffb354, emissive: 0xffb354, emissiveIntensity: 0.48, metalness: 0.34, roughness: 0.3 }),
   bedAlert: new THREE.MeshStandardMaterial({ color: 0xff5d7c, emissive: 0xff5d7c, emissiveIntensity: 0.76, metalness: 0.26, roughness: 0.28 }),
   bedOffline: new THREE.MeshStandardMaterial({ color: 0x7388a0, emissive: 0x7388a0, emissiveIntensity: 0.18, metalness: 0.2, roughness: 0.5 })
 }
@@ -225,11 +227,12 @@ function createLabel(text: string, className: string) {
   return new CSS2DObject(div)
 }
 
-function resolveBedVisualState(bed: any): 'normal' | 'occupied' | 'sleep' | 'warning' | 'alert' | 'offline' {
+function resolveBedVisualState(bed: any): 'normal' | 'occupied' | 'sleep' | 'ai' | 'warning' | 'alert' | 'offline' {
   const abnormalCount = Number(bed.abnormalVital24hCount || 0)
-  if (bed.status === 0 || bed.occupancySource === 'MAINTENANCE' || bed.occupancySource === 'FROZEN') return 'offline'
+  if (bed.status === 0 || bed.occupancySource === 'FROZEN') return 'offline'
   if (bed.riskLevel === 'HIGH' || abnormalCount > 0) return 'alert'
-  if (bed.riskLevel === 'MEDIUM' || bed.status === 3 || bed.occupancySource === 'RESERVATION' || bed.occupancySource === 'CLEANING') return 'warning'
+  if (bed.status === 3 || bed.occupancySource === 'MAINTENANCE' || bed.occupancySource === 'CLEANING') return 'warning'
+  if (bed.riskLevel === 'MEDIUM' || bed.riskSource) return 'ai'
   if (bed.riskLevel === 'LOW' && bed.elderId) return 'sleep'
   if (bed.elderId) return 'occupied'
   return 'normal'
@@ -238,6 +241,7 @@ function resolveBedVisualState(bed: any): 'normal' | 'occupied' | 'sleep' | 'war
 function materialForState(state: ReturnType<typeof resolveBedVisualState>) {
   if (state === 'occupied') return materials.bedOccupied.clone()
   if (state === 'sleep') return materials.bedSleep.clone()
+  if (state === 'ai') return materials.bedAi.clone()
   if (state === 'warning') return materials.bedWarning.clone()
   if (state === 'alert') return materials.bedAlert.clone()
   if (state === 'offline') return materials.bedOffline.clone()
@@ -288,6 +292,8 @@ function createBedUnit(bed: any, width: number, depth: number) {
 
   if (state === 'alert') {
     animatedBeds.push({ mesh: mattress, type: 'pulse', baseIntensity: 0.76 })
+  } else if (state === 'ai') {
+    animatedBeds.push({ mesh: mattress, type: 'ai', baseIntensity: 0.42 })
   } else if (state === 'warning') {
     animatedBeds.push({ mesh: mattress, type: 'blink', baseIntensity: 0.48 })
   } else if (state === 'sleep') {
@@ -560,14 +566,14 @@ function updateTooltip(event: PointerEvent, obj: THREE.Object3D) {
 
   if (obj.userData.type === 'bed') {
     const bed = obj.userData.bed
-    const occupiedText = bed.elderId ? `${bed.elderName || '已入住'}` : '空床'
+    const occupiedText = bed.elderId ? `${bed.elderName || '在住长者'}` : '空床待命'
     tooltip.value.title = `床位 ${bed.bedNo || '-'}`
     tooltip.value.content = `<div class="tt-row"><span>状态</span><span class="tt-val">${occupiedText}</span></div>
-      <div class="tt-row"><span>风险</span><span class="tt-val ${bed.riskLevel === 'HIGH' ? 'red' : bed.riskLevel === 'MEDIUM' ? 'orange' : 'cyan'}">${bed.riskLabel || '正常'}</span></div>
+      <div class="tt-row"><span>风险</span><span class="tt-val ${bed.riskLevel === 'HIGH' ? 'red' : bed.riskLevel === 'MEDIUM' ? 'purple' : bed.riskLevel === 'LOW' ? 'blue' : 'cyan'}">${bed.riskLabel || '守护稳定'}</span></div>
       <div class="tt-row"><span>24h异常</span><span class="tt-val">${bed.abnormalVital24hCount || 0} 次</span></div>
       <div class="tt-tip">点击查看业务详情</div>`
     focusTitle.value = `${bed.roomNo || '-'} / ${bed.bedNo || '-'}`
-    focusStatus.value = bed.riskLabel || (bed.elderId ? '在住监测中' : '床位空闲')
+    focusStatus.value = bed.riskLabel || (bed.elderId ? '长者守护中' : '空床待命')
     return
   }
 
@@ -781,6 +787,8 @@ function animate() {
     const material = item.mesh.material as THREE.MeshStandardMaterial
     if (item.type === 'pulse') {
       material.emissiveIntensity = item.baseIntensity + (Math.sin(time * 5) + 1) * 0.3
+    } else if (item.type === 'ai') {
+      material.emissiveIntensity = item.baseIntensity + (Math.sin(time * 3.4) + 1) * 0.18
     } else if (item.type === 'blink') {
       material.emissiveIntensity = Math.sin(time * 7) > 0 ? item.baseIntensity + 0.28 : item.baseIntensity * 0.36
     } else {
@@ -828,14 +836,16 @@ onBeforeUnmount(() => {
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 620px;
+  min-height: 720px;
   overflow: hidden;
   border-radius: 24px;
   background:
     radial-gradient(circle at 12% 12%, rgba(87, 215, 255, 0.14), transparent 26%),
     radial-gradient(circle at 82% 0%, rgba(143, 116, 255, 0.16), transparent 28%),
     linear-gradient(180deg, #05101d 0%, #030914 100%);
-  box-shadow: inset 0 0 120px rgba(43, 207, 255, 0.08);
+  box-shadow:
+    inset 0 0 120px rgba(43, 207, 255, 0.08),
+    inset 0 0 40px rgba(111, 132, 255, 0.08);
 }
 
 .canvas-wrapper {
@@ -953,11 +963,23 @@ onBeforeUnmount(() => {
 }
 
 .status-occupied {
-  border-color: rgba(62, 232, 181, 0.24);
+  border-color: rgba(57, 212, 255, 0.28);
+}
+
+.status-empty {
+  border-color: rgba(131, 156, 184, 0.3);
+}
+
+.status-warning {
+  border-color: rgba(255, 179, 84, 0.32);
 }
 
 .status-sleep {
-  border-color: rgba(143, 116, 255, 0.3);
+  border-color: rgba(83, 124, 255, 0.34);
+}
+
+.status-ai {
+  border-color: rgba(162, 125, 255, 0.34);
 }
 
 .status-alert {
@@ -1017,6 +1039,14 @@ onBeforeUnmount(() => {
 
 .tech-tooltip :deep(.tt-val.orange) {
   color: #ffbf74;
+}
+
+.tech-tooltip :deep(.tt-val.blue) {
+  color: #7b99ff;
+}
+
+.tech-tooltip :deep(.tt-val.purple) {
+  color: #b18bff;
 }
 
 .tech-tooltip :deep(.tt-val.red) {
