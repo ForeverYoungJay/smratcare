@@ -232,8 +232,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message } from 'ant-design-vue'
@@ -246,9 +246,11 @@ import { getDiseaseList } from '../../api/store'
 import type { AdmissionRequest, BedItem, BuildingItem, ElderCreateRequest, ElderItem, FloorItem, Id, RoomItem } from '../../types'
 
 const router = useRouter()
+const route = useRoute()
 const formRef = ref<FormInstance>()
 const saving = ref(false)
 const formDerivedBirthDate = ref('')
+const syncingAssetSelection = ref(false)
 
 const form = reactive<ElderCreateRequest & { contractNo?: string; depositAmount?: number }>({
   fullName: '',
@@ -312,6 +314,12 @@ const assetSelect = reactive({
   floorId: undefined as Id | undefined,
   roomId: undefined as Id | undefined
 })
+
+function normalizeId(value: unknown): Id | undefined {
+  if (value == null) return undefined
+  const text = String(Array.isArray(value) ? value[0] : value).trim()
+  return text ? (text as Id) : undefined
+}
 
 function trimText(value?: string) {
   return String(value || '').trim()
@@ -720,6 +728,33 @@ async function loadAssets() {
   }
 }
 
+async function applyBedRoutePrefill() {
+  const bedId = normalizeId(route.query.bedId)
+  const buildingId = normalizeId(route.query.buildingId)
+  const floorId = normalizeId(route.query.floorId)
+  const roomId = normalizeId(route.query.roomId)
+  const matchedBed = bedId
+    ? beds.value.find((item) => String(item.id || '').trim() === String(bedId))
+    : undefined
+  const matchedRoomId = matchedBed?.roomId || roomId
+  const matchedRoom = matchedRoomId
+    ? rooms.value.find((item) => String(item.id || '').trim() === String(matchedRoomId))
+    : undefined
+  const matchedFloorId = matchedRoom?.floorId || floorId
+  const matchedBuildingId = matchedRoom?.buildingId || buildingId
+
+  syncingAssetSelection.value = true
+  assetSelect.buildingId = matchedBuildingId
+  assetSelect.floorId = matchedFloorId
+  assetSelect.roomId = matchedRoomId
+  form.bedId = matchedBed?.id || bedId
+  if (!form.bedStartDate && form.admissionDate) {
+    form.bedStartDate = form.admissionDate
+  }
+  await nextTick()
+  syncingAssetSelection.value = false
+}
+
 async function loadDiseaseOptions() {
   try {
     const list = await getDiseaseList()
@@ -746,6 +781,9 @@ watch(
 watch(
   () => assetSelect.buildingId,
   () => {
+    if (syncingAssetSelection.value) {
+      return
+    }
     assetSelect.floorId = undefined
     assetSelect.roomId = undefined
     form.bedId = undefined
@@ -754,6 +792,9 @@ watch(
 watch(
   () => assetSelect.floorId,
   () => {
+    if (syncingAssetSelection.value) {
+      return
+    }
     assetSelect.roomId = undefined
     form.bedId = undefined
   }
@@ -761,6 +802,9 @@ watch(
 watch(
   () => assetSelect.roomId,
   () => {
+    if (syncingAssetSelection.value) {
+      return
+    }
     form.bedId = undefined
   }
 )
@@ -787,8 +831,9 @@ watch(
   }
 )
 
-onMounted(() => {
-  loadAssets()
+onMounted(async () => {
+  await loadAssets()
+  await applyBedRoutePrefill()
   loadDiseaseOptions()
 })
 </script>

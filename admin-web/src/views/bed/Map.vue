@@ -193,7 +193,7 @@
       </template>
     </a-card>
 
-    <a-modal v-model:open="detailOpen" title="床位与老人详情" width="560px" @ok="printBedQr" ok-text="打印床位二维码" @cancel="() => (detailOpen = false)">
+    <a-modal v-model:open="detailOpen" title="床位与老人详情" width="560px" @cancel="() => (detailOpen = false)">
       <a-descriptions bordered :column="2" size="small">
         <a-descriptions-item label="楼栋">{{ current?.building || '-' }}</a-descriptions-item>
         <a-descriptions-item label="楼层">{{ current?.floorNo || '-' }}</a-descriptions-item>
@@ -224,6 +224,16 @@
       <div class="qr-preview" v-if="qrDataUrl">
         <img :src="qrDataUrl" alt="qr" />
       </div>
+      <template #footer>
+        <a-space>
+          <a-button @click="detailOpen = false">关闭</a-button>
+          <template v-if="current && isIdleBed(current)">
+            <a-button @click="goHistoricalAdmissionFromBed(current)">历史补录入住</a-button>
+            <a-button type="primary" @click="goContractAdmissionFromBed(current)">合同入住办理</a-button>
+          </template>
+          <a-button v-else type="primary" @click="printBedQr">打印床位二维码</a-button>
+        </a-space>
+      </template>
     </a-modal>
 
     <a-modal v-model:open="roomDetailOpen" :title="`房间详情 · ${roomCurrent?.roomNo || '-'}`" width="760px" :footer="null" destroy-on-close>
@@ -947,6 +957,35 @@ async function openBed(bed: BedItem) {
   } finally {
     elderLoading.value = false
   }
+}
+
+function buildBedRouteQuery(bed: BedItem) {
+  return {
+    bedId: String(bed.id || ''),
+    roomId: String(bed.roomId || ''),
+    buildingId: String(bed.buildingId || ''),
+    floorId: String(bed.floorId || ''),
+    building: String(bed.building || ''),
+    floorNo: String(bed.floorNo || ''),
+    roomNo: String(bed.roomNo || ''),
+    bedNo: String(bed.bedNo || '')
+  }
+}
+
+function goHistoricalAdmissionFromBed(bed: BedItem) {
+  detailOpen.value = false
+  router.push({
+    path: '/elder/create',
+    query: buildBedRouteQuery(bed)
+  })
+}
+
+function goContractAdmissionFromBed(bed: BedItem) {
+  detailOpen.value = false
+  router.push({
+    path: '/elder/admission-processing',
+    query: buildBedRouteQuery(bed)
+  })
 }
 
 function printBedQr() {

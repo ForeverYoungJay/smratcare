@@ -1004,19 +1004,24 @@ async function loadAssets() {
 
 async function applyBedRoutePrefill(bedId: Id | undefined) {
   const normalizedBedId = normalizeId(bedId)
-  if (!normalizedBedId) {
+  const routeBuildingId = normalizeId(route.query.buildingId)
+  const routeFloorId = normalizeId(route.query.floorId)
+  const routeRoomId = normalizeId(route.query.roomId)
+  const matchedBed = normalizedBedId
+    ? beds.value.find((item) => String(item.id || '').trim() === normalizedBedId)
+    : undefined
+  const matchedRoom = roomById.value.get(String(matchedBed?.roomId || routeRoomId || ''))
+  const targetBuildingId = matchedRoom?.buildingId || routeBuildingId
+  const targetFloorId = matchedRoom?.floorId || routeFloorId
+  const targetRoomId = matchedBed?.roomId || routeRoomId
+  if (!targetBuildingId && !targetFloorId && !targetRoomId && !matchedBed) {
     return
   }
-  const matchedBed = beds.value.find((item) => String(item.id || '').trim() === normalizedBedId)
-  if (!matchedBed) {
-    return
-  }
-  const matchedRoom = roomById.value.get(String(matchedBed.roomId || ''))
   syncingAssetSelection.value = true
-  assetSelect.buildingId = matchedRoom?.buildingId
-  assetSelect.floorId = matchedRoom?.floorId
-  assetSelect.roomId = matchedBed.roomId
-  form.bedId = matchedBed.id
+  assetSelect.buildingId = targetBuildingId
+  assetSelect.floorId = targetFloorId
+  assetSelect.roomId = targetRoomId
+  form.bedId = matchedBed?.id || normalizedBedId
   await nextTick()
   syncingAssetSelection.value = false
 }
