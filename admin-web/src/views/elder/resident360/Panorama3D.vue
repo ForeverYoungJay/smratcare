@@ -6,7 +6,9 @@
     <div class="scene-toolbar">
       <div class="toolbar-left">
         <a-button v-if="currentLevel !== 'PARK'" class="tech-btn" @click="goUpLevel">返回上级</a-button>
+        <a-button class="tech-btn" @click="toggleCruise">{{ cruiseEnabled ? '暂停巡航' : '自动巡航' }}</a-button>
         <a-button class="tech-btn" @click="resetCamera">重置视角</a-button>
+        <a-button class="tech-btn" @click="toggleFullscreen">{{ fullscreenActive ? '退出全屏' : '全屏展示' }}</a-button>
       </div>
       <div class="toolbar-center">
         <span class="toolbar-eyebrow">Current Scope</span>
@@ -67,6 +69,8 @@ const currentLevel = ref<'PARK' | 'BUILDING' | 'FLOOR' | 'ROOM'>('PARK')
 const selectedBuilding = ref('')
 const selectedFloor = ref('')
 const selectedRoom = ref('')
+const cruiseEnabled = ref(true)
+const fullscreenActive = ref(false)
 const focusTitle = ref('园区总览')
 const focusStatus = ref('等待交互')
 const tooltip = ref({ visible: false, x: 0, y: 0, title: '', content: '' })
@@ -155,7 +159,7 @@ function initScene() {
   controls.value.maxDistance = 180
   controls.value.maxPolarAngle = Math.PI / 2 - 0.04
   controls.value.autoRotate = true
-  controls.value.autoRotateSpeed = 0.18
+  controls.value.autoRotateSpeed = 0.12
 
   const ambientLight = new THREE.AmbientLight(0xd8efff, 0.62)
   scene.value.add(ambientLight)
@@ -464,7 +468,7 @@ function buildSceneData() {
 }
 
 function updateVisibility() {
-  controls.value!.autoRotate = currentLevel.value === 'PARK'
+  controls.value!.autoRotate = currentLevel.value === 'PARK' && cruiseEnabled.value
   objectsMap.forEach((obj, key) => {
     if (!key.startsWith('building_')) return
     const buildingName = obj.userData.name
@@ -743,11 +747,28 @@ function resetCamera() {
   selectedBuilding.value = ''
   selectedFloor.value = ''
   selectedRoom.value = ''
+  cruiseEnabled.value = true
   focusTitle.value = '园区总览'
   focusStatus.value = '等待交互'
   updateVisibility()
   gsap.to(camera.value.position, { x: 42, y: 38, z: 64, duration: 1.1, ease: 'power3.out' })
   gsap.to(controls.value.target, { x: 0, y: 0, z: 0, duration: 1.1, ease: 'power3.out' })
+}
+
+function toggleCruise() {
+  cruiseEnabled.value = !cruiseEnabled.value
+  updateVisibility()
+}
+
+async function toggleFullscreen() {
+  if (!containerRef.value) return
+  if (!document.fullscreenElement) {
+    await containerRef.value.requestFullscreen?.().catch(() => {})
+    fullscreenActive.value = Boolean(document.fullscreenElement)
+    return
+  }
+  await document.exitFullscreen?.().catch(() => {})
+  fullscreenActive.value = Boolean(document.fullscreenElement)
 }
 
 function onWindowResize() {
@@ -775,6 +796,10 @@ function handleVisibilityChange() {
   if (sceneRenderingEnabled.value && !animationFrameId) {
     animate()
   }
+}
+
+function syncFullscreenState() {
+  fullscreenActive.value = Boolean(document.fullscreenElement)
 }
 
 function animate() {
@@ -813,6 +838,7 @@ onMounted(() => {
   sceneRenderingEnabled.value = !document.hidden
   initScene()
   document.addEventListener('visibilitychange', handleVisibilityChange)
+  document.addEventListener('fullscreenchange', syncFullscreenState)
 })
 
 onBeforeUnmount(() => {
@@ -826,6 +852,7 @@ onBeforeUnmount(() => {
   renderer.value?.domElement.removeEventListener('click', onClick)
   window.removeEventListener('resize', onWindowResize)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
+  document.removeEventListener('fullscreenchange', syncFullscreenState)
   controls.value?.dispose()
   renderer.value?.dispose()
 })
@@ -836,16 +863,16 @@ onBeforeUnmount(() => {
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 720px;
+  min-height: 760px;
   overflow: hidden;
   border-radius: 24px;
   background:
-    radial-gradient(circle at 12% 12%, rgba(87, 215, 255, 0.14), transparent 26%),
-    radial-gradient(circle at 82% 0%, rgba(143, 116, 255, 0.16), transparent 28%),
-    linear-gradient(180deg, #05101d 0%, #030914 100%);
+    radial-gradient(circle at 12% 12%, rgba(111, 192, 207, 0.12), transparent 26%),
+    radial-gradient(circle at 82% 0%, rgba(111, 143, 200, 0.14), transparent 28%),
+    linear-gradient(180deg, #07111b 0%, #040912 100%);
   box-shadow:
-    inset 0 0 120px rgba(43, 207, 255, 0.08),
-    inset 0 0 40px rgba(111, 132, 255, 0.08);
+    inset 0 0 120px rgba(111, 192, 207, 0.06),
+    inset 0 0 40px rgba(111, 143, 200, 0.06);
 }
 
 .canvas-wrapper {
@@ -869,7 +896,7 @@ onBeforeUnmount(() => {
 .scene-scanlines {
   background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0, rgba(255, 255, 255, 0.02) 1px, transparent 1px, transparent 4px);
   mix-blend-mode: screen;
-  opacity: 0.16;
+  opacity: 0.09;
 }
 
 .scene-toolbar,
@@ -910,10 +937,10 @@ onBeforeUnmount(() => {
 .hud-panel {
   padding: 12px 16px;
   border-radius: 18px;
-  border: 1px solid rgba(87, 215, 255, 0.18);
-  background: rgba(5, 16, 31, 0.8);
+  border: 1px solid rgba(126, 177, 194, 0.18);
+  background: rgba(8, 17, 28, 0.72);
   backdrop-filter: blur(12px);
-  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.24);
 }
 
 .toolbar-center {
@@ -928,34 +955,34 @@ onBeforeUnmount(() => {
   font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #88a9c3;
+  color: #92aabd;
 }
 
 .toolbar-center strong,
 .hud-panel strong {
-  color: #ebfbff;
+  color: #edf4f8;
 }
 
 .tech-btn {
-  background: rgba(7, 22, 42, 0.86);
-  border: 1px solid rgba(87, 215, 255, 0.22);
-  color: #dff6ff;
+  background: rgba(10, 20, 33, 0.82);
+  border: 1px solid rgba(126, 177, 194, 0.2);
+  color: #dbe8f0;
   border-radius: 14px;
 }
 
 .tech-btn:hover {
-  border-color: rgba(87, 215, 255, 0.5);
+  border-color: rgba(126, 177, 194, 0.4);
   color: #ffffff;
-  box-shadow: 0 0 20px rgba(87, 215, 255, 0.18);
+  box-shadow: 0 0 16px rgba(126, 177, 194, 0.12);
 }
 
 .legend-chip {
   padding: 6px 10px;
   border-radius: 999px;
   border: 1px solid transparent;
-  background: rgba(5, 16, 31, 0.76);
+  background: rgba(8, 17, 28, 0.72);
   font-size: 12px;
-  color: #dff6ff;
+  color: #dfe8ee;
 }
 
 .status-normal {
@@ -963,27 +990,27 @@ onBeforeUnmount(() => {
 }
 
 .status-occupied {
-  border-color: rgba(57, 212, 255, 0.28);
+  border-color: rgba(111, 192, 207, 0.28);
 }
 
 .status-empty {
-  border-color: rgba(131, 156, 184, 0.3);
+  border-color: rgba(126, 147, 166, 0.3);
 }
 
 .status-warning {
-  border-color: rgba(255, 179, 84, 0.32);
+  border-color: rgba(213, 165, 108, 0.32);
 }
 
 .status-sleep {
-  border-color: rgba(83, 124, 255, 0.34);
+  border-color: rgba(111, 143, 200, 0.34);
 }
 
 .status-ai {
-  border-color: rgba(162, 125, 255, 0.34);
+  border-color: rgba(150, 133, 199, 0.34);
 }
 
 .status-alert {
-  border-color: rgba(255, 93, 124, 0.34);
+  border-color: rgba(207, 120, 134, 0.34);
 }
 
 .status-offline {
@@ -995,11 +1022,11 @@ onBeforeUnmount(() => {
   z-index: 10;
   min-width: 210px;
   border-radius: 16px;
-  border: 1px solid rgba(87, 215, 255, 0.24);
-  background: rgba(6, 18, 34, 0.9);
-  color: #eaf7ff;
+  border: 1px solid rgba(126, 177, 194, 0.22);
+  background: rgba(8, 17, 28, 0.88);
+  color: #eaf2f7;
   backdrop-filter: blur(12px);
-  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.42), 0 0 24px rgba(43, 207, 255, 0.14);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.36), 0 0 20px rgba(111, 192, 207, 0.08);
   padding: 14px;
   pointer-events: none;
 }
@@ -1014,7 +1041,7 @@ onBeforeUnmount(() => {
 
 .tt-body {
   font-size: 12px;
-  color: #9ebcd4;
+  color: #9db0bf;
 }
 
 .tech-tooltip :deep(.tt-row) {
@@ -1030,48 +1057,48 @@ onBeforeUnmount(() => {
 }
 
 .tech-tooltip :deep(.tt-val.cyan) {
-  color: #57d7ff;
+  color: #7fc9d4;
 }
 
 .tech-tooltip :deep(.tt-val.green) {
-  color: #52f3c4;
+  color: #86d1c1;
 }
 
 .tech-tooltip :deep(.tt-val.orange) {
-  color: #ffbf74;
+  color: #ddb17a;
 }
 
 .tech-tooltip :deep(.tt-val.blue) {
-  color: #7b99ff;
+  color: #8ea3d3;
 }
 
 .tech-tooltip :deep(.tt-val.purple) {
-  color: #b18bff;
+  color: #b09bcf;
 }
 
 .tech-tooltip :deep(.tt-val.red) {
-  color: #ff8aa0;
+  color: #d8929d;
 }
 
 .tech-tooltip :deep(.tt-tip) {
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px dashed rgba(134, 169, 196, 0.18);
-  color: #57d7ff;
+  color: #8bbecd;
 }
 
 :global(.scene-label) {
   padding: 6px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(87, 215, 255, 0.24);
-  background: rgba(6, 18, 34, 0.82);
-  color: #eaf7ff;
+  border: 1px solid rgba(126, 177, 194, 0.2);
+  background: rgba(9, 18, 29, 0.8);
+  color: #eaf2f7;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   backdrop-filter: blur(8px);
-  box-shadow: 0 0 18px rgba(43, 207, 255, 0.12);
+  box-shadow: 0 0 14px rgba(111, 192, 207, 0.08);
   white-space: nowrap;
 }
 

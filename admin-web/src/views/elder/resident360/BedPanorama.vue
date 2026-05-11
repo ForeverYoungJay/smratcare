@@ -1,82 +1,81 @@
 <template>
-  <PageContainer class="bed-cockpit-page" title="智慧床态全景指挥中心" subTitle="3D床态全景 / 智慧养老数字孪生驾驶舱">
-    <template #extra>
-      <div class="cockpit-topbar">
-        <div class="topbar-brand">
-          <div class="brand-mark">
-            <span></span>
-          </div>
+  <PageContainer class="bed-immersive-page" title="3D床态全景" subTitle="智慧养老数字孪生床态指挥舱">
+    <div class="immersive-stage-shell">
+      <Panorama3D
+        v-if="matrixBuildings.length && matrixFloors.length"
+        :buildings="matrixBuildings"
+        :floors="matrixFloors"
+        :room-lookup="roomSceneLookup"
+        @click-room="openRoomDetail"
+        @click-bed="selectBed"
+      />
+      <a-empty v-else class="stage-empty" description="暂无床位数据" />
+
+      <div class="scene-vignette"></div>
+      <div class="scene-glow scene-glow-left"></div>
+      <div class="scene-glow scene-glow-right"></div>
+
+      <header class="hud hud-topbar">
+        <div class="hud-topbar__brand">
+          <div class="brand-mark"><span></span></div>
           <div class="brand-copy">
-            <strong>智慧养老数字孪生指挥中心</strong>
-            <small>{{ lifecycleContext.active ? '入住联动模式已开启' : '长者床态与护理监测联动中' }}</small>
+            <div class="brand-kicker">Smart Senior Care Digital Twin</div>
+            <strong>智慧养老数字孪生床态指挥舱</strong>
+            <small>{{ lifecycleContext.active ? '入住联动模式已开启' : '长者床态、风险提醒与护理节奏实时联动中' }}</small>
           </div>
         </div>
-        <div class="topbar-status">
-          <span class="status-dot"></span>
-          <span>系统平稳运行</span>
-          <span class="status-divider"></span>
-          <span>{{ commandCenterStatus }}</span>
+
+        <div class="hud-topbar__metrics">
+          <button v-for="item in overviewCards" :key="item.label" class="metric-pill" :class="item.tone">
+            <span>{{ item.label }}</span>
+            <strong><AnimatedMetricNumber :value="item.numericValue" :suffix="item.suffix || ''" /></strong>
+            <small>{{ item.meta }}</small>
+          </button>
         </div>
-        <div class="topbar-clock">
-          <div class="clock-date">{{ currentDateText }}</div>
-          <div class="clock-time">{{ currentTimeText }}</div>
-        </div>
-        <div class="topbar-actions">
-          <button class="top-action-pill">
-            <strong>{{ notificationCount }}</strong>
-            <span>通知</span>
-          </button>
-          <button class="top-action-pill">
-            <strong>{{ todoCount }}</strong>
-            <span>待办</span>
-          </button>
-          <button class="top-action-pill">
-            <strong>{{ chatCount }}</strong>
-            <span>智护会话</span>
-          </button>
-          <div class="operator-card">
+
+        <div class="hud-topbar__ops">
+          <div class="status-stack">
+            <span class="status-dot"></span>
+            <div>
+              <strong>系统平稳运行</strong>
+              <small>{{ commandCenterStatus }}</small>
+            </div>
+          </div>
+          <div class="clock-stack">
+            <span>{{ currentDateText }}</span>
+            <strong>{{ currentTimeText }}</strong>
+          </div>
+          <div class="operator-stack">
             <a-avatar class="operator-avatar">{{ operatorInitial }}</a-avatar>
             <div>
               <strong>{{ operatorName }}</strong>
-              <span>{{ operatorRole }}</span>
+              <small>{{ operatorRole }}</small>
             </div>
           </div>
         </div>
-      </div>
-    </template>
+      </header>
 
-    <template #stats>
-      <div class="hero-metrics">
-        <div v-for="item in overviewCards" :key="item.label" class="hero-metric-card" :class="item.tone">
-          <span class="metric-label">{{ item.label }}</span>
-          <strong class="metric-value">
-            <AnimatedMetricNumber :value="item.numericValue" :suffix="item.suffix || ''" />
-          </strong>
-          <span class="metric-meta">{{ item.meta }}</span>
-        </div>
-      </div>
-    </template>
-
-    <div class="bed-cockpit-shell">
-      <aside class="cockpit-panel panel-left">
-        <section class="tech-panel">
-          <div class="section-head">
+      <aside class="hud hud-left">
+        <section class="hud-panel">
+          <div class="hud-panel__head">
             <div>
-              <h3>运行总览</h3>
-              <p>床位、告警与设备态势一屏掌握</p>
+              <span class="panel-kicker">运行总览</span>
+              <strong>床态守护概况</strong>
             </div>
+            <small>{{ roomCount }} 间房 / {{ sourceBeds.length }} 张床位</small>
           </div>
-          <div class="metric-grid">
-            <div v-for="item in leftStatCards" :key="item.label" class="metric-tile" :class="item.tone">
+
+          <div class="overview-list">
+            <div v-for="item in leftStatCards" :key="item.label" class="overview-row">
               <span>{{ item.label }}</span>
               <strong>{{ item.value }}</strong>
               <small>{{ item.meta }}</small>
             </div>
           </div>
 
-          <div class="distribution-list">
-            <div v-for="item in statusDistributionRows" :key="item.label" class="distribution-item">
-              <div class="distribution-top">
+          <div class="status-bars">
+            <div v-for="item in statusDistributionRows" :key="item.label" class="status-bar">
+              <div class="status-bar__top">
                 <span>{{ item.label }}</span>
                 <strong>{{ item.value }}</strong>
               </div>
@@ -85,359 +84,157 @@
               </div>
             </div>
           </div>
-
-          <div class="scope-snapshot">
-            <div class="scope-snapshot-card">
-              <span>当前范围</span>
-              <strong>{{ bedGuardSubject }}</strong>
-              <small>{{ roomCount }} 间房 / {{ sourceBeds.length }} 张床位纳入分析</small>
-            </div>
-            <div class="scope-snapshot-card accent">
-              <span>当前阶段</span>
-              <strong>{{ bedGuardStageText }}</strong>
-              <small>{{ bedGuardHint }}</small>
-            </div>
-          </div>
         </section>
 
-        <section class="tech-panel">
-          <div class="section-head">
+        <section class="hud-panel hud-panel--compact">
+          <div class="hud-panel__head">
             <div>
-              <h3>指挥筛选</h3>
-              <p>筛选条件仍与原业务参数保持同步</p>
+              <span class="panel-kicker">场景控制</span>
+              <strong>楼栋与床态筛选</strong>
             </div>
           </div>
 
-          <div class="filter-stack">
-            <label class="field-block">
-              <span class="field-label">搜索目标</span>
-              <a-input-search v-model:value="keyword" placeholder="搜索房间号 / 长者名" allow-clear size="large" />
-            </label>
+          <label class="field-block">
+            <span class="field-label">搜索目标</span>
+            <a-input-search v-model:value="keyword" placeholder="搜索房间号 / 长者名" allow-clear />
+          </label>
 
-            <label class="field-block">
-              <span class="field-label">床位筛选</span>
-              <a-segmented v-model:value="quickFilter" :options="quickFilterOptions" block />
-            </label>
-
-            <div class="field-block">
-              <div class="field-inline">
-                <span class="field-label">风险筛选</span>
-                <a-switch v-model:checked="riskFilterEnabled" />
-              </div>
-              <a-segmented
-                v-if="riskFilterEnabled"
-                v-model:value="riskFilterLevel"
-                :options="riskLevelOptions"
-                block
-              />
-            </div>
-
-            <div class="field-block">
-              <span class="field-label">视角聚焦</span>
-              <div class="selection-tags">
-                <a-tag color="blue" v-if="selectedBuilding">楼栋：{{ selectedBuilding }}</a-tag>
-                <a-tag color="cyan" v-if="selectedFloor">楼层：{{ selectedFloor }}</a-tag>
-                <span v-if="!selectedBuilding && !selectedFloor" class="field-tip">点击场景中的楼栋、楼层可快速聚焦</span>
-              </div>
-            </div>
-
-            <div class="field-block">
-              <span class="field-label">楼栋快捷切换</span>
-              <div class="scope-chip-list">
-                <button
-                  v-for="item in buildingScopeOptions"
-                  :key="item"
-                  class="scope-chip"
-                  :class="{ active: item === selectedBuilding }"
-                  @click="setBuildingScope(item)"
-                >
-                  {{ item }}
-                </button>
-                <button
-                  v-if="selectedBuilding"
-                  class="scope-chip muted"
-                  @click="setBuildingScope('')"
-                >
-                  查看全部
-                </button>
-              </div>
-            </div>
-
-            <div class="field-block" v-if="floorScopeOptions.length">
-              <span class="field-label">楼层快捷切换</span>
-              <div class="scope-chip-list compact">
-                <button
-                  v-for="item in floorScopeOptions"
-                  :key="item"
-                  class="scope-chip"
-                  :class="{ active: item === selectedFloor }"
-                  @click="setFloorScope(item)"
-                >
-                  {{ item }}
-                </button>
-                <button
-                  v-if="selectedFloor"
-                  class="scope-chip muted"
-                  @click="setFloorScope('')"
-                >
-                  全部楼层
-                </button>
-              </div>
-            </div>
-
-            <div class="command-buttons">
-              <a-button @click="openBedMap">房态视图</a-button>
-              <a-button @click="openBedManage">床位管理</a-button>
-              <a-button type="primary" @click="resetFilters">重置</a-button>
-            </div>
-          </div>
-        </section>
-
-        <section class="tech-panel">
-          <div class="section-head">
-            <div>
-              <h3>重点床位</h3>
-              <p>优先关注需关怀、风险上升与护理节奏变化的长者</p>
-            </div>
-          </div>
-          <div class="focus-bed-list">
-            <BedInfoCard v-for="bed in focusBeds" :key="bed.id" :bed="bed" @click="selectBed(bed)" />
-            <a-empty v-if="!focusBeds.length" description="当前没有重点床位" />
-          </div>
-        </section>
-      </aside>
-
-      <main class="cockpit-core">
-        <section class="tech-panel stage-panel">
-          <div class="stage-heading">
-            <div>
-              <div class="eyebrow">3D Bed State Panorama</div>
-              <h2>空间透视床态总览</h2>
-              <p>中台接口与床位绑定逻辑保持不变，只重构视觉层、结构层与场景表现。</p>
-            </div>
-            <div class="stage-kpis">
-              <div>
-                <span>监测楼栋</span>
-                <strong>{{ matrixBuildings.length }}</strong>
-              </div>
-              <div>
-                <span>监测楼层</span>
-                <strong>{{ matrixFloors.length }}</strong>
-              </div>
-              <div>
-                <span>实时风险提醒</span>
-                <strong>{{ concernCount }}</strong>
-              </div>
-            </div>
+          <div class="field-block">
+            <span class="field-label">床位状态筛选</span>
+            <a-segmented v-model:value="quickFilter" :options="quickFilterOptions" block />
           </div>
 
-          <div class="stage-command-bar">
-            <div class="stage-command-main">
-              <div class="stage-command-title">当前聚焦</div>
-              <strong>{{ focusHeadline.title }}</strong>
-              <span>{{ focusHeadline.meta }}</span>
+          <div class="field-block">
+            <div class="field-inline">
+              <span class="field-label">风险筛选</span>
+              <a-switch v-model:checked="riskFilterEnabled" />
             </div>
-            <div class="stage-command-actions">
+            <a-segmented
+              v-if="riskFilterEnabled"
+              v-model:value="riskFilterLevel"
+              :options="riskLevelOptions"
+              block
+            />
+          </div>
+
+          <div class="field-block">
+            <span class="field-label">楼栋切换</span>
+            <div class="scope-chip-list">
               <button
-                v-for="item in stageQuickActions"
-                :key="item.key"
-                class="stage-action-pill"
-                :class="item.tone"
-                @click="handleCommandAction(item.key)"
+                v-for="item in buildingScopeOptions"
+                :key="item"
+                class="scope-chip"
+                :class="{ active: item === selectedBuilding }"
+                @click="setBuildingScope(item)"
               >
-                <strong>{{ item.label }}</strong>
-                <span>{{ item.description }}</span>
+                {{ item }}
               </button>
             </div>
           </div>
 
-          <a-alert
-            v-if="lifecycleContext.active"
-            type="info"
-            show-icon
-            class="lifecycle-alert"
-            :message="lifecycleContext.message"
-          />
-
-          <div class="stage-shell">
-            <Panorama3D
-              v-if="matrixBuildings.length && matrixFloors.length"
-              :buildings="matrixBuildings"
-              :floors="matrixFloors"
-              :room-lookup="roomSceneLookup"
-              @click-room="openRoomDetail"
-              @click-bed="selectBed"
-            />
-            <a-empty v-else class="stage-empty" description="暂无床位数据" />
-
-            <div class="stage-overlay-card">
-              <div class="overlay-title">选中焦点</div>
-              <div class="overlay-name">{{ selectedBed?.elderName || selectedRoom?.roomNo || '等待选择床位 / 房间' }}</div>
-              <div class="overlay-meta">
-                {{
-                  selectedBed
-                    ? `${selectedBed.building || '-'} / ${selectedBed.floorNo || '-'} / ${selectedBed.roomNo || '-'} / ${selectedBed.bedNo || '-'}`
-                    : selectedRoom
-                      ? `${selectedRoom.roomType} · ${selectedRoom.capacity || 0}床`
-                      : '点击场景中的楼栋、楼层、房间或床位进行联动分析'
-                }}
-              </div>
-              <div class="overlay-tags" v-if="selectedBed">
-                <span class="overlay-chip">{{ resolveStatus(selectedBed) }}</span>
-                <span class="overlay-chip" v-if="selectedBed.riskLabel">{{ selectedBed.riskLabel }}</span>
-                <span class="overlay-chip">异常 {{ selectedBed.abnormalVital24hCount || 0 }}</span>
-              </div>
-              <div class="overlay-progress">
-                <div
-                  v-for="(step, index) in bedGuardSteps"
-                  :key="step"
-                  class="overlay-step"
-                  :class="{ active: index <= bedGuardCurrentIndex, current: index === bedGuardCurrentIndex }"
-                >
-                  <span>{{ index + 1 }}</span>
-                  <small>{{ step }}</small>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="chart-grid">
-          <div class="tech-panel chart-panel">
-            <div class="section-head compact">
-              <div>
-                <h3>24小时床态趋势</h3>
-                <p>在住长者、空床调配与即时状态联动观察</p>
-              </div>
-            </div>
-            <v-chart class="chart-view" :option="occupancyTrendOption" autoresize />
-          </div>
-
-          <div class="tech-panel chart-panel">
-            <div class="section-head compact">
-              <div>
-                <h3>夜间离床统计</h3>
-                <p>基于离床观察与睡眠稳定度生成夜巡参考</p>
-              </div>
-            </div>
-            <v-chart class="chart-view" :option="sleepTrendOption" autoresize />
-          </div>
-
-          <div class="tech-panel chart-panel">
-            <div class="section-head compact">
-              <div>
-                <h3>护理响应效率</h3>
-                <p>需关注长者提醒、任务闭环与响应效率趋势</p>
-              </div>
-            </div>
-            <v-chart class="chart-view" :option="alertTrendOption" autoresize />
-          </div>
-
-          <div class="tech-panel chart-panel">
-            <div class="section-head compact">
-              <div>
-                <h3>风险热力趋势</h3>
-                <p>守护设备在线率与风险热区变化联合参考</p>
-              </div>
-            </div>
-            <v-chart class="chart-view" :option="deviceTrendOption" autoresize />
-          </div>
-        </section>
-      </main>
-
-      <aside class="cockpit-panel panel-right">
-        <section class="tech-panel">
-          <div class="section-head">
-            <div>
-              <h3>实时风险提醒</h3>
-              <p>风险事件、离床观察与守护设备状态联动推送</p>
-            </div>
-          </div>
-          <div class="event-list">
-            <div v-for="item in alertFeed" :key="item.key" class="event-card" :class="item.tone">
-              <div class="event-top">
-                <span class="event-type">{{ item.type }}</span>
-                <span class="event-time">{{ item.time }}</span>
-              </div>
-              <strong>{{ item.title }}</strong>
-              <p>{{ item.description }}</p>
-            </div>
-            <a-empty v-if="!alertFeed.length" description="暂无告警流" />
-          </div>
-        </section>
-
-        <section class="tech-panel">
-          <div class="section-head">
-            <div>
-              <h3>AI护理建议</h3>
-              <p>基于床态、风险与护理任务自动生成值守提示</p>
-            </div>
-          </div>
-          <div class="timeline-list ai-suggestion-list">
-            <div v-for="item in aiSuggestionFeed" :key="item.key" class="timeline-item ai-suggestion-item">
-              <span class="timeline-dot" :class="item.tone"></span>
-              <div>
-                <strong>{{ item.title }}</strong>
-                <p>{{ item.description }}</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="tech-panel">
-          <div class="section-head">
-            <div>
-              <h3>设备异常提醒</h3>
-              <p>优先确认离线、维修与待复位的守护设备</p>
-            </div>
-          </div>
-          <div class="timeline-list">
-            <div v-for="item in deviceAlertFeed" :key="item.key" class="timeline-item">
-              <span class="timeline-dot" :class="item.tone"></span>
-              <div>
-                <strong>{{ item.title }}</strong>
-                <p>{{ item.description }}</p>
-              </div>
-            </div>
-            <a-empty v-if="!deviceAlertFeed.length" description="当前暂无设备异常提醒" />
-          </div>
-        </section>
-
-        <section class="tech-panel selected-panel">
-          <div class="section-head">
-            <div>
-              <h3>指挥操作台</h3>
-              <p>围绕当前床位执行业务动作</p>
-            </div>
-          </div>
-
-          <div class="selected-summary" v-if="selectedBed">
-            <div class="selected-title">{{ selectedBed.bedNo || '-' }} / {{ selectedBed.elderName || '空床' }}</div>
-            <div class="selected-meta">{{ selectedBed.building || '-' }} · {{ selectedBed.floorNo || '-' }} · {{ selectedBed.roomNo || '-' }}</div>
-            <div class="selected-badges">
-              <span class="overlay-chip">{{ resolveStatus(selectedBed) }}</span>
-              <span class="overlay-chip" v-if="selectedBed.riskLabel">{{ selectedBed.riskLabel }}</span>
-              <span class="overlay-chip">{{ selectedBed.careLevel || '未配置护理等级' }}</span>
-            </div>
-          </div>
-          <a-empty v-else description="点击床位后显示详情与快捷操作" />
-
-          <div class="guard-panel">
-            <div class="guard-stage">
-              <span class="guard-label">当前阶段</span>
-              <strong>{{ bedGuardStageText }}</strong>
-              <small>{{ bedGuardHint }}</small>
-            </div>
-            <div class="guard-steps">
-              <div
-                v-for="(step, index) in bedGuardSteps"
-                :key="step"
-                class="guard-step"
-                :class="{ active: index <= bedGuardCurrentIndex, current: index === bedGuardCurrentIndex }"
+          <div class="field-block" v-if="floorScopeOptions.length">
+            <span class="field-label">楼层切换</span>
+            <div class="scope-chip-list compact">
+              <button
+                v-for="item in floorScopeOptions"
+                :key="item"
+                class="scope-chip"
+                :class="{ active: item === selectedFloor }"
+                @click="setFloorScope(item)"
               >
-                <span>{{ index + 1 }}</span>
-                <div>{{ step }}</div>
-              </div>
+                {{ item }}
+              </button>
+            </div>
+          </div>
+
+          <div class="scene-actions">
+            <a-button @click="openBedMap">房态视图</a-button>
+            <a-button @click="openBedManage">床位管理</a-button>
+            <a-button type="primary" @click="resetFilters">重置场景</a-button>
+          </div>
+        </section>
+      </aside>
+
+      <div class="hud hud-center">
+        <section class="hud-panel hud-panel--spotlight">
+          <div class="hud-panel__head">
+            <div>
+              <span class="panel-kicker">当前聚焦</span>
+              <strong>{{ focusHeadline.title }}</strong>
+            </div>
+            <small>{{ focusHeadline.meta }}</small>
+          </div>
+
+          <div class="spotlight-meta">
+            <div class="spotlight-block">
+              <span>当前范围</span>
+              <strong>{{ bedGuardSubject }}</strong>
+            </div>
+            <div class="spotlight-block">
+              <span>护理阶段</span>
+              <strong>{{ bedGuardStageText }}</strong>
+            </div>
+          </div>
+
+          <div class="overlay-progress">
+            <div
+              v-for="(step, index) in bedGuardSteps"
+              :key="step"
+              class="overlay-step"
+              :class="{ active: index <= bedGuardCurrentIndex, current: index === bedGuardCurrentIndex }"
+            >
+              <span>{{ index + 1 }}</span>
+              <small>{{ step }}</small>
+            </div>
+          </div>
+
+          <div class="spotlight-actions">
+            <button
+              v-for="item in stageQuickActions"
+              :key="item.key"
+              class="stage-action-pill"
+              :class="item.tone"
+              @click="handleCommandAction(item.key)"
+            >
+              <strong>{{ item.label }}</strong>
+              <span>{{ item.description }}</span>
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <aside class="hud hud-right">
+        <section class="hud-panel hud-panel--detail" v-if="selectedBed">
+          <div class="hud-panel__head">
+            <div>
+              <span class="panel-kicker">床位详情</span>
+              <strong>{{ selectedBed.elderName || '空床待命' }}</strong>
+            </div>
+            <small>{{ selectedBed.roomNo || '-' }} / {{ selectedBed.bedNo || '-' }}</small>
+          </div>
+
+          <div class="detail-tags">
+            <span class="overlay-chip">{{ resolveStatus(selectedBed) }}</span>
+            <span class="overlay-chip" v-if="selectedBed.riskLabel">{{ selectedBed.riskLabel }}</span>
+            <span class="overlay-chip">{{ selectedBed.careLevel || '未配置护理等级' }}</span>
+          </div>
+
+          <div class="detail-grid">
+            <div>
+              <span>楼栋楼层</span>
+              <strong>{{ selectedBed.building || '-' }} / {{ selectedBed.floorNo || '-' }}</strong>
+            </div>
+            <div>
+              <span>24h异常</span>
+              <strong>{{ selectedBed.abnormalVital24hCount || 0 }} 次</strong>
+            </div>
+            <div>
+              <span>风险来源</span>
+              <strong>{{ selectedBed.riskSource || '守护稳定' }}</strong>
+            </div>
+            <div>
+              <span>最近评估</span>
+              <strong>{{ formatLatestAssessment(selectedBed) }}</strong>
             </div>
           </div>
 
@@ -471,7 +268,98 @@
             </button>
           </div>
         </section>
+
+        <template v-else>
+          <section class="hud-panel hud-panel--compact">
+            <div class="hud-panel__head">
+              <div>
+                <span class="panel-kicker">实时风险提醒</span>
+                <strong>值守事件流</strong>
+              </div>
+              <small>{{ concernCount }} 条提醒</small>
+            </div>
+            <div class="event-list">
+              <div v-for="item in alertFeed.slice(0, 4)" :key="item.key" class="event-card" :class="item.tone">
+                <div class="event-top">
+                  <span class="event-type">{{ item.type }}</span>
+                  <span class="event-time">{{ item.time }}</span>
+                </div>
+                <strong>{{ item.title }}</strong>
+                <p>{{ item.description }}</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="hud-panel hud-panel--compact">
+            <div class="hud-panel__head">
+              <div>
+                <span class="panel-kicker">AI护理建议</span>
+                <strong>值守提示</strong>
+              </div>
+            </div>
+            <div class="timeline-list">
+              <div v-for="item in aiSuggestionFeed" :key="item.key" class="timeline-item">
+                <span class="timeline-dot" :class="item.tone"></span>
+                <div>
+                  <strong>{{ item.title }}</strong>
+                  <p>{{ item.description }}</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="hud-panel hud-panel--compact">
+            <div class="hud-panel__head">
+              <div>
+                <span class="panel-kicker">今日重点关注</span>
+                <strong>长者守护名单</strong>
+              </div>
+            </div>
+            <div class="focus-list">
+              <button v-for="bed in focusBeds" :key="bed.id" class="focus-row" @click="selectBed(bed)">
+                <div>
+                  <strong>{{ bed.elderName || '空床待命' }}</strong>
+                  <small>{{ bed.roomNo || '-' }} / {{ bed.bedNo || '-' }}</small>
+                </div>
+                <span class="focus-status">{{ bed.riskLabel || resolveStatus(bed) }}</span>
+              </button>
+            </div>
+          </section>
+        </template>
       </aside>
+
+      <footer class="hud hud-bottom">
+        <section class="trend-panel">
+          <div class="trend-card">
+            <div class="trend-head">
+              <span>24小时床态趋势</span>
+              <strong>在住与空床节奏</strong>
+            </div>
+            <v-chart class="chart-view" :option="occupancyTrendOption" autoresize />
+          </div>
+          <div class="trend-card">
+            <div class="trend-head">
+              <span>夜间离床统计</span>
+              <strong>夜巡观察参考</strong>
+            </div>
+            <v-chart class="chart-view" :option="sleepTrendOption" autoresize />
+          </div>
+          <div class="trend-card">
+            <div class="trend-head">
+              <span>护理响应效率</span>
+              <strong>风险任务闭环</strong>
+            </div>
+            <v-chart class="chart-view" :option="alertTrendOption" autoresize />
+          </div>
+          <div class="trend-card">
+            <div class="trend-head">
+              <span>风险热力趋势</span>
+              <strong>守护在线状态</strong>
+            </div>
+            <v-chart class="chart-view" :option="deviceTrendOption" autoresize />
+          </div>
+        </section>
+      </footer>
     </div>
 
     <a-modal v-model:open="detailOpen" title="床位详情" width="560px" :footer="null" destroy-on-close>
@@ -545,7 +433,6 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../../components/PageContainer.vue'
-import BedInfoCard from '../../../components/bed/BedInfoCard.vue'
 import AnimatedMetricNumber from '../../../components/dashboard/AnimatedMetricNumber.vue'
 import Panorama3D from './Panorama3D.vue'
 import { getBedMap, getRoomList } from '../../../api/bed'
@@ -760,9 +647,6 @@ const operatorRole = computed(() => {
   return role || '智慧床态调度员'
 })
 const operatorInitial = computed(() => operatorName.value.slice(0, 1) || '护')
-const notificationCount = computed(() => concernCount.value + stats.value.maintenance)
-const todoCount = computed(() => Math.max(2, focusBeds.value.length + bedGuardBlockers.value.length))
-const chatCount = computed(() => Math.max(1, aiSuggestionFeed.value.length))
 const commandCenterStatus = computed(() => lifecycleContext.value.active ? '入住状态联动中' : '全院床态守护中')
 
 const overviewCards = computed(() => ([
@@ -830,18 +714,6 @@ const aiSuggestionFeed = computed(() => {
   }))
 })
 
-const deviceAlertFeed = computed(() => {
-  const deviceBeds = beds.value.filter((bed) => bed.status === 0 || bed.status === 3 || bed.occupancySource === 'MAINTENANCE').slice(0, 4)
-  return deviceBeds.map((bed, index) => ({
-    key: `device-${bed.id || index}`,
-    title: `${bed.roomNo || '-'} / ${bed.bedNo || '-'} 守护设备待处理`,
-    description: bed.status === 3 || bed.occupancySource === 'MAINTENANCE'
-      ? '设备正在维修，请确认替代监测方案是否已到位。'
-      : '设备离线或冻结，请核查网关、电量与床旁传感器连接状态。',
-    tone: bed.status === 3 || bed.occupancySource === 'MAINTENANCE' ? 'dot-orange' : 'dot-red'
-  }))
-})
-
 const bedGuardCurrentIndex = computed(() => {
   if (!selectedBed.value) return 2
   if (isEmptyBed(selectedBed.value)) return 1
@@ -854,13 +726,6 @@ const bedGuardStageText = computed(() => {
   if (isEmptyBed(selectedBed.value)) return '空床待分配'
   if (selectedBed.value.riskLevel === 'HIGH') return '高风险干预中'
   return '照护执行中'
-})
-
-const bedGuardStageColor = computed(() => {
-  if (!selectedBed.value) return 'blue'
-  if (isEmptyBed(selectedBed.value)) return 'gold'
-  if (selectedBed.value.riskLevel === 'HIGH') return 'red'
-  return 'green'
 })
 
 const bedGuardSubject = computed(() => {
@@ -1058,10 +923,6 @@ function setBuildingScope(building: string) {
 
 function setFloorScope(floor: string) {
   selectedFloor.value = floor
-}
-
-function roomsAt(building: string, floor: string) {
-  return roomSceneLookup.value.get(`${building}@@${floor}`) || []
 }
 
 function clearMatrixSelection() {
@@ -1486,125 +1347,152 @@ watch(
 </script>
 
 <style scoped>
-.bed-cockpit-page {
-  --panel-border: rgba(87, 215, 255, 0.18);
-  --panel-bg: linear-gradient(180deg, rgba(10, 25, 46, 0.92) 0%, rgba(6, 16, 31, 0.94) 100%);
-  --panel-shadow: 0 18px 48px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(106, 217, 255, 0.12);
+.bed-immersive-page {
+  --hud-border: rgba(138, 197, 216, 0.2);
+  --hud-bg: rgba(8, 16, 29, 0.42);
+  --hud-bg-strong: rgba(8, 16, 29, 0.7);
+  --hud-shadow: 0 20px 40px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(218, 238, 247, 0.08);
+  --text-strong: #edf6fb;
+  --text-main: #d4e6f0;
+  --text-soft: #8fa8ba;
+  --tone-cyan: #7ccfdb;
+  --tone-blue: #88a2dc;
+  --tone-green: #86d1bf;
+  --tone-purple: #a891d4;
+  --tone-orange: #d8ad72;
+  --tone-red: #d88995;
+  --tone-gray: #8ca2b6;
 }
 
-.bed-cockpit-page :deep(.page-head) {
-  border: 1px solid var(--panel-border);
+.bed-immersive-page :deep(.page-head) {
+  display: none;
+}
+
+.bed-immersive-page :deep(.page-body) {
+  gap: 0;
+}
+
+.immersive-stage-shell {
+  position: relative;
+  min-height: calc(100vh - 112px);
+  border-radius: 28px;
+  overflow: hidden;
   background:
-    radial-gradient(circle at top right, rgba(77, 124, 255, 0.18), transparent 30%),
-    radial-gradient(circle at left top, rgba(87, 215, 255, 0.14), transparent 28%),
-    linear-gradient(180deg, rgba(7, 20, 38, 0.94) 0%, rgba(4, 11, 23, 0.98) 100%);
-  box-shadow: var(--panel-shadow);
+    radial-gradient(circle at 15% 10%, rgba(124, 207, 219, 0.12), transparent 30%),
+    radial-gradient(circle at 88% 12%, rgba(136, 162, 220, 0.16), transparent 28%),
+    linear-gradient(180deg, #040a12 0%, #02060d 100%);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
 }
 
-.bed-cockpit-page :deep(.page-title) {
-  color: #ecfbff;
-  font-size: 28px;
-  letter-spacing: 0.08em;
+.immersive-stage-shell :deep(.panorama-container) {
+  height: calc(100vh - 112px);
+  min-height: 840px;
 }
 
-.bed-cockpit-page :deep(.page-subtitle) {
-  color: #8db2cf;
-}
-
-.scope-snapshot {
+.stage-empty {
+  min-height: calc(100vh - 112px);
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 14px;
+  place-items: center;
 }
 
-.scope-snapshot-card {
+.scene-vignette,
+.scene-glow {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.scene-vignette {
+  inset: 0;
+  background:
+    radial-gradient(circle at center, transparent 38%, rgba(2, 8, 15, 0.44) 100%),
+    linear-gradient(180deg, rgba(2, 8, 15, 0.06), rgba(2, 8, 15, 0.42));
+}
+
+.scene-glow {
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.2;
+}
+
+.scene-glow-left {
+  left: -100px;
+  bottom: -80px;
+  background: rgba(124, 207, 219, 0.72);
+}
+
+.scene-glow-right {
+  right: -120px;
+  top: 120px;
+  background: rgba(136, 162, 220, 0.7);
+}
+
+.hud {
+  position: absolute;
+  z-index: 3;
+}
+
+.hud-panel,
+.metric-pill,
+.stage-action-pill,
+.action-card,
+.focus-row {
+  border: 1px solid var(--hud-border);
+  background:
+    linear-gradient(180deg, rgba(10, 18, 30, 0.56), rgba(8, 14, 24, 0.78));
+  backdrop-filter: blur(18px);
+  box-shadow: var(--hud-shadow);
+}
+
+.hud-panel::before,
+.metric-pill::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 48%, transparent);
+}
+
+.hud-topbar {
+  top: 22px;
+  left: 24px;
+  right: 24px;
   display: grid;
-  gap: 6px;
-  padding: 14px 16px;
-  border-radius: 18px;
-  border: 1px solid rgba(87, 215, 255, 0.14);
-  background: linear-gradient(180deg, rgba(8, 22, 40, 0.78), rgba(6, 16, 29, 0.94));
-}
-
-.scope-snapshot-card.accent {
-  border-color: rgba(143, 116, 255, 0.24);
-  background: linear-gradient(180deg, rgba(24, 20, 53, 0.82), rgba(9, 15, 31, 0.96));
-}
-
-.scope-snapshot-card span,
-.stage-command-title,
-.guard-label {
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #7ea5c3;
-}
-
-.scope-snapshot-card strong,
-.guard-stage strong,
-.stage-command-main strong {
-  color: #eefcff;
-  font-size: 15px;
-}
-
-.scope-snapshot-card small,
-.guard-stage small,
-.stage-command-main span {
-  color: #8db2cf;
-  line-height: 1.6;
-}
-
-.cockpit-topbar,
-.topbar-status,
-.topbar-actions,
-.hero-metrics,
-.metric-grid,
-.distribution-top,
-.section-head,
-.stage-heading,
-.stage-command-bar,
-.stage-kpis,
-.command-buttons,
-.event-top,
-.selected-badges {
-  display: flex;
-  align-items: center;
-}
-
-.cockpit-topbar {
+  grid-template-columns: 320px minmax(0, 1fr) 320px;
   gap: 16px;
-  justify-content: space-between;
-  align-items: stretch;
-  flex-wrap: wrap;
+  align-items: start;
 }
 
-.topbar-brand {
+.hud-topbar__brand,
+.status-stack,
+.clock-stack,
+.operator-stack {
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-width: 280px;
+  gap: 12px;
 }
 
 .brand-mark {
   position: relative;
-  width: 44px;
-  height: 44px;
-  border-radius: 16px;
-  border: 1px solid rgba(87, 215, 255, 0.28);
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 18px;
+  border: 1px solid rgba(124, 207, 219, 0.32);
   background:
-    radial-gradient(circle at 40% 35%, rgba(123, 239, 255, 0.9), rgba(87, 215, 255, 0.18) 58%, transparent 62%),
-    linear-gradient(180deg, rgba(10, 26, 49, 0.96), rgba(7, 18, 35, 0.98));
-  box-shadow:
-    inset 0 1px 0 rgba(163, 236, 255, 0.18),
-    0 0 24px rgba(87, 215, 255, 0.18);
+    radial-gradient(circle at 38% 36%, rgba(214, 243, 247, 0.92), rgba(124, 207, 219, 0.16) 56%, transparent 62%),
+    linear-gradient(180deg, rgba(12, 22, 38, 0.96), rgba(8, 14, 24, 0.98));
+  box-shadow: 0 0 26px rgba(124, 207, 219, 0.18);
 }
 
 .brand-mark span {
   position: absolute;
   inset: 9px;
   border-radius: 12px;
-  border: 1px solid rgba(87, 215, 255, 0.28);
+  border: 1px solid rgba(124, 207, 219, 0.24);
 }
 
 .brand-copy {
@@ -1612,284 +1500,200 @@ watch(
   gap: 4px;
 }
 
+.brand-kicker,
+.panel-kicker,
+.field-label,
+.metric-pill span,
+.trend-head span,
+.overview-row span,
+.status-bar__top span {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
 .brand-copy strong,
-.operator-card strong {
-  color: #eefcff;
-  font-size: 15px;
+.hud-panel__head strong,
+.focus-row strong,
+.event-card strong,
+.timeline-item strong,
+.operator-stack strong,
+.status-stack strong {
+  color: var(--text-strong);
 }
 
 .brand-copy small,
-.operator-card span {
-  color: #8db2cf;
+.hud-panel__head small,
+.status-stack small,
+.clock-stack span,
+.operator-stack small,
+.overview-row small,
+.event-card p,
+.timeline-item p,
+.focus-row small {
+  color: var(--text-soft);
   line-height: 1.5;
 }
 
-.topbar-status {
+.hud-topbar__metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
-  color: #8db2cf;
+}
+
+.metric-pill {
+  position: relative;
+  min-height: 84px;
+  border-radius: 20px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 4px;
+  text-align: left;
+}
+
+.metric-pill strong {
+  color: var(--text-strong);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.metric-pill small {
+  color: var(--text-soft);
   font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+}
+
+.hud-topbar__ops {
+  display: grid;
+  gap: 10px;
+}
+
+.status-stack,
+.clock-stack,
+.operator-stack {
+  min-height: 58px;
+  padding: 12px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--hud-border);
+  background: var(--hud-bg);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--hud-shadow);
 }
 
 .status-dot {
   width: 10px;
   height: 10px;
-  border-radius: 50%;
-  background: #3ee8b5;
-  box-shadow: 0 0 12px rgba(62, 232, 181, 0.7);
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: #86d1bf;
+  box-shadow: 0 0 16px rgba(134, 209, 191, 0.5);
+  animation: statusBreath 3.2s ease-in-out infinite;
 }
 
-.status-divider {
-  width: 1px;
-  height: 12px;
-  background: rgba(141, 178, 207, 0.22);
+.clock-stack {
+  justify-content: space-between;
 }
 
-.topbar-clock {
-  text-align: right;
-  min-width: 180px;
-}
-
-.clock-date {
-  color: #8db2cf;
-  font-size: 12px;
-}
-
-.clock-time {
-  color: #effcff;
-  font-size: 26px;
-  font-weight: 700;
+.clock-stack strong {
+  color: var(--text-strong);
+  font-size: 22px;
   letter-spacing: 0.12em;
 }
 
-.topbar-actions {
-  gap: 10px;
-  margin-left: auto;
-  flex-wrap: wrap;
-}
-
-.top-action-pill,
-.operator-card {
-  min-height: 52px;
-  padding: 10px 14px;
-  border-radius: 18px;
-  border: 1px solid rgba(87, 215, 255, 0.16);
-  background: rgba(7, 19, 35, 0.72);
-  backdrop-filter: blur(12px);
-  box-shadow: inset 0 1px 0 rgba(163, 236, 255, 0.08);
-}
-
-.top-action-pill {
-  display: grid;
-  gap: 2px;
-  min-width: 84px;
-  text-align: left;
-}
-
-.top-action-pill strong {
-  color: #f2fdff;
-  font-size: 18px;
-}
-
-.top-action-pill span {
-  color: #8db2cf;
-  font-size: 12px;
-}
-
-.operator-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 170px;
-}
-
 .operator-avatar {
-  background: linear-gradient(135deg, #31d6ff, #7f86ff);
-  color: #04111f;
+  background: linear-gradient(135deg, #82cad5, #8ca0d5);
+  color: #07111d;
   font-weight: 700;
 }
 
-.hero-metrics {
+.hud-left {
+  top: 118px;
+  left: 24px;
+  width: 280px;
+  display: grid;
   gap: 14px;
-  flex-wrap: nowrap;
 }
 
-.hero-metric-card {
-  min-width: 160px;
-  flex: 1 1 0;
+.hud-center {
+  top: 118px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(680px, calc(100% - 680px));
+}
+
+.hud-right {
+  top: 118px;
+  right: 24px;
+  width: 320px;
   display: grid;
-  gap: 6px;
-  padding: 16px 18px;
-  border-radius: 18px;
-  border: 1px solid rgba(87, 215, 255, 0.16);
-  background:
-    linear-gradient(180deg, rgba(8, 23, 42, 0.74), rgba(5, 14, 28, 0.92));
-  backdrop-filter: blur(12px);
+  gap: 14px;
 }
 
-.metric-label {
-  font-size: 12px;
-  color: #8db2cf;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.hud-bottom {
+  left: 24px;
+  right: 24px;
+  bottom: 24px;
 }
 
-.metric-value {
-  color: #f5fdff;
-  font-size: 32px;
-  line-height: 1;
-  text-shadow: 0 0 18px rgba(87, 215, 255, 0.14);
-}
-
-.metric-meta {
-  color: #9fbcd3;
-  font-size: 12px;
-}
-
-.tone-cyan {
-  box-shadow: inset 0 0 0 1px rgba(87, 215, 255, 0.08), 0 0 26px rgba(87, 215, 255, 0.08);
-}
-
-.tone-green {
-  box-shadow: inset 0 0 0 1px rgba(62, 232, 181, 0.08), 0 0 26px rgba(62, 232, 181, 0.08);
-}
-
-.tone-blue {
-  box-shadow: inset 0 0 0 1px rgba(77, 124, 255, 0.08), 0 0 26px rgba(77, 124, 255, 0.08);
-}
-
-.tone-orange {
-  box-shadow: inset 0 0 0 1px rgba(255, 174, 87, 0.08), 0 0 24px rgba(255, 174, 87, 0.08);
-}
-
-.tone-purple {
-  box-shadow: inset 0 0 0 1px rgba(143, 116, 255, 0.1), 0 0 24px rgba(143, 116, 255, 0.1);
-}
-
-.tone-gray {
-  box-shadow: inset 0 0 0 1px rgba(140, 160, 181, 0.08), 0 0 24px rgba(140, 160, 181, 0.08);
-}
-
-.tone-deep-blue {
-  box-shadow: inset 0 0 0 1px rgba(83, 124, 255, 0.1), 0 0 24px rgba(83, 124, 255, 0.1);
-}
-
-.tone-red {
-  box-shadow: inset 0 0 0 1px rgba(255, 93, 124, 0.1), 0 0 28px rgba(255, 93, 124, 0.12);
-}
-
-.bed-cockpit-shell {
-  display: grid;
-  grid-template-columns: 280px minmax(0, 1.5fr) 320px;
-  gap: 18px;
-  min-height: 0;
-}
-
-.cockpit-panel,
-.cockpit-core {
-  display: grid;
-  gap: 18px;
-  min-height: 0;
-}
-
-.tech-panel {
+.hud-panel {
   position: relative;
   overflow: hidden;
   border-radius: 24px;
-  border: 1px solid var(--panel-border);
-  background: var(--panel-bg);
-  box-shadow: var(--panel-shadow);
-  padding: 18px;
+  padding: 16px;
 }
 
-.tech-panel::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(90deg, transparent 0%, rgba(87, 215, 255, 0.05) 48%, transparent 100%);
-  opacity: 0.6;
-  pointer-events: none;
+.hud-panel--compact {
+  padding: 14px;
 }
 
-.section-head {
+.hud-panel__head {
+  display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
-.section-head h3,
-.stage-heading h2 {
-  margin: 0;
-  color: #ecfbff;
-}
-
-.section-head p,
-.stage-heading p,
-.field-tip,
-.event-card p,
-.timeline-item p,
-.selected-meta {
-  margin: 4px 0 0;
-  color: #86a9c4;
-  line-height: 1.6;
-  font-size: 12px;
-}
-
-.metric-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.metric-tile {
-  display: grid;
-  gap: 6px;
-  padding: 14px;
-  border-radius: 18px;
-  border: 1px solid rgba(87, 215, 255, 0.14);
-  background: rgba(5, 15, 28, 0.6);
-}
-
-.metric-tile span,
-.field-label,
-.overlay-title,
-.event-type {
-  font-size: 12px;
-  color: #8db2cf;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.metric-tile strong {
-  color: #f5fdff;
-  font-size: 24px;
-}
-
-.metric-tile small {
-  color: #9dbbd3;
-}
-
-.distribution-list,
-.filter-stack,
+.overview-list,
+.status-bars,
 .event-list,
 .timeline-list,
-.focus-bed-list {
+.focus-list,
+.blocker-list {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
-.distribution-top {
+.overview-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(138, 197, 216, 0.08);
+}
+
+.overview-row strong,
+.status-bar__top strong,
+.detail-grid strong {
+  color: var(--text-main);
+}
+
+.overview-row small {
+  grid-column: 1 / -1;
+}
+
+.status-bar__top {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
-  color: #c8e8ff;
+  margin-bottom: 6px;
 }
 
 .distribution-track {
-  height: 8px;
+  height: 7px;
   border-radius: 999px;
-  background: rgba(120, 164, 201, 0.12);
+  background: rgba(138, 197, 216, 0.12);
   overflow: hidden;
 }
 
@@ -1899,335 +1703,233 @@ watch(
   border-radius: inherit;
 }
 
-.fill-cyan {
-  background: linear-gradient(90deg, #2bcfff, #57d7ff);
-}
-
-.fill-gray {
-  background: linear-gradient(90deg, #68849d, #89a4bd);
-}
-
-.fill-purple {
-  background: linear-gradient(90deg, #7967ff, #b287ff);
-}
-
-.fill-orange {
-  background: linear-gradient(90deg, #ff9655, #ffbf74);
-}
-
-.fill-red {
-  background: linear-gradient(90deg, #ff5d7c, #ff8aa0);
-}
+.fill-cyan { background: linear-gradient(90deg, #6dbdca, #8ed7e1); }
+.fill-gray { background: linear-gradient(90deg, #758da2, #97aabe); }
+.fill-purple { background: linear-gradient(90deg, #8c7cbc, #b49bd8); }
+.fill-orange { background: linear-gradient(90deg, #c98e51, #ddb37b); }
+.fill-red { background: linear-gradient(90deg, #c97384, #e39aa7); }
 
 .field-block {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
-.field-inline,
-.selection-tags,
-.action-grid {
+.field-inline {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
-  flex-wrap: wrap;
 }
 
-.command-buttons {
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.scope-chip-list {
+.scope-chip-list,
+.scene-actions,
+.spotlight-actions,
+.detail-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
 .scope-chip {
-  border: 1px solid rgba(87, 215, 255, 0.16);
+  padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(8, 24, 44, 0.82);
-  color: #cdefff;
-  padding: 7px 12px;
+  border: 1px solid rgba(138, 197, 216, 0.18);
+  background: rgba(10, 18, 30, 0.46);
+  color: var(--text-main);
   font-size: 12px;
-  transition: all 0.22s ease;
+  transition: all 0.2s ease;
 }
 
-.scope-chip:hover,
-.scope-chip.active {
-  border-color: rgba(87, 215, 255, 0.44);
-  color: #ffffff;
-  box-shadow: 0 0 18px rgba(87, 215, 255, 0.14);
+.scope-chip.active,
+.scope-chip:hover {
+  color: #fff;
+  border-color: rgba(138, 197, 216, 0.34);
+  box-shadow: 0 0 16px rgba(124, 207, 219, 0.12);
 }
 
-.scope-chip.muted {
-  border-style: dashed;
-  color: #8db2cf;
+.scene-actions :deep(.ant-btn) {
+  flex: 1 1 0;
 }
 
-.flow-panel {
-  padding: 12px 16px;
+.hud-panel--spotlight {
+  max-width: 100%;
 }
 
-.stage-panel {
+.spotlight-meta {
   display: grid;
-  gap: 14px;
-  padding: 20px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
 }
 
-.stage-command-bar {
-  align-items: stretch;
-  gap: 14px;
-  margin: 2px 0 0;
-}
-
-.stage-command-main,
-.stage-action-pill,
-.guard-panel,
-.blocker-card,
-.action-card {
-  border-radius: 20px;
-  border: 1px solid rgba(87, 215, 255, 0.14);
-  background: linear-gradient(180deg, rgba(8, 24, 44, 0.82), rgba(5, 14, 28, 0.96));
-  box-shadow: inset 0 1px 0 rgba(112, 219, 255, 0.08);
-}
-
-.stage-command-main {
-  min-width: 220px;
-  max-width: 280px;
-  padding: 16px 18px;
-  display: grid;
-  gap: 8px;
-}
-
-.stage-command-actions {
-  flex: 1;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.stage-action-pill,
-.action-card {
-  width: 100%;
-  text-align: left;
-  padding: 14px 16px;
-  display: grid;
-  gap: 6px;
-  color: #e9fbff;
-  transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
-}
-
-.stage-action-pill:hover,
-.action-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(87, 215, 255, 0.3);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24), 0 0 18px rgba(87, 215, 255, 0.12);
-}
-
-.stage-action-pill span,
-.action-card span {
-  font-size: 12px;
-  line-height: 1.6;
-  color: #8db2cf;
-}
-
-.stage-heading {
-  justify-content: space-between;
-  gap: 18px;
-  align-items: flex-start;
-}
-
-.eyebrow {
-  margin-bottom: 8px;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.22em;
-  color: #57d7ff;
-}
-
-.stage-kpis {
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.stage-kpis > div {
-  min-width: 82px;
+.spotlight-block {
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(138, 197, 216, 0.14);
+  background: rgba(10, 18, 30, 0.34);
   display: grid;
   gap: 4px;
 }
 
-.stage-kpis span {
-  color: #8db2cf;
-  font-size: 11px;
-  text-transform: uppercase;
-}
-
-.stage-kpis strong {
-  color: #effcff;
-  font-size: 22px;
-}
-
-.lifecycle-alert {
-  border-radius: 16px;
-}
-
-.stage-shell {
-  position: relative;
-  min-height: 720px;
-}
-
-.stage-shell :deep(.panorama-container) {
-  height: 720px;
-}
-
-.stage-empty {
-  min-height: 720px;
-  display: grid;
-  place-items: center;
-}
-
-.stage-overlay-card {
-  position: absolute;
-  right: 18px;
-  bottom: 18px;
-  max-width: 320px;
-  padding: 16px;
-  border-radius: 18px;
-  border: 1px solid rgba(87, 215, 255, 0.2);
-  background: rgba(5, 16, 31, 0.84);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.3);
-}
-
-.overlay-name,
-.selected-title,
-.event-card strong,
-.timeline-item strong {
-  color: #ecfbff;
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.overlay-meta {
-  margin-top: 6px;
-  color: #8db2cf;
-  line-height: 1.6;
+.spotlight-block span,
+.detail-grid span {
+  color: var(--text-soft);
   font-size: 12px;
 }
 
-.overlay-tags {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 12px;
+.spotlight-block strong {
+  color: var(--text-main);
 }
 
 .overlay-progress {
   display: grid;
   gap: 8px;
-  margin-top: 14px;
 }
 
-.overlay-step,
-.guard-step {
+.overlay-step {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
-  align-items: center;
+  grid-template-columns: 26px minmax(0, 1fr);
   gap: 10px;
-  color: #7ea5c3;
+  align-items: center;
+  color: var(--text-soft);
 }
 
-.overlay-step span,
-.guard-step span {
-  width: 24px;
-  height: 24px;
+.overlay-step span {
+  width: 26px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  border: 1px solid rgba(87, 215, 255, 0.16);
-  background: rgba(7, 19, 34, 0.86);
+  border: 1px solid rgba(138, 197, 216, 0.16);
+  background: rgba(8, 14, 24, 0.84);
   font-size: 12px;
 }
 
-.overlay-step.active,
-.guard-step.active {
-  color: #def6ff;
+.overlay-step.active {
+  color: var(--text-main);
 }
 
-.overlay-step.active span,
-.guard-step.active span {
-  border-color: rgba(87, 215, 255, 0.42);
-  background: rgba(29, 103, 150, 0.42);
+.overlay-step.active span {
+  border-color: rgba(138, 197, 216, 0.34);
+  background: rgba(81, 110, 137, 0.34);
 }
 
-.overlay-step.current small,
-.guard-step.current div {
-  color: #ffffff;
-}
-
-.overlay-step small,
-.guard-step div {
+.overlay-step small {
   font-size: 12px;
-  line-height: 1.5;
 }
 
-.overlay-chip {
+.stage-action-pill,
+.action-card {
+  position: relative;
+  border-radius: 18px;
+  padding: 12px 14px;
+  text-align: left;
+  display: grid;
+  gap: 4px;
+  color: var(--text-strong);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.stage-action-pill:hover,
+.action-card:hover,
+.focus-row:hover {
+  transform: translateY(-1px);
+  border-color: rgba(138, 197, 216, 0.32);
+}
+
+.stage-action-pill span,
+.action-card span {
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.detail-tags {
+  margin-bottom: 14px;
+}
+
+.overlay-chip,
+.focus-status {
   padding: 5px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(87, 215, 255, 0.16);
-  background: rgba(87, 215, 255, 0.08);
-  color: #d7f8ff;
+  border: 1px solid rgba(138, 197, 216, 0.18);
+  background: rgba(124, 207, 219, 0.1);
+  color: var(--text-main);
   font-size: 12px;
 }
 
-.chart-grid {
+.detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  gap: 10px;
+  margin-bottom: 14px;
 }
 
-.chart-panel {
-  min-height: 260px;
+.detail-grid > div {
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(138, 197, 216, 0.12);
+  background: rgba(10, 18, 30, 0.34);
+  display: grid;
+  gap: 4px;
 }
 
-.section-head.compact {
-  margin-bottom: 8px;
+.blocker-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(216, 173, 114, 0.14);
+  background: rgba(46, 30, 20, 0.36);
 }
 
-.chart-view {
-  height: 210px;
+.blocker-card strong {
+  color: #e0b582;
+}
+
+.blocker-card p {
+  margin: 4px 0 0;
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .event-card,
-.selected-summary {
-  padding: 14px;
+.focus-row {
+  position: relative;
   border-radius: 18px;
-  border: 1px solid rgba(87, 215, 255, 0.14);
-  background: rgba(4, 14, 26, 0.56);
-}
-
-.event-card.tone-red {
-  animation: alertPulse 2.4s ease-in-out infinite;
+  padding: 12px 14px;
 }
 
 .event-top {
+  display: flex;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
+.event-type,
 .event-time {
-  color: #86a9c4;
-  font-size: 12px;
+  color: var(--text-soft);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.event-card.tone-red {
+  animation: alertPulse 3.6s ease-in-out infinite;
 }
 
 .timeline-item {
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: 10px;
   align-items: start;
 }
 
@@ -2235,188 +1937,173 @@ watch(
   width: 10px;
   height: 10px;
   margin-top: 6px;
-  border-radius: 50%;
+  border-radius: 999px;
   box-shadow: 0 0 14px currentColor;
 }
 
-.dot-cyan {
-  color: #57d7ff;
-  background: #57d7ff;
+.dot-cyan { color: #82d5df; background: #82d5df; }
+.dot-purple { color: #aa95d7; background: #aa95d7; }
+.dot-red { color: #d78a97; background: #d78a97; }
+.dot-orange { color: #ddb37b; background: #ddb37b; }
+
+.focus-list {
+  gap: 8px;
 }
 
-.dot-green {
-  color: #52f3c4;
-  background: #52f3c4;
-}
-
-.dot-orange {
-  color: #ffbf74;
-  background: #ffbf74;
-}
-
-.dot-red {
-  color: #ff7d96;
-  background: #ff7d96;
-}
-
-.dot-purple {
-  color: #a78bff;
-  background: #a78bff;
-}
-
-.selected-panel {
-  align-content: start;
-}
-
-.guard-panel {
-  padding: 14px;
-  margin: 14px 0;
-  display: grid;
-  gap: 14px;
-}
-
-.guard-steps {
-  display: grid;
-  gap: 10px;
-}
-
-.blocker-list {
-  display: grid;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.blocker-card {
-  padding: 12px 14px;
+.focus-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
+  text-align: left;
 }
 
-.blocker-card strong {
-  color: #ffb86f;
-}
-
-.blocker-card p {
-  margin: 4px 0 0;
-  color: #9bbbd4;
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.action-grid {
+.trend-panel {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
 }
 
-.bed-cockpit-page :deep(.ant-input),
-.bed-cockpit-page :deep(.ant-input-search-button),
-.bed-cockpit-page :deep(.ant-segmented),
-.bed-cockpit-page :deep(.ant-btn),
-.bed-cockpit-page :deep(.ant-alert) {
+.trend-card {
+  padding: 12px 14px;
+  border-radius: 22px;
+  border: 1px solid var(--hud-border);
+  background: linear-gradient(180deg, rgba(9, 16, 28, 0.68), rgba(7, 12, 22, 0.82));
+  backdrop-filter: blur(18px);
+  box-shadow: var(--hud-shadow);
+}
+
+.trend-head {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.trend-head strong {
+  color: var(--text-main);
+}
+
+.chart-view {
+  height: 130px;
+}
+
+.bed-immersive-page :deep(.ant-input),
+.bed-immersive-page :deep(.ant-input-affix-wrapper),
+.bed-immersive-page :deep(.ant-input-search-button),
+.bed-immersive-page :deep(.ant-segmented),
+.bed-immersive-page :deep(.ant-switch),
+.bed-immersive-page :deep(.ant-btn) {
   border-radius: 14px;
+  background: rgba(10, 18, 30, 0.72);
+  border-color: rgba(138, 197, 216, 0.18);
+  color: var(--text-main);
 }
 
-.bed-cockpit-page :deep(.ant-input),
-.bed-cockpit-page :deep(.ant-input-affix-wrapper),
-.bed-cockpit-page :deep(.ant-segmented),
-.bed-cockpit-page :deep(.ant-alert),
-.bed-cockpit-page :deep(.ant-switch) {
-  background: rgba(8, 20, 38, 0.92);
-  border-color: rgba(87, 215, 255, 0.14);
-  color: #ecfbff;
+.bed-immersive-page :deep(.ant-btn-primary) {
+  background: linear-gradient(90deg, #7ccfdb, #9cb0da) !important;
+  color: #07111d !important;
 }
 
-.bed-cockpit-page :deep(.ant-btn) {
-  background: rgba(8, 20, 38, 0.92);
-  border-color: rgba(87, 215, 255, 0.18);
-  color: #dff7ff;
+.bed-immersive-page :deep(.ant-empty-description) {
+  color: var(--text-soft);
 }
 
-.bed-cockpit-page :deep(.ant-btn-primary) {
-  background: linear-gradient(90deg, #0f82d8, #3cbfff) !important;
-  color: #06111f !important;
-}
-
-.bed-cockpit-page :deep(.ant-empty-description) {
-  color: #86a9c4;
+@keyframes statusBreath {
+  0%, 100% { opacity: 0.82; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.08); }
 }
 
 @keyframes alertPulse {
   0%, 100% {
-    box-shadow: inset 0 0 0 1px rgba(255, 93, 124, 0.12), 0 0 0 rgba(255, 93, 124, 0);
+    box-shadow: var(--hud-shadow), inset 0 0 0 1px rgba(216, 137, 149, 0.08);
   }
   50% {
-    box-shadow: inset 0 0 0 1px rgba(255, 93, 124, 0.22), 0 0 24px rgba(255, 93, 124, 0.14);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.34), 0 0 22px rgba(216, 137, 149, 0.08);
   }
 }
 
 @media (max-width: 1600px) {
-  .bed-cockpit-shell {
-    grid-template-columns: 260px minmax(0, 1.4fr) 300px;
+  .hud-topbar {
+    grid-template-columns: 300px minmax(0, 1fr) 280px;
   }
 
-  .hero-metrics {
-    flex-wrap: wrap;
+  .hud-topbar__metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .hud-center {
+    width: min(620px, calc(100% - 640px));
   }
 }
 
 @media (max-width: 1280px) {
-  .bed-cockpit-shell {
+  .immersive-stage-shell,
+  .immersive-stage-shell :deep(.panorama-container),
+  .stage-empty {
+    min-height: 900px;
+    height: 900px;
+  }
+
+  .hud-topbar {
     grid-template-columns: 1fr;
   }
 
-  .scope-snapshot,
-  .stage-command-actions,
-  .chart-grid {
-    grid-template-columns: 1fr;
+  .hud-topbar__metrics,
+  .trend-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .stage-overlay-card {
-    position: static;
-    margin-top: 14px;
+  .hud-left,
+  .hud-center,
+  .hud-right {
+    position: absolute;
+    width: auto;
     max-width: none;
   }
 
-  .stage-shell,
-  .stage-shell :deep(.panorama-container),
-  .stage-empty {
-    min-height: 620px;
-    height: 620px;
+  .hud-left,
+  .hud-right {
+    width: 280px;
+  }
+
+  .hud-center {
+    left: 50%;
+    width: calc(100% - 640px);
   }
 }
 
-@media (max-width: 768px) {
-  .hero-metrics,
-  .metric-grid,
-  .scope-snapshot,
-  .stage-command-actions,
-  .action-grid {
+@media (max-width: 960px) {
+  .immersive-stage-shell,
+  .immersive-stage-shell :deep(.panorama-container),
+  .stage-empty {
+    min-height: auto;
+    height: auto;
+  }
+
+  .hud {
+    position: static;
+    transform: none !important;
+    width: auto !important;
+    margin: 12px;
+  }
+
+  .immersive-stage-shell {
+    display: grid;
+    gap: 12px;
+    padding-bottom: 12px;
+  }
+
+  .scene-vignette,
+  .scene-glow {
+    display: none;
+  }
+
+  .hud-topbar__metrics,
+  .trend-panel,
+  .detail-grid,
+  .action-grid,
+  .spotlight-meta {
     grid-template-columns: 1fr;
-  }
-
-  .cockpit-topbar,
-  .stage-heading,
-  .stage-command-bar {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .topbar-actions {
-    margin-left: 0;
-  }
-
-  .clock-time {
-    font-size: 22px;
-  }
-
-  .stage-shell,
-  .stage-shell :deep(.panorama-container) {
-    min-height: 520px;
-    height: 520px;
   }
 }
 </style>
