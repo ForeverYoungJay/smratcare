@@ -1,5 +1,7 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
+ARG NODE_OPTIONS=--max-old-space-size=4096
+ENV NODE_OPTIONS=$NODE_OPTIONS
 
 COPY package*.json ./
 RUN npm ci

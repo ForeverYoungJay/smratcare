@@ -92,9 +92,17 @@
         :loading="loading"
         :pagination="false"
         :row-selection="rowSelection"
+        :empty-title="emptyStateTitle"
+        :empty-description="emptyStateDescription"
         :scroll="{ x: 1450, y: 560 }"
         @change="onTableChange"
       >
+        <template #emptyExtra>
+          <a-space wrap>
+            <a-button type="primary" @click="goCreate">新建长者</a-button>
+            <a-button v-if="activeFilterTags.length" @click="reset">清空筛选</a-button>
+          </a-space>
+        </template>
         <template #toolbar>
           <div class="table-head">
             <div>
@@ -261,6 +269,14 @@ const activeFilterTags = computed(() => {
   if (query.lifecycleStatus) tags.push(`状态: ${statusText({ lifecycleStatus: query.lifecycleStatus })}`)
   return tags
 })
+const emptyStateTitle = computed(() => (
+  activeFilterTags.value.length ? '当前筛选下没有匹配的长者' : '还没有长者档案'
+))
+const emptyStateDescription = computed(() => (
+  activeFilterTags.value.length
+    ? '可以先清空筛选范围重新查看，或直接创建新的长者档案。'
+    : '从这里新建第一位长者，后续就能继续入住、评估、合同和家属绑定等业务。'
+))
 const lifecycleStageCounters = computed(() => {
   const counters = {
     pendingAssessment: 0,

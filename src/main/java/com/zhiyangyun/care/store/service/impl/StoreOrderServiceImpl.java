@@ -394,7 +394,6 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
     }
     List<OrderItem> items = orderItemMapper.selectList(
         Wrappers.lambdaQuery(OrderItem.class).eq(OrderItem::getOrderId, order.getId()));
-    Map<Long, Integer> qtyByProduct = new HashMap<>();
     Map<Long, BigDecimal> priceByProduct = new HashMap<>();
     Map<Long, String> codeSnapshotByProduct = new HashMap<>();
     Map<Long, String> nameSnapshotByProduct = new HashMap<>();
@@ -402,7 +401,6 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
       if (item.getProductId() == null) {
         continue;
       }
-      qtyByProduct.merge(item.getProductId(), item.getQuantity(), Integer::sum);
       priceByProduct.putIfAbsent(item.getProductId(), item.getUnitPrice());
       if (item.getProductCodeSnapshot() != null) {
         codeSnapshotByProduct.putIfAbsent(item.getProductId(), item.getProductCodeSnapshot());
@@ -411,44 +409,22 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
         nameSnapshotByProduct.putIfAbsent(item.getProductId(), item.getProductNameSnapshot());
       }
     }
-    for (Map.Entry<Long, Integer> entry : qtyByProduct.entrySet()) {
-      Long productId = entry.getKey();
-      Integer qty = entry.getValue();
-      if (qty == null || qty <= 0) {
-        continue;
+    List<InventoryLog> outboundLogs = inventoryLogMapper.selectList(
+        Wrappers.lambdaQuery(InventoryLog.class)
+            .eq(InventoryLog::getOrgId, order.getOrgId())
+            .eq(InventoryLog::getRefOrderId, order.getId())
+            .eq(InventoryLog::getChangeType, "OUT")
+            .eq(InventoryLog::getIsDeleted, 0)
+            .orderByAsc(InventoryLog::getId));
+    if (!outboundLogs.isEmpty()) {
+      for (InventoryLog outboundLog : outboundLogs) {
+        restoreRefundInventory(
+            order,
+            outboundLog,
+            priceByProduct.get(outboundLog.getProductId()),
+            firstNonBlank(outboundLog.getProductCodeSnapshot(), codeSnapshotByProduct.get(outboundLog.getProductId())),
+            firstNonBlank(outboundLog.getProductNameSnapshot(), nameSnapshotByProduct.get(outboundLog.getProductId())));
       }
-      String batchNo = "RETURN-" + order.getOrderNo();
-      InventoryBatch batch = inventoryBatchMapper.selectOne(
-          Wrappers.lambdaQuery(InventoryBatch.class)
-              .eq(InventoryBatch::getOrgId, order.getOrgId())
-              .eq(InventoryBatch::getProductId, productId)
-              .eq(InventoryBatch::getBatchNo, batchNo)
-              .eq(InventoryBatch::getIsDeleted, 0));
-      if (batch == null) {
-        batch = new InventoryBatch();
-        batch.setOrgId(order.getOrgId());
-        batch.setProductId(productId);
-        batch.setBatchNo(batchNo);
-        batch.setQuantity(qty);
-        batch.setCostPrice(priceByProduct.get(productId));
-        inventoryBatchMapper.insert(batch);
-      } else {
-        batch.setQuantity(batch.getQuantity() + qty);
-        inventoryBatchMapper.updateById(batch);
-      }
-
-      InventoryLog log = new InventoryLog();
-      log.setOrgId(order.getOrgId());
-      log.setProductId(productId);
-      log.setBatchId(batch.getId());
-      log.setChangeType("IN");
-      log.setChangeQty(qty);
-      log.setRefOrderId(order.getId());
-      log.setBizType("RETURN");
-      log.setProductCodeSnapshot(codeSnapshotByProduct.get(productId));
-      log.setProductNameSnapshot(nameSnapshotByProduct.get(productId));
-      log.setRemark("Return in");
-      inventoryLogMapper.insert(log);
     }
     if (order.getPayStatus() != null && order.getPayStatus() == PAY_STATUS_SETTLED) {
       rollbackPoints(order);
@@ -737,6 +713,7 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
       inventoryLog.setOrgId(orgId);
       inventoryLog.setProductId(product.getId());
       inventoryLog.setBatchId(batch.getId());
+      inventoryLog.setWarehouseId(batch.getWarehouseId());
       inventoryLog.setChangeType("OUT");
       inventoryLog.setChangeQty(used);
       inventoryLog.setRefOrderId(orderId);
@@ -771,6 +748,82 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
     log.setRefOrderId(order.getId());
     log.setRemark("Order rollback");
     pointsLogMapper.insert(log);
+  }
+
+  private void restoreRefundInventory(StoreOrder order, InventoryLog outboundLog, BigDecimal costPrice,
+      String productCode, String productName) {
+    if (outboundLog == null || outboundLog.getProductId() == null) {
+      return;
+    }
+    int qty = outboundLog.getChangeQty() == null ? 0 : outboundLog.getChangeQty();
+    if (qty <= 0) {
+      return;
+    }
+
+    InventoryBatch sourceBatch = outboundLog.getBatchId() == null ? null : inventoryBatchMapper.selectById(outboundLog.getBatchId());
+    InventoryBatch targetBatch;
+    if (sourceBatch != null && (sourceBatch.getIsDeleted() == null || sourceBatch.getIsDeleted() == 0)) {
+      int current = sourceBatch.getQuantity() == null ? 0 : sourceBatch.getQuantity();
+      sourceBatch.setQuantity(current + qty);
+      inventoryBatchMapper.updateById(sourceBatch);
+      targetBatch = sourceBatch;
+    } else {
+      Long warehouseId = sourceBatch == null ? outboundLog.getWarehouseId() : sourceBatch.getWarehouseId();
+      String batchNo = buildReturnBatchNo(order.getOrderNo(), warehouseId);
+      LambdaQueryWrapper<InventoryBatch> wrapper = Wrappers.lambdaQuery(InventoryBatch.class)
+          .eq(InventoryBatch::getOrgId, order.getOrgId())
+          .eq(InventoryBatch::getProductId, outboundLog.getProductId())
+          .eq(InventoryBatch::getBatchNo, batchNo)
+          .eq(InventoryBatch::getIsDeleted, 0);
+      if (warehouseId == null) {
+        wrapper.isNull(InventoryBatch::getWarehouseId);
+      } else {
+        wrapper.eq(InventoryBatch::getWarehouseId, warehouseId);
+      }
+      targetBatch = inventoryBatchMapper.selectOne(wrapper);
+      if (targetBatch == null) {
+        targetBatch = new InventoryBatch();
+        targetBatch.setOrgId(order.getOrgId());
+        targetBatch.setProductId(outboundLog.getProductId());
+        targetBatch.setWarehouseId(warehouseId);
+        targetBatch.setBatchNo(batchNo);
+        targetBatch.setQuantity(qty);
+        targetBatch.setCostPrice(costPrice);
+        targetBatch.setExpireDate(sourceBatch == null ? null : sourceBatch.getExpireDate());
+        targetBatch.setWarehouseLocation(warehouseId == null ? null : String.valueOf(warehouseId));
+        inventoryBatchMapper.insert(targetBatch);
+      } else {
+        int current = targetBatch.getQuantity() == null ? 0 : targetBatch.getQuantity();
+        targetBatch.setQuantity(current + qty);
+        inventoryBatchMapper.updateById(targetBatch);
+      }
+    }
+
+    InventoryLog log = new InventoryLog();
+    log.setOrgId(order.getOrgId());
+    log.setProductId(outboundLog.getProductId());
+    log.setBatchId(targetBatch.getId());
+    log.setWarehouseId(targetBatch.getWarehouseId());
+    log.setChangeType("IN");
+    log.setChangeQty(qty);
+    log.setRefOrderId(order.getId());
+    log.setBizType("RETURN");
+    log.setProductCodeSnapshot(productCode);
+    log.setProductNameSnapshot(productName);
+    log.setRemark("Return in");
+    inventoryLogMapper.insert(log);
+  }
+
+  private String buildReturnBatchNo(String orderNo, Long warehouseId) {
+    String base = "RETURN-" + orderNo;
+    return warehouseId == null ? base : base + "-" + warehouseId;
+  }
+
+  private String firstNonBlank(String first, String second) {
+    if (first != null && !first.isBlank()) {
+      return first;
+    }
+    return second;
   }
 
   private void applyBillRefund(StoreOrder order, String type) {

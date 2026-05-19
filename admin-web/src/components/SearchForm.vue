@@ -35,6 +35,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
+import dayjs from 'dayjs'
 
 const props = withDefaults(
   defineProps<{
@@ -65,8 +66,28 @@ const heading = computed(() => (activeFieldCount.value > 0 ? '当前已按条件
 
 function cloneValue<T>(value: T): T {
   if (value === undefined || value === null || typeof value !== 'object') return value
-  if (typeof structuredClone === 'function') return structuredClone(value)
-  return JSON.parse(JSON.stringify(value))
+  if (dayjs.isDayjs(value)) return value.clone() as T
+  if (Array.isArray(value)) return value.map((item) => cloneValue(item)) as T
+  if (value instanceof Date) return new Date(value.getTime()) as T
+  if (typeof structuredClone === 'function') {
+    try {
+      return structuredClone(value)
+    } catch {
+      // Fall through to the safer recursive clone below for proxied or non-cloneable values.
+    }
+  }
+  if (Object.prototype.toString.call(value) === '[object Object]') {
+    const cloned: Record<string, any> = {}
+    Object.keys(value as Record<string, any>).forEach((key) => {
+      cloned[key] = cloneValue((value as Record<string, any>)[key])
+    })
+    return cloned as T
+  }
+  try {
+    return JSON.parse(JSON.stringify(value))
+  } catch {
+    return value
+  }
 }
 
 onMounted(() => {

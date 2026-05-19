@@ -13,7 +13,7 @@ public interface CrmLeadService {
                               String consultantName, String consultantPhone, String elderName, String elderPhone,
                               String consultDateFrom, String consultDateTo, String consultType, String mediaChannel,
                               String infoSource, String marketerName, String followupStatus, String reservationChannel,
-                              String contractNo, String contractStatus, String flowStage, String currentOwnerDept, String callbackType,
+                              String contractNo, String contractStatus, String flowStage, String currentOwnerDept, String mode, String callbackType,
                               String followupDateFrom, String followupDateTo, Boolean followupDueOnly);
   CrmLeadResponse assign(Long id, Long tenantId, Long operatorId, boolean adminView, CrmLeadAssignRequest request);
   void delete(Long id, Long tenantId, Long currentStaffId, boolean adminView);

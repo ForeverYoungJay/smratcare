@@ -163,7 +163,9 @@ public class MedicalCvdRiskAssessmentController {
         || (orgId != null && !orgId.equals(item.getOrgId()))) {
       return Result.ok(null);
     }
-    item.setStatus("PUBLISHED");
+    if (!"PUBLISHED".equals(item.getStatus())) {
+      item.setStatus("PUBLISHED");
+    }
     if (actions != null) {
       item.setGenerateInspectionPlan(actions.getGenerateInspectionPlan() == null ? 0 : actions.getGenerateInspectionPlan());
       item.setGenerateFollowupTask(actions.getGenerateFollowupTask() == null ? 0 : actions.getGenerateFollowupTask());
@@ -175,11 +177,26 @@ public class MedicalCvdRiskAssessmentController {
     Long nursingLogId = null;
     Long careTaskId = null;
     if (item.getGenerateInspectionPlan() != null && item.getGenerateInspectionPlan() == 1) {
-      inspectionId = createInspectionPlan(item);
+      inspectionId = findExistingInspectionId(item);
+      if (inspectionId == null) {
+        inspectionId = createInspectionPlan(item);
+      }
     }
     if (item.getGenerateFollowupTask() != null && item.getGenerateFollowupTask() == 1) {
-      nursingLogId = createFollowupTask(item, inspectionId);
-      careTaskId = createCareFollowTask(item);
+      HealthNursingLog existingLog = findExistingFollowupLog(item, inspectionId);
+      if (existingLog != null) {
+        if (!"INSPECTION_FOLLOW_UP".equals(existingLog.getLogType())) {
+          existingLog.setLogType("INSPECTION_FOLLOW_UP");
+          nursingLogMapper.updateById(existingLog);
+        }
+        nursingLogId = existingLog.getId();
+      } else {
+        nursingLogId = createFollowupTask(item, inspectionId);
+      }
+      careTaskId = findExistingCareFollowTaskId(item);
+      if (careTaskId == null) {
+        careTaskId = createCareFollowTask(item);
+      }
     }
 
     Map<String, Object> response = new HashMap<>();
@@ -233,7 +250,7 @@ public class MedicalCvdRiskAssessmentController {
     nursingLog.setElderName(item.getElderName());
     nursingLog.setSourceInspectionId(inspectionId);
     nursingLog.setLogTime(LocalDateTime.now());
-    nursingLog.setLogType("医护随访");
+    nursingLog.setLogType("INSPECTION_FOLLOW_UP");
     nursingLog.setContent(item.getMedicalAdvice() == null || item.getMedicalAdvice().isBlank()
         ? "请在随访周期内执行心血管高风险复核"
         : item.getMedicalAdvice());
@@ -260,6 +277,46 @@ public class MedicalCvdRiskAssessmentController {
       careTaskDailyMapper.updateById(taskDaily);
     }
     return taskId;
+  }
+
+  private Long findExistingInspectionId(MedicalCvdRiskAssessment item) {
+    HealthInspection inspection = inspectionMapper.selectOne(Wrappers.lambdaQuery(HealthInspection.class)
+        .eq(HealthInspection::getIsDeleted, 0)
+        .eq(HealthInspection::getOrgId, item.getOrgId())
+        .eq(HealthInspection::getElderId, item.getElderId())
+        .eq(HealthInspection::getRemark, buildAssessmentRemark(item.getId()))
+        .orderByDesc(HealthInspection::getId)
+        .last("LIMIT 1"));
+    return inspection == null ? null : inspection.getId();
+  }
+
+  private HealthNursingLog findExistingFollowupLog(MedicalCvdRiskAssessment item, Long inspectionId) {
+    var wrapper = Wrappers.lambdaQuery(HealthNursingLog.class)
+        .eq(HealthNursingLog::getIsDeleted, 0)
+        .eq(HealthNursingLog::getOrgId, item.getOrgId())
+        .eq(HealthNursingLog::getElderId, item.getElderId())
+        .eq(HealthNursingLog::getRemark, buildAssessmentRemark(item.getId()))
+        .orderByDesc(HealthNursingLog::getId)
+        .last("LIMIT 1");
+    if (inspectionId != null) {
+      wrapper.eq(HealthNursingLog::getSourceInspectionId, inspectionId);
+    }
+    return nursingLogMapper.selectOne(wrapper);
+  }
+
+  private Long findExistingCareFollowTaskId(MedicalCvdRiskAssessment item) {
+    CareTaskDaily task = careTaskDailyMapper.selectOne(Wrappers.lambdaQuery(CareTaskDaily.class)
+        .eq(CareTaskDaily::getIsDeleted, 0)
+        .eq(CareTaskDaily::getOrgId, item.getOrgId())
+        .eq(CareTaskDaily::getSourceType, "CVD_RISK")
+        .eq(CareTaskDaily::getSourceId, item.getId())
+        .orderByDesc(CareTaskDaily::getId)
+        .last("LIMIT 1"));
+    return task == null ? null : task.getId();
+  }
+
+  private String buildAssessmentRemark(Long assessmentId) {
+    return "来源：心血管风险评估#" + assessmentId;
   }
 
   private void fillFromRequest(MedicalCvdRiskAssessment item, MedicalCvdRiskAssessmentRequest request, Long elderId) {

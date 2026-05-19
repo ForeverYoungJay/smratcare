@@ -61,8 +61,16 @@
           :data-source="rows"
           :loading="loading"
           :pagination="pagination"
+          :empty-title="emptyStateTitle"
+          :empty-description="emptyStateDescription"
           @change="handleTableChange"
         >
+          <template #emptyExtra>
+            <a-space wrap>
+              <a-button type="primary" @click="openCreate">新增文档</a-button>
+              <a-button v-if="showCreateFolderAction" @click="openFolderCreate">新增档案夹</a-button>
+            </a-space>
+          </template>
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'name'">
               <a-button
@@ -312,6 +320,26 @@ const selectedFolderName = computed(() => {
   }
   return selectedFolderRecord.value?.name || '全部文档'
 })
+const hasDocumentFilters = computed(() => Boolean(query.keyword || query.folderVisibility || query.regionCode))
+const showCreateFolderAction = computed(() => selectedFolderKey.value === ROOT_KEY)
+const emptyStateTitle = computed(() => {
+  if (selectedFolderKey.value !== ROOT_KEY) {
+    return `“${selectedFolderName.value}”里还没有文档`
+  }
+  if (hasDocumentFilters.value) {
+    return '当前筛选下暂无文档'
+  }
+  return '文档中心还是空的'
+})
+const emptyStateDescription = computed(() => {
+  if (selectedFolderKey.value !== ROOT_KEY) {
+    return '可以直接上传第一份文档，或先整理档案夹结构再归档。'
+  }
+  if (hasDocumentFilters.value) {
+    return '尝试放宽关键词、可见性或区域条件，或者直接新增一份文档。'
+  }
+  return '先建立档案夹结构，再上传 Word / PDF 文档，会更方便后续检索和归档。'
+})
 
 const folderTreeData = computed(() => [
   {
@@ -424,6 +452,10 @@ async function submit() {
     message.warning('请先上传文档，或至少填写文件名/文件地址')
     return
   }
+  if (!form.name?.trim()) {
+    message.warning('请填写文档名称')
+    return
+  }
   form.folderId = resolveExistingFormFolderId(form.folderId)
   const selectedFolder = form.folderId ? folderNodeMap.value.get(String(form.folderId)) : null
   const payload = {
@@ -437,6 +469,7 @@ async function submit() {
   }
   saving.value = true
   try {
+    const creating = !form.id
     if (form.id) {
       await updateDocument(form.id, payload)
       message.success('文档更新成功')
@@ -445,6 +478,10 @@ async function submit() {
       message.success('文档创建成功')
     }
     editOpen.value = false
+    if (creating && hasDocumentFilters.value) {
+      onReset()
+      return
+    }
     await fetchData()
   } finally {
     saving.value = false
@@ -578,11 +615,17 @@ async function submitFolder() {
       await updateDocumentFolder(folderForm.id, payload)
       message.success('档案夹更新成功')
     } else {
-      await createDocumentFolder(payload)
+      const created = await createDocumentFolder(payload)
       message.success('档案夹创建成功')
+      if (created?.id != null) {
+        selectedFolderKey.value = String(created.id)
+        query.folderId = String(created.id)
+      }
     }
     folderEditOpen.value = false
     await fetchFolderTree()
+    query.pageNo = 1
+    pagination.current = 1
     await fetchData()
   } finally {
     folderSaving.value = false

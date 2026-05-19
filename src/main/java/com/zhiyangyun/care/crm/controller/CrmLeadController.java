@@ -120,6 +120,7 @@ public class CrmLeadController {
       @RequestParam(required = false) String contractStatus,
       @RequestParam(required = false) String flowStage,
       @RequestParam(required = false) String currentOwnerDept,
+      @RequestParam(required = false) String mode,
       @RequestParam(required = false) String callbackType,
       @RequestParam(required = false) String followupDateFrom,
       @RequestParam(required = false) String followupDateTo,
@@ -132,7 +133,7 @@ public class CrmLeadController {
         consultantName, consultantPhone, elderName, elderPhone,
         consultDateFrom, consultDateTo, consultType, mediaChannel,
         infoSource, marketerName, followupStatus, reservationChannel,
-        contractNo, contractStatus, flowStage, currentOwnerDept, callbackType,
+        contractNo, contractStatus, flowStage, currentOwnerDept, mode, callbackType,
         followupDateFrom, followupDateTo, followupDueOnly));
   }
 

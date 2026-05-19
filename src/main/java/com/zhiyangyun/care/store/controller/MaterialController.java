@@ -312,7 +312,9 @@ public class MaterialController {
         .eq(queryStatusCode != null, MaterialPurchaseOrder::getStatus, queryStatusCode)
         .orderByDesc(MaterialPurchaseOrder::getCreateTime);
     if (keyword != null && !keyword.isBlank()) {
-      wrapper.like(MaterialPurchaseOrder::getOrderNo, keyword);
+      String normalizedKeyword = keyword.trim();
+      wrapper.and(w -> w.like(MaterialPurchaseOrder::getOrderNo, normalizedKeyword)
+          .or().like(MaterialPurchaseOrder::getRemark, normalizedKeyword));
     }
     IPage<MaterialPurchaseOrder> page = purchaseOrderMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
     IPage<MaterialPurchaseOrderDetailResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
@@ -488,7 +490,7 @@ public class MaterialController {
   }
 
   @PostMapping("/purchase/{id}/cancel")
-  public Result<Void> cancelPurchase(@PathVariable Long id) {
+  public Result<MaterialPurchaseOrderDetailResponse> cancelPurchase(@PathVariable Long id) {
     Long orgId = AuthContext.getOrgId();
     MaterialPurchaseOrder order = purchaseOrderMapper.selectById(id);
     if (order == null || order.getIsDeleted() != null && order.getIsDeleted() == 1) {
@@ -505,7 +507,7 @@ public class MaterialController {
     purchaseOrderMapper.updateById(order);
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "CANCEL", "MATERIAL_PURCHASE_ORDER", id, "采购单作废");
-    return Result.ok(null);
+    return Result.ok(buildPurchaseDetail(order));
   }
 
   @GetMapping("/transfer/page")
@@ -526,7 +528,9 @@ public class MaterialController {
         .eq(queryStatusCode != null, MaterialTransferOrder::getStatus, queryStatusCode)
         .orderByDesc(MaterialTransferOrder::getCreateTime);
     if (keyword != null && !keyword.isBlank()) {
-      wrapper.like(MaterialTransferOrder::getTransferNo, keyword);
+      String normalizedKeyword = keyword.trim();
+      wrapper.and(w -> w.like(MaterialTransferOrder::getTransferNo, normalizedKeyword)
+          .or().like(MaterialTransferOrder::getRemark, normalizedKeyword));
     }
     IPage<MaterialTransferOrder> page = transferOrderMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
     IPage<MaterialTransferOrderDetailResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
@@ -656,7 +660,7 @@ public class MaterialController {
   }
 
   @PostMapping("/transfer/{id}/cancel")
-  public Result<Void> cancelTransfer(@PathVariable Long id) {
+  public Result<MaterialTransferOrderDetailResponse> cancelTransfer(@PathVariable Long id) {
     Long orgId = AuthContext.getOrgId();
     MaterialTransferOrder order = transferOrderMapper.selectById(id);
     if (order == null || order.getIsDeleted() != null && order.getIsDeleted() == 1) {
@@ -673,7 +677,7 @@ public class MaterialController {
     transferOrderMapper.updateById(order);
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "CANCEL", "MATERIAL_TRANSFER_ORDER", id, "调拨单作废");
-    return Result.ok(null);
+    return Result.ok(buildTransferDetail(order));
   }
 
   @GetMapping("/stock/amount")

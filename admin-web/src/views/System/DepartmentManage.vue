@@ -128,6 +128,8 @@ async function fetchData() {
   try {
     const res: PageResult<DepartmentItem> = await getDepartmentPage(query)
     rows.value = res.list
+    pagination.current = Number(res.pageNo || query.pageNo || pagination.current || 1)
+    pagination.pageSize = Number(res.pageSize || query.pageSize || pagination.pageSize || 10)
     pagination.total = res.total || res.list.length
   } finally {
     loading.value = false
@@ -176,7 +178,9 @@ async function submit() {
     }
     message.success('保存成功')
     drawerOpen.value = false
-    fetchData()
+    query.pageNo = 1
+    pagination.current = 1
+    await fetchData()
   } finally {
     saving.value = false
   }
@@ -184,8 +188,14 @@ async function submit() {
 
 async function remove(record: DepartmentItem) {
   await deleteDepartment(record.id)
+  rows.value = rows.value.filter((item) => item.id !== record.id)
+  pagination.total = Math.max(0, Number(pagination.total || 0) - 1)
+  if (rows.value.length === 0 && query.pageNo > 1) {
+    query.pageNo -= 1
+    pagination.current = query.pageNo
+  }
   message.success('删除成功')
-  fetchData()
+  await fetchData()
 }
 
 function openHrProfile(record: DepartmentItem) {

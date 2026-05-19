@@ -1081,9 +1081,12 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     FamilyPortalModels.PaymentSummaryResponse response = new FamilyPortalModels.PaymentSummaryResponse();
     response.setElderName(elder == null ? "" : elder.getFullName());
     response.setMonth(billMonth);
-    response.setTotal(monthly == null ? BigDecimal.ZERO : safeDecimal(monthly.getTotalAmount()));
-    response.setPaid(monthly == null ? BigDecimal.ZERO : safeDecimal(monthly.getPaidAmount()));
-    response.setOutstanding(monthly == null ? BigDecimal.ZERO : safeDecimal(monthly.getOutstandingAmount()));
+    BigDecimal rawTotal = monthly == null ? BigDecimal.ZERO : safeDecimal(monthly.getTotalAmount());
+    BigDecimal rawPaid = monthly == null ? BigDecimal.ZERO : safeDecimal(monthly.getPaidAmount());
+    BigDecimal rawOutstanding = monthly == null ? BigDecimal.ZERO : safeDecimal(monthly.getOutstandingAmount());
+    response.setTotal(normalizePaymentTotal(rawTotal));
+    response.setPaid(normalizePaymentPaid(rawTotal, rawPaid));
+    response.setOutstanding(normalizePaymentOutstanding(rawTotal, rawPaid, rawOutstanding));
 
     ElderAccount account = elderAccountMapper.selectOne(
         Wrappers.lambdaQuery(ElderAccount.class)
@@ -1168,10 +1171,14 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
 
     return bills.stream().map(bill -> {
       FamilyPortalModels.PaymentHistoryItem item = new FamilyPortalModels.PaymentHistoryItem();
+      BigDecimal normalizedTotal = normalizePaymentTotal(bill.getTotalAmount());
+      BigDecimal normalizedPaid = normalizePaymentPaid(bill.getTotalAmount(), bill.getPaidAmount());
+      BigDecimal normalizedOutstanding = normalizePaymentOutstanding(
+          bill.getTotalAmount(), bill.getPaidAmount(), bill.getOutstandingAmount());
       item.setMonth(defaultText(bill.getBillMonth(), ""));
-      item.setTotal(safeDecimal(bill.getTotalAmount()));
-      item.setPaid(safeDecimal(bill.getPaidAmount()));
-      item.setStatus(mapBillStatus(bill.getStatus()));
+      item.setTotal(normalizedTotal);
+      item.setPaid(normalizedPaid);
+      item.setStatus(mapBillStatus(bill.getStatus(), normalizedTotal, normalizedPaid, normalizedOutstanding));
       return item;
     }).toList();
   }
@@ -1206,9 +1213,25 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     log.setCreatedBy(familyUserId);
     elderAccountLogMapper.insert(log);
 
+    String outTradeNo = "FAM" + System.currentTimeMillis() + defaultText(String.valueOf(log.getId()), "");
+    FamilyRechargeOrder rechargeOrder = new FamilyRechargeOrder();
+    rechargeOrder.setTenantId(orgId);
+    rechargeOrder.setOrgId(orgId);
+    rechargeOrder.setFamilyUserId(familyUserId);
+    rechargeOrder.setElderId(targetElderId);
+    rechargeOrder.setOutTradeNo(outTradeNo);
+    rechargeOrder.setChannel(defaultText(request.getMethod(), "MANUAL"));
+    rechargeOrder.setStatus(ORDER_STATUS_PAID);
+    rechargeOrder.setAmount(amount);
+    rechargeOrder.setCurrency("CNY");
+    rechargeOrder.setPaidAt(LocalDateTime.now());
+    rechargeOrder.setRemark(defaultText(request.getRemark(), "家属端手动充值"));
+    rechargeOrder.setCreatedBy(familyUserId);
+    familyRechargeOrderMapper.insert(rechargeOrder);
+
     FamilyPortalModels.PaymentRechargeResponse response = new FamilyPortalModels.PaymentRechargeResponse();
     response.setLogId(log.getId());
-    response.setOutTradeNo("FAM" + System.currentTimeMillis() + defaultText(String.valueOf(log.getId()), ""));
+    response.setOutTradeNo(outTradeNo);
     response.setRechargeAmount(amount);
     response.setAccountBalance(newBalance);
     response.setMessage("充值成功，余额已更新");
@@ -4845,12 +4868,42 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     return BigDecimal.valueOf(99);
   }
 
-  private String mapBillStatus(Integer status) {
+  private String mapBillStatus(Integer status, BigDecimal total, BigDecimal paid, BigDecimal outstanding) {
+    if (safeDecimal(total).compareTo(BigDecimal.ZERO) == 0 && safeDecimal(outstanding).compareTo(BigDecimal.ZERO) == 0) {
+      return "已结清";
+    }
+    if (safeDecimal(outstanding).compareTo(BigDecimal.ZERO) == 0 && safeDecimal(paid).compareTo(BigDecimal.ZERO) > 0) {
+      return "已结清";
+    }
+    if (safeDecimal(paid).compareTo(BigDecimal.ZERO) > 0) {
+      return "部分缴费";
+    }
     if (status == null || status == 0) return "待缴费";
     if (status == 1) return "部分缴费";
     if (status == 2) return "已结清";
     if (status == 9) return "已作废";
     return "待处理";
+  }
+
+  private BigDecimal normalizePaymentTotal(BigDecimal total) {
+    return safeDecimal(total).max(BigDecimal.ZERO);
+  }
+
+  private BigDecimal normalizePaymentPaid(BigDecimal total, BigDecimal paid) {
+    BigDecimal normalizedTotal = normalizePaymentTotal(total);
+    BigDecimal normalizedPaid = safeDecimal(paid).max(BigDecimal.ZERO);
+    if (normalizedPaid.compareTo(normalizedTotal) > 0) {
+      return normalizedTotal;
+    }
+    return normalizedPaid;
+  }
+
+  private BigDecimal normalizePaymentOutstanding(BigDecimal total, BigDecimal paid, BigDecimal outstanding) {
+    BigDecimal normalizedTotal = normalizePaymentTotal(total);
+    BigDecimal normalizedPaid = normalizePaymentPaid(total, paid);
+    BigDecimal derivedOutstanding = normalizedTotal.subtract(normalizedPaid).max(BigDecimal.ZERO);
+    BigDecimal normalizedOutstanding = safeDecimal(outstanding).max(BigDecimal.ZERO);
+    return normalizedOutstanding.max(derivedOutstanding);
   }
 
   private String currentBillMonth() {

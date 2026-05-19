@@ -972,6 +972,7 @@ function buildQueryParams() {
   return {
     pageNo: query.pageNo,
     pageSize: query.pageSize,
+    mode,
     status: isCallback ? undefined : defaultStatus(mode),
     consultantName: query.consultantName || undefined,
     consultantPhone: query.consultantPhone || undefined,

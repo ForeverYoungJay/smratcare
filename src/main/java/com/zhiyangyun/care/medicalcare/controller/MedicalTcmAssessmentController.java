@@ -160,9 +160,11 @@ public class MedicalTcmAssessmentController {
         || (orgId != null && !orgId.equals(item.getOrgId()))) {
       return Result.ok(null);
     }
-    item.setStatus("PUBLISHED");
-    mapper.updateById(item);
-    if (item.getGenerateNursingTask() != null && item.getGenerateNursingTask() == 1) {
+    if (!"PUBLISHED".equals(item.getStatus())) {
+      item.setStatus("PUBLISHED");
+      mapper.updateById(item);
+    }
+    if (item.getGenerateNursingTask() != null && item.getGenerateNursingTask() == 1 && !hasExistingTcmCareTask(item)) {
       createTcmCareTask(item);
     }
     return Result.ok(item);
@@ -263,5 +265,14 @@ public class MedicalTcmAssessmentController {
       taskDaily.setSourceId(item.getId());
       careTaskDailyMapper.updateById(taskDaily);
     }
+  }
+
+  private boolean hasExistingTcmCareTask(MedicalTcmAssessment item) {
+    return careTaskDailyMapper.selectOne(Wrappers.lambdaQuery(CareTaskDaily.class)
+        .eq(CareTaskDaily::getIsDeleted, 0)
+        .eq(CareTaskDaily::getOrgId, item.getOrgId())
+        .eq(CareTaskDaily::getSourceType, "TCM_CONSTITUTION")
+        .eq(CareTaskDaily::getSourceId, item.getId())
+        .last("LIMIT 1")) != null;
   }
 }

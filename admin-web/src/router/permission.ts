@@ -2,13 +2,22 @@ import type { Router } from 'vue-router'
 import { getPagePermissions, getRoles, getToken } from '../utils/auth'
 import { resolveRouteAccess } from '../utils/routeAccess'
 
+function resolveLoginRedirectTarget(fullPath: string) {
+  return {
+    path: '/login',
+    query: {
+      redirect: fullPath || '/portal'
+    }
+  }
+}
+
 export function setupPermission(router: Router) {
   router.beforeEach((to, _from, next) => {
     const token = getToken()
     const publicPages = ['/home', '/enterprise', '/admin', '/login', '/403']
 
     if (!token && !publicPages.includes(to.path)) {
-      next('/home')
+      next(resolveLoginRedirectTarget(to.fullPath))
       return
     }
 

@@ -25,7 +25,7 @@ SET @auto_discharge_status_exists = (
 );
 SET @ddl = IF(
   @auto_discharge_status_exists = 0,
-  'ALTER TABLE elder_discharge_apply ADD COLUMN auto_discharge_status VARCHAR(16) DEFAULT NULL COMMENT ''自动退住结果 SUCCESS/FAILED'' AFTER linked_discharge_id',
+  'ALTER TABLE elder_discharge_apply ADD COLUMN auto_discharge_status VARCHAR(32) DEFAULT NULL COMMENT ''自动退住结果 SUCCESS/FAILED/PENDING_SETTLEMENT'' AFTER linked_discharge_id',
   'SELECT 1'
 );
 PREPARE stmt FROM @ddl;

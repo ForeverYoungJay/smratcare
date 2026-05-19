@@ -2268,7 +2268,9 @@ public class AdminHrController {
       @RequestBody StaffTrainingRequest request) {
     StaffTrainingRecord record = trainingRecordMapper.selectById(id);
     Long orgId = AuthContext.getOrgId();
-    if (record == null || (orgId != null && !orgId.equals(record.getOrgId()))) {
+    if (record == null
+        || Integer.valueOf(1).equals(record.getIsDeleted())
+        || (orgId != null && !orgId.equals(record.getOrgId()))) {
       return Result.error(404, "Training record not found");
     }
     applyTrainingRequest(record, request, true);
@@ -2284,7 +2286,9 @@ public class AdminHrController {
   public Result<Void> deleteTraining(@PathVariable Long id) {
     StaffTrainingRecord record = trainingRecordMapper.selectById(id);
     Long orgId = AuthContext.getOrgId();
-    if (record == null || (orgId != null && !orgId.equals(record.getOrgId()))) {
+    if (record == null
+        || Integer.valueOf(1).equals(record.getIsDeleted())
+        || (orgId != null && !orgId.equals(record.getOrgId()))) {
       return Result.error(404, "Training record not found");
     }
     record.setIsDeleted(1);
@@ -2333,14 +2337,24 @@ public class AdminHrController {
     wrapper.orderByDesc(StaffTrainingRecord::getCreateTime);
     IPage<StaffTrainingRecord> page = trainingRecordMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
 
-    Map<Long, StaffAccount> staffMap = staffMapper.selectBatchIdsSafe(
-            page.getRecords().stream().map(StaffTrainingRecord::getStaffId).filter(id -> id != null).distinct().toList())
-        .stream()
-        .collect(Collectors.toMap(StaffAccount::getId, s -> s));
-    Map<Long, Department> departmentMap = departmentMapper.selectBatchIds(
-            page.getRecords().stream().map(StaffTrainingRecord::getDepartmentId).filter(id -> id != null).distinct().toList())
-        .stream()
-        .collect(Collectors.toMap(Department::getId, item -> item, (a, b) -> a));
+    List<Long> staffIds = page.getRecords().stream()
+        .map(StaffTrainingRecord::getStaffId)
+        .filter(id -> id != null)
+        .distinct()
+        .toList();
+    Map<Long, StaffAccount> staffMap = staffIds.isEmpty()
+        ? Map.of()
+        : staffMapper.selectBatchIdsSafe(staffIds).stream()
+            .collect(Collectors.toMap(StaffAccount::getId, s -> s));
+    List<Long> departmentIds = page.getRecords().stream()
+        .map(StaffTrainingRecord::getDepartmentId)
+        .filter(id -> id != null)
+        .distinct()
+        .toList();
+    Map<Long, Department> departmentMap = departmentIds.isEmpty()
+        ? Map.of()
+        : departmentMapper.selectBatchIds(departmentIds).stream()
+            .collect(Collectors.toMap(Department::getId, item -> item, (a, b) -> a));
 
     IPage<StaffTrainingResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
     resp.setRecords(page.getRecords().stream().map(record -> {

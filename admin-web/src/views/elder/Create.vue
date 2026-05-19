@@ -346,6 +346,17 @@ function resolveBirthDateAndAgeFromIdCard(idCardNo?: string) {
   return ''
 }
 
+function resolveGenderFromIdCard(idCardNo?: string) {
+  const normalized = trimText(idCardNo)
+  if (/^\d{17}[\dXx]$/.test(normalized)) {
+    return Number(normalized.charAt(16)) % 2 === 1 ? 1 : 2
+  }
+  if (/^\d{15}$/.test(normalized)) {
+    return Number(normalized.charAt(14)) % 2 === 1 ? 1 : 2
+  }
+  return undefined
+}
+
 async function validateIdCardNo(_rule: unknown, value?: string) {
   const text = trimText(value)
   if (!text) {
@@ -771,9 +782,13 @@ watch(
   () => form.idCardNo,
   (value) => {
     const parsedBirthDate = resolveBirthDateAndAgeFromIdCard(value)
+    const parsedGender = resolveGenderFromIdCard(value)
     formDerivedBirthDate.value = parsedBirthDate
     if (parsedBirthDate && !form.birthDate) {
       form.birthDate = parsedBirthDate
+    }
+    if (parsedGender && !form.gender) {
+      form.gender = parsedGender
     }
   },
   { immediate: true }
@@ -832,6 +847,12 @@ watch(
 )
 
 onMounted(async () => {
+  if (!familyDraftRows.value.length) {
+    addFamilyDraftRow()
+  }
+  if (!form.admissionDate) {
+    form.admissionDate = dayjs().format('YYYY-MM-DD')
+  }
   await loadAssets()
   await applyBedRoutePrefill()
   loadDiseaseOptions()

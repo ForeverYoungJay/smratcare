@@ -195,8 +195,9 @@ public class CrmLeadServiceImpl implements CrmLeadService {
                                      String consultantName, String consultantPhone, String elderName, String elderPhone,
                                      String consultDateFrom, String consultDateTo, String consultType, String mediaChannel,
                                      String infoSource, String marketerName, String followupStatus, String reservationChannel,
-                                     String contractNo, String contractStatus, String flowStage, String currentOwnerDept, String callbackType,
+                                     String contractNo, String contractStatus, String flowStage, String currentOwnerDept, String mode, String callbackType,
                                      String followupDateFrom, String followupDateTo, Boolean followupDueOnly) {
+    String normalizedMode = normalizeLeadMode(mode);
     var wrapper = Wrappers.lambdaQuery(CrmLead.class)
         .eq(CrmLead::getIsDeleted, 0)
         .eq(tenantId != null, CrmLead::getTenantId, tenantId);
@@ -208,7 +209,7 @@ public class CrmLeadServiceImpl implements CrmLeadService {
             .or(x -> x.isNull(CrmLead::getOwnerStaffId).eq(CrmLead::getCreatedBy, currentStaffId)));
       }
     }
-    if (status != null) {
+    if (status != null && normalizedMode == null) {
       wrapper.eq(CrmLead::getStatus, status);
     }
     if (source != null && !source.isBlank()) {
@@ -308,8 +309,23 @@ public class CrmLeadServiceImpl implements CrmLeadService {
           .or().like(CrmLead::getElderPhone, keyword));
     }
     wrapper.orderByDesc(CrmLead::getConsultDate).orderByDesc(CrmLead::getCreateTime);
-    IPage<CrmLead> page = leadMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
-    return page.convert(this::toResponse);
+    if (normalizedMode == null) {
+      IPage<CrmLead> page = leadMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+      return page.convert(this::toResponse);
+    }
+
+    List<CrmLead> filtered = leadMapper.selectList(wrapper).stream()
+        .filter(lead -> matchesLeadMode(lead, normalizedMode))
+        .toList();
+    long total = filtered.size();
+    long fromIndex = Math.max((pageNo - 1L) * pageSize, 0L);
+    long toIndex = Math.min(fromIndex + pageSize, total);
+    List<CrmLeadResponse> pageRecords = fromIndex >= total
+        ? List.of()
+        : filtered.subList((int) fromIndex, (int) toIndex).stream().map(this::toResponse).toList();
+    Page<CrmLeadResponse> page = new Page<>(pageNo, pageSize, total);
+    page.setRecords(pageRecords);
+    return page;
   }
 
   @Override
@@ -355,7 +371,7 @@ public class CrmLeadServiceImpl implements CrmLeadService {
 
   private CrmLead findAccessibleLead(Long id, Long tenantId, Long currentStaffId, boolean adminView) {
     CrmLead lead = leadMapper.selectById(id);
-    if (lead == null) {
+    if (lead == null || Integer.valueOf(1).equals(lead.getIsDeleted())) {
       return null;
     }
     if (tenantId != null && !tenantId.equals(lead.getTenantId())) {
@@ -888,6 +904,77 @@ public class CrmLeadServiceImpl implements CrmLeadService {
         || FLOW_PENDING_BED_SELECT.equalsIgnoreCase(flowStage)
         || FLOW_PENDING_SIGN.equalsIgnoreCase(flowStage)
         || FLOW_SIGNED.equalsIgnoreCase(flowStage);
+  }
+
+  private String normalizeLeadMode(String mode) {
+    String value = blankToNull(mode);
+    if (value == null) {
+      return null;
+    }
+    String normalized = value.trim().toLowerCase(Locale.ROOT);
+    return switch (normalized) {
+      case "consultation", "intent", "reservation", "invalid", "callback" -> normalized;
+      default -> null;
+    };
+  }
+
+  private boolean matchesLeadMode(CrmLead lead, String mode) {
+    if (lead == null || mode == null) {
+      return true;
+    }
+    return switch (mode) {
+      case "consultation" -> isConsultLead(lead);
+      case "intent" -> isIntentLead(lead);
+      case "reservation" -> hasReservationEvidence(lead);
+      case "invalid" -> Integer.valueOf(3).equals(lead.getStatus());
+      case "callback" -> !Integer.valueOf(3).equals(lead.getStatus()) && !isSignedLead(lead);
+      default -> true;
+    };
+  }
+
+  private boolean isConsultLead(CrmLead lead) {
+    return lead != null
+        && !Integer.valueOf(3).equals(lead.getStatus())
+        && !isSignedLead(lead)
+        && !hasReservationEvidence(lead)
+        && !Integer.valueOf(1).equals(lead.getStatus());
+  }
+
+  private boolean isIntentLead(CrmLead lead) {
+    return lead != null
+        && !Integer.valueOf(3).equals(lead.getStatus())
+        && !isSignedLead(lead)
+        && !hasReservationEvidence(lead)
+        && Integer.valueOf(1).equals(lead.getStatus());
+  }
+
+  private boolean isSignedLead(CrmLead lead) {
+    if (lead == null) {
+      return false;
+    }
+    return Integer.valueOf(1).equals(lead.getContractSignedFlag())
+        || FLOW_SIGNED.equalsIgnoreCase(blankToNull(lead.getFlowStage()));
+  }
+
+  private boolean hasReservationEvidence(CrmLead lead) {
+    if (lead == null || Integer.valueOf(3).equals(lead.getStatus()) || isSignedLead(lead)) {
+      return false;
+    }
+    if (lead.getReservationBedId() != null || blankToNull(lead.getReservationRoomNo()) != null) {
+      return true;
+    }
+    if (lead.getReservationAmount() != null && lead.getReservationAmount().compareTo(BigDecimal.ZERO) > 0) {
+      return true;
+    }
+    String reservationStatus = blankToNull(lead.getReservationStatus());
+    if (reservationStatus != null) {
+      String normalized = reservationStatus.toLowerCase(Locale.ROOT);
+      if (normalized.contains("预") || normalized.contains("锁") || normalized.contains("reserve") || normalized.contains("lock")) {
+        return true;
+      }
+    }
+    String flowStage = blankToNull(lead.getFlowStage());
+    return FLOW_PENDING_BED_SELECT.equalsIgnoreCase(flowStage) || FLOW_PENDING_SIGN.equalsIgnoreCase(flowStage);
   }
 
   private CrmLead cloneLead(CrmLead source) {

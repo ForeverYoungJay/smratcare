@@ -112,7 +112,7 @@ export function completePurchase(id: Id) {
 }
 
 export function cancelPurchase(id: Id) {
-  return request.post<void>(`/api/material/purchase/${id}/cancel`)
+  return request.post<MaterialPurchaseOrder>(`/api/material/purchase/${id}/cancel`)
 }
 
 export function getTransferPage(params: {
@@ -154,7 +154,7 @@ export function completeTransfer(id: Id) {
 }
 
 export function cancelTransfer(id: Id) {
-  return request.post<void>(`/api/material/transfer/${id}/cancel`)
+  return request.post<MaterialTransferOrder>(`/api/material/transfer/${id}/cancel`)
 }
 
 export function getStockAmount(params?: {

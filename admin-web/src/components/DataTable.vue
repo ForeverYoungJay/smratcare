@@ -22,7 +22,17 @@
       </template>
       <template #emptyText>
         <div class="empty-wrap">
-          <a-empty :description="emptyDescription || '暂无数据'" />
+          <a-empty :description="null">
+            <template #description>
+              <div class="empty-copy">
+                <strong class="empty-copy__title">{{ emptyTitle || '暂无数据' }}</strong>
+                <span class="empty-copy__description">{{ emptyDescription || '当前还没有可展示的数据，稍后再来看看。' }}</span>
+              </div>
+            </template>
+            <div class="empty-extra" v-if="$slots.emptyExtra">
+              <slot name="emptyExtra" />
+            </div>
+          </a-empty>
         </div>
       </template>
     </a-table>
@@ -44,6 +54,7 @@ const props = defineProps<{
   scroll?: any
   size?: 'small' | 'middle' | 'large'
   sticky?: boolean
+  emptyTitle?: string
   emptyDescription?: string
   showStriped?: boolean
 }>()
@@ -93,5 +104,31 @@ function onChange(pagination: TablePaginationConfig, filters: any, sorter: any) 
 
 .data-table :deep(.is-striped-row > td) {
   background: rgba(247, 251, 254, 0.88);
+}
+
+.empty-wrap {
+  padding: 12px 0;
+}
+
+.empty-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.empty-copy__title {
+  color: #12314d;
+  font-size: 15px;
+}
+
+.empty-copy__description {
+  color: #5f7b95;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.empty-extra {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
 }
 </style>

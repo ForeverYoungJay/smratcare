@@ -57,8 +57,16 @@
       :data-source="rows"
       :loading="loading"
       :pagination="pagination"
+      :empty-title="emptyStateTitle"
+      :empty-description="emptyStateDescription"
       @change="handleTableChange"
     >
+      <template #emptyExtra>
+        <a-space wrap>
+          <a-button type="primary" @click="openDrawer()">{{ isPlanScene ? '新增计划' : '新增记录' }}</a-button>
+          <a-button v-if="hasActiveFilters" @click="onReset">清空筛选</a-button>
+        </a-space>
+      </template>
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
           <a-tag :color="record.status === 1 ? 'green' : 'default'">
@@ -290,12 +298,31 @@ const trainingScene = computed<'plans' | 'records'>(() => {
 const isPlanScene = computed(() => trainingScene.value === 'plans')
 const isRecordScene = computed(() => !isPlanScene.value)
 const backendScene = computed(() => (isPlanScene.value ? 'PLAN' : 'RECORD'))
+const hasActiveFilters = computed(() => Boolean(
+  query.departmentId
+  || query.staffId
+  || query.keyword
+  || (query.range && query.range.length)
+  || (isPlanScene.value && query.trainingYear !== dayjs().year())
+))
 
 const pageTitle = computed(() => (isPlanScene.value ? '培训计划' : '培训记录'))
 const pageSubTitle = computed(() => (
   isPlanScene.value
     ? '培训与发展 / 按部门与年度维护培训与考证要求'
     : '培训与发展 / 记录已完成培训并自动生成证书'
+))
+const emptyStateTitle = computed(() => (
+  hasActiveFilters.value
+    ? `当前筛选下暂无${isPlanScene.value ? '培训计划' : '培训记录'}`
+    : `还没有${isPlanScene.value ? '培训计划' : '培训记录'}`
+))
+const emptyStateDescription = computed(() => (
+  hasActiveFilters.value
+    ? '可以先清空筛选重新查看，或直接新增一条培训数据。'
+    : isPlanScene.value
+      ? '从这里补齐年度培训计划，后续更容易追踪部门培训与证书要求。'
+      : '从这里录入第一条培训记录，后续可以继续导出档案、生成证书和做培训统计。'
 ))
 
 const query = reactive({
@@ -554,7 +581,13 @@ function openDrawer(record?: StaffTrainingRecord) {
   if (record?.startDate && record?.endDate) {
     formRange.value = [dayjs(record.startDate), dayjs(record.endDate)]
   } else {
-    formRange.value = undefined
+    formRange.value = isRecordScene.value ? [dayjs(), dayjs()] : undefined
+  }
+  if (!record) {
+    searchDepartments('')
+    if (isRecordScene.value) {
+      searchStaff('')
+    }
   }
   drawerOpen.value = true
 }
@@ -601,6 +634,7 @@ async function submit() {
   }
   saving.value = true
   try {
+    const creating = !form.id
     if (formRange.value) {
       form.startDate = formRange.value[0].format('YYYY-MM-DD')
       form.endDate = formRange.value[1].format('YYYY-MM-DD')
@@ -613,6 +647,10 @@ async function submit() {
     }
     message.success(isRecordScene.value ? '培训记录已保存' : '培训计划已保存')
     drawerOpen.value = false
+    if (creating && hasActiveFilters.value) {
+      onReset()
+      return
+    }
     fetchData()
   } catch {
     message.error('保存失败')

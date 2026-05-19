@@ -9,12 +9,12 @@ RUN --mount=type=cache,target=/root/.m2 \
 COPY src ./src
 RUN --mount=type=cache,target=/root/.m2 \
     mvn -B -DskipTests -Dmaven.repo.local=/root/.m2/repository package
+RUN cp /build/target/*.jar /build/app.jar
 
 FROM eclipse-temurin:17-jre
 WORKDIR /app
 
-# 不再写死版本号
-COPY --from=builder /build/target/*.jar /app/app.jar
+COPY --from=builder /build/app.jar /app/app.jar
 
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

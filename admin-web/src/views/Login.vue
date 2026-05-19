@@ -128,8 +128,9 @@ async function onSubmit() {
   try {
     const res = await login(form)
     userStore.setAuth(res)
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
-    router.push(redirect || '/portal')
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect.trim() : ''
+    const nextPath = redirect.startsWith('/') ? redirect : '/portal'
+    await router.replace(nextPath)
   } catch (error: any) {
     const status = Number(error?.response?.status || 0)
     const backendMsg = String(error?.response?.data?.message || error?.response?.data?.msg || error?.message || '')
@@ -165,7 +166,7 @@ async function onSubmit() {
 }
 
 function goEnterpriseHome() {
-  router.push('/home')
+  router.replace('/home')
 }
 </script>
 

@@ -57,8 +57,16 @@
       :data-source="rows"
       :loading="loading"
       :pagination="pagination"
+      :empty-title="emptyStateTitle"
+      :empty-description="emptyStateDescription"
       @change="handleTableChange"
     >
+      <template #emptyExtra>
+        <a-space wrap>
+          <a-button type="primary" @click="openCreate">新增公告</a-button>
+          <a-button v-if="hasActiveFilters" @click="onReset">清空筛选</a-button>
+        </a-space>
+      </template>
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
           <a-tag :color="record.status === 'PUBLISHED' ? 'green' : 'orange'">
@@ -143,6 +151,13 @@ const activeFilterTags = computed(() => {
   if (query.status) tags.push(`状态: ${query.status === 'PUBLISHED' ? '已发布' : '草稿'}`)
   return tags
 })
+const hasActiveFilters = computed(() => activeFilterTags.value.length > 0)
+const emptyStateTitle = computed(() => (hasActiveFilters.value ? '当前筛选下暂无公告' : '还没有公告'))
+const emptyStateDescription = computed(() => (
+  hasActiveFilters.value
+    ? '可以先清空筛选重新查看，或直接新增一条公告草稿。'
+    : '从这里新增第一条公告草稿，后续可继续发布、编辑或批量处理。'
+))
 
 async function fetchData() {
   loading.value = true
@@ -197,15 +212,29 @@ function openEdit(record: OaNotice) {
 }
 
 async function submit() {
+  if (!form.title.trim()) {
+    message.warning('请填写公告标题')
+    return
+  }
+  if (!form.content.trim()) {
+    message.warning('请填写公告内容')
+    return
+  }
   const payload = { title: form.title, content: form.content, status: form.status }
   saving.value = true
   try {
+    const creating = !form.id
     if (form.id) {
       await updateNotice(form.id, payload)
     } else {
       await createNotice(payload)
     }
+    message.success(creating ? '公告草稿已创建' : '公告已更新')
     editOpen.value = false
+    if (creating && hasActiveFilters.value) {
+      onReset()
+      return
+    }
     fetchData()
   } finally {
     saving.value = false

@@ -46,6 +46,15 @@ function resolveAxiosErrorMessage(error: any) {
   return resolveErrorMessage(error?.response?.data, rawMessage || '请求失败')
 }
 
+function resolveLoginRedirect(fullPath: string) {
+  return {
+    path: '/login',
+    query: {
+      redirect: fullPath || '/portal'
+    }
+  }
+}
+
 request.interceptors.request.use((config) => {
   const token = getToken()
   if (token) {
@@ -108,7 +117,8 @@ request.interceptors.response.use(
       clearRoles()
       clearPermissions()
       clearPagePermissions()
-      router.push('/login')
+      const currentFullPath = router.currentRoute.value?.fullPath || '/portal'
+      router.replace(resolveLoginRedirect(currentFullPath))
       return Promise.reject(error)
     }
     if (isLoginRequest) {
