@@ -13,7 +13,15 @@ export default defineConfig({
     rollupOptions: {
       input: {
         admin: resolve(__dirname, 'index.html'),
-        home: resolve(__dirname, 'home.html')
+        home: resolve(__dirname, 'home.html'),
+        about: resolve(__dirname, 'about.html'),
+        services: resolve(__dirname, 'services.html'),
+        pricing: resolve(__dirname, 'pricing.html'),
+        faq: resolve(__dirname, 'faq.html'),
+        contact: resolve(__dirname, 'contact.html'),
+        disabilityCare: resolve(__dirname, 'disability-care.html'),
+        memoryCare: resolve(__dirname, 'memory-care.html'),
+        rehabilitation: resolve(__dirname, 'rehabilitation.html')
       }
     }
   },

@@ -14,9 +14,10 @@
           <a v-for="item in navItems" :key="item.id" @click="scrollTo(item.id)">{{ item.label }}</a>
         </nav>
         <div class="top-actions">
+          <a-button type="primary" @click="openConsultModal">预约参观</a-button>
+          <a-button @click="openAppointment">电话咨询</a-button>
           <a-button v-if="canManageSiteConfig" @click="goSiteConfig">官网配置</a-button>
-          <a-button type="primary" @click="goAdmin">进入管理后台</a-button>
-          <a-button @click="goLogin">员工登录</a-button>
+          <a-button v-if="hasToken" @click="goAdmin">管理后台</a-button>
         </div>
       </div>
     </header>
@@ -28,27 +29,35 @@
     </a-drawer>
 
     <div class="floating-actions">
-      <a-button v-if="canManageSiteConfig" @click="goSiteConfig">官网配置</a-button>
-      <a-button type="primary" @click="goAdmin">后台入口</a-button>
       <a-button @click="openConsultModal">预约参观</a-button>
+      <a-button type="primary" @click="openAppointment">电话咨询</a-button>
       <a-button @click="toggleReadingMode">{{ readingMode ? '标准模式' : '阅读模式' }}</a-button>
       <a-button @click="openMapNavigation">到院导航</a-button>
+      <a-button v-if="canManageSiteConfig" @click="goSiteConfig">官网配置</a-button>
+      <a-button v-if="hasToken" @click="goAdmin">管理后台</a-button>
       <a-button @click="scrollTo('top')">回到顶部</a-button>
     </div>
 
     <section id="top" class="hero">
       <div class="hero-mask" />
       <div class="container hero-content">
-        <div class="hero-badge">企业首页</div>
+        <div class="hero-badge">弋阳养老院 · 医养结合 · 预约参观</div>
         <div v-if="contentRiskCount > 0" class="risk-badge">内容待完善 {{ contentRiskCount }} 项</div>
         <h1>{{ profile.heroTitle }}</h1>
         <p>{{ profile.heroDesc }}</p>
         <div class="hero-actions">
-          <a-button type="primary" size="large" @click="goAdmin">进入管理后台</a-button>
+          <a-button type="primary" size="large" @click="openConsultModal">立即预约</a-button>
+          <a-button size="large" @click="openAppointment">电话咨询</a-button>
           <a-button size="large" @click="scrollTo('service-system')">查看服务体系</a-button>
-          <a-button size="large" @click="openVrCommunity">VR看社区</a-button>
-          <a-button size="large" @click="openJoinUs">加入我们</a-button>
-          <a-button size="large" @click="openConsultModal">立即预约</a-button>
+          <a-button size="large" @click="openMapNavigation">到院导航</a-button>
+          <a-button size="large" @click="scrollTo('contact')">查看联系方式</a-button>
+        </div>
+        <div class="hero-link-group">
+          <a href="/services.html">服务项目</a>
+          <a href="/pricing.html">收费与入住</a>
+          <a href="/disability-care.html">失能护理</a>
+          <a href="/memory-care.html">记忆照护</a>
+          <a href="/faq.html">常见问题</a>
         </div>
       </div>
     </section>
@@ -261,7 +270,7 @@
       <div class="container">
         <div class="section-title">
           <h2>智能照护方案推荐</h2>
-          <p>基于年龄、自理能力、认知状态给出初步建议（演示版，可作为到院咨询前参考）。</p>
+          <p>基于年龄、自理能力、认知状态给出初步建议，可作为到院咨询前的参考。</p>
         </div>
         <a-card :bordered="false" class="card matcher-card">
           <div class="matcher-form">
@@ -360,7 +369,7 @@
       </div>
     </section>
 
-    <section id="city-tier" class="section section-alt">
+    <section v-if="canManageSiteConfig" id="city-tier" class="section section-alt">
       <div class="container">
         <div class="section-title">
           <h2>城市分档</h2>
@@ -435,7 +444,7 @@
       </div>
     </section>
 
-    <section id="ops-governance" class="section section-alt">
+    <section v-if="canManageSiteConfig" id="ops-governance" class="section section-alt">
       <div class="container">
         <div class="section-title">
           <h2>运营治理看板</h2>
@@ -513,8 +522,9 @@
             <li><span>参观时段：</span>{{ profile.contact.visitingTime }}</li>
           </ul>
           <div class="contact-actions">
-            <a-button type="primary" @click="goAdmin">进入管理后台</a-button>
-            <a-button @click="goLogin">后台登录</a-button>
+            <a-button type="primary" @click="openConsultModal">预约参观</a-button>
+            <a-button @click="openAppointment">电话咨询</a-button>
+            <a-button @click="openMapNavigation">查看路线</a-button>
           </div>
         </div>
       </div>
@@ -619,7 +629,7 @@
           <a-date-picker v-model:value="consultForm.visitDate" style="width: 100%;" />
         </a-form-item>
       </a-form>
-      <div class="consult-tip">提交后将保存在本地浏览器（演示环境），并提示你电话联系院方确认到院时间。</div>
+      <div class="consult-tip">提交后可由接待人员统一回访确认到院时间，建议同时电话联系院方提高沟通效率。</div>
       <div class="consult-actions">
         <a-button size="small" @click="exportConsultRecords">导出预约记录(JSON)</a-button>
         <a-button size="small" danger @click="clearConsultRecords">清空预约记录</a-button>
@@ -716,7 +726,7 @@ const careMatcher = ref({
   cognitiveState: ''
 })
 const careRecommendation = ref<{ title: string; desc: string } | null>(null)
-const navItems = [
+const publicNavItems = [
   { id: 'service-system', label: '服务体系' },
   { id: 'resident-system', label: '龟峰居民' },
   { id: 'community', label: '社区动态' },
@@ -727,12 +737,28 @@ const navItems = [
   { id: 'about-us', label: '关于我们' },
   { id: 'join-us', label: '加入我们' },
   { id: 'cooperation', label: '业务合作' },
-  { id: 'city-tier', label: '城市分档' },
   { id: 'compliance', label: '机构公示' },
-  { id: 'ops-governance', label: '运营治理' },
   { id: 'family-voice', label: '家属评价' },
   { id: 'contact', label: '联系我们' }
 ] as const
+
+const adminNavItems = [
+  { id: 'city-tier', label: '城市分档' },
+  { id: 'ops-governance', label: '运营治理' }
+] as const
+
+const navItems = computed(() => (canManageSiteConfig.value ? [...publicNavItems, ...adminNavItems] : [...publicNavItems]))
+
+function safeStorage() {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage
+    }
+  } catch (_error) {
+    return null
+  }
+  return null
+}
 
 function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value))
@@ -764,7 +790,7 @@ function mergeProfile(base: any, patch: any): any {
 }
 
 function loadProfileOverride(): Partial<EnterpriseProfile> {
-  const raw = localStorage.getItem(PROFILE_OVERRIDE_STORAGE_KEY)
+  const raw = safeStorage()?.getItem(PROFILE_OVERRIDE_STORAGE_KEY)
   if (!raw) return {}
   try {
     const parsed = JSON.parse(raw)
@@ -819,9 +845,13 @@ const cognitiveOptions = [
 ]
 
 function loadConsultRecords() {
-  const raw = localStorage.getItem('enterprise_consult_records')
-  const list = raw ? JSON.parse(raw) : []
-  return Array.isArray(list) ? list : []
+  const raw = safeStorage()?.getItem('enterprise_consult_records')
+  try {
+    const list = raw ? JSON.parse(raw) : []
+    return Array.isArray(list) ? list : []
+  } catch (_error) {
+    return []
+  }
 }
 
 const consultRecords = computed(() => {
@@ -924,7 +954,7 @@ const pageMaintainer = computed(() => {
 
 const guideResults = computed(() => {
   const keyword = guideKeyword.value.trim()
-  if (!keyword) return navItems.slice(0, 6)
+  if (!keyword) return navItems.value.slice(0, 6)
   const aliasMap = [
     { id: 'service-system', label: '服务体系', aliases: ['服务', '护理', '记忆', '康复'] },
     { id: 'resident-system', label: '龟峰居民', aliases: ['居民', '故事', '组织'] },
@@ -932,16 +962,18 @@ const guideResults = computed(() => {
     { id: 'news', label: '新闻资讯', aliases: ['新闻', '资讯', '公告'] },
     { id: 'activities', label: '居民活动', aliases: ['活动', '社团'] },
     { id: 'compliance', label: '机构公示', aliases: ['证照', '资质', '公示', '版权'] },
-    { id: 'ops-governance', label: '运营治理', aliases: ['运营', '清单', '值班'] },
     { id: 'contact', label: '联系我们', aliases: ['联系', '电话', '地址', '地图'] }
   ]
+  if (canManageSiteConfig.value) {
+    aliasMap.push({ id: 'ops-governance', label: '运营治理', aliases: ['运营', '清单', '值班'] })
+  }
   return aliasMap.filter((item) => `${item.label}${item.aliases.join('')}`.includes(keyword))
 })
 
 onMounted(() => {
   reloadProfileConfigDraft()
-  document.title = `${profile.name} - 企业首页`
-  const cachedReadingMode = localStorage.getItem('enterprise_home_reading_mode')
+  document.title = `${profile.name} - 弋阳养老院_医养结合_失能失智照护`
+  const cachedReadingMode = safeStorage()?.getItem('enterprise_home_reading_mode')
   if (cachedReadingMode === '1') readingMode.value = true
 })
 
@@ -976,7 +1008,7 @@ function saveProfileConfig() {
     parsed.publishMeta = publishMetaPatch
     const merged = mergeProfile(deepClone(enterpriseProfile), parsed) as EnterpriseProfile
     replaceProfile(merged)
-    localStorage.setItem(PROFILE_OVERRIDE_STORAGE_KEY, JSON.stringify(parsed))
+    safeStorage()?.setItem(PROFILE_OVERRIDE_STORAGE_KEY, JSON.stringify(parsed))
     profileConfigOpen.value = false
     message.success(`运营配置已保存并生效，维护人已更新为：${updater}`)
   } catch (_error) {
@@ -1007,7 +1039,7 @@ function downloadProfileConfigTemplate() {
     contact: {
       phone: '0793-5899001',
       hotlineTip: '工作日 08:00-18:00',
-      email: 'service@yiyang-guifeng-care.cn',
+      email: 'service@gfyy.org.cn',
       address: '江西省上饶市弋阳县龟峰大道88号',
       visitingTime: '周一至周日 08:00-18:00'
     },
@@ -1051,7 +1083,7 @@ function importProfileConfigFromFile() {
 }
 
 function resetProfileConfig() {
-  localStorage.removeItem(PROFILE_OVERRIDE_STORAGE_KEY)
+  safeStorage()?.removeItem(PROFILE_OVERRIDE_STORAGE_KEY)
   replaceProfile(deepClone(enterpriseProfile))
   reloadProfileConfigDraft()
   message.success('已恢复默认配置。')
@@ -1084,7 +1116,7 @@ function jumpToGuideTarget(id: string) {
 
 function toggleReadingMode() {
   readingMode.value = !readingMode.value
-  localStorage.setItem('enterprise_home_reading_mode', readingMode.value ? '1' : '0')
+  safeStorage()?.setItem('enterprise_home_reading_mode', readingMode.value ? '1' : '0')
 }
 
 function generateCareRecommendation() {
@@ -1170,7 +1202,7 @@ async function submitConsult() {
     }
     const list = loadConsultRecords()
     list.unshift(payload)
-    localStorage.setItem('enterprise_consult_records', JSON.stringify(list.slice(0, 200)))
+    safeStorage()?.setItem('enterprise_consult_records', JSON.stringify(list.slice(0, 200)))
     consultVersion.value += 1
     consultModalOpen.value = false
     consultForm.value = { name: '', phone: '', need: '', department: '', visitDate: null }
@@ -1234,7 +1266,7 @@ function exportConsultRecordsCsv() {
 }
 
 function clearConsultRecords() {
-  localStorage.removeItem('enterprise_consult_records')
+  safeStorage()?.removeItem('enterprise_consult_records')
   consultVersion.value += 1
   consultRecordsModalOpen.value = false
   message.success('预约记录已清空。')
@@ -1597,6 +1629,25 @@ function scrollTo(id: string) {
 .hero-actions .ant-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+}
+
+.hero-link-group {
+  margin-top: 22px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+}
+
+.hero-link-group a {
+  color: rgba(255, 255, 255, 0.92);
+  text-decoration: none;
+  font-size: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.hero-link-group a:hover {
+  color: #ffffff;
+  border-bottom-color: rgba(255, 255, 255, 0.85);
 }
 
 .section {

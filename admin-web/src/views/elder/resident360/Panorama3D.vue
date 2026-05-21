@@ -1,47 +1,51 @@
 <template>
   <div class="panorama-container" ref="containerRef">
     <div class="scene-atmosphere"></div>
-    <div class="scene-scanlines"></div>
 
     <div class="scene-toolbar">
       <div class="toolbar-left">
         <a-button v-if="currentLevel !== 'PARK'" class="tech-btn" @click="goUpLevel">返回上级</a-button>
         <a-button class="tech-btn" @click="toggleCruise">{{ cruiseEnabled ? '暂停巡航' : '自动巡航' }}</a-button>
-        <a-button class="tech-btn" @click="resetCamera">重置视角</a-button>
-        <a-button class="tech-btn" @click="toggleFullscreen">{{ fullscreenActive ? '退出全屏' : '全屏展示' }}</a-button>
       </div>
+
       <div class="toolbar-center">
-        <span class="toolbar-eyebrow">Current Scope</span>
+        <span class="toolbar-eyebrow">{{ currentLevelLabel }}视角</span>
         <strong>{{ breadcrumbText }}</strong>
+        <small>{{ focusTitle }} · {{ focusStatus }} · {{ toolbarHint }}</small>
       </div>
+
       <div class="toolbar-right">
-        <div class="legend-chip status-occupied">正常守护</div>
-        <div class="legend-chip status-empty">空床待命</div>
-        <div class="legend-chip status-warning">离床观察</div>
-        <div class="legend-chip status-sleep">睡眠稳定</div>
-        <div class="legend-chip status-ai">AI关注</div>
-        <div class="legend-chip status-alert">异常提醒</div>
+        <a-button class="tech-btn" @click="resetCamera">复位</a-button>
+        <a-button class="tech-btn" @click="toggleFullscreen">{{ fullscreenActive ? '退出全屏' : '全屏' }}</a-button>
       </div>
     </div>
 
     <div class="scene-hud">
-      <div class="hud-panel">
-        <span class="hud-label">当前层级</span>
-        <strong>{{ currentLevelLabel }}</strong>
-      </div>
-      <div class="hud-panel">
-        <span class="hud-label">聚焦对象</span>
-        <strong>{{ focusTitle }}</strong>
-      </div>
-      <div class="hud-panel">
-        <span class="hud-label">运行状态</span>
-        <strong>{{ focusStatus }}</strong>
+      <div class="scene-legend">
+        <div class="legend-chip status-occupied">在住</div>
+        <div class="legend-chip status-empty">空床</div>
+        <div class="legend-chip status-warning">外出</div>
+        <div class="legend-chip status-ai">观察</div>
+        <div class="legend-chip status-alert">异常</div>
       </div>
     </div>
 
-    <div v-show="tooltip.visible" class="tech-tooltip" :style="{ left: `${tooltip.x}px`, top: `${tooltip.y}px` }">
-      <div class="tt-header">{{ tooltip.title }}</div>
-      <div class="tt-body" v-html="tooltip.content"></div>
+    <div
+      v-show="tooltip.visible"
+      class="tech-tooltip"
+      :style="{ left: `${tooltip.x}px`, top: `${tooltip.y}px` }"
+    >
+      <div class="tt-header">
+        <strong>{{ tooltip.title }}</strong>
+        <small>{{ tooltip.badge }}</small>
+      </div>
+      <div class="tt-body">
+        <div v-for="row in tooltip.rows" :key="row.label" class="tt-row">
+          <span>{{ row.label }}</span>
+          <strong :class="row.tone">{{ row.value }}</strong>
+        </div>
+      </div>
+      <div class="tt-tip">{{ tooltip.tip }}</div>
     </div>
 
     <div ref="canvasRef" class="canvas-wrapper"></div>
@@ -52,20 +56,46 @@
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
+import { CSS2DObject, CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
 import gsap from 'gsap'
+
+type PanoramaScopeLevel = 'PARK' | 'BUILDING' | 'FLOOR' | 'ROOM'
+type PanoramaScope = {
+  level: PanoramaScopeLevel
+  building: string
+  floor: string
+  room: string
+}
+
+type RoomScene = {
+  roomNo: string
+  occupiedBeds: number
+  totalBeds: number
+  beds: any[]
+}
+
+type TooltipRow = {
+  label: string
+  value: string
+  tone?: string
+}
 
 const props = defineProps<{
   buildings: string[]
   floors: string[]
-  roomLookup: Map<string, any[]>
+  roomLookup: Map<string, RoomScene[]>
+  scope?: PanoramaScope
 }>()
 
-const emit = defineEmits(['click-room', 'click-bed'])
+const emit = defineEmits<{
+  (e: 'click-room', room: RoomScene): void
+  (e: 'click-bed', bed: any): void
+  (e: 'scope-change', scope: PanoramaScope): void
+}>()
 
 const containerRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLElement | null>(null)
-const currentLevel = ref<'PARK' | 'BUILDING' | 'FLOOR' | 'ROOM'>('PARK')
+const currentLevel = ref<PanoramaScopeLevel>('PARK')
 const selectedBuilding = ref('')
 const selectedFloor = ref('')
 const selectedRoom = ref('')
@@ -73,21 +103,15 @@ const cruiseEnabled = ref(true)
 const fullscreenActive = ref(false)
 const focusTitle = ref('园区总览')
 const focusStatus = ref('等待交互')
-const tooltip = ref({ visible: false, x: 0, y: 0, title: '', content: '' })
-
-const breadcrumbText = computed(() => {
-  let text = '园区全景'
-  if (selectedBuilding.value) text += ` / ${selectedBuilding.value}`
-  if (selectedFloor.value) text += ` / ${selectedFloor.value}`
-  if (selectedRoom.value) text += ` / 房间 ${selectedRoom.value}`
-  return text
-})
-
-const currentLevelLabel = computed(() => {
-  if (currentLevel.value === 'PARK') return '园区'
-  if (currentLevel.value === 'BUILDING') return '楼栋'
-  if (currentLevel.value === 'FLOOR') return '楼层'
-  return '房间'
+const sceneRenderingEnabled = ref(true)
+const tooltip = ref({
+  visible: false,
+  x: 0,
+  y: 0,
+  title: '',
+  badge: '',
+  rows: [] as TooltipRow[],
+  tip: ''
 })
 
 const scene = shallowRef(new THREE.Scene())
@@ -103,125 +127,73 @@ let particles: THREE.Points | null = null
 let animationFrameId = 0
 let rebuildSceneTimer = 0
 let lastPointerMoveAt = 0
-const sceneRenderingEnabled = ref(true)
+let hoveredObj: THREE.Object3D | null = null
 const pickPosition = new THREE.Vector2()
 const raycaster = new THREE.Raycaster()
-let hoveredObj: THREE.Object3D | null = null
+
+const currentScope = computed<PanoramaScope>(() => ({
+  level: currentLevel.value,
+  building: selectedBuilding.value,
+  floor: selectedFloor.value,
+  room: selectedRoom.value
+}))
+
+const breadcrumbText = computed(() => {
+  let text = '园区全景'
+  if (selectedBuilding.value) text += ` / ${selectedBuilding.value}`
+  if (selectedFloor.value) text += ` / ${selectedFloor.value}`
+  if (selectedRoom.value) text += ` / ${selectedRoom.value}`
+  return text
+})
+
+const toolbarHint = computed(() => {
+  if (currentLevel.value === 'ROOM') return '再次点击房间可打开业务详情，点击床位可查看守护信息'
+  if (currentLevel.value === 'FLOOR') return '楼层已展开，可继续选择房间或床位'
+  if (currentLevel.value === 'BUILDING') return '楼栋已展开，可进入楼层鸟瞰视角'
+  return '先看楼栋群组，再逐级钻取到楼层、房间与床位'
+})
+
+const currentLevelLabel = computed(() => {
+  if (currentLevel.value === 'PARK') return '园区'
+  if (currentLevel.value === 'BUILDING') return '楼栋'
+  if (currentLevel.value === 'FLOOR') return '楼层'
+  return '房间'
+})
 
 const materials = {
-  building: new THREE.MeshStandardMaterial({ color: 0x57d7ff, transparent: true, opacity: 0.1, roughness: 0.15, metalness: 0.86, side: THREE.DoubleSide }),
-  floor: new THREE.MeshStandardMaterial({ color: 0x08192f, transparent: true, opacity: 0.95, roughness: 0.42, metalness: 0.42 }),
-  room: new THREE.MeshStandardMaterial({ color: 0x163859, transparent: true, opacity: 0.7, roughness: 0.55, metalness: 0.2 }),
-  roomHover: new THREE.MeshStandardMaterial({ color: 0x2bcfff, emissive: 0x2bcfff, emissiveIntensity: 0.4, transparent: true, opacity: 0.85 }),
-  hover: new THREE.MeshStandardMaterial({ color: 0x63e3ff, emissive: 0x2bcfff, emissiveIntensity: 0.6, transparent: true, opacity: 0.85 }),
-  bedNormal: new THREE.MeshStandardMaterial({ color: 0x728aa3, emissive: 0x728aa3, emissiveIntensity: 0.22, metalness: 0.42, roughness: 0.34 }),
-  bedOccupied: new THREE.MeshStandardMaterial({ color: 0x39d4ff, emissive: 0x39d4ff, emissiveIntensity: 0.44, metalness: 0.38, roughness: 0.28 }),
-  bedSleep: new THREE.MeshStandardMaterial({ color: 0x456dff, emissive: 0x456dff, emissiveIntensity: 0.4, metalness: 0.36, roughness: 0.3 }),
-  bedAi: new THREE.MeshStandardMaterial({ color: 0xa27dff, emissive: 0xa27dff, emissiveIntensity: 0.42, metalness: 0.34, roughness: 0.32 }),
-  bedWarning: new THREE.MeshStandardMaterial({ color: 0xffb354, emissive: 0xffb354, emissiveIntensity: 0.48, metalness: 0.34, roughness: 0.3 }),
-  bedAlert: new THREE.MeshStandardMaterial({ color: 0xff5d7c, emissive: 0xff5d7c, emissiveIntensity: 0.76, metalness: 0.26, roughness: 0.28 }),
-  bedOffline: new THREE.MeshStandardMaterial({ color: 0x7388a0, emissive: 0x7388a0, emissiveIntensity: 0.18, metalness: 0.2, roughness: 0.5 })
+  buildingShell: new THREE.MeshStandardMaterial({ color: 0xe9f1fb, transparent: true, opacity: 0.98, roughness: 0.74, metalness: 0.06 }),
+  buildingCap: new THREE.MeshStandardMaterial({ color: 0xdbe8f7, transparent: true, opacity: 1, roughness: 0.62, metalness: 0.04 }),
+  buildingHitbox: new THREE.MeshBasicMaterial({ color: 0x7da0ff, transparent: true, opacity: 0.01, side: THREE.DoubleSide }),
+  floor: new THREE.MeshStandardMaterial({ color: 0xf7fbff, transparent: true, opacity: 0.98, roughness: 0.8, metalness: 0.02 }),
+  roomNeutral: new THREE.MeshStandardMaterial({ color: 0xf6efe4, transparent: true, opacity: 0.98, roughness: 0.84, metalness: 0.02 }),
+  roomHover: new THREE.MeshStandardMaterial({ color: 0xe3efff, emissive: 0xe8f3ff, emissiveIntensity: 0.08, transparent: true, opacity: 0.98 }),
+  hover: new THREE.MeshStandardMaterial({ color: 0xe7f2ff, emissive: 0xdcecff, emissiveIntensity: 0.16, transparent: true, opacity: 0.98 }),
+  bedNormal: new THREE.MeshStandardMaterial({ color: 0xc9d2dc, emissive: 0xe5ebf1, emissiveIntensity: 0.08, metalness: 0.12, roughness: 0.44 }),
+  bedOccupied: new THREE.MeshStandardMaterial({ color: 0x58c392, emissive: 0x81e3b7, emissiveIntensity: 0.3, metalness: 0.08, roughness: 0.3 }),
+  bedSleep: new THREE.MeshStandardMaterial({ color: 0xf2b14c, emissive: 0xffd18a, emissiveIntensity: 0.3, metalness: 0.06, roughness: 0.3 }),
+  bedAi: new THREE.MeshStandardMaterial({ color: 0x8b78e8, emissive: 0xb4a6ff, emissiveIntensity: 0.28, metalness: 0.08, roughness: 0.34 }),
+  bedWarning: new THREE.MeshStandardMaterial({ color: 0xf2b14c, emissive: 0xffd18a, emissiveIntensity: 0.24, metalness: 0.06, roughness: 0.3 }),
+  bedAlert: new THREE.MeshStandardMaterial({ color: 0xef6f7c, emissive: 0xff9faa, emissiveIntensity: 0.36, metalness: 0.06, roughness: 0.28 }),
+  bedOffline: new THREE.MeshStandardMaterial({ color: 0xc9d2dc, emissive: 0xdce5ee, emissiveIntensity: 0.08, metalness: 0.08, roughness: 0.42 })
 }
 
-function initScene() {
-  if (!canvasRef.value) return
-
-  const width = canvasRef.value.clientWidth
-  const height = canvasRef.value.clientHeight
-
-  scene.value = new THREE.Scene()
-  scene.value.background = new THREE.Color(0x030b16)
-  scene.value.fog = new THREE.FogExp2(0x020811, 0.008)
-
-  camera.value = new THREE.PerspectiveCamera(42, width / height, 0.1, 1600)
-  camera.value.position.set(42, 38, 64)
-
-  renderer.value = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-  renderer.value.setSize(width, height)
-  renderer.value.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-  renderer.value.setClearColor(0x020811, 1)
-  renderer.value.outputColorSpace = THREE.SRGBColorSpace
-  renderer.value.toneMapping = THREE.ACESFilmicToneMapping
-  renderer.value.toneMappingExposure = 1.16
-  canvasRef.value.appendChild(renderer.value.domElement)
-
-  cssRenderer.value = new CSS2DRenderer()
-  cssRenderer.value.setSize(width, height)
-  cssRenderer.value.domElement.style.position = 'absolute'
-  cssRenderer.value.domElement.style.top = '0'
-  cssRenderer.value.domElement.style.pointerEvents = 'none'
-  canvasRef.value.appendChild(cssRenderer.value.domElement)
-
-  controls.value = new OrbitControls(camera.value, renderer.value.domElement)
-  controls.value.enableDamping = true
-  controls.value.dampingFactor = 0.05
-  controls.value.minDistance = 8
-  controls.value.maxDistance = 180
-  controls.value.maxPolarAngle = Math.PI / 2 - 0.04
-  controls.value.autoRotate = true
-  controls.value.autoRotateSpeed = 0.12
-
-  const ambientLight = new THREE.AmbientLight(0xd8efff, 0.62)
-  scene.value.add(ambientLight)
-
-  const topLight = new THREE.DirectionalLight(0xf0fbff, 1.45)
-  topLight.position.set(36, 80, 40)
-  scene.value.add(topLight)
-
-  const fillLight = new THREE.DirectionalLight(0x45bfff, 0.65)
-  fillLight.position.set(-40, 24, -36)
-  scene.value.add(fillLight)
-
-  const rimLight = new THREE.PointLight(0x8f74ff, 1.2, 260, 2)
-  rimLight.position.set(0, 20, -24)
-  scene.value.add(rimLight)
-
-  buildAtmosphere()
-
-  renderer.value.domElement.addEventListener('pointermove', onPointerMove)
-  renderer.value.domElement.addEventListener('click', onClick)
-  window.addEventListener('resize', onWindowResize)
-
-  buildSceneData()
-  animate()
+function emitScopeChange(scope: PanoramaScope) {
+  emit('scope-change', { ...scope })
 }
 
-function buildAtmosphere() {
-  if (!scene.value) return
+function applyScope(scope: PanoramaScope, options?: { emit?: boolean; animate?: boolean }) {
+  currentLevel.value = scope.level
+  selectedBuilding.value = scope.building || ''
+  selectedFloor.value = scope.floor || ''
+  selectedRoom.value = scope.room || ''
+  updateVisibility()
 
-  const gridHelper = new THREE.GridHelper(280, 42, 0x163859, 0x0a1526)
-  gridHelper.position.y = -0.12
-  gridHelper.material.transparent = true
-  ;(gridHelper.material as THREE.Material).opacity = 0.38
-  gridHelper.userData.isGenerated = true
-  scene.value.add(gridHelper)
-
-  const ringGeo = new THREE.RingGeometry(32, 34, 120)
-  const ringMat = new THREE.MeshBasicMaterial({ color: 0x2bcfff, transparent: true, opacity: 0.08, side: THREE.DoubleSide })
-  const ringMesh = new THREE.Mesh(ringGeo, ringMat)
-  ringMesh.rotation.x = -Math.PI / 2
-  ringMesh.position.y = -0.08
-  ringMesh.userData.isGenerated = true
-  scene.value.add(ringMesh)
-
-  const particleGeometry = new THREE.BufferGeometry()
-  const particleCount = 320
-  const positions = new Float32Array(particleCount * 3)
-  for (let i = 0; i < particleCount; i += 1) {
-    positions[i * 3] = (Math.random() - 0.5) * 180
-    positions[i * 3 + 1] = Math.random() * 28 + 4
-    positions[i * 3 + 2] = (Math.random() - 0.5) * 180
+  if (options?.emit) {
+    emitScopeChange(scope)
   }
-  particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-  const particleMaterial = new THREE.PointsMaterial({
-    size: 0.7,
-    color: 0x57d7ff,
-    transparent: true,
-    opacity: 0.4
-  })
-  particles = new THREE.Points(particleGeometry, particleMaterial)
-  particles.userData.isGenerated = true
-  scene.value.add(particles)
+  if (options?.animate !== false) {
+    focusScope(scope)
+  }
 }
 
 function createLabel(text: string, className: string) {
@@ -252,59 +224,202 @@ function materialForState(state: ReturnType<typeof resolveBedVisualState>) {
   return materials.bedNormal.clone()
 }
 
+function roomMaterialForData(room: RoomScene) {
+  const ratio = room.totalBeds ? room.occupiedBeds / room.totalBeds : 0
+  const concernBeds = room.beds.filter((bed) => ['HIGH', 'MEDIUM'].includes(String(bed.riskLevel || '')) || Number(bed.abnormalVital24hCount || 0) > 0).length
+  const material = materials.roomNeutral.clone()
+  if (concernBeds > 0) {
+    material.color = new THREE.Color(0xf3eefe)
+    material.emissive = new THREE.Color(0xded6ff)
+    material.emissiveIntensity = 0.06
+    return material
+  }
+  if (ratio >= 1) {
+    material.color = new THREE.Color(0xe6f5ee)
+    material.emissive = new THREE.Color(0xcff0dd)
+    material.emissiveIntensity = 0.05
+    return material
+  }
+  if (ratio === 0) {
+    material.color = new THREE.Color(0xf2f5f9)
+    return material
+  }
+  material.color = new THREE.Color(0xf6efe4)
+  material.emissive = new THREE.Color(0xfff5ea)
+  material.emissiveIntensity = 0.03
+  return material
+}
+
+function createBuildingMass(totalFloors: number) {
+  const group = new THREE.Group()
+  const width = 10
+  const depth = 10
+  const floorHeight = 1.75
+  for (let index = 0; index < totalFloors; index += 1) {
+    const shell = new THREE.Mesh(
+      new THREE.BoxGeometry(width - index * 0.18, floorHeight, depth - index * 0.18),
+      materials.buildingShell.clone()
+    )
+    shell.position.y = floorHeight / 2 + index * (floorHeight * 0.96)
+    group.add(shell)
+  }
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(width + 0.6, 0.4, depth + 0.6), materials.buildingCap.clone())
+  roof.position.y = totalFloors * (floorHeight * 0.96) + 0.3
+  group.add(roof)
+  return group
+}
+
 function createBedUnit(bed: any, width: number, depth: number) {
   const state = resolveBedVisualState(bed)
   const group = new THREE.Group()
-  const frameHeight = 0.22
+  const frameHeight = 0.2
 
   const base = new THREE.Mesh(
     new THREE.BoxGeometry(width, frameHeight, depth),
-    new THREE.MeshStandardMaterial({
-      color: 0x10253d,
-      metalness: 0.5,
-      roughness: 0.42
-    })
+    new THREE.MeshStandardMaterial({ color: 0xeaf0f6, metalness: 0.06, roughness: 0.54 })
   )
   base.position.y = frameHeight / 2
   group.add(base)
 
   const mattressMaterial = materialForState(state)
-  const mattress = new THREE.Mesh(new THREE.BoxGeometry(width * 0.82, 0.14, depth * 0.74), mattressMaterial)
+  const mattress = new THREE.Mesh(new THREE.BoxGeometry(width * 0.82, 0.14, depth * 0.7), mattressMaterial)
   mattress.position.y = frameHeight + 0.08
   mattress.userData = { type: 'bed', bed, originalMat: mattressMaterial, state }
   group.add(mattress)
   interactableObjects.push(mattress)
 
   const headboard = new THREE.Mesh(
-    new THREE.BoxGeometry(width * 0.84, 0.34, 0.08),
-    new THREE.MeshStandardMaterial({ color: 0x1f4367, metalness: 0.42, roughness: 0.26 })
+    new THREE.BoxGeometry(width * 0.84, 0.3, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0xc8d7ea, metalness: 0.08, roughness: 0.3 })
   )
-  headboard.position.set(0, 0.34, -depth * 0.36)
+  headboard.position.set(0, 0.3, -depth * 0.34)
   group.add(headboard)
 
-  const glow = new THREE.Mesh(
-    new THREE.PlaneGeometry(width * 0.96, depth * 0.88),
-    new THREE.MeshBasicMaterial({
-      color: mattressMaterial.color,
-      transparent: true,
-      opacity: state === 'alert' ? 0.24 : 0.12
-    })
+  const halo = new THREE.Mesh(
+    new THREE.RingGeometry(Math.min(width, depth) * 0.38, Math.min(width, depth) * 0.52, 32),
+    new THREE.MeshBasicMaterial({ color: mattressMaterial.color, transparent: true, opacity: state === 'alert' ? 0.24 : 0.12, side: THREE.DoubleSide })
   )
-  glow.rotation.x = -Math.PI / 2
-  glow.position.y = 0.02
-  group.add(glow)
+  halo.rotation.x = -Math.PI / 2
+  halo.position.y = 0.03
+  halo.userData.isHalo = true
+  group.add(halo)
+  mattress.userData.halo = halo
 
-  if (state === 'alert') {
-    animatedBeds.push({ mesh: mattress, type: 'pulse', baseIntensity: 0.76 })
-  } else if (state === 'ai') {
-    animatedBeds.push({ mesh: mattress, type: 'ai', baseIntensity: 0.42 })
-  } else if (state === 'warning') {
-    animatedBeds.push({ mesh: mattress, type: 'blink', baseIntensity: 0.48 })
-  } else if (state === 'sleep') {
-    animatedBeds.push({ mesh: mattress, type: 'sleep', baseIntensity: 0.44 })
-  }
+  if (state === 'alert') animatedBeds.push({ mesh: mattress, type: 'pulse', baseIntensity: 0.42 })
+  else if (state === 'ai') animatedBeds.push({ mesh: mattress, type: 'ai', baseIntensity: 0.24 })
+  else if (state === 'warning') animatedBeds.push({ mesh: mattress, type: 'blink', baseIntensity: 0.28 })
+  else if (state === 'sleep') animatedBeds.push({ mesh: mattress, type: 'sleep', baseIntensity: 0.26 })
 
   return group
+}
+
+function buildAtmosphere() {
+  if (!scene.value) return
+
+  const campusBase = new THREE.Mesh(
+    new THREE.CylinderGeometry(78, 84, 1.4, 64),
+    new THREE.MeshStandardMaterial({
+      color: 0xf2f7fd,
+      roughness: 0.86,
+      metalness: 0.02
+    })
+  )
+  campusBase.position.y = -0.7
+  campusBase.userData.isGenerated = true
+  scene.value.add(campusBase)
+
+  const gridHelper = new THREE.GridHelper(180, 28, 0xd5e3f3, 0xe6eef7)
+  gridHelper.position.y = 0.02
+  gridHelper.material.transparent = true
+  ;(gridHelper.material as THREE.Material).opacity = 0.24
+  gridHelper.userData.isGenerated = true
+  scene.value.add(gridHelper)
+
+  const ringGeo = new THREE.RingGeometry(28, 31, 96)
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0x7da0ff, transparent: true, opacity: 0.05, side: THREE.DoubleSide })
+  const ringMesh = new THREE.Mesh(ringGeo, ringMat)
+  ringMesh.rotation.x = -Math.PI / 2
+  ringMesh.position.y = 0.04
+  ringMesh.userData.isGenerated = true
+  scene.value.add(ringMesh)
+
+  const particleGeometry = new THREE.BufferGeometry()
+  const particleCount = 240
+  const positions = new Float32Array(particleCount * 3)
+  for (let i = 0; i < particleCount; i += 1) {
+    positions[i * 3] = (Math.random() - 0.5) * 144
+    positions[i * 3 + 1] = Math.random() * 22 + 5
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 144
+  }
+  particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  const particleMaterial = new THREE.PointsMaterial({ size: 0.42, color: 0x8fb3ff, transparent: true, opacity: 0.16 })
+  particles = new THREE.Points(particleGeometry, particleMaterial)
+  particles.userData.isGenerated = true
+  scene.value.add(particles)
+}
+
+function initScene() {
+  if (!canvasRef.value) return
+
+  const width = canvasRef.value.clientWidth
+  const height = canvasRef.value.clientHeight
+
+  scene.value = new THREE.Scene()
+  scene.value.background = new THREE.Color(0xf3f8fe)
+  scene.value.fog = new THREE.FogExp2(0xf3f8fe, 0.0022)
+
+  camera.value = new THREE.PerspectiveCamera(40, width / height, 0.1, 1600)
+  camera.value.position.set(50, 38, 62)
+
+  renderer.value = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+  renderer.value.setSize(width, height)
+  renderer.value.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+  renderer.value.setClearColor(0xf3f8fe, 1)
+  renderer.value.outputColorSpace = THREE.SRGBColorSpace
+  renderer.value.toneMapping = THREE.ACESFilmicToneMapping
+  renderer.value.toneMappingExposure = 0.96
+  canvasRef.value.appendChild(renderer.value.domElement)
+
+  cssRenderer.value = new CSS2DRenderer()
+  cssRenderer.value.setSize(width, height)
+  cssRenderer.value.domElement.style.position = 'absolute'
+  cssRenderer.value.domElement.style.top = '0'
+  cssRenderer.value.domElement.style.pointerEvents = 'none'
+  canvasRef.value.appendChild(cssRenderer.value.domElement)
+
+  controls.value = new OrbitControls(camera.value, renderer.value.domElement)
+  controls.value.enableDamping = true
+  controls.value.dampingFactor = 0.04
+  controls.value.minDistance = 10
+  controls.value.maxDistance = 220
+  controls.value.maxPolarAngle = Math.PI / 2 - 0.06
+  controls.value.autoRotate = true
+  controls.value.autoRotateSpeed = 0.14
+  controls.value.target.set(0, 6, 0)
+
+  const ambientLight = new THREE.AmbientLight(0xffffff, 1)
+  scene.value.add(ambientLight)
+
+  const topLight = new THREE.DirectionalLight(0xffffff, 1.18)
+  topLight.position.set(40, 90, 40)
+  scene.value.add(topLight)
+
+  const fillLight = new THREE.DirectionalLight(0xb7cbff, 0.4)
+  fillLight.position.set(-56, 28, -46)
+  scene.value.add(fillLight)
+
+  const rimLight = new THREE.PointLight(0xb2c6ff, 0.72, 240, 2)
+  rimLight.position.set(0, 18, -20)
+  scene.value.add(rimLight)
+
+  buildAtmosphere()
+
+  renderer.value.domElement.addEventListener('pointermove', onPointerMove)
+  renderer.value.domElement.addEventListener('click', onClick)
+  window.addEventListener('resize', onWindowResize)
+
+  buildSceneData()
+  animate()
 }
 
 function clearScene() {
@@ -336,7 +451,7 @@ function buildSceneData() {
   scene.value.add(parkGroup)
 
   const cols = Math.ceil(Math.sqrt(props.buildings.length))
-  const spacing = 24
+  const spacing = 26
 
   props.buildings.forEach((buildingName, buildingIndex) => {
     const buildingGroup = new THREE.Group()
@@ -344,35 +459,77 @@ function buildSceneData() {
 
     const row = Math.floor(buildingIndex / cols)
     const col = buildingIndex % cols
-    buildingGroup.position.set((col - (cols - 1) / 2) * spacing, 0, (row - (Math.ceil(props.buildings.length / cols) - 1) / 2) * spacing)
+    buildingGroup.position.set(
+      (col - (cols - 1) / 2) * spacing,
+      0,
+      (row - (Math.ceil(props.buildings.length / cols) - 1) / 2) * spacing
+    )
 
     const buildingFloors = props.floors.filter((floor) => props.roomLookup.has(`${buildingName}@@${floor}`))
-    const floorHeight = 4
     const totalFloors = buildingFloors.length || 1
+
+    const plinth = new THREE.Mesh(
+      new THREE.CylinderGeometry(7.8, 8.8, 1.4, 18),
+      new THREE.MeshStandardMaterial({ color: 0x0f1b29, roughness: 0.72, metalness: 0.06 })
+    )
+    plinth.position.y = 0.6
+    buildingGroup.add(plinth)
+
+    const buildingMass = createBuildingMass(totalFloors)
+    buildingMass.position.y = 1.3
+    buildingMass.userData.type = 'buildingMass'
+    buildingGroup.add(buildingMass)
 
     buildingFloors.forEach((floorName, floorIndex) => {
       const floorGroup = new THREE.Group()
       const floorYIndex = totalFloors - 1 - floorIndex
-      floorGroup.position.y = floorYIndex * floorHeight
+      floorGroup.position.y = floorYIndex * 4.4 + 1.4
       floorGroup.userData = { type: 'floor', building: buildingName, name: floorName, floorYIndex }
 
       const rooms = props.roomLookup.get(`${buildingName}@@${floorName}`) || []
       const roomColumns = Math.ceil(Math.sqrt(Math.max(rooms.length, 1)))
-      const roomSize = 4.4
-      const roomGap = 0.8
-      const slabWidth = roomColumns * (roomSize + roomGap) + 1.2
-      const slabDepth = Math.ceil(Math.max(rooms.length, 1) / roomColumns) * (roomSize + roomGap) + 1.2
+      const roomSize = 4.5
+      const roomGap = 0.84
+      const slabWidth = roomColumns * (roomSize + roomGap) + 1.4
+      const slabDepth = Math.ceil(Math.max(rooms.length, 1) / roomColumns) * (roomSize + roomGap) + 1.4
 
-      const floorSlab = new THREE.Mesh(new THREE.BoxGeometry(slabWidth, 0.42, slabDepth), materials.floor.clone())
+      const floorSlab = new THREE.Mesh(new THREE.BoxGeometry(slabWidth, 0.36, slabDepth), materials.floor.clone())
       floorSlab.position.y = 0.18
-      floorSlab.userData = { type: 'floorSlab', building: buildingName, floor: floorName, originalMat: materials.floor }
+      floorSlab.userData = { type: 'floorSlab', building: buildingName, floor: floorName, originalMat: materials.floor.clone() }
       floorGroup.add(floorSlab)
       interactableObjects.push(floorSlab)
       objectsMap.set(`floor_${buildingName}_${floorName}`, floorGroup)
 
+      const corridor = new THREE.Mesh(
+        new THREE.BoxGeometry(Math.max(3.6, slabWidth * 0.24), 0.04, slabDepth - 1.2),
+        new THREE.MeshStandardMaterial({ color: 0xe8eef6, roughness: 0.92, metalness: 0.02 })
+      )
+      corridor.position.y = 0.21
+      floorGroup.add(corridor)
+
+      const nurseStation = new THREE.Group()
+      nurseStation.position.set(0, 0.32, 0)
+      const stationBase = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.3, 1.45, 0.42, 28),
+        new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0.04 })
+      )
+      const stationTop = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.05, 1.15, 0.16, 28),
+        new THREE.MeshStandardMaterial({ color: 0xdce8f6, roughness: 0.32, metalness: 0.08 })
+      )
+      stationTop.position.y = 0.24
+      nurseStation.add(stationBase)
+      nurseStation.add(stationTop)
+      floorGroup.add(nurseStation)
+
+      const stationLabel = createLabel('护理站', 'station-label')
+      stationLabel.position.set(0, 1.05, 0)
+      stationLabel.visible = true
+      floorGroup.add(stationLabel)
+
       const slabEdge = new THREE.LineSegments(
-        new THREE.EdgesGeometry(new THREE.BoxGeometry(slabWidth, 0.42, slabDepth)),
-        new THREE.LineBasicMaterial({ color: 0x2bcfff, transparent: true, opacity: 0.28 })
+        new THREE.EdgesGeometry(new THREE.BoxGeometry(slabWidth, 0.36, slabDepth)),
+        new THREE.LineBasicMaterial({ color: 0xb8cbe0, transparent: true, opacity: 0.28 })
       )
       slabEdge.position.y = 0.18
       floorGroup.add(slabEdge)
@@ -385,60 +542,87 @@ function buildSceneData() {
         const c = roomIndex % roomColumns
         roomGroup.position.set(
           (c - (roomColumns - 1) / 2) * (roomSize + roomGap),
-          0.42,
+          0.38,
           (r - (Math.ceil(Math.max(rooms.length, 1) / roomColumns) - 1) / 2) * (roomSize + roomGap)
         )
 
-        const roomTile = new THREE.Mesh(new THREE.BoxGeometry(roomSize, 0.22, roomSize), materials.room.clone())
-        roomTile.position.y = 0.11
-        roomTile.userData = { type: 'roomTile', ref: roomGroup, data: roomItem, floorName, originalMat: materials.room }
+        const roomMaterial = roomMaterialForData(roomItem)
+        const roomTile = new THREE.Mesh(new THREE.BoxGeometry(roomSize, 0.18, roomSize), roomMaterial)
+        roomTile.position.y = 0.09
+        roomTile.userData = { type: 'roomTile', ref: roomGroup, data: roomItem, floorName, originalMat: roomMaterial }
         roomGroup.add(roomTile)
         interactableObjects.push(roomTile)
 
-        const roomEdges = new THREE.LineSegments(
-          new THREE.EdgesGeometry(new THREE.BoxGeometry(roomSize, 0.22, roomSize)),
-          new THREE.LineBasicMaterial({ color: 0x2bcfff, transparent: true, opacity: 0.26 })
+        const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xf8fbff, roughness: 0.86, metalness: 0.02 })
+        const wallHeight = 1.08
+        const wallThickness = 0.08
+        const sideWallDepth = roomSize - 0.32
+        const rearWall = new THREE.Mesh(new THREE.BoxGeometry(roomSize, wallHeight, wallThickness), wallMaterial)
+        rearWall.position.set(0, wallHeight / 2 + 0.09, -roomSize / 2 + wallThickness / 2)
+        roomGroup.add(rearWall)
+        ;[-1, 1].forEach((direction) => {
+          const sideWall = new THREE.Mesh(new THREE.BoxGeometry(wallThickness, wallHeight, sideWallDepth), wallMaterial)
+          sideWall.position.set(direction * (roomSize / 2 - wallThickness / 2), wallHeight / 2 + 0.09, 0)
+          roomGroup.add(sideWall)
+        })
+        const frontWallWidth = (roomSize - 1.36) / 2
+        ;[-1, 1].forEach((direction) => {
+          const frontWall = new THREE.Mesh(new THREE.BoxGeometry(frontWallWidth, wallHeight, wallThickness), wallMaterial)
+          frontWall.position.set(direction * (0.68 + frontWallWidth / 2), wallHeight / 2 + 0.09, roomSize / 2 - wallThickness / 2)
+          roomGroup.add(frontWall)
+        })
+        const doorLintel = new THREE.Mesh(
+          new THREE.BoxGeometry(1.28, 0.14, wallThickness),
+          new THREE.MeshStandardMaterial({ color: 0xd9e5f3, roughness: 0.42, metalness: 0.06 })
         )
-        roomEdges.position.y = 0.11
+        doorLintel.position.set(0, wallHeight + 0.02, roomSize / 2 - wallThickness / 2)
+        roomGroup.add(doorLintel)
+
+        const roomEdges = new THREE.LineSegments(
+          new THREE.EdgesGeometry(new THREE.BoxGeometry(roomSize, 0.18, roomSize)),
+          new THREE.LineBasicMaterial({ color: roomItem.occupiedBeds >= roomItem.totalBeds ? 0x8ad1dc : 0x546778, transparent: true, opacity: 0.24 })
+        )
+        roomEdges.position.y = 0.09
         roomGroup.add(roomEdges)
 
         const bedCount = roomItem.beds.length
         if (bedCount) {
           const bedColumns = Math.ceil(Math.sqrt(bedCount))
           const bedWidth = (roomSize - 0.8) / bedColumns
-          const bedDepth = Math.min(bedWidth * 1.5, (roomSize - 0.8) / Math.ceil(bedCount / bedColumns))
+          const bedDepth = Math.min(bedWidth * 1.46, (roomSize - 0.8) / Math.ceil(bedCount / bedColumns))
           roomItem.beds.forEach((bed: any, bedIndex: number) => {
-            const bedUnit = createBedUnit(bed, bedWidth * 0.88, bedDepth * 0.82)
+            const bedUnit = createBedUnit(bed, bedWidth * 0.88, bedDepth * 0.8)
             const rowIndex = Math.floor(bedIndex / bedColumns)
             const colIndex = bedIndex % bedColumns
             bedUnit.position.set(
               (colIndex - (bedColumns - 1) / 2) * bedWidth,
-              0.26,
+              0.22,
               (rowIndex - (Math.ceil(bedCount / bedColumns) - 1) / 2) * bedDepth
             )
             roomGroup.add(bedUnit)
           })
         }
 
-        const roomLabel = createLabel(`${roomItem.roomNo}  ${roomItem.occupiedBeds}/${roomItem.totalBeds}`, 'room-label')
-        roomLabel.position.set(0, 1.9, 0)
+        const roomLabel = createLabel(`${roomItem.roomNo} · ${roomItem.occupiedBeds}/${roomItem.totalBeds}`, 'room-label')
+        roomLabel.position.set(0, 1.76, 0)
         roomLabel.visible = false
         roomGroup.add(roomLabel)
 
         floorGroup.add(roomGroup)
+        objectsMap.set(`room_${buildingName}_${floorName}_${roomItem.roomNo}`, roomGroup)
       })
 
       const floorLabel = createLabel(floorName, 'floor-label')
-      floorLabel.position.set(slabWidth / 2 + 1.6, 0.2, 0)
+      floorLabel.position.set(slabWidth / 2 + 1.2, 0.1, 0)
       floorLabel.visible = false
       floorGroup.add(floorLabel)
 
       buildingGroup.add(floorGroup)
     })
 
-    const hitboxHeight = Math.max(totalFloors * floorHeight, floorHeight)
-    const hitbox = new THREE.Mesh(new THREE.BoxGeometry(12, hitboxHeight, 12), materials.building.clone())
-    hitbox.position.y = hitboxHeight / 2
+    const hitboxHeight = Math.max(totalFloors * 2.1, 3.8)
+    const hitbox = new THREE.Mesh(new THREE.BoxGeometry(12, hitboxHeight, 12), materials.buildingHitbox.clone())
+    hitbox.position.y = hitboxHeight / 2 + 1.4
     hitbox.userData = {
       type: 'buildingHitbox',
       name: buildingName,
@@ -451,13 +635,13 @@ function buildSceneData() {
 
     const hitboxEdges = new THREE.LineSegments(
       new THREE.EdgesGeometry(new THREE.BoxGeometry(12, hitboxHeight, 12)),
-      new THREE.LineBasicMaterial({ color: 0x57d7ff, transparent: true, opacity: 0.58 })
+      new THREE.LineBasicMaterial({ color: 0x8ad1dc, transparent: true, opacity: 0.36 })
     )
-    hitboxEdges.position.y = hitboxHeight / 2
+    hitboxEdges.position.y = hitboxHeight / 2 + 1.4
     buildingGroup.add(hitboxEdges)
 
     const buildingLabel = createLabel(buildingName, 'building-label')
-    buildingLabel.position.set(0, hitboxHeight + 2.2, 0)
+    buildingLabel.position.set(0, hitboxHeight + 3.2, 0)
     buildingGroup.add(buildingLabel)
 
     parkGroup.add(buildingGroup)
@@ -468,21 +652,25 @@ function buildSceneData() {
 }
 
 function updateVisibility() {
-  controls.value!.autoRotate = currentLevel.value === 'PARK' && cruiseEnabled.value
+  if (!controls.value) return
+  controls.value.autoRotate = currentLevel.value === 'PARK' && cruiseEnabled.value
+
   objectsMap.forEach((obj, key) => {
     if (!key.startsWith('building_')) return
     const buildingName = obj.userData.name
     const hitbox = obj.children.find((child) => child.userData.type === 'buildingHitbox')
     const buildingLabel = obj.children.find((child) => child instanceof CSS2DObject && child.element.className.includes('building-label'))
+    const buildingMass = obj.children.find((child) => child.userData.type === 'buildingMass')
 
     if (currentLevel.value === 'PARK') {
       obj.visible = true
       if (hitbox) hitbox.visible = true
       if (buildingLabel) buildingLabel.visible = true
+      if (buildingMass) buildingMass.visible = true
       obj.children.forEach((child) => {
         if (child.userData.type === 'floor') {
           child.visible = false
-          gsap.to(child.position, { y: child.userData.originalY ?? child.position.y, duration: 0.5 })
+          gsap.to(child.position, { y: child.userData.originalY ?? child.position.y, duration: 0.45 })
         }
       })
       return
@@ -496,13 +684,15 @@ function updateVisibility() {
     obj.visible = true
     if (hitbox) hitbox.visible = false
     if (buildingLabel) buildingLabel.visible = false
+    if (buildingMass) buildingMass.visible = false
 
     obj.children.forEach((child) => {
       if (child.userData.type !== 'floor') return
       child.userData.originalY = child.userData.originalY ?? child.position.y
+
       if (currentLevel.value === 'BUILDING') {
         child.visible = true
-        gsap.to(child.position, { y: child.userData.floorYIndex * 8.5, duration: 0.85, ease: 'power2.out' })
+        gsap.to(child.position, { y: child.userData.floorYIndex * 10.2 + 1.4, duration: 0.82, ease: 'power2.out' })
         child.children.forEach((subChild) => {
           if (subChild.userData.type === 'room') {
             subChild.visible = true
@@ -516,15 +706,15 @@ function updateVisibility() {
 
       if (child.userData.name === selectedFloor.value) {
         child.visible = true
-        gsap.to(child.position, { y: 0, duration: 0.85, ease: 'power2.out' })
+        gsap.to(child.position, { y: 1.4, duration: 0.82, ease: 'power2.out' })
         child.children.forEach((subChild) => {
           if (subChild.userData.type === 'room') {
             const isCurrentRoom = subChild.userData.room.roomNo === selectedRoom.value
             subChild.visible = currentLevel.value !== 'ROOM' || isCurrentRoom
             const roomLabel = subChild.children.find((roomChild) => roomChild instanceof CSS2DObject && roomChild.element.className.includes('room-label'))
-            if (roomLabel) roomLabel.visible = currentLevel.value === 'FLOOR'
+            if (roomLabel) roomLabel.visible = currentLevel.value !== 'ROOM'
           }
-          if (subChild instanceof CSS2DObject && subChild.element.className.includes('floor-label')) subChild.visible = false
+          if (subChild instanceof CSS2DObject && subChild.element.className.includes('floor-label')) subChild.visible = currentLevel.value === 'FLOOR'
         })
       } else {
         child.visible = false
@@ -533,16 +723,27 @@ function updateVisibility() {
   })
 }
 
+function setTooltipPosition(event: PointerEvent) {
+  if (!containerRef.value) return
+  const rect = containerRef.value.getBoundingClientRect()
+  const desiredX = event.clientX - rect.left + 18
+  const desiredY = event.clientY - rect.top + 18
+  tooltip.value.x = Math.min(Math.max(desiredX, 18), rect.width - 250)
+  tooltip.value.y = Math.min(Math.max(desiredY, 18), rect.height - 180)
+}
+
 function updateTooltip(event: PointerEvent, obj: THREE.Object3D) {
   tooltip.value.visible = true
-  tooltip.value.x = event.clientX + 18
-  tooltip.value.y = event.clientY + 18
+  setTooltipPosition(event)
 
   if (obj.userData.type === 'buildingHitbox') {
     tooltip.value.title = obj.userData.name
-    tooltip.value.content = `<div class="tt-row"><span>楼层数</span><span class="tt-val cyan">${obj.userData.totalFloors} 层</span></div>
-      <div class="tt-row"><span>总房间</span><span class="tt-val">${obj.userData.totalRooms} 间</span></div>
-      <div class="tt-tip">点击展开楼栋内部结构</div>`
+    tooltip.value.badge = '楼栋'
+    tooltip.value.rows = [
+      { label: '楼层数', value: `${obj.userData.totalFloors} 层`, tone: 'cyan' },
+      { label: '总房间', value: `${obj.userData.totalRooms} 间` }
+    ]
+    tooltip.value.tip = '点击展开楼栋内部结构'
     focusTitle.value = obj.userData.name
     focusStatus.value = '楼栋级观察'
     return
@@ -550,8 +751,12 @@ function updateTooltip(event: PointerEvent, obj: THREE.Object3D) {
 
   if (obj.userData.type === 'floorSlab') {
     tooltip.value.title = `${obj.userData.building} / ${obj.userData.floor}`
-    tooltip.value.content = `<div class="tt-row"><span>透视模式</span><span class="tt-val cyan">楼层平铺</span></div>
-      <div class="tt-tip">点击进入楼层鸟瞰视图</div>`
+    tooltip.value.badge = '楼层'
+    tooltip.value.rows = [
+      { label: '视图模式', value: '楼层爆炸视图', tone: 'cyan' },
+      { label: '下一步', value: '选择房间或床位' }
+    ]
+    tooltip.value.tip = '点击进入楼层鸟瞰视角'
     focusTitle.value = `${obj.userData.building} ${obj.userData.floor}`
     focusStatus.value = '楼层级观察'
     return
@@ -560,9 +765,12 @@ function updateTooltip(event: PointerEvent, obj: THREE.Object3D) {
   if (obj.userData.type === 'roomTile') {
     const roomData = obj.userData.data
     tooltip.value.title = `房间 ${roomData.roomNo || '-'}`
-    tooltip.value.content = `<div class="tt-row"><span>容量</span><span class="tt-val">${roomData.totalBeds} 床</span></div>
-      <div class="tt-row"><span>入住</span><span class="tt-val ${roomData.occupiedBeds >= roomData.totalBeds ? 'red' : 'green'}">${roomData.occupiedBeds}/${roomData.totalBeds}</span></div>
-      <div class="tt-tip">${currentLevel.value === 'ROOM' ? '再次点击打开房间详情' : '点击进入房间视角'}</div>`
+    tooltip.value.badge = '房间'
+    tooltip.value.rows = [
+      { label: '容量', value: `${roomData.totalBeds} 床` },
+      { label: '入住', value: `${roomData.occupiedBeds}/${roomData.totalBeds}`, tone: roomData.occupiedBeds >= roomData.totalBeds ? 'cyan' : 'green' }
+    ]
+    tooltip.value.tip = currentLevel.value === 'ROOM' ? '再次点击打开房间详情' : '点击进入房间视角'
     focusTitle.value = `房间 ${roomData.roomNo || '-'}`
     focusStatus.value = `${roomData.occupiedBeds}/${roomData.totalBeds} 床位占用`
     return
@@ -570,12 +778,14 @@ function updateTooltip(event: PointerEvent, obj: THREE.Object3D) {
 
   if (obj.userData.type === 'bed') {
     const bed = obj.userData.bed
-    const occupiedText = bed.elderId ? `${bed.elderName || '在住长者'}` : '空床待命'
     tooltip.value.title = `床位 ${bed.bedNo || '-'}`
-    tooltip.value.content = `<div class="tt-row"><span>状态</span><span class="tt-val">${occupiedText}</span></div>
-      <div class="tt-row"><span>风险</span><span class="tt-val ${bed.riskLevel === 'HIGH' ? 'red' : bed.riskLevel === 'MEDIUM' ? 'purple' : bed.riskLevel === 'LOW' ? 'blue' : 'cyan'}">${bed.riskLabel || '守护稳定'}</span></div>
-      <div class="tt-row"><span>24h异常</span><span class="tt-val">${bed.abnormalVital24hCount || 0} 次</span></div>
-      <div class="tt-tip">点击查看业务详情</div>`
+    tooltip.value.badge = bed.elderId ? '守护中' : '空床'
+    tooltip.value.rows = [
+      { label: '状态', value: bed.elderId ? (bed.elderName || '在住长者') : '空床待命' },
+      { label: '风险', value: bed.riskLabel || '守护稳定', tone: bed.riskLevel === 'HIGH' ? 'red' : bed.riskLevel === 'MEDIUM' ? 'purple' : bed.riskLevel === 'LOW' ? 'blue' : 'cyan' },
+      { label: '24h异常', value: `${bed.abnormalVital24hCount || 0} 次` }
+    ]
+    tooltip.value.tip = '点击查看业务详情'
     focusTitle.value = `${bed.roomNo || '-'} / ${bed.bedNo || '-'}`
     focusStatus.value = bed.riskLabel || (bed.elderId ? '长者守护中' : '空床待命')
     return
@@ -586,14 +796,18 @@ function updateTooltip(event: PointerEvent, obj: THREE.Object3D) {
 
 function restoreHoverObject(obj: THREE.Object3D) {
   if (obj.userData.type === 'buildingHitbox' || obj.userData.type === 'floorSlab') {
-    ;(obj as THREE.Mesh).material = obj.userData.originalMat || materials.building
+    ;(obj as THREE.Mesh).material = obj.userData.originalMat || materials.buildingHitbox
   }
   if (obj.userData.type === 'roomTile') {
-    ;(obj as THREE.Mesh).material = obj.userData.originalMat || materials.room
+    ;(obj as THREE.Mesh).material = obj.userData.originalMat || materials.roomNeutral
   }
   if (obj.userData.type === 'bed') {
     ;(obj as THREE.Mesh).material = obj.userData.originalMat
     ;(obj as THREE.Mesh).scale.set(1, 1, 1)
+    if (obj.userData.halo) {
+      const haloMaterial = (obj.userData.halo as THREE.Mesh).material as THREE.MeshBasicMaterial
+      haloMaterial.opacity = obj.userData.state === 'alert' ? 0.24 : 0.12
+    }
   }
 }
 
@@ -602,6 +816,7 @@ function onPointerMove(event: PointerEvent) {
   const now = performance.now()
   if (now - lastPointerMoveAt < 32) return
   lastPointerMoveAt = now
+
   const rect = canvasRef.value.getBoundingClientRect()
   pickPosition.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
   pickPosition.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
@@ -632,9 +847,10 @@ function onPointerMove(event: PointerEvent) {
       ;(obj as THREE.Mesh).material = materials.roomHover
     }
     if (obj.userData.type === 'bed') {
-      ;(obj as THREE.Mesh).scale.set(1.14, 1.14, 1.14)
-      if (!animatedBeds.some((item) => item.mesh === obj)) {
-        ;(obj as THREE.Mesh).material = materials.hover
+      ;(obj as THREE.Mesh).scale.set(1.06, 1.06, 1.06)
+      if (obj.userData.halo) {
+        const haloMaterial = (obj.userData.halo as THREE.Mesh).material as THREE.MeshBasicMaterial
+        haloMaterial.opacity = 0.3
       }
     }
     hoveredObj = obj
@@ -650,34 +866,37 @@ function onClick() {
   }
 
   if (hoveredObj.userData.type === 'buildingHitbox') {
-    selectedBuilding.value = hoveredObj.userData.name
-    selectedFloor.value = ''
-    selectedRoom.value = ''
-    currentLevel.value = 'BUILDING'
-    updateVisibility()
-    zoomToObject(hoveredObj.userData.ref)
+    applyScope({
+      level: 'BUILDING',
+      building: hoveredObj.userData.name,
+      floor: '',
+      room: ''
+    }, { emit: true })
     return
   }
 
   if (hoveredObj.userData.type === 'floorSlab') {
-    selectedFloor.value = hoveredObj.userData.floor
-    selectedRoom.value = ''
-    currentLevel.value = 'FLOOR'
-    updateVisibility()
-    const floorGroup = objectsMap.get(`floor_${selectedBuilding.value}_${selectedFloor.value}`)
-    if (floorGroup) zoomToObject(floorGroup, true)
+    applyScope({
+      level: 'FLOOR',
+      building: hoveredObj.userData.building,
+      floor: hoveredObj.userData.floor,
+      room: ''
+    }, { emit: true })
     return
   }
 
   if (hoveredObj.userData.type === 'roomTile') {
+    const roomNo = hoveredObj.userData.ref.userData.room.roomNo
     if (currentLevel.value === 'ROOM') {
       emit('click-room', hoveredObj.userData.data)
       return
     }
-    selectedRoom.value = hoveredObj.userData.ref.userData.room.roomNo
-    currentLevel.value = 'ROOM'
-    updateVisibility()
-    zoomToObject(hoveredObj.userData.ref, false, 18)
+    applyScope({
+      level: 'ROOM',
+      building: selectedBuilding.value,
+      floor: selectedFloor.value,
+      room: roomNo
+    }, { emit: true })
     return
   }
 
@@ -686,73 +905,93 @@ function onClick() {
   }
 }
 
-function zoomToObject(obj: THREE.Object3D, topDown = false, overrideZ?: number) {
+function zoomToObject(obj: THREE.Object3D, topDown = false, overrideDistance?: number) {
   if (!camera.value || !controls.value) return
   const box = new THREE.Box3().setFromObject(obj)
   const center = box.getCenter(new THREE.Vector3())
   const size = box.getSize(new THREE.Vector3())
   const maxDim = Math.max(size.x, size.y, size.z)
   const fov = camera.value.fov * (Math.PI / 180)
-  const cameraDistance = overrideZ || Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.8
-  const offsetX = topDown ? 0 : cameraDistance * 0.42
-  const offsetZ = topDown ? 0 : cameraDistance
+  const cameraDistance = overrideDistance || Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 2
+  const offsetX = topDown ? 0 : cameraDistance * 0.46
+  const offsetZ = topDown ? cameraDistance * 0.18 : cameraDistance
 
   gsap.to(camera.value.position, {
     x: center.x + offsetX,
-    y: topDown ? center.y + cameraDistance : center.y + size.y / 2 + 10,
+    y: topDown ? center.y + cameraDistance * 0.92 : center.y + size.y / 2 + 10,
     z: center.z + offsetZ,
-    duration: 1.24,
+    duration: 1.18,
     ease: 'power3.inOut'
   })
   gsap.to(controls.value.target, {
     x: center.x,
     y: center.y,
     z: center.z,
-    duration: 1.24,
+    duration: 1.18,
     ease: 'power3.inOut'
   })
 }
 
+function focusScope(scope: PanoramaScope) {
+  if (!camera.value || !controls.value) return
+  if (scope.level === 'PARK') {
+    gsap.to(camera.value.position, { x: 50, y: 38, z: 62, duration: 1.1, ease: 'power3.out' })
+    gsap.to(controls.value.target, { x: 0, y: 6, z: 0, duration: 1.1, ease: 'power3.out' })
+    focusTitle.value = '园区总览'
+    focusStatus.value = '等待交互'
+    return
+  }
+  if (scope.level === 'BUILDING') {
+    const buildingGroup = objectsMap.get(`building_${scope.building}`)
+    if (buildingGroup) zoomToObject(buildingGroup, false, 20)
+    return
+  }
+  if (scope.level === 'FLOOR') {
+    const floorGroup = objectsMap.get(`floor_${scope.building}_${scope.floor}`)
+    if (floorGroup) zoomToObject(floorGroup, true, 18)
+    return
+  }
+  const roomGroup = objectsMap.get(`room_${scope.building}_${scope.floor}_${scope.room}`)
+  if (roomGroup) zoomToObject(roomGroup, false, 16)
+}
+
 function goUpLevel() {
   if (currentLevel.value === 'ROOM') {
-    currentLevel.value = 'FLOOR'
-    selectedRoom.value = ''
-    updateVisibility()
-    const floorGroup = objectsMap.get(`floor_${selectedBuilding.value}_${selectedFloor.value}`)
-    if (floorGroup) zoomToObject(floorGroup, true)
+    applyScope({
+      level: 'FLOOR',
+      building: selectedBuilding.value,
+      floor: selectedFloor.value,
+      room: ''
+    }, { emit: true })
     return
   }
 
   if (currentLevel.value === 'FLOOR') {
-    currentLevel.value = 'BUILDING'
-    selectedFloor.value = ''
-    updateVisibility()
-    const buildingGroup = objectsMap.get(`building_${selectedBuilding.value}`)
-    if (buildingGroup) zoomToObject(buildingGroup)
+    applyScope({
+      level: 'BUILDING',
+      building: selectedBuilding.value,
+      floor: '',
+      room: ''
+    }, { emit: true })
     return
   }
 
   if (currentLevel.value === 'BUILDING') {
-    currentLevel.value = 'PARK'
-    selectedBuilding.value = ''
-    selectedFloor.value = ''
-    updateVisibility()
-    resetCamera()
+    applyScope({ level: 'PARK', building: '', floor: '', room: '' }, { emit: true })
   }
 }
 
 function resetCamera() {
-  if (!camera.value || !controls.value) return
-  currentLevel.value = 'PARK'
-  selectedBuilding.value = ''
-  selectedFloor.value = ''
-  selectedRoom.value = ''
   cruiseEnabled.value = true
-  focusTitle.value = '园区总览'
-  focusStatus.value = '等待交互'
-  updateVisibility()
-  gsap.to(camera.value.position, { x: 42, y: 38, z: 64, duration: 1.1, ease: 'power3.out' })
-  gsap.to(controls.value.target, { x: 0, y: 0, z: 0, duration: 1.1, ease: 'power3.out' })
+  if (selectedBuilding.value && selectedFloor.value) {
+    applyScope({ level: 'FLOOR', building: selectedBuilding.value, floor: selectedFloor.value, room: '' }, { emit: true })
+    return
+  }
+  if (selectedBuilding.value) {
+    applyScope({ level: 'BUILDING', building: selectedBuilding.value, floor: '', room: '' }, { emit: true })
+    return
+  }
+  applyScope({ level: 'PARK', building: '', floor: '', room: '' }, { emit: true })
 }
 
 function toggleCruise() {
@@ -782,20 +1021,17 @@ function onWindowResize() {
 }
 
 function scheduleBuildSceneData() {
-  if (rebuildSceneTimer) {
-    window.clearTimeout(rebuildSceneTimer)
-  }
+  if (rebuildSceneTimer) window.clearTimeout(rebuildSceneTimer)
   rebuildSceneTimer = window.setTimeout(() => {
     rebuildSceneTimer = 0
     buildSceneData()
+    focusScope(currentScope.value)
   }, 80)
 }
 
 function handleVisibilityChange() {
   sceneRenderingEnabled.value = !document.hidden
-  if (sceneRenderingEnabled.value && !animationFrameId) {
-    animate()
-  }
+  if (sceneRenderingEnabled.value && !animationFrameId) animate()
 }
 
 function syncFullscreenState() {
@@ -805,25 +1041,25 @@ function syncFullscreenState() {
 function animate() {
   animationFrameId = requestAnimationFrame(animate)
   if (!sceneRenderingEnabled.value) return
-  const time = Date.now() * 0.0014
+  const time = Date.now() * 0.0011
   controls.value?.update()
 
   animatedBeds.forEach((item) => {
     const material = item.mesh.material as THREE.MeshStandardMaterial
     if (item.type === 'pulse') {
-      material.emissiveIntensity = item.baseIntensity + (Math.sin(time * 5) + 1) * 0.3
+      material.emissiveIntensity = item.baseIntensity + (Math.sin(time * 5.2) + 1) * 0.14
     } else if (item.type === 'ai') {
-      material.emissiveIntensity = item.baseIntensity + (Math.sin(time * 3.4) + 1) * 0.18
+      material.emissiveIntensity = item.baseIntensity + (Math.sin(time * 3.2) + 1) * 0.08
     } else if (item.type === 'blink') {
-      material.emissiveIntensity = Math.sin(time * 7) > 0 ? item.baseIntensity + 0.28 : item.baseIntensity * 0.36
+      material.emissiveIntensity = Math.sin(time * 6.4) > 0 ? item.baseIntensity + 0.14 : item.baseIntensity * 0.32
     } else {
-      material.emissiveIntensity = item.baseIntensity + (Math.sin(time * 2.8) + 1) * 0.12
+      material.emissiveIntensity = item.baseIntensity + (Math.sin(time * 2.8) + 1) * 0.06
     }
   })
 
   if (particles) {
-    particles.rotation.y += 0.0008
-    particles.position.y = Math.sin(time * 0.8) * 0.6
+    particles.rotation.y += 0.0006
+    particles.position.y = Math.sin(time * 0.7) * 0.4 + 2
   }
 
   renderer.value?.render(scene.value, camera.value!)
@@ -833,10 +1069,30 @@ function animate() {
 watch(() => props.buildings, scheduleBuildSceneData, { deep: true })
 watch(() => props.floors, scheduleBuildSceneData, { deep: true })
 watch(() => props.roomLookup, scheduleBuildSceneData, { deep: true })
+watch(
+  () => props.scope,
+  (scope) => {
+    if (!scope) return
+    const changed = [
+      scope.level !== currentLevel.value,
+      scope.building !== selectedBuilding.value,
+      scope.floor !== selectedFloor.value,
+      scope.room !== selectedRoom.value
+    ].some(Boolean)
+    if (!changed) return
+    applyScope(scope, { emit: false })
+  },
+  { deep: true }
+)
 
 onMounted(() => {
   sceneRenderingEnabled.value = !document.hidden
   initScene()
+  if (props.scope) {
+    applyScope(props.scope, { emit: false })
+  } else {
+    focusScope(currentScope.value)
+  }
   document.addEventListener('visibilitychange', handleVisibilityChange)
   document.addEventListener('fullscreenchange', syncFullscreenState)
 })
@@ -865,14 +1121,14 @@ onBeforeUnmount(() => {
   height: 100%;
   min-height: 760px;
   overflow: hidden;
-  border-radius: 24px;
+  border-radius: 28px;
   background:
-    radial-gradient(circle at 12% 12%, rgba(111, 192, 207, 0.12), transparent 26%),
-    radial-gradient(circle at 82% 0%, rgba(111, 143, 200, 0.14), transparent 28%),
-    linear-gradient(180deg, #07111b 0%, #040912 100%);
+    radial-gradient(circle at 12% 12%, rgba(141, 194, 255, 0.14), transparent 28%),
+    radial-gradient(circle at 82% 0%, rgba(123, 210, 184, 0.12), transparent 30%),
+    linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
   box-shadow:
-    inset 0 0 120px rgba(111, 192, 207, 0.06),
-    inset 0 0 40px rgba(111, 143, 200, 0.06);
+    inset 0 0 90px rgba(141, 194, 255, 0.05),
+    inset 0 0 30px rgba(123, 210, 184, 0.04);
 }
 
 .canvas-wrapper {
@@ -880,53 +1136,35 @@ onBeforeUnmount(() => {
   height: 100%;
 }
 
-.scene-atmosphere,
-.scene-scanlines {
+.scene-atmosphere {
   position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 1;
-}
-
-.scene-atmosphere {
   background:
-    radial-gradient(circle at center, transparent 38%, rgba(3, 10, 20, 0.54) 100%);
-}
-
-.scene-scanlines {
-  background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0, rgba(255, 255, 255, 0.02) 1px, transparent 1px, transparent 4px);
-  mix-blend-mode: screen;
-  opacity: 0.09;
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.02), rgba(224, 235, 247, 0.12) 100%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(225, 236, 248, 0.12));
 }
 
 .scene-toolbar,
 .scene-hud {
   position: absolute;
-  left: 20px;
-  right: 20px;
+  left: 50%;
+  bottom: 18px;
   z-index: 3;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  transform: translateX(-50%);
 }
 
 .scene-toolbar {
-  top: 18px;
+  top: 16px;
 }
 
 .scene-hud {
-  bottom: 18px;
-  left: 18px;
-  right: auto;
-  max-width: calc(100% - 36px);
-  gap: 10px;
-  flex-wrap: wrap;
+  width: auto;
 }
 
 .toolbar-left,
-.toolbar-right,
-.overlay-tags {
+.toolbar-right {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -934,171 +1172,159 @@ onBeforeUnmount(() => {
 }
 
 .toolbar-center,
-.hud-panel {
+.scene-legend {
   padding: 12px 16px;
   border-radius: 18px;
-  border: 1px solid rgba(126, 177, 194, 0.18);
-  background: rgba(8, 17, 28, 0.72);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.24);
+  border: 1px solid rgba(171, 191, 214, 0.22);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 14px 28px rgba(114, 135, 162, 0.12);
 }
 
 .toolbar-center {
   display: grid;
   gap: 4px;
-  min-width: 240px;
+  min-width: 320px;
   text-align: center;
 }
 
-.toolbar-eyebrow,
-.hud-label {
+.toolbar-center strong {
+  color: #1f2d41;
+}
+
+.toolbar-center small,
+.toolbar-eyebrow {
+  color: #7d8ea5;
   font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #92aabd;
-}
-
-.toolbar-center strong,
-.hud-panel strong {
-  color: #edf4f8;
 }
 
 .tech-btn {
-  background: rgba(10, 20, 33, 0.82);
-  border: 1px solid rgba(126, 177, 194, 0.2);
-  color: #dbe8f0;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(171, 191, 214, 0.24);
+  color: #41536b;
   border-radius: 14px;
 }
 
 .tech-btn:hover {
-  border-color: rgba(126, 177, 194, 0.4);
-  color: #ffffff;
-  box-shadow: 0 0 16px rgba(126, 177, 194, 0.12);
+  border-color: rgba(111, 149, 255, 0.32);
+  color: #22324b;
+  box-shadow: 0 10px 24px rgba(111, 149, 255, 0.12);
+}
+
+.scene-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .legend-chip {
-  padding: 6px 10px;
+  padding: 0;
   border-radius: 999px;
-  border: 1px solid transparent;
-  background: rgba(8, 17, 28, 0.72);
+  border: 0;
+  background: transparent;
   font-size: 12px;
-  color: #dfe8ee;
+  color: #50627a;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.status-normal {
-  border-color: rgba(87, 215, 255, 0.24);
+.legend-chip::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
 }
 
-.status-occupied {
-  border-color: rgba(111, 192, 207, 0.28);
-}
-
-.status-empty {
-  border-color: rgba(126, 147, 166, 0.3);
-}
-
-.status-warning {
-  border-color: rgba(213, 165, 108, 0.32);
-}
-
-.status-sleep {
-  border-color: rgba(111, 143, 200, 0.34);
-}
-
-.status-ai {
-  border-color: rgba(150, 133, 199, 0.34);
-}
-
-.status-alert {
-  border-color: rgba(207, 120, 134, 0.34);
-}
-
-.status-offline {
-  border-color: rgba(115, 136, 160, 0.3);
-}
+.status-occupied::before { background: #4fc291; }
+.status-empty::before { background: #c6d0dc; }
+.status-warning::before { background: #f2b14c; }
+.status-ai::before { background: #8b78e8; }
+.status-alert::before { background: #ef6f7c; }
 
 .tech-tooltip {
-  position: fixed;
-  z-index: 10;
-  min-width: 210px;
-  border-radius: 16px;
-  border: 1px solid rgba(126, 177, 194, 0.22);
-  background: rgba(8, 17, 28, 0.88);
-  color: #eaf2f7;
-  backdrop-filter: blur(12px);
-  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.36), 0 0 20px rgba(111, 192, 207, 0.08);
+  position: absolute;
+  z-index: 8;
+  width: 230px;
+  border-radius: 18px;
+  border: 1px solid rgba(171, 191, 214, 0.24);
+  background: rgba(255, 255, 255, 0.96);
+  color: #33455d;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 16px 28px rgba(116, 137, 164, 0.14);
   padding: 14px;
   pointer-events: none;
 }
 
 .tt-header {
-  font-size: 14px;
-  font-weight: 700;
-  border-bottom: 1px solid rgba(87, 215, 255, 0.16);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
   padding-bottom: 8px;
+  border-bottom: 1px solid rgba(166, 199, 219, 0.12);
   margin-bottom: 8px;
 }
 
-.tt-body {
-  font-size: 12px;
-  color: #9db0bf;
+.tt-header strong {
+  font-size: 14px;
 }
 
-.tech-tooltip :deep(.tt-row) {
+.tt-header small {
+  font-size: 11px;
+  color: #7d8ea5;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.tt-body {
+  display: grid;
+  gap: 6px;
+}
+
+.tt-row {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 4px;
+  font-size: 12px;
 }
 
-.tech-tooltip :deep(.tt-val) {
-  color: #f2fdff;
-  font-weight: 700;
+.tt-row span {
+  color: #7d8ea5;
 }
 
-.tech-tooltip :deep(.tt-val.cyan) {
-  color: #7fc9d4;
+.tt-row strong {
+  color: #22324b;
 }
 
-.tech-tooltip :deep(.tt-val.green) {
-  color: #86d1c1;
-}
+.tt-row strong.cyan { color: #5a8dff; }
+.tt-row strong.green { color: #2f9b6c; }
+.tt-row strong.blue { color: #5a8dff; }
+.tt-row strong.purple { color: #6b56d5; }
+.tt-row strong.red { color: #d65164; }
 
-.tech-tooltip :deep(.tt-val.orange) {
-  color: #ddb17a;
-}
-
-.tech-tooltip :deep(.tt-val.blue) {
-  color: #8ea3d3;
-}
-
-.tech-tooltip :deep(.tt-val.purple) {
-  color: #b09bcf;
-}
-
-.tech-tooltip :deep(.tt-val.red) {
-  color: #d8929d;
-}
-
-.tech-tooltip :deep(.tt-tip) {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed rgba(134, 169, 196, 0.18);
-  color: #8bbecd;
+.tt-tip {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(171, 191, 214, 0.24);
+  color: #7d8ea5;
+  font-size: 12px;
 }
 
 :global(.scene-label) {
   padding: 6px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(126, 177, 194, 0.2);
-  background: rgba(9, 18, 29, 0.8);
-  color: #eaf2f7;
+  border: 1px solid rgba(171, 191, 214, 0.22);
+  background: rgba(255, 255, 255, 0.92);
+  color: #354760;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 0 14px rgba(111, 192, 207, 0.08);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 26px rgba(114, 135, 162, 0.12);
   white-space: nowrap;
 }
 
@@ -1114,7 +1340,13 @@ onBeforeUnmount(() => {
 
   .scene-hud {
     position: static;
-    padding: 14px 18px 18px;
+    transform: none;
+    padding: 0 18px 18px;
+  }
+
+  .scene-legend {
+    flex-wrap: wrap;
+    justify-content: center;
   }
 }
 </style>

@@ -148,7 +148,7 @@ export const enterpriseProfile: EnterpriseProfile = {
   vision: '成为上饶地区值得信赖的示范型智慧养老机构。',
   heroTitle: '弋阳龟峰颐养中心\n让长者安享有品质的晚年生活',
   heroDesc:
-    '参考头部养老社区的服务理念，我们构建“服务体系 + 居民体系 + 社区运营 + 企业治理”的完整企业首页框架，同时保留管理后台入口，支持机构对外展示与对内运营一体化。',
+    '面向自理、半失能、失能及认知障碍长者，提供医养结合、康复护理、记忆照护、短住试住与入住评估服务，支持家属预约参观并获取个性化照护建议。',
   quickStats: [
     { value: '7×24', label: '全天候照护', tip: '护理、巡查、应急响应' },
     { value: '多学科', label: '专业团队', tip: '医生、护士、康复、社工协作' },
@@ -319,11 +319,11 @@ export const enterpriseProfile: EnterpriseProfile = {
   ],
   admissionFlow: ['预约咨询', '到院参观', '综合评估', '方案确认', '签约入住', '周期复评'],
   vrCommunityUrl: 'https://www.720yun.com/',
-  joinUsUrl: 'mailto:hr@yiyang-guifeng-care.cn',
+  joinUsUrl: 'mailto:hr@gfyy.org.cn',
   contact: {
     phone: '0793-5899001',
     hotlineTip: '工作日 08:00-18:00',
-    email: 'service@yiyang-guifeng-care.cn',
+    email: 'service@gfyy.org.cn',
     address: '江西省上饶市弋阳县龟峰大道88号',
     visitingTime: '周一至周日 08:00-18:00'
   },
@@ -373,13 +373,13 @@ export const enterpriseProfile: EnterpriseProfile = {
       copyrightOwner: '弋阳龟峰颐养中心',
       authorizedScope: '官网/公众号/宣传画册/招聘页',
       lastVerifiedAt: '2026-03-08',
-      contact: 'brand@yiyang-guifeng-care.cn'
+      contact: 'brand@gfyy.org.cn'
     }
   },
   faq: [
     {
       question: '如何预约到院参观？',
-      answer: '可在企业首页点击“立即预约”，提交联系人与电话后，工作人员会在工作时间内回访确认。'
+      answer: '可通过页面中的“立即预约”或咨询电话提交参观需求，工作人员会在工作时间内回访确认。'
     },
     {
       question: '失能或认知障碍长者是否可入住？',

@@ -4,6 +4,17 @@ const PERMISSIONS_KEY = 'zhiyangyun_permissions'
 const PAGE_PERMISSIONS_KEY = 'zhiyangyun_page_permissions'
 const STAFF_INFO_KEY = 'zhiyangyun_staff_info'
 
+function safeStorage() {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage
+    }
+  } catch (_error) {
+    return null
+  }
+  return null
+}
+
 export function normalizeRoles(roles: string[]): string[] {
   const normalized = new Set<string>()
   ;(roles || []).forEach((role) => {
@@ -29,59 +40,72 @@ export function normalizeRoles(roles: string[]): string[] {
 }
 
 export function getToken(): string {
-  return localStorage.getItem(TOKEN_KEY) || ''
+  return safeStorage()?.getItem(TOKEN_KEY) || ''
 }
 
 export function setToken(token: string) {
-  localStorage.setItem(TOKEN_KEY, token)
+  safeStorage()?.setItem(TOKEN_KEY, token)
 }
 
 export function clearToken() {
-  localStorage.removeItem(TOKEN_KEY)
+  safeStorage()?.removeItem(TOKEN_KEY)
 }
 
 export function getRoles(): string[] {
-  const raw = localStorage.getItem(ROLES_KEY)
-  const roles = raw ? JSON.parse(raw) : []
+  const raw = safeStorage()?.getItem(ROLES_KEY)
+  let roles: string[] = []
+  try {
+    roles = raw ? JSON.parse(raw) : []
+  } catch (_error) {
+    roles = []
+  }
   return normalizeRoles(roles)
 }
 
 export function setRoles(roles: string[]) {
-  localStorage.setItem(ROLES_KEY, JSON.stringify(normalizeRoles(roles || [])))
+  safeStorage()?.setItem(ROLES_KEY, JSON.stringify(normalizeRoles(roles || [])))
 }
 
 export function clearRoles() {
-  localStorage.removeItem(ROLES_KEY)
+  safeStorage()?.removeItem(ROLES_KEY)
 }
 
 export function getPermissions(): string[] {
-  const raw = localStorage.getItem(PERMISSIONS_KEY)
-  return raw ? JSON.parse(raw) : []
+  const raw = safeStorage()?.getItem(PERMISSIONS_KEY)
+  try {
+    return raw ? JSON.parse(raw) : []
+  } catch (_error) {
+    return []
+  }
 }
 
 export function setPermissions(permissions: string[]) {
-  localStorage.setItem(PERMISSIONS_KEY, JSON.stringify(permissions || []))
+  safeStorage()?.setItem(PERMISSIONS_KEY, JSON.stringify(permissions || []))
 }
 
 export function clearPermissions() {
-  localStorage.removeItem(PERMISSIONS_KEY)
+  safeStorage()?.removeItem(PERMISSIONS_KEY)
 }
 
 export function getPagePermissions(): string[] {
-  const raw = localStorage.getItem(PAGE_PERMISSIONS_KEY)
-  return raw ? JSON.parse(raw) : []
+  const raw = safeStorage()?.getItem(PAGE_PERMISSIONS_KEY)
+  try {
+    return raw ? JSON.parse(raw) : []
+  } catch (_error) {
+    return []
+  }
 }
 
 export function setPagePermissions(pagePermissions: string[]) {
-  localStorage.setItem(PAGE_PERMISSIONS_KEY, JSON.stringify(pagePermissions || []))
+  safeStorage()?.setItem(PAGE_PERMISSIONS_KEY, JSON.stringify(pagePermissions || []))
 }
 
 export function clearPagePermissions() {
-  localStorage.removeItem(PAGE_PERMISSIONS_KEY)
+  safeStorage()?.removeItem(PAGE_PERMISSIONS_KEY)
 }
 
 export function getStaffInfo<T = any>(): T | null {
-  const raw = localStorage.getItem(STAFF_INFO_KEY)
+  const raw = safeStorage()?.getItem(STAFF_INFO_KEY)
   if (!raw) return null
   try {
     return JSON.parse(raw) as T
@@ -91,9 +115,9 @@ export function getStaffInfo<T = any>(): T | null {
 }
 
 export function setStaffInfo(staffInfo: any) {
-  localStorage.setItem(STAFF_INFO_KEY, JSON.stringify(staffInfo || null))
+  safeStorage()?.setItem(STAFF_INFO_KEY, JSON.stringify(staffInfo || null))
 }
 
 export function clearStaffInfo() {
-  localStorage.removeItem(STAFF_INFO_KEY)
+  safeStorage()?.removeItem(STAFF_INFO_KEY)
 }

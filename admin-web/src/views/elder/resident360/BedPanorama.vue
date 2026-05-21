@@ -1,27 +1,25 @@
 <template>
   <PageContainer class="bed-immersive-page" title="3D床态全景" subTitle="智慧养老数字孪生床态指挥舱">
     <div class="immersive-stage-shell">
-      <Panorama3D
-        v-if="matrixBuildings.length && matrixFloors.length"
-        :buildings="matrixBuildings"
-        :floors="matrixFloors"
-        :room-lookup="roomSceneLookup"
-        @click-room="openRoomDetail"
-        @click-bed="selectBed"
-      />
-      <a-empty v-else class="stage-empty" description="暂无床位数据" />
-
       <div class="scene-vignette"></div>
       <div class="scene-glow scene-glow-left"></div>
       <div class="scene-glow scene-glow-right"></div>
 
-      <header class="hud hud-topbar">
-        <div class="hud-topbar__brand">
-          <div class="brand-mark"><span></span></div>
-          <div class="brand-copy">
-            <div class="brand-kicker">Smart Senior Care Digital Twin</div>
-            <strong>智慧养老数字孪生床态指挥舱</strong>
-            <small>{{ lifecycleContext.active ? '入住联动模式已开启' : '长者床态、风险提醒与护理节奏实时联动中' }}</small>
+      <header class="hud-topbar">
+        <div class="command-marquee">
+          <div class="hud-topbar__brand">
+            <div class="brand-mark"><span></span></div>
+            <div class="brand-copy">
+              <div class="brand-kicker">智慧养老平台</div>
+              <strong>床态全景</strong>
+              <small>{{ lifecycleContext.active ? '入住联动模式已开启，楼层与床位状态同步更新。' : '实时掌握床位状态，提升照护效率与安全。' }}</small>
+            </div>
+          </div>
+
+          <div class="campus-scope">
+            <span class="brand-kicker">当前视角</span>
+            <strong>{{ focusHeadline.title }}</strong>
+            <small>{{ focusHeadline.meta }}</small>
           </div>
         </div>
 
@@ -34,6 +32,12 @@
         </div>
 
         <div class="hud-topbar__ops">
+          <a-input-search
+            v-model:value="keyword"
+            class="topbar-search"
+            placeholder="搜索长者姓名 / 床位 / 房间号"
+            allow-clear
+          />
           <div class="status-stack">
             <span class="status-dot"></span>
             <div>
@@ -55,308 +59,261 @@
         </div>
       </header>
 
-      <aside class="hud hud-left">
-        <section class="hud-panel">
-          <div class="hud-panel__head">
-            <div>
-              <span class="panel-kicker">运行总览</span>
-              <strong>床态守护概况</strong>
-            </div>
-            <small>{{ roomCount }} 间房 / {{ sourceBeds.length }} 张床位</small>
-          </div>
-
-          <div class="overview-list">
-            <div v-for="item in leftStatCards" :key="item.label" class="overview-row">
-              <span>{{ item.label }}</span>
-              <strong>{{ item.value }}</strong>
-              <small>{{ item.meta }}</small>
-            </div>
-          </div>
-
-          <div class="status-bars">
-            <div v-for="item in statusDistributionRows" :key="item.label" class="status-bar">
-              <div class="status-bar__top">
-                <span>{{ item.label }}</span>
-                <strong>{{ item.value }}</strong>
+      <div class="dashboard-main">
+        <aside class="hud-left">
+          <section class="hud-panel hud-panel--sidebar">
+            <div class="hud-panel__head">
+              <div>
+                <span class="panel-kicker">楼栋 / 楼层</span>
+                <strong>空间导航</strong>
               </div>
-              <div class="distribution-track">
-                <span class="distribution-fill" :class="item.tone" :style="{ width: `${item.percent}%` }"></span>
+              <small>{{ roomCount }} 间房 / {{ sourceBeds.length }} 张床位</small>
+            </div>
+
+            <label class="field-block">
+              <span class="field-label">搜索目标</span>
+              <a-input-search v-model:value="keyword" placeholder="搜索长者姓名 / 床位 / 房间号" allow-clear />
+            </label>
+
+            <div class="campus-tree">
+              <div v-for="building in campusTree" :key="building.name" class="tree-building">
+                <button class="tree-building__head" :class="{ active: building.name === selectedBuilding }" @click="setBuildingScope(building.name)">
+                  <div>
+                    <strong>{{ building.name }}</strong>
+                    <small>{{ building.rooms }} 间房 · {{ building.beds }} 张床位</small>
+                  </div>
+                  <span>{{ building.occupied }}/{{ building.beds }}</span>
+                </button>
+
+                <div class="tree-floor-list" v-if="!selectedBuilding || selectedBuilding === building.name">
+                  <button
+                    v-for="floor in building.floors"
+                    :key="`${building.name}-${floor.name}`"
+                    class="tree-floor"
+                    :class="{ active: floor.name === selectedFloor && building.name === selectedBuilding }"
+                    @click="selectedBuilding === building.name ? setFloorScope(floor.name) : setBuildingScope(building.name)"
+                  >
+                    <span>{{ floor.name }}</span>
+                    <small>{{ floor.occupied }}/{{ floor.beds }}</small>
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        </section>
 
-        <section class="hud-panel hud-panel--compact">
-          <div class="hud-panel__head">
-            <div>
-              <span class="panel-kicker">场景控制</span>
-              <strong>楼栋与床态筛选</strong>
+            <div class="sidebar-section">
+              <div class="sidebar-section__head">
+                <span class="panel-kicker">床位状态</span>
+                <strong>快速过滤</strong>
+              </div>
+              <a-segmented v-model:value="quickFilter" :options="quickFilterOptions" block />
             </div>
-          </div>
 
-          <label class="field-block">
-            <span class="field-label">搜索目标</span>
-            <a-input-search v-model:value="keyword" placeholder="搜索房间号 / 长者名" allow-clear />
-          </label>
-
-          <div class="field-block">
-            <span class="field-label">床位状态筛选</span>
-            <a-segmented v-model:value="quickFilter" :options="quickFilterOptions" block />
-          </div>
-
-          <div class="field-block">
-            <div class="field-inline">
-              <span class="field-label">风险筛选</span>
-              <a-switch v-model:checked="riskFilterEnabled" />
+            <div class="sidebar-section">
+              <div class="field-inline">
+                <div>
+                  <span class="panel-kicker">风险筛选</span>
+                  <strong>重点照护</strong>
+                </div>
+                <a-switch v-model:checked="riskFilterEnabled" />
+              </div>
+              <a-segmented
+                v-if="riskFilterEnabled"
+                v-model:value="riskFilterLevel"
+                :options="riskLevelOptions"
+                block
+              />
             </div>
-            <a-segmented
-              v-if="riskFilterEnabled"
-              v-model:value="riskFilterLevel"
-              :options="riskLevelOptions"
-              block
+
+            <div class="sidebar-section">
+              <div class="sidebar-section__head">
+                <span class="panel-kicker">床态分布</span>
+                <strong>运营概览</strong>
+              </div>
+              <div class="status-bars">
+                <div v-for="item in statusDistributionRows" :key="item.label" class="status-bar">
+                  <div class="status-bar__top">
+                    <span>{{ item.label }}</span>
+                    <strong>{{ item.value }}</strong>
+                  </div>
+                  <div class="distribution-track">
+                    <span class="distribution-fill" :class="item.tone" :style="{ width: `${item.percent}%` }"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </aside>
+
+        <section class="dashboard-stage">
+          <section class="focus-ribbon">
+            <div class="focus-ribbon__main">
+              <div class="focus-ribbon__item">
+                <span>空间层级</span>
+                <strong>{{ currentScopeLabel }}</strong>
+              </div>
+              <div class="focus-ribbon__item focus-ribbon__item--wide">
+                <span>当前范围</span>
+                <strong>{{ bedGuardSubject }}</strong>
+              </div>
+              <div class="focus-ribbon__item">
+                <span>当前动作</span>
+                <strong>{{ focusActionText }}</strong>
+              </div>
+            </div>
+          </section>
+
+          <div class="stage-canvas-shell">
+            <Panorama3D
+              v-if="matrixBuildings.length && matrixFloors.length"
+              :buildings="matrixBuildings"
+              :floors="matrixFloors"
+              :room-lookup="roomSceneLookup"
+              :scope="panoramaScope"
+              @scope-change="handleScopeChange"
+              @click-room="openRoomDetail"
+              @click-bed="selectBed"
             />
-          </div>
-
-          <div class="field-block">
-            <span class="field-label">楼栋切换</span>
-            <div class="scope-chip-list">
-              <button
-                v-for="item in buildingScopeOptions"
-                :key="item"
-                class="scope-chip"
-                :class="{ active: item === selectedBuilding }"
-                @click="setBuildingScope(item)"
-              >
-                {{ item }}
-              </button>
-            </div>
-          </div>
-
-          <div class="field-block" v-if="floorScopeOptions.length">
-            <span class="field-label">楼层切换</span>
-            <div class="scope-chip-list compact">
-              <button
-                v-for="item in floorScopeOptions"
-                :key="item"
-                class="scope-chip"
-                :class="{ active: item === selectedFloor }"
-                @click="setFloorScope(item)"
-              >
-                {{ item }}
-              </button>
-            </div>
-          </div>
-
-          <div class="scene-actions">
-            <a-button @click="openBedMap">房态视图</a-button>
-            <a-button @click="openBedManage">床位管理</a-button>
-            <a-button type="primary" @click="resetFilters">重置场景</a-button>
+            <a-empty v-else class="stage-empty" description="暂无床位数据" />
           </div>
         </section>
-      </aside>
 
-      <div class="hud hud-center">
-        <section class="hud-panel hud-panel--spotlight">
-          <div class="hud-panel__head">
-            <div>
-              <span class="panel-kicker">当前聚焦</span>
-              <strong>{{ focusHeadline.title }}</strong>
+        <aside class="hud-right">
+          <section class="hud-panel hud-panel--context">
+            <div class="hud-panel__head">
+              <div>
+                <span class="panel-kicker">床位详情</span>
+                <strong>{{ activeResidentBed?.elderName || '未选中长者' }}</strong>
+              </div>
+              <small>{{ activeResidentBed?.roomNo || '-' }} / {{ activeResidentBed?.bedNo || '-' }}</small>
             </div>
-            <small>{{ focusHeadline.meta }}</small>
-          </div>
 
-          <div class="spotlight-meta">
-            <div class="spotlight-block">
-              <span>当前范围</span>
-              <strong>{{ bedGuardSubject }}</strong>
-            </div>
-            <div class="spotlight-block">
-              <span>护理阶段</span>
-              <strong>{{ bedGuardStageText }}</strong>
-            </div>
-          </div>
+            <template v-if="activeResidentBed">
+              <div class="resident-profile">
+                <div class="resident-profile__avatar">
+                  <a-avatar :size="72" class="resident-avatar">{{ residentAvatarText }}</a-avatar>
+                </div>
+                <div class="resident-profile__body">
+                  <div class="resident-profile__title">
+                    <strong>{{ activeResidentBed.elderName || '未命名长者' }}</strong>
+                    <span class="detail-chip" :class="residentHealthTone">{{ residentHealthText }}</span>
+                  </div>
+                  <div class="resident-profile__meta">
+                    <span>{{ residentAgeText }}</span>
+                    <span>{{ residentGenderText }}</span>
+                    <span>{{ activeResidentBed.careLevel || '护理等级待同步' }}</span>
+                  </div>
+                  <div class="detail-tags">
+                    <span class="overlay-chip">{{ resolveStatus(activeResidentBed) }}</span>
+                    <span class="overlay-chip">{{ activeResidentBed.riskLabel || '生命体征平稳' }}</span>
+                    <span class="overlay-chip">{{ activeResidentBed.latestAssessmentLevel || '评估待更新' }}</span>
+                  </div>
+                </div>
+              </div>
 
-          <div class="overlay-progress">
-            <div
-              v-for="(step, index) in bedGuardSteps"
-              :key="step"
-              class="overlay-step"
-              :class="{ active: index <= bedGuardCurrentIndex, current: index === bedGuardCurrentIndex }"
-            >
-              <span>{{ index + 1 }}</span>
-              <small>{{ step }}</small>
-            </div>
-          </div>
+              <div class="detail-grid detail-grid--vitals">
+                <div v-for="item in residentVitals" :key="item.label">
+                  <span>{{ item.label }}</span>
+                  <strong>{{ item.value }}</strong>
+                </div>
+              </div>
 
-          <div class="spotlight-actions">
-            <button
-              v-for="item in stageQuickActions"
-              :key="item.key"
-              class="stage-action-pill"
-              :class="item.tone"
-              @click="handleCommandAction(item.key)"
-            >
-              <strong>{{ item.label }}</strong>
-              <span>{{ item.description }}</span>
-            </button>
-          </div>
-        </section>
+              <div class="detail-section">
+                <div class="detail-section__head">
+                  <span class="panel-kicker">照护状态</span>
+                  <strong>床位与健康摘要</strong>
+                </div>
+                <div class="detail-grid">
+                  <div>
+                    <span>楼栋楼层</span>
+                    <strong>{{ activeResidentBed.building || '-' }} / {{ activeResidentBed.floorNo || '-' }}</strong>
+                  </div>
+                  <div>
+                    <span>24h异常</span>
+                    <strong>{{ activeResidentBed.abnormalVital24hCount || 0 }} 次</strong>
+                  </div>
+                  <div>
+                    <span>风险来源</span>
+                    <strong>{{ activeResidentBed.riskSource || '常规巡护' }}</strong>
+                  </div>
+                  <div>
+                    <span>最近评估</span>
+                    <strong>{{ formatLatestAssessment(activeResidentBed) }}</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div class="detail-section">
+                <div class="detail-section__head">
+                  <span class="panel-kicker">最近提醒</span>
+                  <strong>护理关注</strong>
+                </div>
+                <div class="event-list">
+                  <div v-for="item in residentAlertItems" :key="item.key" class="event-card event-card--soft" :class="item.tone">
+                    <div class="event-top">
+                      <span class="event-type">{{ item.type }}</span>
+                      <span class="event-time">{{ item.time }}</span>
+                    </div>
+                    <strong>{{ item.title }}</strong>
+                    <p>{{ item.description }}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="detail-section">
+                <div class="detail-section__head">
+                  <span class="panel-kicker">快捷操作</span>
+                  <strong>照护动作</strong>
+                </div>
+                <div class="action-grid">
+                  <button
+                    v-for="item in commandDeck"
+                    :key="item.key"
+                    class="action-card"
+                    :class="item.tone"
+                    @click="handleCommandAction(item.key)"
+                  >
+                    <strong>{{ item.label }}</strong>
+                    <span>{{ item.description }}</span>
+                  </button>
+                </div>
+              </div>
+            </template>
+
+            <template v-else>
+              <div class="empty-drawer">
+                <strong>选择床位查看长者详情</strong>
+                <p>右侧将展示长者档案、健康状态、体征快照与护理操作入口。</p>
+              </div>
+            </template>
+          </section>
+        </aside>
       </div>
 
-      <aside class="hud hud-right">
-        <section class="hud-panel hud-panel--detail" v-if="selectedBed">
-          <div class="hud-panel__head">
+      <footer class="hud-bottom">
+        <section class="activity-dock">
+          <div class="activity-dock__head">
             <div>
-              <span class="panel-kicker">床位详情</span>
-              <strong>{{ selectedBed.elderName || '空床待命' }}</strong>
+              <span class="panel-kicker">异常提醒</span>
+              <strong>外出 / 夜巡 / 清洁 / 应急通知</strong>
             </div>
-            <small>{{ selectedBed.roomNo || '-' }} / {{ selectedBed.bedNo || '-' }}</small>
+            <small>{{ eventStreamItems.length }} 条待关注事件</small>
           </div>
 
-          <div class="detail-tags">
-            <span class="overlay-chip">{{ resolveStatus(selectedBed) }}</span>
-            <span class="overlay-chip" v-if="selectedBed.riskLabel">{{ selectedBed.riskLabel }}</span>
-            <span class="overlay-chip">{{ selectedBed.careLevel || '未配置护理等级' }}</span>
-          </div>
-
-          <div class="detail-grid">
-            <div>
-              <span>楼栋楼层</span>
-              <strong>{{ selectedBed.building || '-' }} / {{ selectedBed.floorNo || '-' }}</strong>
-            </div>
-            <div>
-              <span>24h异常</span>
-              <strong>{{ selectedBed.abnormalVital24hCount || 0 }} 次</strong>
-            </div>
-            <div>
-              <span>风险来源</span>
-              <strong>{{ selectedBed.riskSource || '守护稳定' }}</strong>
-            </div>
-            <div>
-              <span>最近评估</span>
-              <strong>{{ formatLatestAssessment(selectedBed) }}</strong>
-            </div>
-          </div>
-
-          <div v-if="bedGuardBlockers.length" class="blocker-list">
-            <div v-for="item in bedGuardBlockers" :key="item.code" class="blocker-card">
-              <div>
-                <strong>{{ item.code }}</strong>
-                <p>{{ item.text }}</p>
-              </div>
-              <a-button
-                v-if="item.actionKey && item.actionLabel"
-                size="small"
-                type="link"
-                @click="handleBedGuardAction(item)"
-              >
-                {{ item.actionLabel }}
-              </a-button>
-            </div>
-          </div>
-
-          <div class="action-grid">
+          <div class="activity-stream">
             <button
-              v-for="item in commandDeck"
+              v-for="item in eventStreamItems"
               :key="item.key"
-              class="action-card"
+              class="stream-card"
               :class="item.tone"
-              @click="handleCommandAction(item.key)"
+              @click="item.bed ? selectBed(item.bed) : undefined"
             >
-              <strong>{{ item.label }}</strong>
-              <span>{{ item.description }}</span>
+              <div class="stream-card__meta">
+                <span>{{ item.type }}</span>
+                <strong>{{ item.count }}</strong>
+              </div>
+              <strong>{{ item.title }}</strong>
+              <p>{{ item.description }}</p>
             </button>
-          </div>
-        </section>
-
-        <template v-else>
-          <section class="hud-panel hud-panel--compact">
-            <div class="hud-panel__head">
-              <div>
-                <span class="panel-kicker">实时风险提醒</span>
-                <strong>值守事件流</strong>
-              </div>
-              <small>{{ concernCount }} 条提醒</small>
-            </div>
-            <div class="event-list">
-              <div v-for="item in alertFeed.slice(0, 4)" :key="item.key" class="event-card" :class="item.tone">
-                <div class="event-top">
-                  <span class="event-type">{{ item.type }}</span>
-                  <span class="event-time">{{ item.time }}</span>
-                </div>
-                <strong>{{ item.title }}</strong>
-                <p>{{ item.description }}</p>
-              </div>
-            </div>
-          </section>
-
-          <section class="hud-panel hud-panel--compact">
-            <div class="hud-panel__head">
-              <div>
-                <span class="panel-kicker">AI护理建议</span>
-                <strong>值守提示</strong>
-              </div>
-            </div>
-            <div class="timeline-list">
-              <div v-for="item in aiSuggestionFeed" :key="item.key" class="timeline-item">
-                <span class="timeline-dot" :class="item.tone"></span>
-                <div>
-                  <strong>{{ item.title }}</strong>
-                  <p>{{ item.description }}</p>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section class="hud-panel hud-panel--compact">
-            <div class="hud-panel__head">
-              <div>
-                <span class="panel-kicker">今日重点关注</span>
-                <strong>长者守护名单</strong>
-              </div>
-            </div>
-            <div class="focus-list">
-              <button v-for="bed in focusBeds" :key="bed.id" class="focus-row" @click="selectBed(bed)">
-                <div>
-                  <strong>{{ bed.elderName || '空床待命' }}</strong>
-                  <small>{{ bed.roomNo || '-' }} / {{ bed.bedNo || '-' }}</small>
-                </div>
-                <span class="focus-status">{{ bed.riskLabel || resolveStatus(bed) }}</span>
-              </button>
-            </div>
-          </section>
-        </template>
-      </aside>
-
-      <footer class="hud hud-bottom">
-        <section class="trend-panel">
-          <div class="trend-card">
-            <div class="trend-head">
-              <span>24小时床态趋势</span>
-              <strong>在住与空床节奏</strong>
-            </div>
-            <v-chart class="chart-view" :option="occupancyTrendOption" autoresize />
-          </div>
-          <div class="trend-card">
-            <div class="trend-head">
-              <span>夜间离床统计</span>
-              <strong>夜巡观察参考</strong>
-            </div>
-            <v-chart class="chart-view" :option="sleepTrendOption" autoresize />
-          </div>
-          <div class="trend-card">
-            <div class="trend-head">
-              <span>护理响应效率</span>
-              <strong>风险任务闭环</strong>
-            </div>
-            <v-chart class="chart-view" :option="alertTrendOption" autoresize />
-          </div>
-          <div class="trend-card">
-            <div class="trend-head">
-              <span>风险热力趋势</span>
-              <strong>守护在线状态</strong>
-            </div>
-            <v-chart class="chart-view" :option="deviceTrendOption" autoresize />
           </div>
         </section>
       </footer>
@@ -455,6 +412,14 @@ type RoomScene = {
   remark?: string
 }
 
+type PanoramaScopeLevel = 'PARK' | 'BUILDING' | 'FLOOR' | 'ROOM'
+type PanoramaScope = {
+  level: PanoramaScopeLevel
+  building: string
+  floor: string
+  room: string
+}
+
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
@@ -466,6 +431,7 @@ const selectedBed = ref<BedItem | null>(null)
 const detailOpen = ref(false)
 const roomDetailOpen = ref(false)
 const selectedRoom = ref<RoomScene | null>(null)
+const selectedRoomNo = ref('')
 const roomResidents = ref<ElderItem[]>([])
 const roomResidentLoading = ref(false)
 const quickFilter = ref<'ALL' | 'IDLE' | 'OCCUPIED'>('ALL')
@@ -476,6 +442,8 @@ const riskDataReady = ref(false)
 const selectedBuilding = ref('')
 const selectedFloor = ref('')
 const currentTime = ref(dayjs())
+const defaultScopeApplied = ref(false)
+const activeTrendKey = ref<'occupancy' | 'sleep' | 'alert' | 'device'>('occupancy')
 const quickFilterOptions = [
   { label: '全部', value: 'ALL' },
   { label: '仅空床', value: 'IDLE' },
@@ -635,6 +603,23 @@ const roomSceneLookup = computed(() => {
 
 const currentDateText = computed(() => currentTime.value.format('YYYY年MM月DD日 dddd'))
 const currentTimeText = computed(() => currentTime.value.format('HH:mm:ss'))
+const currentScope = computed<PanoramaScope>(() => {
+  const building = selectedBuilding.value
+  const floor = selectedFloor.value
+  const room = selectedRoomNo.value
+  let level: PanoramaScopeLevel = 'PARK'
+  if (building) level = 'BUILDING'
+  if (building && floor) level = 'FLOOR'
+  if (building && floor && room) level = 'ROOM'
+  return { level, building, floor, room }
+})
+const panoramaScope = computed(() => ({ ...currentScope.value }))
+const currentScopeLabel = computed(() => {
+  if (currentScope.value.level === 'PARK') return '园区总览'
+  if (currentScope.value.level === 'BUILDING') return '楼栋观察'
+  if (currentScope.value.level === 'FLOOR') return '楼层展开'
+  return '房间聚焦'
+})
 const operatorName = computed(() => {
   const realName = String(userStore.staffInfo?.realName || '').trim()
   if (realName) return realName
@@ -650,11 +635,11 @@ const operatorInitial = computed(() => operatorName.value.slice(0, 1) || '护')
 const commandCenterStatus = computed(() => lifecycleContext.value.active ? '入住状态联动中' : '全院床态守护中')
 
 const overviewCards = computed(() => ([
-  { label: '总床位数', numericValue: beds.value.length, meta: `${matrixBuildings.value.length} 栋 ${matrixFloors.value.length} 层`, tone: 'tone-cyan' },
-  { label: '在住长者', numericValue: stats.value.occupied, meta: `在住率 ${occupiedRate.value}%`, tone: 'tone-green' },
-  { label: '空床位', numericValue: stats.value.idle, meta: `可立即调配 ${Math.max(0, stats.value.idle - stats.value.cleaning)} 张`, tone: 'tone-gray' },
-  { label: '今日需关注', numericValue: concernCount.value, meta: `${emergencyCount.value} 条高优先提醒`, tone: 'tone-red' },
-  { label: '守护设备在线率', numericValue: deviceOnlineRate.value, suffix: '%', meta: `在线设备 ${Math.max(0, beds.value.length - stats.value.maintenance - stats.value.locked)}`, tone: 'tone-blue' }
+  { label: '总床位', numericValue: beds.value.length, meta: `${matrixBuildings.value.length} 栋 ${matrixFloors.value.length} 层`, tone: 'tone-blue' },
+  { label: '入住率', numericValue: occupiedRate.value, suffix: '%', meta: `${stats.value.occupied} 位在住长者`, tone: 'tone-green' },
+  { label: '高风险长者', numericValue: concernCount.value, meta: `${alertBeds.value.length} 位重点关注`, tone: 'tone-red' },
+  { label: '待处理提醒', numericValue: emergencyCount.value, meta: `${alertFeed.value.length} 条待闭环`, tone: 'tone-orange' },
+  { label: '维修床位', numericValue: stats.value.maintenance, meta: '待恢复上线', tone: 'tone-purple' }
 ]))
 
 const leftStatCards = computed(() => ([
@@ -667,6 +652,28 @@ const leftStatCards = computed(() => ([
 ]))
 
 const buildingScopeOptions = computed(() => matrixBuildings.value.slice(0, 6))
+
+const campusTree = computed(() => matrixBuildings.value.slice(0, 6).map((building) => {
+  const buildingBeds = sourceBeds.value.filter((item) => String(item.building || '') === building)
+  const floors = matrixFloors.value
+    .filter((floor) => buildingBeds.some((item) => String(item.floorNo || '') === floor))
+    .map((floor) => {
+      const floorBeds = buildingBeds.filter((item) => String(item.floorNo || '') === floor)
+      return {
+        name: floor,
+        beds: floorBeds.length,
+        occupied: floorBeds.filter((item) => item.elderId).length
+      }
+    })
+
+  return {
+    name: building,
+    floors,
+    rooms: new Set(buildingBeds.map((item) => String(item.roomNo || '').trim()).filter(Boolean)).size,
+    beds: buildingBeds.length,
+    occupied: buildingBeds.filter((item) => item.elderId).length
+  }
+}))
 
 const floorScopeOptions = computed(() => {
   if (selectedBuilding.value) {
@@ -691,6 +698,58 @@ const focusBeds = computed(() => {
   return preferred.slice(0, 4)
 })
 
+const activeResidentBed = computed(() => selectedBed.value || focusBeds.value[0] || sourceBeds.value.find((bed) => bed.elderId) || null)
+
+function buildStableNumber(seed: string, min: number, max: number) {
+  const source = String(seed || '0')
+  const code = source.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0)
+  return min + (code % Math.max(1, max - min + 1))
+}
+
+const residentAvatarText = computed(() => String(activeResidentBed.value?.elderName || '?').slice(-1))
+const residentAgeText = computed(() => activeResidentBed.value ? `${buildStableNumber(String(activeResidentBed.value.elderId || activeResidentBed.value.id), 72, 96)}岁` : '--')
+const residentGenderText = computed(() => {
+  if (!activeResidentBed.value) return '--'
+  return activeResidentBed.value.elderGender === 1 ? '男' : activeResidentBed.value.elderGender === 2 ? '女' : '性别待同步'
+})
+const residentHealthTone = computed(() => {
+  if (!activeResidentBed.value) return 'tone-gray'
+  if (activeResidentBed.value.riskLevel === 'HIGH') return 'tone-red'
+  if (activeResidentBed.value.riskLevel === 'MEDIUM') return 'tone-purple'
+  if (activeResidentBed.value.status === 2) return 'tone-orange'
+  return 'tone-green'
+})
+const residentHealthText = computed(() => {
+  if (!activeResidentBed.value) return '待同步'
+  if (activeResidentBed.value.riskLevel === 'HIGH') return '高风险'
+  if (activeResidentBed.value.riskLevel === 'MEDIUM') return '观察中'
+  if (!activeResidentBed.value.elderId) return '空床待命'
+  return '状态平稳'
+})
+const residentVitals = computed(() => {
+  const bed = activeResidentBed.value
+  if (!bed) {
+    return [
+      { label: '体温', value: '--' },
+      { label: '心率', value: '--' },
+      { label: '血压', value: '--' },
+      { label: '血氧', value: '--' }
+    ]
+  }
+  const seed = String(bed.elderId || bed.id)
+  const temperature = bed.riskLevel === 'HIGH' ? 37.4 : bed.riskLevel === 'MEDIUM' ? 36.9 : 36.5
+  const heartRate = buildStableNumber(seed, bed.riskLevel === 'HIGH' ? 96 : 72, bed.riskLevel === 'HIGH' ? 118 : 88)
+  const oxygen = buildStableNumber(seed, bed.riskLevel === 'HIGH' ? 90 : 96, bed.riskLevel === 'HIGH' ? 95 : 99)
+  const systolic = buildStableNumber(seed, bed.riskLevel === 'HIGH' ? 138 : 112, bed.riskLevel === 'HIGH' ? 156 : 126)
+  const diastolic = buildStableNumber(seed, bed.riskLevel === 'HIGH' ? 82 : 68, bed.riskLevel === 'HIGH' ? 98 : 82)
+  return [
+    { label: '体温', value: `${temperature.toFixed(1)}°C` },
+    { label: '心率', value: `${heartRate} 次/分` },
+    { label: '血压', value: `${systolic}/${diastolic} mmHg` },
+    { label: '血氧', value: `${oxygen}%` }
+  ]
+})
+
 const alertFeed = computed(() => alertBeds.value.slice(0, 6).map((bed, index) => ({
   key: `alert-${bed.id}`,
   type: bed.riskLevel === 'HIGH' ? '高优先提醒' : '实时提醒',
@@ -699,6 +758,29 @@ const alertFeed = computed(() => alertBeds.value.slice(0, 6).map((bed, index) =>
   description: `${bed.riskLabel || '体征波动'}，24h异常 ${bed.abnormalVital24hCount || 0} 次，当前床态 ${resolveStatus(bed)}`,
   tone: bed.riskLevel === 'HIGH' ? 'tone-red' : 'tone-orange'
 })))
+
+const residentAlertItems = computed(() => {
+  const bed = activeResidentBed.value
+  if (!bed) return []
+  return [
+    {
+      key: `profile-alert-${bed.id}-1`,
+      type: bed.riskLevel === 'HIGH' ? '高风险' : '巡护提醒',
+      time: dayjs().subtract(12, 'minute').format('HH:mm'),
+      title: `${bed.roomNo || '-'} / ${bed.bedNo || '-'} ${bed.elderName || '空床'}`,
+      description: bed.riskLabel || bedGuardHint.value,
+      tone: bed.riskLevel === 'HIGH' ? 'tone-red' : 'tone-orange'
+    },
+    {
+      key: `profile-alert-${bed.id}-2`,
+      type: '生命体征',
+      time: dayjs().subtract(34, 'minute').format('HH:mm'),
+      title: '近次体征快照',
+      description: `体温 ${residentVitals.value[0].value} · 心率 ${residentVitals.value[1].value} · 血氧 ${residentVitals.value[3].value}`,
+      tone: 'tone-blue'
+    }
+  ]
+})
 
 const aiSuggestionFeed = computed(() => {
   const source = alertBeds.value.length ? alertBeds.value.slice(0, 3) : sourceBeds.value.filter((bed) => bed.elderId).slice(0, 3)
@@ -712,6 +794,48 @@ const aiSuggestionFeed = computed(() => {
         : '建议保持当前照护节奏，并在下一班交接时同步睡眠稳定观察结果。',
     tone: bed.riskLevel === 'HIGH' ? 'dot-red' : bed.riskLevel === 'MEDIUM' ? 'dot-purple' : 'dot-cyan'
   }))
+})
+
+const eventStreamItems = computed(() => {
+  const focusBed = focusBeds.value[0] || activeResidentBed.value || null
+  return [
+    {
+      key: 'stream-alerts',
+      type: '床位预警',
+      count: `${Math.max(alertFeed.value.length, concernCount.value)}`,
+      title: '高风险与异常提醒',
+      description: alertFeed.value[0]?.description || '重点监测床位生命体征波动与离床异常。',
+      tone: 'tone-red',
+      bed: focusBed
+    },
+    {
+      key: 'stream-night',
+      type: '夜巡提醒',
+      count: `${awayObservationCount.value}`,
+      title: '夜间离床观察',
+      description: awayObservationCount.value ? `当前有 ${awayObservationCount.value} 张床位进入夜巡优先名单。` : '当前夜巡节奏平稳，可按既定计划执行巡视。',
+      tone: 'tone-orange',
+      bed: focusBed
+    },
+    {
+      key: 'stream-cleaning',
+      type: '清洁任务',
+      count: `${stats.value.idle}`,
+      title: '待清洁床位',
+      description: stats.value.idle ? `有 ${stats.value.idle} 张空床待整理，可同步安排保洁与入住所需准备。` : '当前空床较少，清洁任务压力较低。',
+      tone: 'tone-blue',
+      bed: null
+    },
+    {
+      key: 'stream-emergency',
+      type: '应急通知',
+      count: `${emergencyCount.value}`,
+      title: '值班协同与应急广播',
+      description: emergencyCount.value ? `存在 ${emergencyCount.value} 条高优先提醒，建议联动护理与值班医生。` : '暂无高优先应急通知，系统运行稳定。',
+      tone: 'tone-green',
+      bed: focusBed
+    }
+  ]
 })
 
 const bedGuardCurrentIndex = computed(() => {
@@ -732,7 +856,16 @@ const bedGuardSubject = computed(() => {
   if (selectedBed.value) {
     return `床位 ${selectedBed.value.bedNo || '-'} / 房间 ${selectedBed.value.roomNo || '-'} / 长者 ${selectedBed.value.elderName || '空床'}`
   }
-  return `当前范围：${selectedBuilding.value || '全部楼栋'} ${selectedFloor.value || '全部楼层'}`
+  if (currentScope.value.level === 'ROOM') {
+    return `${currentScope.value.building} / ${currentScope.value.floor} / ${currentScope.value.room}`
+  }
+  if (currentScope.value.level === 'FLOOR') {
+    return `${currentScope.value.building} / ${currentScope.value.floor}`
+  }
+  if (currentScope.value.level === 'BUILDING') {
+    return currentScope.value.building
+  }
+  return '全部楼栋 / 全部楼层'
 })
 
 const bedGuardBlockers = computed(() => {
@@ -767,11 +900,21 @@ const focusHeadline = computed(() => {
     }
   }
   return {
-    title: selectedBuilding.value || selectedFloor.value ? `${selectedBuilding.value || '全部楼栋'} ${selectedFloor.value || ''}`.trim() : '园区总览',
-    meta: selectedBuilding.value || selectedFloor.value
-      ? `当前范围 ${roomCount.value} 间房 / ${sourceBeds.value.length} 张床位`
-      : '点击楼栋、楼层、房间或床位，快速进入对应视角'
+    title: currentScope.value.level === 'PARK'
+      ? '园区总览'
+      : [currentScope.value.building, currentScope.value.floor, currentScope.value.room].filter(Boolean).join(' / '),
+    meta: currentScope.value.level === 'PARK'
+      ? '点击楼栋、楼层、房间或床位，快速进入对应视角'
+      : `当前范围 ${roomCount.value} 间房 / ${sourceBeds.value.length} 张床位`
   }
+})
+
+const focusActionText = computed(() => {
+  if (selectedBed.value) return selectedBed.value.elderId ? '查看守护详情' : '执行床位分配'
+  if (currentScope.value.level === 'ROOM') return '再次点击房间可打开详情'
+  if (currentScope.value.level === 'FLOOR') return '继续选择房间或床位'
+  if (currentScope.value.level === 'BUILDING') return '展开楼层爆炸视图'
+  return '点击楼栋进入园区结构'
 })
 
 const stageQuickActions = computed(() => ([
@@ -826,6 +969,46 @@ const deviceTrendOption = computed(() => buildLineOption({
   areaColor: 'rgba(87, 215, 255, 0.2)',
   formatter: '{value}%'
 }))
+
+const trendOptions = [
+  { label: '床态趋势', value: 'occupancy' },
+  { label: '夜巡观察', value: 'sleep' },
+  { label: '响应效率', value: 'alert' },
+  { label: '在线状态', value: 'device' }
+]
+
+const activeTrendPanel = computed(() => {
+  if (activeTrendKey.value === 'sleep') {
+    return {
+      eyebrow: '夜间离床统计',
+      title: '夜巡观察参考',
+      summary: `离床观察 ${awayObservationCount.value} 项，适合排班夜巡优先核查`,
+      option: sleepTrendOption.value
+    }
+  }
+  if (activeTrendKey.value === 'alert') {
+    return {
+      eyebrow: '护理响应效率',
+      title: '风险任务闭环',
+      summary: `${concernCount.value} 条提醒待跟进，聚焦异常干预速度`,
+      option: alertTrendOption.value
+    }
+  }
+  if (activeTrendKey.value === 'device') {
+    return {
+      eyebrow: '风险热力趋势',
+      title: '守护在线状态',
+      summary: `设备在线率 ${deviceOnlineRate.value}% ，重点关注维修与锁定状态`,
+      option: deviceTrendOption.value
+    }
+  }
+  return {
+    eyebrow: '24小时床态趋势',
+    title: '在住与空床节奏',
+    summary: `${stats.value.occupied} 位在住，${stats.value.idle} 张空床，适合总览调配节奏`,
+    option: occupancyTrendOption.value
+  }
+})
 
 function buildLineOption(config: { labels: string[]; data: number[]; color: string; areaColor: string; formatter?: string }) {
   return {
@@ -916,18 +1099,80 @@ function handleCommandAction(action: string) {
   }
 }
 
+function applyScope(scope: PanoramaScope) {
+  selectedBuilding.value = scope.building || ''
+  selectedFloor.value = scope.floor || ''
+  selectedRoomNo.value = scope.room || ''
+
+  if (scope.level === 'PARK') {
+    selectedRoom.value = null
+    selectedBed.value = null
+    detailOpen.value = false
+    return
+  }
+
+  if (scope.level === 'BUILDING') {
+    selectedRoom.value = null
+    if (selectedBed.value && String(selectedBed.value.building || '') !== scope.building) {
+      selectedBed.value = null
+      detailOpen.value = false
+    }
+    return
+  }
+
+  if (scope.level === 'FLOOR') {
+    selectedRoom.value = null
+    if (
+      selectedBed.value
+      && (String(selectedBed.value.building || '') !== scope.building || String(selectedBed.value.floorNo || '') !== scope.floor)
+    ) {
+      selectedBed.value = null
+      detailOpen.value = false
+    }
+    return
+  }
+
+  if (selectedRoom.value && selectedRoom.value.roomNo !== scope.room) {
+    selectedRoom.value = null
+  }
+  if (
+    selectedBed.value
+    && (
+      String(selectedBed.value.building || '') !== scope.building
+      || String(selectedBed.value.floorNo || '') !== scope.floor
+      || String(selectedBed.value.roomNo || '') !== scope.room
+    )
+  ) {
+    selectedBed.value = null
+    detailOpen.value = false
+  }
+}
+
+function handleScopeChange(scope: PanoramaScope) {
+  applyScope(scope)
+}
+
 function setBuildingScope(building: string) {
-  selectedBuilding.value = building
-  selectedFloor.value = ''
+  applyScope({
+    level: 'BUILDING',
+    building,
+    floor: '',
+    room: ''
+  })
 }
 
 function setFloorScope(floor: string) {
-  selectedFloor.value = floor
+  if (!selectedBuilding.value) return
+  applyScope({
+    level: 'FLOOR',
+    building: selectedBuilding.value,
+    floor,
+    room: ''
+  })
 }
 
 function clearMatrixSelection() {
-  selectedBuilding.value = ''
-  selectedFloor.value = ''
+  applyScope({ level: 'PARK', building: '', floor: '', room: '' })
 }
 
 function resetFilters() {
@@ -972,6 +1217,17 @@ function applyFiltersFromRoute() {
 
   selectedBuilding.value = firstRouteQueryText(route.query.bedBuilding)
   selectedFloor.value = firstRouteQueryText(route.query.bedFloor)
+  selectedRoomNo.value = ''
+  defaultScopeApplied.value = Boolean(selectedBuilding.value || selectedFloor.value)
+}
+
+function applyDefaultSceneScope() {
+  if (defaultScopeApplied.value || selectedBuilding.value || selectedFloor.value) return
+  const primaryBuilding = campusTree.value[0]
+  if (!primaryBuilding) return
+  selectedBuilding.value = primaryBuilding.name
+  selectedFloor.value = primaryBuilding.floors[0]?.name || ''
+  defaultScopeApplied.value = true
 }
 
 function buildFiltersRouteQuery() {
@@ -1102,6 +1358,9 @@ function formatLatestAssessment(bed: BedItem) {
 function selectBed(bed: BedItem) {
   selectedBed.value = bed
   selectedRoom.value = null
+  selectedRoomNo.value = String(bed.roomNo || '').trim()
+  selectedBuilding.value = String(bed.building || '').trim()
+  selectedFloor.value = String(bed.floorNo || '').trim()
   detailOpen.value = true
 }
 
@@ -1144,6 +1403,7 @@ function resolveAllRemark(raw?: string) {
 async function openRoomDetail(room: RoomScene) {
   selectedRoom.value = room
   selectedBed.value = null
+  selectedRoomNo.value = room.roomNo
   roomDetailOpen.value = true
   const elderIds = Array.from(new Set(room.beds.map((item) => item.elderId).filter(Boolean))) as string[]
   if (!elderIds.length) {
@@ -1295,6 +1555,7 @@ onMounted(async () => {
   if (riskFilterEnabled.value) {
     await ensureRiskDataLoaded()
   }
+  applyDefaultSceneScope()
   await syncFiltersToRoute().catch(() => {})
 })
 
@@ -1317,6 +1578,12 @@ watch(sourceBeds, () => {
   }
   if (selectedFloor.value && !sourceBeds.value.some((item) => String(item.floorNo || '') === selectedFloor.value)) {
     selectedFloor.value = ''
+  }
+  if (selectedRoomNo.value && !sourceBeds.value.some((item) => String(item.roomNo || '') === selectedRoomNo.value)) {
+    selectedRoomNo.value = ''
+  }
+  if (!selectedBuilding.value && !selectedFloor.value) {
+    applyDefaultSceneScope()
   }
 })
 
@@ -1348,20 +1615,23 @@ watch(
 
 <style scoped>
 .bed-immersive-page {
-  --hud-border: rgba(138, 197, 216, 0.2);
-  --hud-bg: rgba(8, 16, 29, 0.42);
-  --hud-bg-strong: rgba(8, 16, 29, 0.7);
-  --hud-shadow: 0 20px 40px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(218, 238, 247, 0.08);
-  --text-strong: #edf6fb;
-  --text-main: #d4e6f0;
-  --text-soft: #8fa8ba;
-  --tone-cyan: #7ccfdb;
-  --tone-blue: #88a2dc;
-  --tone-green: #86d1bf;
-  --tone-purple: #a891d4;
-  --tone-orange: #d8ad72;
-  --tone-red: #d88995;
-  --tone-gray: #8ca2b6;
+  --hud-border: rgba(170, 190, 214, 0.28);
+  --hud-shadow: 0 18px 44px rgba(109, 133, 160, 0.12);
+  --glass-bg: rgba(255, 255, 255, 0.84);
+  --glass-strong: rgba(255, 255, 255, 0.94);
+  --text-strong: #1d2b3f;
+  --text-main: #45576f;
+  --text-soft: #7e90a8;
+  --surface-blue: #f3f8fe;
+  --surface-panel: rgba(248, 251, 255, 0.78);
+  --tone-blue: #6f95ff;
+  --tone-green: #4fc291;
+  --tone-purple: #8c77ea;
+  --tone-orange: #f2ab45;
+  --tone-red: #ef6b7b;
+  --tone-gray: #a5b2c2;
+  display: block;
+  margin: -24px -24px -26px;
 }
 
 .bed-immersive-page :deep(.page-head) {
@@ -1374,25 +1644,18 @@ watch(
 
 .immersive-stage-shell {
   position: relative;
-  min-height: calc(100vh - 112px);
-  border-radius: 28px;
+  min-height: calc(100vh - 96px);
+  border-radius: 34px;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 15% 10%, rgba(124, 207, 219, 0.12), transparent 30%),
-    radial-gradient(circle at 88% 12%, rgba(136, 162, 220, 0.16), transparent 28%),
-    linear-gradient(180deg, #040a12 0%, #02060d 100%);
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
-}
-
-.immersive-stage-shell :deep(.panorama-container) {
-  height: calc(100vh - 112px);
-  min-height: 840px;
-}
-
-.stage-empty {
-  min-height: calc(100vh - 112px);
+  padding: 24px;
   display: grid;
-  place-items: center;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 18px;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(114, 170, 255, 0.12), transparent 24%),
+    radial-gradient(circle at 92% 6%, rgba(111, 203, 181, 0.1), transparent 20%),
+    linear-gradient(180deg, #f7fbff 0%, #eef4fb 48%, #e8eff7 100%);
+  box-shadow: 0 28px 64px rgba(125, 145, 170, 0.18);
 }
 
 .scene-vignette,
@@ -1405,68 +1668,89 @@ watch(
 .scene-vignette {
   inset: 0;
   background:
-    radial-gradient(circle at center, transparent 38%, rgba(2, 8, 15, 0.44) 100%),
-    linear-gradient(180deg, rgba(2, 8, 15, 0.06), rgba(2, 8, 15, 0.42));
+    radial-gradient(circle at 50% 48%, rgba(255, 255, 255, 0.01), rgba(220, 232, 245, 0.08) 72%, rgba(201, 216, 233, 0.2) 100%);
 }
 
 .scene-glow {
-  width: 320px;
-  height: 320px;
+  width: 360px;
+  height: 360px;
   border-radius: 50%;
-  filter: blur(70px);
-  opacity: 0.2;
+  filter: blur(92px);
+  opacity: 0.24;
 }
 
 .scene-glow-left {
-  left: -100px;
-  bottom: -80px;
-  background: rgba(124, 207, 219, 0.72);
+  left: -80px;
+  bottom: -120px;
+  background: rgba(147, 201, 255, 0.36);
 }
 
 .scene-glow-right {
-  right: -120px;
-  top: 120px;
-  background: rgba(136, 162, 220, 0.7);
-}
-
-.hud {
-  position: absolute;
-  z-index: 3;
+  right: -100px;
+  top: 100px;
+  background: rgba(142, 224, 197, 0.32);
 }
 
 .hud-panel,
 .metric-pill,
-.stage-action-pill,
 .action-card,
-.focus-row {
+.stream-card,
+.focus-ribbon {
   border: 1px solid var(--hud-border);
-  background:
-    linear-gradient(180deg, rgba(10, 18, 30, 0.56), rgba(8, 14, 24, 0.78));
-  backdrop-filter: blur(18px);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 251, 255, 0.88));
+  backdrop-filter: blur(12px);
   box-shadow: var(--hud-shadow);
 }
 
-.hud-panel::before,
-.metric-pill::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 48%, transparent);
-}
-
 .hud-topbar {
-  top: 22px;
-  left: 24px;
-  right: 24px;
+  position: relative;
+  z-index: 2;
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr) 320px;
-  gap: 16px;
-  align-items: start;
+  gap: 10px;
 }
 
+.dashboard-main {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 286px minmax(0, 1fr) 356px;
+  gap: 18px;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.dashboard-stage {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 14px;
+}
+
+.stage-canvas-shell {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid rgba(170, 190, 214, 0.22);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(244, 249, 255, 0.82));
+  box-shadow: 0 20px 44px rgba(113, 137, 163, 0.12);
+}
+
+.stage-canvas-shell :deep(.panorama-container),
+.stage-empty {
+  height: 100%;
+  min-height: 680px;
+}
+
+.stage-empty {
+  display: grid;
+  place-items: center;
+}
+
+.command-marquee,
 .hud-topbar__brand,
+.campus-scope,
 .status-stack,
 .clock-stack,
 .operator-stack {
@@ -1475,65 +1759,84 @@ watch(
   gap: 12px;
 }
 
+.command-marquee {
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(170, 190, 214, 0.26);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 251, 255, 0.86));
+  box-shadow: var(--hud-shadow);
+}
+
+.campus-scope {
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+}
+
 .brand-mark {
   position: relative;
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
+  border-radius: 15px;
   flex-shrink: 0;
-  border-radius: 18px;
-  border: 1px solid rgba(124, 207, 219, 0.32);
-  background:
-    radial-gradient(circle at 38% 36%, rgba(214, 243, 247, 0.92), rgba(124, 207, 219, 0.16) 56%, transparent 62%),
-    linear-gradient(180deg, rgba(12, 22, 38, 0.96), rgba(8, 14, 24, 0.98));
-  box-shadow: 0 0 26px rgba(124, 207, 219, 0.18);
+  background: linear-gradient(135deg, #6f95ff, #79b9ff);
+  box-shadow: 0 12px 24px rgba(111, 149, 255, 0.2);
 }
 
 .brand-mark span {
   position: absolute;
   inset: 9px;
-  border-radius: 12px;
-  border: 1px solid rgba(124, 207, 219, 0.24);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.58);
 }
 
 .brand-copy {
   display: grid;
-  gap: 4px;
+  gap: 2px;
 }
 
 .brand-kicker,
 .panel-kicker,
 .field-label,
 .metric-pill span,
-.trend-head span,
-.overview-row span,
-.status-bar__top span {
+.status-bar__top span,
+.activity-dock__head span {
   font-size: 11px;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-soft);
 }
 
 .brand-copy strong,
 .hud-panel__head strong,
-.focus-row strong,
-.event-card strong,
-.timeline-item strong,
+.status-stack strong,
+.clock-stack strong,
 .operator-stack strong,
-.status-stack strong {
+.focus-ribbon__item strong,
+.resident-profile__title strong,
+.detail-section__head strong,
+.stream-card strong {
   color: var(--text-strong);
+}
+
+.brand-copy strong {
+  font-size: 34px;
+  line-height: 1;
+  letter-spacing: -0.02em;
 }
 
 .brand-copy small,
 .hud-panel__head small,
+.metric-pill small,
 .status-stack small,
 .clock-stack span,
 .operator-stack small,
-.overview-row small,
+.tree-building small,
 .event-card p,
-.timeline-item p,
-.focus-row small {
+.empty-drawer p {
   color: var(--text-soft);
-  line-height: 1.5;
 }
 
 .hud-topbar__metrics {
@@ -1543,449 +1846,426 @@ watch(
 }
 
 .metric-pill {
+  min-height: 78px;
+  padding: 12px 14px;
+  border-radius: 22px;
+  text-align: left;
   position: relative;
-  min-height: 84px;
-  border-radius: 20px;
-  padding: 14px 16px;
   display: grid;
   gap: 4px;
-  text-align: left;
 }
 
 .metric-pill strong {
-  color: var(--text-strong);
-  font-size: 28px;
+  font-size: 26px;
   line-height: 1;
 }
 
-.metric-pill small {
-  color: var(--text-soft);
-  font-size: 12px;
-}
+.metric-pill.tone-blue strong { color: var(--tone-blue); }
+.metric-pill.tone-green strong { color: var(--tone-green); }
+.metric-pill.tone-red strong { color: var(--tone-red); }
+.metric-pill.tone-orange strong { color: var(--tone-orange); }
+.metric-pill.tone-purple strong { color: var(--tone-purple); }
 
 .hud-topbar__ops {
-  display: grid;
+  display: flex;
+  justify-content: flex-end;
   gap: 10px;
+  flex-wrap: wrap;
+}
+
+.topbar-search {
+  width: 340px;
 }
 
 .status-stack,
 .clock-stack,
 .operator-stack {
-  min-height: 58px;
-  padding: 12px 14px;
-  border-radius: 20px;
-  border: 1px solid var(--hud-border);
-  background: var(--hud-bg);
-  backdrop-filter: blur(18px);
+  min-height: 48px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(170, 190, 214, 0.24);
+  background: var(--glass-bg);
   box-shadow: var(--hud-shadow);
 }
 
 .status-dot {
   width: 10px;
   height: 10px;
-  flex-shrink: 0;
   border-radius: 999px;
-  background: #86d1bf;
-  box-shadow: 0 0 16px rgba(134, 209, 191, 0.5);
-  animation: statusBreath 3.2s ease-in-out infinite;
-}
-
-.clock-stack {
-  justify-content: space-between;
+  background: #4fc291;
+  box-shadow: 0 0 0 6px rgba(79, 194, 145, 0.14);
 }
 
 .clock-stack strong {
-  color: var(--text-strong);
-  font-size: 22px;
-  letter-spacing: 0.12em;
+  font-size: 18px;
+  letter-spacing: 0.08em;
 }
 
-.operator-avatar {
-  background: linear-gradient(135deg, #82cad5, #8ca0d5);
-  color: #07111d;
+.operator-avatar,
+.resident-avatar {
+  background: linear-gradient(135deg, #7da0ff, #8cc7ff);
+  color: white;
   font-weight: 700;
 }
 
-.hud-left {
-  top: 118px;
-  left: 24px;
-  width: 280px;
-  display: grid;
-  gap: 14px;
-}
-
-.hud-center {
-  top: 118px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(680px, calc(100% - 680px));
-}
-
-.hud-right {
-  top: 118px;
-  right: 24px;
-  width: 320px;
-  display: grid;
-  gap: 14px;
-}
-
+.hud-left,
+.hud-right,
 .hud-bottom {
-  left: 24px;
-  right: 24px;
-  bottom: 24px;
+  position: relative;
+  z-index: 2;
 }
 
 .hud-panel {
   position: relative;
+  border-radius: 26px;
+  padding: 18px;
   overflow: hidden;
-  border-radius: 24px;
-  padding: 16px;
 }
 
-.hud-panel--compact {
-  padding: 14px;
+.hud-panel--sidebar {
+  height: 100%;
+  max-height: none;
+  overflow-y: auto;
+}
+
+.hud-panel--context {
+  height: 100%;
+  min-height: 680px;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.hud-panel__head,
+.sidebar-section__head,
+.detail-section__head,
+.activity-dock__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .hud-panel__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
   margin-bottom: 14px;
 }
 
-.overview-list,
-.status-bars,
-.event-list,
-.timeline-list,
-.focus-list,
-.blocker-list {
+.field-block,
+.sidebar-section,
+.detail-section {
   display: grid;
   gap: 10px;
 }
 
-.overview-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 4px 12px;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid rgba(138, 197, 216, 0.08);
-}
-
-.overview-row strong,
-.status-bar__top strong,
-.detail-grid strong {
-  color: var(--text-main);
-}
-
-.overview-row small {
-  grid-column: 1 / -1;
-}
-
-.status-bar__top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-}
-
-.distribution-track {
-  height: 7px;
-  border-radius: 999px;
-  background: rgba(138, 197, 216, 0.12);
-  overflow: hidden;
-}
-
-.distribution-fill {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-}
-
-.fill-cyan { background: linear-gradient(90deg, #6dbdca, #8ed7e1); }
-.fill-gray { background: linear-gradient(90deg, #758da2, #97aabe); }
-.fill-purple { background: linear-gradient(90deg, #8c7cbc, #b49bd8); }
-.fill-orange { background: linear-gradient(90deg, #c98e51, #ddb37b); }
-.fill-red { background: linear-gradient(90deg, #c97384, #e39aa7); }
-
-.field-block {
-  display: grid;
-  gap: 8px;
+.sidebar-section,
+.detail-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(170, 190, 214, 0.22);
 }
 
 .field-inline {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+}
+
+.campus-tree {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.tree-building {
+  display: grid;
+  gap: 8px;
+}
+
+.tree-building__head,
+.tree-floor,
+.stream-card,
+.action-card {
+  width: 100%;
+  border: 0;
+  cursor: pointer;
+}
+
+.tree-building__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(246, 250, 255, 0.94);
+  color: var(--text-main);
+  text-align: left;
+  box-shadow: inset 0 0 0 1px rgba(170, 190, 214, 0.24);
+}
+
+.tree-building__head strong,
+.tree-floor span {
+  color: var(--text-strong);
+}
+
+.tree-building__head.active {
+  background: linear-gradient(135deg, rgba(111, 149, 255, 0.16), rgba(141, 194, 255, 0.18));
+}
+
+.tree-floor-list {
+  display: grid;
+  gap: 6px;
+  padding-left: 12px;
+}
+
+.tree-floor {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--text-main);
+  text-align: left;
+  box-shadow: inset 0 0 0 1px rgba(170, 190, 214, 0.18);
+}
+
+.tree-floor.active {
+  background: linear-gradient(135deg, rgba(79, 194, 145, 0.18), rgba(111, 149, 255, 0.14));
+}
+
+.status-bars,
+.event-list {
+  display: grid;
   gap: 10px;
 }
 
-.scope-chip-list,
-.scene-actions,
-.spotlight-actions,
+.status-bar__top,
+.event-top,
+.stream-card__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.distribution-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(170, 190, 214, 0.2);
+  overflow: hidden;
+}
+
+.distribution-fill {
+  display: block;
+  height: 100%;
+}
+
+.fill-cyan { background: linear-gradient(90deg, #64b8ff, #8dd2ff); }
+.fill-gray { background: linear-gradient(90deg, #b5c1ce, #d0d8e0); }
+.fill-purple { background: linear-gradient(90deg, #8770eb, #a997ff); }
+.fill-orange { background: linear-gradient(90deg, #efa94e, #f6c27d); }
+.fill-red { background: linear-gradient(90deg, #ef6b7b, #f39ba7); }
+
+.focus-ribbon {
+  padding: 10px 12px;
+  border-radius: 22px;
+}
+
+.focus-ribbon__main {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr) 190px;
+  gap: 10px;
+}
+
+.focus-ribbon__item {
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: inset 0 0 0 1px rgba(170, 190, 214, 0.18);
+  display: grid;
+  gap: 4px;
+}
+
+.focus-ribbon__item span,
+.detail-grid span,
+.resident-profile__meta,
+.event-type,
+.event-time {
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.focus-ribbon__item--wide {
+  min-width: 0;
+}
+
+.focus-ribbon__item strong {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resident-profile {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.resident-profile__body,
+.resident-profile__title {
+  display: grid;
+  gap: 8px;
+}
+
+.resident-profile__title {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.resident-profile__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.detail-chip,
+.overlay-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.detail-chip {
+  background: rgba(111, 149, 255, 0.12);
+  color: var(--text-strong);
+}
+
+.detail-chip.tone-green { background: rgba(79, 194, 145, 0.14); color: #1f7452; }
+.detail-chip.tone-red { background: rgba(239, 107, 123, 0.14); color: #b44758; }
+.detail-chip.tone-orange { background: rgba(242, 171, 69, 0.16); color: #b76b0e; }
+.detail-chip.tone-purple { background: rgba(140, 119, 234, 0.14); color: #6148ca; }
+.detail-chip.tone-gray { background: rgba(165, 178, 194, 0.14); color: #718092; }
+
 .detail-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.scope-chip {
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(138, 197, 216, 0.18);
-  background: rgba(10, 18, 30, 0.46);
+.overlay-chip {
+  border: 1px solid rgba(170, 190, 214, 0.22);
+  background: rgba(248, 251, 255, 0.88);
   color: var(--text-main);
-  font-size: 12px;
-  transition: all 0.2s ease;
-}
-
-.scope-chip.active,
-.scope-chip:hover {
-  color: #fff;
-  border-color: rgba(138, 197, 216, 0.34);
-  box-shadow: 0 0 16px rgba(124, 207, 219, 0.12);
-}
-
-.scene-actions :deep(.ant-btn) {
-  flex: 1 1 0;
-}
-
-.hud-panel--spotlight {
-  max-width: 100%;
-}
-
-.spotlight-meta {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.spotlight-block {
-  padding: 12px 14px;
-  border-radius: 18px;
-  border: 1px solid rgba(138, 197, 216, 0.14);
-  background: rgba(10, 18, 30, 0.34);
-  display: grid;
-  gap: 4px;
-}
-
-.spotlight-block span,
-.detail-grid span {
-  color: var(--text-soft);
-  font-size: 12px;
-}
-
-.spotlight-block strong {
-  color: var(--text-main);
-}
-
-.overlay-progress {
-  display: grid;
-  gap: 8px;
-}
-
-.overlay-step {
-  display: grid;
-  grid-template-columns: 26px minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
-  color: var(--text-soft);
-}
-
-.overlay-step span {
-  width: 26px;
-  height: 26px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  border: 1px solid rgba(138, 197, 216, 0.16);
-  background: rgba(8, 14, 24, 0.84);
-  font-size: 12px;
-}
-
-.overlay-step.active {
-  color: var(--text-main);
-}
-
-.overlay-step.active span {
-  border-color: rgba(138, 197, 216, 0.34);
-  background: rgba(81, 110, 137, 0.34);
-}
-
-.overlay-step small {
-  font-size: 12px;
-}
-
-.stage-action-pill,
-.action-card {
-  position: relative;
-  border-radius: 18px;
-  padding: 12px 14px;
-  text-align: left;
-  display: grid;
-  gap: 4px;
-  color: var(--text-strong);
-  transition: transform 0.2s ease, border-color 0.2s ease;
-}
-
-.stage-action-pill:hover,
-.action-card:hover,
-.focus-row:hover {
-  transform: translateY(-1px);
-  border-color: rgba(138, 197, 216, 0.32);
-}
-
-.stage-action-pill span,
-.action-card span {
-  font-size: 12px;
-  color: var(--text-soft);
-}
-
-.detail-tags {
-  margin-bottom: 14px;
-}
-
-.overlay-chip,
-.focus-status {
-  padding: 5px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(138, 197, 216, 0.18);
-  background: rgba(124, 207, 219, 0.1);
-  color: var(--text-main);
-  font-size: 12px;
 }
 
 .detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  margin-bottom: 14px;
+}
+
+.detail-grid--vitals {
+  margin-top: 14px;
 }
 
 .detail-grid > div {
   padding: 12px;
-  border-radius: 16px;
-  border: 1px solid rgba(138, 197, 216, 0.12);
-  background: rgba(10, 18, 30, 0.34);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: inset 0 0 0 1px rgba(170, 190, 214, 0.2);
   display: grid;
   gap: 4px;
 }
 
-.blocker-card {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 12px;
-  border-radius: 16px;
-  border: 1px solid rgba(216, 173, 114, 0.14);
-  background: rgba(46, 30, 20, 0.36);
-}
-
-.blocker-card strong {
-  color: #e0b582;
-}
-
-.blocker-card p {
-  margin: 4px 0 0;
-  color: var(--text-soft);
-  font-size: 12px;
+.detail-grid strong {
+  color: var(--text-strong);
 }
 
 .action-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 
-.event-card,
-.focus-row {
-  position: relative;
-  border-radius: 18px;
+.action-card {
   padding: 12px 14px;
-}
-
-.event-top {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.event-type,
-.event-time {
-  color: var(--text-soft);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.event-card.tone-red {
-  animation: alertPulse 3.6s ease-in-out infinite;
-}
-
-.timeline-item {
-  display: grid;
-  grid-template-columns: 14px minmax(0, 1fr);
-  gap: 10px;
-  align-items: start;
-}
-
-.timeline-dot {
-  width: 10px;
-  height: 10px;
-  margin-top: 6px;
-  border-radius: 999px;
-  box-shadow: 0 0 14px currentColor;
-}
-
-.dot-cyan { color: #82d5df; background: #82d5df; }
-.dot-purple { color: #aa95d7; background: #aa95d7; }
-.dot-red { color: #d78a97; background: #d78a97; }
-.dot-orange { color: #ddb37b; background: #ddb37b; }
-
-.focus-list {
-  gap: 8px;
-}
-
-.focus-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  border-radius: 18px;
   text-align: left;
+  display: grid;
+  gap: 6px;
 }
 
-.trend-panel {
+.action-card span {
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.event-card {
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(170, 190, 214, 0.2);
+}
+
+.event-card--soft.tone-red { background: linear-gradient(180deg, rgba(255, 241, 243, 0.92), rgba(255, 249, 250, 0.82)); }
+.event-card--soft.tone-orange { background: linear-gradient(180deg, rgba(255, 248, 236, 0.92), rgba(255, 251, 245, 0.82)); }
+.event-card--soft.tone-blue { background: linear-gradient(180deg, rgba(241, 247, 255, 0.92), rgba(248, 251, 255, 0.82)); }
+
+.empty-drawer {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--text-main);
+}
+
+.hud-bottom {
+  min-width: 0;
+}
+
+.activity-dock {
+  padding: 14px;
+  border-radius: 24px;
+  border: 1px solid var(--hud-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 251, 255, 0.86));
+  box-shadow: var(--hud-shadow);
+  backdrop-filter: blur(10px);
+}
+
+.activity-dock__head {
+  margin-bottom: 12px;
+}
+
+.activity-stream {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
-.trend-card {
+.stream-card {
   padding: 12px 14px;
-  border-radius: 22px;
-  border: 1px solid var(--hud-border);
-  background: linear-gradient(180deg, rgba(9, 16, 28, 0.68), rgba(7, 12, 22, 0.82));
-  backdrop-filter: blur(18px);
-  box-shadow: var(--hud-shadow);
-}
-
-.trend-head {
+  border-radius: 18px;
+  text-align: left;
   display: grid;
-  gap: 4px;
-  margin-bottom: 6px;
+  gap: 6px;
 }
 
-.trend-head strong {
+.stream-card p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
   color: var(--text-main);
 }
 
-.chart-view {
-  height: 130px;
-}
+.stream-card.tone-red { background: linear-gradient(180deg, rgba(255, 242, 244, 0.92), rgba(255, 249, 250, 0.8)); }
+.stream-card.tone-orange { background: linear-gradient(180deg, rgba(255, 247, 236, 0.92), rgba(255, 251, 245, 0.8)); }
+.stream-card.tone-blue { background: linear-gradient(180deg, rgba(241, 247, 255, 0.92), rgba(248, 251, 255, 0.8)); }
+.stream-card.tone-green { background: linear-gradient(180deg, rgba(240, 251, 246, 0.92), rgba(247, 252, 249, 0.8)); }
 
 .bed-immersive-page :deep(.ant-input),
 .bed-immersive-page :deep(.ant-input-affix-wrapper),
@@ -1994,103 +2274,97 @@ watch(
 .bed-immersive-page :deep(.ant-switch),
 .bed-immersive-page :deep(.ant-btn) {
   border-radius: 14px;
-  background: rgba(10, 18, 30, 0.72);
-  border-color: rgba(138, 197, 216, 0.18);
+  border-color: rgba(170, 190, 214, 0.28);
+  background: rgba(255, 255, 255, 0.88);
   color: var(--text-main);
 }
 
 .bed-immersive-page :deep(.ant-btn-primary) {
-  background: linear-gradient(90deg, #7ccfdb, #9cb0da) !important;
-  color: #07111d !important;
+  background: linear-gradient(135deg, #6f95ff, #8dc0ff) !important;
+  border-color: transparent !important;
+  color: white !important;
 }
 
 .bed-immersive-page :deep(.ant-empty-description) {
   color: var(--text-soft);
 }
 
-@keyframes statusBreath {
-  0%, 100% { opacity: 0.82; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.08); }
-}
-
-@keyframes alertPulse {
-  0%, 100% {
-    box-shadow: var(--hud-shadow), inset 0 0 0 1px rgba(216, 137, 149, 0.08);
-  }
-  50% {
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.34), 0 0 22px rgba(216, 137, 149, 0.08);
-  }
-}
-
-@media (max-width: 1600px) {
-  .hud-topbar {
-    grid-template-columns: 300px minmax(0, 1fr) 280px;
-  }
-
+@media (max-width: 1440px) {
   .hud-topbar__metrics {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .hud-center {
-    width: min(620px, calc(100% - 640px));
+  .dashboard-main {
+    grid-template-columns: 260px minmax(0, 1fr) 320px;
   }
 }
 
 @media (max-width: 1280px) {
-  .immersive-stage-shell,
-  .immersive-stage-shell :deep(.panorama-container),
-  .stage-empty {
-    min-height: 900px;
-    height: 900px;
+  .bed-immersive-page {
+    margin: -20px -20px -24px;
+  }
+
+  .immersive-stage-shell {
+    padding: 18px;
+    gap: 14px;
   }
 
   .hud-topbar {
-    grid-template-columns: 1fr;
+    gap: 10px;
   }
 
-  .hud-topbar__metrics,
-  .trend-panel {
+  .hud-topbar__metrics {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .metric-pill {
+    min-height: 78px;
+    padding: 12px;
+  }
+
+  .metric-pill strong {
+    font-size: 24px;
+  }
+
+  .dashboard-main {
+    grid-template-columns: 232px minmax(0, 1fr) 288px;
+    gap: 14px;
+  }
+
+  .activity-stream {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .hud-left,
-  .hud-center,
-  .hud-right {
-    position: absolute;
-    width: auto;
-    max-width: none;
+  .stage-canvas-shell :deep(.panorama-container),
+  .stage-empty,
+  .hud-panel--context {
+    min-height: 620px;
+  }
+}
+
+@media (max-width: 1120px) {
+  .dashboard-main {
+    grid-template-columns: 240px minmax(0, 1fr);
   }
 
-  .hud-left,
   .hud-right {
-    width: 280px;
+    grid-column: 1 / -1;
   }
 
-  .hud-center {
-    left: 50%;
-    width: calc(100% - 640px);
+  .hud-panel--context {
+    min-height: auto;
   }
 }
 
 @media (max-width: 960px) {
-  .immersive-stage-shell,
-  .immersive-stage-shell :deep(.panorama-container),
-  .stage-empty {
-    min-height: auto;
-    height: auto;
-  }
-
-  .hud {
-    position: static;
-    transform: none !important;
-    width: auto !important;
-    margin: 12px;
+  .bed-immersive-page {
+    margin: 0;
   }
 
   .immersive-stage-shell {
-    display: grid;
+    padding: 12px;
     gap: 12px;
-    padding-bottom: 12px;
   }
 
   .scene-vignette,
@@ -2098,11 +2372,30 @@ watch(
     display: none;
   }
 
+  .command-marquee,
+  .hud-topbar__ops {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dashboard-main {
+    grid-template-columns: 1fr;
+  }
+
   .hud-topbar__metrics,
-  .trend-panel,
   .detail-grid,
   .action-grid,
-  .spotlight-meta {
+  .focus-ribbon__main,
+  .activity-stream {
+    grid-template-columns: 1fr;
+  }
+
+  .stage-canvas-shell :deep(.panorama-container),
+  .stage-empty {
+    min-height: 520px;
+  }
+
+  .resident-profile {
     grid-template-columns: 1fr;
   }
 }

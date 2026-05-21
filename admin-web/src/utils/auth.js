@@ -3,6 +3,17 @@ const ROLES_KEY = 'zhiyangyun_roles';
 const PERMISSIONS_KEY = 'zhiyangyun_permissions';
 const PAGE_PERMISSIONS_KEY = 'zhiyangyun_page_permissions';
 const STAFF_INFO_KEY = 'zhiyangyun_staff_info';
+function safeStorage() {
+    try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+            return window.localStorage;
+        }
+    }
+    catch (_error) {
+        return null;
+    }
+    return null;
+}
 export function normalizeRoles(roles) {
     const normalized = new Set();
     (roles || []).forEach((role) => {
@@ -26,47 +37,63 @@ export function normalizeRoles(roles) {
     return Array.from(normalized);
 }
 export function getToken() {
-    return localStorage.getItem(TOKEN_KEY) || '';
+    return (safeStorage()?.getItem(TOKEN_KEY)) || '';
 }
 export function setToken(token) {
-    localStorage.setItem(TOKEN_KEY, token);
+    safeStorage()?.setItem(TOKEN_KEY, token);
 }
 export function clearToken() {
-    localStorage.removeItem(TOKEN_KEY);
+    safeStorage()?.removeItem(TOKEN_KEY);
 }
 export function getRoles() {
-    const raw = localStorage.getItem(ROLES_KEY);
-    const roles = raw ? JSON.parse(raw) : [];
+    const raw = safeStorage()?.getItem(ROLES_KEY);
+    let roles = [];
+    try {
+        roles = raw ? JSON.parse(raw) : [];
+    }
+    catch (_error) {
+        roles = [];
+    }
     return normalizeRoles(roles);
 }
 export function setRoles(roles) {
-    localStorage.setItem(ROLES_KEY, JSON.stringify(normalizeRoles(roles || [])));
+    safeStorage()?.setItem(ROLES_KEY, JSON.stringify(normalizeRoles(roles || [])));
 }
 export function clearRoles() {
-    localStorage.removeItem(ROLES_KEY);
+    safeStorage()?.removeItem(ROLES_KEY);
 }
 export function getPermissions() {
-    const raw = localStorage.getItem(PERMISSIONS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const raw = safeStorage()?.getItem(PERMISSIONS_KEY);
+    try {
+        return raw ? JSON.parse(raw) : [];
+    }
+    catch (_error) {
+        return [];
+    }
 }
 export function setPermissions(permissions) {
-    localStorage.setItem(PERMISSIONS_KEY, JSON.stringify(permissions || []));
+    safeStorage()?.setItem(PERMISSIONS_KEY, JSON.stringify(permissions || []));
 }
 export function clearPermissions() {
-    localStorage.removeItem(PERMISSIONS_KEY);
+    safeStorage()?.removeItem(PERMISSIONS_KEY);
 }
 export function getPagePermissions() {
-    const raw = localStorage.getItem(PAGE_PERMISSIONS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const raw = safeStorage()?.getItem(PAGE_PERMISSIONS_KEY);
+    try {
+        return raw ? JSON.parse(raw) : [];
+    }
+    catch (_error) {
+        return [];
+    }
 }
 export function setPagePermissions(pagePermissions) {
-    localStorage.setItem(PAGE_PERMISSIONS_KEY, JSON.stringify(pagePermissions || []));
+    safeStorage()?.setItem(PAGE_PERMISSIONS_KEY, JSON.stringify(pagePermissions || []));
 }
 export function clearPagePermissions() {
-    localStorage.removeItem(PAGE_PERMISSIONS_KEY);
+    safeStorage()?.removeItem(PAGE_PERMISSIONS_KEY);
 }
 export function getStaffInfo() {
-    const raw = localStorage.getItem(STAFF_INFO_KEY);
+    const raw = safeStorage()?.getItem(STAFF_INFO_KEY);
     if (!raw)
         return null;
     try {
@@ -77,8 +104,8 @@ export function getStaffInfo() {
     }
 }
 export function setStaffInfo(staffInfo) {
-    localStorage.setItem(STAFF_INFO_KEY, JSON.stringify(staffInfo || null));
+    safeStorage()?.setItem(STAFF_INFO_KEY, JSON.stringify(staffInfo || null));
 }
 export function clearStaffInfo() {
-    localStorage.removeItem(STAFF_INFO_KEY);
+    safeStorage()?.removeItem(STAFF_INFO_KEY);
 }

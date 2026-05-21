@@ -177,11 +177,11 @@ export const enterpriseProfile = {
     ],
     admissionFlow: ['预约咨询', '到院参观', '综合评估', '方案确认', '签约入住', '周期复评'],
     vrCommunityUrl: 'https://www.720yun.com/',
-    joinUsUrl: 'mailto:hr@yiyang-guifeng-care.cn',
+    joinUsUrl: 'mailto:hr@gfyy.org.cn',
     contact: {
         phone: '0793-5899001',
         hotlineTip: '工作日 08:00-18:00',
-        email: 'service@yiyang-guifeng-care.cn',
+        email: 'service@gfyy.org.cn',
         address: '江西省上饶市弋阳县龟峰大道88号',
         visitingTime: '周一至周日 08:00-18:00'
     },
@@ -231,7 +231,7 @@ export const enterpriseProfile = {
             copyrightOwner: '弋阳龟峰颐养中心',
             authorizedScope: '官网/公众号/宣传画册/招聘页',
             lastVerifiedAt: '2026-03-08',
-            contact: 'brand@yiyang-guifeng-care.cn'
+            contact: 'brand@gfyy.org.cn'
         }
     },
     faq: [
