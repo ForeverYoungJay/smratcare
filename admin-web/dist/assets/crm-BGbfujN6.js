@@ -1,0 +1,1 @@
+import{f as t,r}from"./request--Ujab7V-.js";function n(e,a){return t("/api/crm/leads/page",e,a)}function s(e){return r.post("/api/crm/leads",e)}function u(e,a){return r.put(`/api/crm/leads/${e}`,a)}function c(e){return r.delete(`/api/crm/leads/${e}`)}export{s as c,c as d,n as g,u};
