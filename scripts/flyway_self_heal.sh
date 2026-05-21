@@ -43,8 +43,9 @@ Description:
   1) 检查本地 Flyway 版本号是否重复
   2) 检查数据库 flyway_schema_history 中 success=0 的失败迁移
   3) 自动删除失败记录（仅 success=0）
-  4) 重启（或重建）backend 触发 Flyway 重新迁移
-  5) 循环检查 backend 日志并给出判定（成功/失败/待继续观察）
+  4) 检测并修复 checksum mismatch（仅将数据库记录修正为当前仓库脚本 checksum）
+  5) 重启（或重建）backend 触发 Flyway 重新迁移
+  6) 循环检查 backend 日志并给出判定（成功/失败/待继续观察）
 EOF
       exit 0
       ;;
@@ -123,14 +124,80 @@ delete_failed_version_record() {
   mysql_exec "DELETE FROM flyway_schema_history WHERE version='${version}' AND success=0;"
 }
 
-echo "[STEP 1/5] 检查本地迁移版本冲突"
+migration_file_for_version() {
+  local version="$1"
+  find "src/main/resources/db/migration" -maxdepth 1 -type f -name "V${version}__*.sql" | sort | head -n 1
+}
+
+flyway_checksum() {
+  local file="$1"
+  python3 - "$file" <<'PY'
+from pathlib import Path
+import sys
+import zlib
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding='utf-8')
+crc = 0
+for idx, line in enumerate(text.splitlines()):
+    if idx == 0 and line.startswith('\ufeff'):
+        line = line[1:]
+    crc = zlib.crc32(line.encode('utf-8'), crc)
+if crc >= 2**31:
+    crc -= 2**32
+print(crc)
+PY
+}
+
+repair_checksum_for_version() {
+  local version="$1"
+  local file
+  local checksum
+  file="$(migration_file_for_version "${version}")"
+  if [[ -z "${file}" ]]; then
+    echo "[FAIL] 未找到 version=${version} 的本地迁移脚本"
+    return 1
+  fi
+  checksum="$(flyway_checksum "${file}")"
+  echo "[ACTION] 修复 checksum: version=${version} file=$(basename "${file}") checksum=${checksum}"
+  mysql_exec "UPDATE flyway_schema_history SET checksum=${checksum} WHERE version='${version}' AND success=1;"
+}
+
+restart_backend() {
+  if [[ "$NO_BUILD" -eq 1 ]]; then
+    compose up -d --no-deps backend >/dev/null
+  else
+    compose up -d --build --no-deps backend >/dev/null
+  fi
+}
+
+check_backend_logs() {
+  local logs=""
+  for _ in $(seq 1 "${WAIT_SECONDS}"); do
+    sleep 1
+    logs="$(compose logs --tail="${LOG_TAIL}" backend || true)"
+    if log_match "${logs}" "${SUCCESS_PATTERN}"; then
+      echo "${logs}"
+      echo
+      echo "[OK] backend 启动成功，Flyway 自检+修复完成"
+      return 0
+    fi
+    if log_match "${logs}" "${FAIL_PATTERN}"; then
+      break
+    fi
+  done
+  echo "${logs}"
+  return 1
+}
+
+echo "[STEP 1/6] 检查本地迁移版本冲突"
 ./scripts/check_flyway_versions.sh
 
-echo "[STEP 2/5] 启动 mysql（如未启动）"
+echo "[STEP 2/6] 启动 mysql（如未启动）"
 compose up -d mysql >/dev/null
 wait_mysql_ready "${WAIT_SECONDS}"
 
-echo "[STEP 3/5] 检查失败迁移（success=0）"
+echo "[STEP 3/6] 检查失败迁移（success=0）"
 if ! history_table_exists; then
   echo "[WARN] flyway_schema_history 尚不存在，跳过失败记录清理"
   FAILED_ROWS=""
@@ -154,33 +221,38 @@ else
   echo "[OK] 未发现失败迁移记录"
 fi
 
-echo "[STEP 4/5] 重启 backend 并触发 Flyway"
-if [[ "$NO_BUILD" -eq 1 ]]; then
-  compose up -d --no-deps backend >/dev/null
-else
-  compose up -d --build --no-deps backend >/dev/null
-fi
+echo "[STEP 4/6] 重启 backend 并触发 Flyway"
+restart_backend
 
-echo "[STEP 5/5] 检查 backend 日志"
+echo "[STEP 5/6] 检查 backend 日志"
 FAIL_PATTERN="Validate failed|Migrations have failed validation|Found more than one migration|Application run failed|Script V[0-9]+__.* failed|SQL State"
 SUCCESS_PATTERN="Started CareApplication|Tomcat started on port 8080"
+CHECKSUM_PATTERN="Migration checksum mismatch for migration version [0-9]+"
 
-BACKEND_LOGS=""
-for _ in $(seq 1 "${WAIT_SECONDS}"); do
-  sleep 1
-  BACKEND_LOGS="$(compose logs --tail="${LOG_TAIL}" backend || true)"
-  if log_match "${BACKEND_LOGS}" "${SUCCESS_PATTERN}"; then
-    echo "${BACKEND_LOGS}"
-    echo
-    echo "[OK] backend 启动成功，Flyway 自检+修复完成"
-    exit 0
-  fi
-  if log_match "${BACKEND_LOGS}" "${FAIL_PATTERN}"; then
-    break
-  fi
-done
+BACKEND_LOGS="$(check_backend_logs || true)"
 
 echo "${BACKEND_LOGS}"
+
+if log_match "${BACKEND_LOGS}" "${SUCCESS_PATTERN}"; then
+  exit 0
+fi
+
+if log_match "${BACKEND_LOGS}" "${CHECKSUM_PATTERN}"; then
+  FAILED_VERSION="$(log_extract_last "${BACKEND_LOGS}" "Migration checksum mismatch for migration version [0-9]+" | awk '{print $NF}' || true)"
+  if [[ -n "${FAILED_VERSION}" ]]; then
+    echo
+    echo "[STEP 6/6] 检测到 checksum mismatch，尝试自动 repair"
+    repair_checksum_for_version "${FAILED_VERSION}"
+    echo "[RETRY] 重新启动 backend"
+    restart_backend
+    RETRY_LOGS="$(check_backend_logs || true)"
+    echo "${RETRY_LOGS}"
+    if log_match "${RETRY_LOGS}" "${SUCCESS_PATTERN}"; then
+      exit 0
+    fi
+    BACKEND_LOGS="${RETRY_LOGS}"
+  fi
+fi
 
 if log_match "${BACKEND_LOGS}" "${FAIL_PATTERN}"; then
   FAILED_SCRIPT="$(log_extract_last "${BACKEND_LOGS}" "V[0-9]+__[^[:space:]]+\\.sql" || true)"
