@@ -141,7 +141,9 @@ Page({
         isPrimary,
         remark
       });
-      getApp().globalData.selectedElderId = resp && resp.elderId ? Number(resp.elderId) : null;
+      const app = getApp();
+      app.globalData.selectedElderId = resp && resp.elderId ? Number(resp.elderId) : null;
+      app.globalData.refreshHomeAfterBinding = true;
       wx.showToast({ title: '绑定成功', icon: 'success' });
       setTimeout(() => wx.navigateBack(), 500);
     } catch (error) {

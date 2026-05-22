@@ -1,24 +1,25 @@
 .home-head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 18rpx;
+  align-items: flex-start;
+  margin-bottom: 20rpx;
+  gap: 16rpx;
 }
 
 .runtime-tip {
-  margin-bottom: 16rpx;
-  padding: 14rpx 16rpx;
-  border-radius: 14rpx;
-  background: #eef6ff;
-  border: 1rpx solid #bfdbfe;
-  color: #1d4ed8;
+  margin-bottom: 18rpx;
+  padding: 16rpx 18rpx;
+  border-radius: 18rpx;
+  background: linear-gradient(180deg, rgba(238, 246, 255, 0.96), rgba(247, 250, 255, 0.94));
+  border: 1rpx solid rgba(96, 165, 250, 0.18);
+  color: #2159ba;
   font-size: 22rpx;
   line-height: 1.6;
 }
 
 .state-card {
-  margin-bottom: 16rpx;
-  padding: 22rpx;
+  margin-bottom: 18rpx;
+  padding: 28rpx 24rpx;
 }
 
 .state-title {
@@ -32,20 +33,23 @@
 }
 
 .mini-btn {
-  background: #ecf5f6;
+  background: rgba(236, 245, 246, 0.94);
   color: #194f5e;
   border-radius: 999rpx;
   font-size: 24rpx;
-  padding: 0 22rpx;
-  line-height: 58rpx;
-  height: 58rpx;
-  border: 1rpx solid #cde1e4;
+  padding: 0 24rpx;
+  line-height: 64rpx;
+  height: 64rpx;
+  border: 1rpx solid rgba(44, 122, 132, 0.14);
+  flex-shrink: 0;
 }
 
 .switch-panel {
-  margin-bottom: 16rpx;
-  padding: 18rpx;
-  background: linear-gradient(145deg, #ffffff, #f3fafb);
+  margin-bottom: 18rpx;
+  padding: 22rpx 20rpx;
+  background:
+    radial-gradient(circle at top right, rgba(240, 199, 135, 0.18) 0%, rgba(240, 199, 135, 0) 32%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(243, 250, 251, 0.94));
 }
 
 .switch-label {
@@ -55,30 +59,33 @@
 
 .switch-pick {
   margin-top: 10rpx;
-  padding: 16rpx;
-  border-radius: 12rpx;
-  border: 1rpx solid #d4e4e8;
+  padding: 18rpx 16rpx;
+  border-radius: 16rpx;
+  border: 1rpx solid rgba(44, 122, 132, 0.15);
   color: #1f2937;
   font-size: 26rpx;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.96);
 }
 
 .elder-swiper {
-  height: 470rpx;
+  height: 540rpx;
 }
 
 .elder-card {
-  padding: 24rpx;
+  padding: 28rpx 24rpx;
+  min-height: 508rpx;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 251, 252, 0.92));
 }
 
 .card-top {
   display: flex;
-  gap: 20rpx;
+  gap: 22rpx;
 }
 
 .avatar {
-  width: 90rpx;
-  height: 90rpx;
+  width: 96rpx;
+  height: 96rpx;
   border-radius: 50%;
   display: flex;
   justify-content: center;
@@ -96,31 +103,36 @@
 .name-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 12rpx;
 }
 
 .elder-name {
-  font-size: 38rpx;
+  font-size: 40rpx;
   font-weight: 700;
   color: #111827;
+  flex: 1;
 }
 
 .meta {
-  margin-top: 6rpx;
-  color: #4b5563;
+  margin-top: 8rpx;
+  color: #556273;
   font-size: 23rpx;
+  line-height: 1.6;
 }
 
 .special-row {
-  margin-top: 16rpx;
+  margin-top: 20rpx;
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  gap: 12rpx;
 }
 
 .special-tag {
-  background: #fff3e6;
+  background: rgba(255, 243, 230, 0.94);
   color: #c2410c;
-  padding: 6rpx 16rpx;
+  padding: 8rpx 16rpx;
   border-radius: 999rpx;
   font-size: 22rpx;
 }
@@ -131,22 +143,28 @@
 }
 
 .dynamic {
-  margin-top: 16rpx;
+  margin-top: 18rpx;
   font-size: 24rpx;
   color: #374151;
+  line-height: 1.7;
+  background: rgba(246, 249, 251, 0.92);
+  border-radius: 16rpx;
+  padding: 16rpx;
 }
 
 .quick-actions {
-  margin-top: 18rpx;
+  margin-top: 20rpx;
   display: flex;
   gap: 12rpx;
+  flex-wrap: wrap;
 }
 
 .quick-action {
-  flex: 1;
+  flex: 1 1 30%;
   font-size: 24rpx;
-  height: 64rpx;
-  line-height: 64rpx;
+  min-width: 180rpx;
+  height: 72rpx;
+  line-height: 72rpx;
   padding: 0;
 }
 
@@ -171,21 +189,24 @@
 }
 
 .panel {
-  margin-top: 18rpx;
-  padding: 24rpx;
+  margin-top: 20rpx;
+  padding: 26rpx 22rpx;
 }
 
 .panel-head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12rpx;
+  align-items: flex-start;
+  margin-bottom: 14rpx;
+  gap: 14rpx;
 }
 
 .panel-right {
   display: flex;
-  align-items: center;
-  gap: 14rpx;
+  align-items: flex-end;
+  gap: 12rpx;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .panel-title {
@@ -208,20 +229,21 @@
 }
 
 .focus-panel {
-  background: linear-gradient(145deg, #fffaf3, #fff);
+  background: linear-gradient(145deg, rgba(255, 250, 243, 0.98), rgba(255, 255, 255, 0.94));
 }
 
 .focus-item {
   margin-top: 10rpx;
   font-size: 24rpx;
   color: #92400e;
-  background: #fff7ed;
-  border-radius: 10rpx;
-  padding: 10rpx 12rpx;
+  background: rgba(255, 247, 237, 0.96);
+  border-radius: 14rpx;
+  padding: 12rpx 14rpx;
+  line-height: 1.6;
 }
 
 .weekly-panel {
-  background: linear-gradient(145deg, #f1f8ff, #ffffff);
+  background: linear-gradient(145deg, rgba(241, 248, 255, 0.98), rgba(255, 255, 255, 0.96));
 }
 
 .weekly-range {
@@ -237,17 +259,17 @@
 }
 
 .weekly-grid {
-  margin-top: 12rpx;
+  margin-top: 16rpx;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8rpx;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12rpx;
 }
 
 .weekly-item {
-  background: #f8fbff;
-  border: 1rpx solid #dce9f5;
-  border-radius: 10rpx;
-  padding: 8rpx 4rpx;
+  background: rgba(248, 251, 255, 0.96);
+  border: 1rpx solid rgba(191, 219, 254, 0.45);
+  border-radius: 16rpx;
+  padding: 14rpx 10rpx;
   text-align: center;
 }
 
@@ -267,6 +289,7 @@
 .summary-line {
   font-size: 24rpx;
   margin-bottom: 14rpx;
+  line-height: 1.6;
 }
 
 .txt-normal {
@@ -284,13 +307,14 @@
 .metric-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12rpx;
+  gap: 14rpx;
 }
 
 .metric-item {
-  background: #f8fafc;
-  border-radius: 14rpx;
-  padding: 14rpx;
+  background: rgba(248, 250, 252, 0.96);
+  border-radius: 18rpx;
+  padding: 16rpx 14rpx;
+  border: 1rpx solid rgba(226, 232, 240, 0.68);
 }
 
 .metric-name,
@@ -322,18 +346,20 @@
 
 .advice {
   margin-top: 14rpx;
-  background: #eef7f8;
-  border-radius: 12rpx;
-  padding: 12rpx;
+  background: rgba(238, 247, 248, 0.96);
+  border-radius: 16rpx;
+  padding: 14rpx 14rpx;
   color: #1f4f57;
   font-size: 23rpx;
+  line-height: 1.7;
 }
 
 .timeline-item {
   display: flex;
-  align-items: center;
-  padding: 10rpx 0;
+  align-items: flex-start;
+  padding: 12rpx 0;
   border-bottom: 1rpx dashed #e5e7eb;
+  gap: 12rpx;
 }
 
 .timeline-item:last-child {
@@ -341,9 +367,10 @@
 }
 
 .time {
-  width: 90rpx;
+  width: 82rpx;
   color: #6b7280;
   font-size: 24rpx;
+  flex-shrink: 0;
 }
 
 .timeline-main {
@@ -353,12 +380,14 @@
 .name {
   font-size: 27rpx;
   color: #111827;
+  line-height: 1.5;
 }
 
 .type {
-  margin-left: 12rpx;
+  margin-top: 4rpx;
   font-size: 22rpx;
   color: #6b7280;
+  display: block;
 }
 
 .state {
@@ -385,6 +414,7 @@
 .meal-review {
   color: #374151;
   font-size: 24rpx;
+  line-height: 1.7;
 }
 
 .tag-row {
@@ -417,8 +447,9 @@
 .notice-item {
   display: flex;
   justify-content: space-between;
-  padding: 10rpx 0;
+  padding: 12rpx 0;
   border-bottom: 1rpx solid #eef2f7;
+  gap: 12rpx;
 }
 
 .notice-item:last-child {
@@ -465,6 +496,7 @@
 .notice-time {
   font-size: 22rpx;
   color: #6b7280;
+  white-space: nowrap;
 }
 
 .unread {
@@ -477,16 +509,17 @@
 
 .entry-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 12rpx;
+  grid-template-columns: 1fr 1fr;
+  gap: 14rpx;
 }
 
 .entry-item {
   position: relative;
-  background: #f8fafc;
-  border-radius: 14rpx;
-  padding: 16rpx;
-  border: 1rpx solid #edf2f7;
+  background: rgba(248, 250, 252, 0.96);
+  border-radius: 18rpx;
+  padding: 20rpx 16rpx 18rpx;
+  border: 1rpx solid rgba(226, 232, 240, 0.72);
+  min-height: 128rpx;
 }
 
 .entry-badge {
@@ -505,14 +538,58 @@
 
 .entry-title {
   display: block;
-  font-size: 25rpx;
+  font-size: 26rpx;
   color: #111827;
   font-weight: 600;
+  line-height: 1.4;
 }
 
 .entry-sub {
   display: block;
-  margin-top: 6rpx;
+  margin-top: 8rpx;
   font-size: 21rpx;
   color: #6b7280;
+  line-height: 1.5;
+}
+
+@media screen and (max-width: 360px) {
+  .home-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mini-btn {
+    width: 100%;
+  }
+
+  .elder-swiper {
+    height: 620rpx;
+  }
+
+  .card-top,
+  .special-row {
+    flex-direction: column;
+  }
+
+  .name-row {
+    flex-direction: column;
+  }
+
+  .metric-grid,
+  .entry-grid,
+  .weekly-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel-head {
+    flex-direction: column;
+  }
+
+  .panel-right {
+    justify-content: flex-start;
+  }
+
+  .quick-action {
+    flex-basis: 100%;
+  }
 }

@@ -43,6 +43,16 @@ function mapStatusClass(statusType) {
   return 'pill-normal';
 }
 
+function isBindingRequiredError(message) {
+  const text = String(message || '').trim();
+  return text.includes('请先绑定老人信息');
+}
+
+function isInvalidSelectedElderError(message) {
+  const text = String(message || '').trim();
+  return text.includes('无权限查看该老人信息');
+}
+
 Page({
   data: {
     loading: false,
@@ -70,12 +80,18 @@ Page({
   },
   onShow() {
     getApp().ensureLogin();
+    const app = getApp();
+    if (app.globalData.refreshHomeAfterBinding) {
+      app.globalData.refreshHomeAfterBinding = false;
+      this.loadData();
+      return;
+    }
     this.loadCapabilityStatus();
   },
   onPullDownRefresh() {
     this.loadData(true);
   },
-  async loadData(fromPullDown = false) {
+  async loadData(fromPullDown = false, hasRetried = false) {
     this.setData({ loading: true, loadError: '' });
     try {
       const [raw, weeklyBrief] = await Promise.all([getHomeDashboard(), getWeeklyBrief()]);
@@ -115,8 +131,33 @@ Page({
       });
       this.loadCapabilityStatus();
     } catch (error) {
+      const message = error && error.message ? error.message : '';
+      if (!hasRetried && isInvalidSelectedElderError(message)) {
+        getApp().globalData.selectedElderId = null;
+        this.setData({ elderIndex: 0 });
+        await this.loadData(fromPullDown, true);
+        return;
+      }
+      if (isBindingRequiredError(message)) {
+        getApp().globalData.selectedElderId = null;
+        this.setData({
+          elders: [],
+          elderOptions: [],
+          elderIndex: 0,
+          dashboard: {
+            healthSummary: { metrics: [] },
+            schedules: [],
+            meal: { tags: [], breakfastText: '', lunchText: '', dinnerText: '' },
+            notices: [],
+            focusEvents: []
+          },
+          weeklyBrief: null,
+          loadError: ''
+        });
+        return;
+      }
       this.setData({
-        loadError: error.message || '首页信息加载失败，请稍后重试'
+        loadError: message || '首页信息加载失败，请稍后重试'
       });
     } finally {
       this.setData({ loading: false });

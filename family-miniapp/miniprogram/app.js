@@ -44,6 +44,7 @@ App({
     token: '',
     familyUser: null,
     selectedElderId: null,
+    refreshHomeAfterBinding: false,
     pendingMessageFilter: '',
     capabilityAlertCount: 0,
     mallOrdersDirty: false
@@ -216,6 +217,7 @@ App({
     this.globalData.token = '';
     this.globalData.familyUser = null;
     this.globalData.selectedElderId = null;
+    this.globalData.refreshHomeAfterBinding = false;
     this.globalData.pendingMessageFilter = '';
     this.updateCapabilityAlerts(0);
     this.globalData.mallOrdersDirty = false;

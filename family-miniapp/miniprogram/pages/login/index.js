@@ -254,6 +254,7 @@ Page({
         realName: loginResp.realName,
         phone: loginResp.phone
       };
+      app.globalData.selectedElderId = null;
       setAuth(loginResp.token, app.globalData.familyUser);
       this.bindWechatNotifyOpenId();
       wx.reLaunch({ url: '/pages/home/index' });
