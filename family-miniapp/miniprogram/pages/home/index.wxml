@@ -7,7 +7,27 @@
     <button class="mini-btn" bindtap="goBind">绑定老人</button>
   </view>
 
-  <view class="surface switch-panel" wx:if="{{elderOptions.length > 0}}">
+  <view class="runtime-tip" wx:if="{{runtimeNotice}}">{{runtimeNotice}}</view>
+
+  <view class="surface state-card" wx:if="{{loading}}">
+    <view class="state-title">首页数据加载中</view>
+    <view class="section-subtitle">正在同步老人状态、消息提醒和本周简报。</view>
+  </view>
+
+  <view class="surface state-card" wx:if="{{!loading && loadError}}">
+    <view class="state-title">首页暂时无法打开</view>
+    <view class="section-subtitle">{{loadError}}</view>
+    <button class="ghost-btn state-btn" bindtap="retryLoad">重新加载</button>
+  </view>
+
+  <view class="surface state-card" wx:if="{{!loading && !loadError && elderOptions.length === 0}}">
+    <view class="state-title">还没有可查看的老人档案</view>
+    <view class="section-subtitle">请先绑定老人，完成后即可查看健康、缴费、消息和探视信息。</view>
+    <button class="primary-btn state-btn" bindtap="goBind">立即绑定老人</button>
+  </view>
+
+  <view wx:if="{{!loading && !loadError && elderOptions.length > 0}}">
+  <view class="surface switch-panel">
     <view class="switch-label">当前关注</view>
     <picker mode="selector" range="{{elderOptions}}" value="{{elderIndex}}" bindchange="onElderPick">
       <view class="switch-pick">{{elderOptions[elderIndex]}}</view>
@@ -179,5 +199,6 @@
         </view>
       </block>
     </view>
+  </view>
   </view>
 </view>

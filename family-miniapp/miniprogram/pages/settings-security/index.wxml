@@ -2,6 +2,12 @@
   <view class="surface card">
     <view class="section-title">安全与隐私策略</view>
     <view class="section-subtitle">重要档案访问建议开启双重验证，减少信息泄露风险</view>
+    <view class="notice-panel">
+      <view class="item-title">隐私与合规说明</view>
+      <view class="item-desc">服务协议：{{complianceInfo.serviceAgreementVersion}} · 隐私说明：{{complianceInfo.privacyPolicyVersion}}</view>
+      <view class="item-desc">客服支持：{{supportInfo.supportPhone}} · {{supportInfo.supportHours}}</view>
+      <view class="item-desc">默认通过登录密码或独立安全密码完成敏感信息访问验证，验证记录会用于安全审计。</view>
+    </view>
 
     <view class="item">
       <view>

@@ -1,10 +1,22 @@
 const { request, uploadFile } = require('../utils/request');
 const mock = require('../mocks/family-app');
 
+function canUseMockFallback() {
+  const app = getApp();
+  return !!(app
+    && app.globalData
+    && app.globalData.useMockFallback
+    && typeof app.isLocalDevEnvironment === 'function'
+    && app.isLocalDevEnvironment());
+}
+
 async function withFallback(realCall, fallbackCall) {
   try {
     return await realCall();
   } catch (error) {
+    if (!canUseMockFallback()) {
+      throw error;
+    }
     return fallbackCall();
   }
 }

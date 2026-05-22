@@ -1,12 +1,23 @@
 <view class="container">
   <view class="surface card">
     <view class="section-title">评估报告中心</view>
+    <view class="section-subtitle" wx:if="{{!accessGranted}}">为保护老人隐私，查看报告前需要再次验证身份。</view>
+    <view class="section-subtitle" wx:if="{{accessGranted}}">支持查看机构上传报告与 AI 生成报告。</view>
     <view class="ai-row">
       <button class="ghost-btn ai-btn" loading="{{generating}}" data-type="TCM" bindtap="generateAi">生成中医评估</button>
       <button class="ghost-btn ai-btn" loading="{{generating}}" data-type="CARDIO" bindtap="generateAi">生成心血管评估</button>
       <button class="primary-btn ai-btn" loading="{{generating}}" data-type="ALL" bindtap="generateAi">一键生成AI评估</button>
     </view>
-    <block wx:for="{{list}}" wx:key="id">
+    <view wx:if="{{!accessGranted}}" class="list-empty">
+      <button class="ghost-btn action" bindtap="retryVerify">立即验证并查看</button>
+    </view>
+    <view wx:if="{{accessGranted && loading}}" class="list-empty">报告加载中...</view>
+    <view wx:if="{{accessGranted && !loading && loadError}}" class="list-empty">
+      {{loadError}}
+      <button class="ghost-btn action" bindtap="loadData">重新加载</button>
+    </view>
+    <view wx:if="{{accessGranted && !loading && !loadError && list.length === 0}}" class="list-empty">暂无可查看的评估报告</view>
+    <block wx:if="{{accessGranted && !loading && !loadError && list.length > 0}}" wx:for="{{list}}" wx:key="id">
       <view class="item">
         <view class="name">{{item.reportName}}</view>
         <view class="meta">{{item.type}} · {{item.date}} · {{item.orgName}}</view>

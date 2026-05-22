@@ -2,6 +2,27 @@
   padding: 24rpx;
 }
 
+.support-box {
+  margin-top: 14rpx;
+  padding: 18rpx;
+  border-radius: 14rpx;
+  background: #f8fafc;
+  border: 1rpx solid #dbe3ea;
+}
+
+.support-title {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.support-text {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: #64748b;
+}
+
 .group {
   margin-top: 18rpx;
 }

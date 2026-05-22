@@ -29,10 +29,16 @@ Page({
     setting: normalizeSetting(),
     scopeOptions: SCOPE_OPTIONS,
     scopeIndex: 0,
-    loading: false
+    loading: false,
+    supportInfo: {},
+    complianceInfo: {}
   },
   async onShow() {
     getApp().ensureLogin();
+    this.setData({
+      supportInfo: getApp().globalData.supportInfo || {},
+      complianceInfo: getApp().globalData.complianceInfo || {}
+    });
     await this.loadSettings();
   },
   async loadSettings() {

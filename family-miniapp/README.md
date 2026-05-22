@@ -192,5 +192,20 @@
 
 - 修改 `miniprogram/app.js` 中 `globalData.baseUrl`
 - 默认值：`http://localhost:8080`
-- 本地调试默认开启 `globalData.localDevBypassLogin=true`（localhost 环境自动跳过登录）
-- `globalData.allowManualRechargeFallback` 默认 `false`（建议仅测试环境临时开启）
+- 小程序现已改为“生产默认关闭开发兜底”：
+  - `globalData.useMockFallback=false`
+  - `globalData.localDevBypassLogin=false`
+  - `globalData.allowManualRechargeFallback=false`
+- 如需本地联调显式开启开发能力，请在微信开发者工具 Storage 中写入：
+
+```json
+{
+  "enableMockFallback": true,
+  "enableLocalDevBypassLogin": true,
+  "allowManualRechargeFallback": false,
+  "baseUrlOverride": "http://localhost:8080"
+}
+```
+
+- Storage Key：`smartcare_family_runtime_flags`
+- `trial/release` 环境若仍使用 localhost、mock 或免登录开关，登录页会直接阻止继续使用，避免误提审或误上线。

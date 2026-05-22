@@ -1,9 +1,17 @@
 <view class="container">
   <view class="surface card">
     <view class="section-title">常见问题</view>
+    <view class="support-box">
+      <view class="support-title">机构服务信息</view>
+      <view class="support-text">{{supportInfo.organizationName}}</view>
+      <view class="support-text">客服热线：{{supportInfo.supportPhone}} · {{supportInfo.supportHours}}</view>
+      <view class="support-text">服务协议：{{complianceInfo.serviceAgreementVersion}} · 隐私说明：{{complianceInfo.privacyPolicyVersion}}</view>
+      <view class="support-text">数据用途：{{complianceInfo.dataUsageSummary}}</view>
+    </view>
 
     <view wx:if="{{loading}}" class="list-empty">FAQ 加载中...</view>
-    <view wx:if="{{!loading && groups.length === 0}}" class="list-empty">暂无帮助内容</view>
+    <view wx:if="{{!loading && loadError}}" class="list-empty">{{loadError}}</view>
+    <view wx:if="{{!loading && !loadError && groups.length === 0}}" class="list-empty">暂无帮助内容</view>
     <block wx:if="{{!loading && groups.length > 0}}" wx:for="{{groups}}" wx:for-item="group" wx:key="category">
       <view class="group">
         <view class="group-title">{{group.category}}</view>
@@ -17,6 +25,7 @@
     </block>
 
     <button class="primary-btn action" bindtap="callService">联系在线客服</button>
+    <button class="ghost-btn action" bindtap="copySupportEmail">复制客服邮箱</button>
     <button class="ghost-btn action" bindtap="goFeedback">提交建议反馈</button>
   </view>
 </view>

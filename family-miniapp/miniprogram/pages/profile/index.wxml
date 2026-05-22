@@ -1,4 +1,10 @@
 <view class="container">
+  <view class="surface card" wx:if="{{loadError}}">
+    <view class="user-name">我的页面暂时不可用</view>
+    <view class="user-sub">{{loadError}}</view>
+    <view class="user-sub">如需帮助，请联系 {{supportInfo.supportPhone}}</view>
+    <button class="ghost-btn action" bindtap="loadData">重新加载</button>
+  </view>
   <view class="surface card" wx:if="{{profile}}">
     <view class="user-name">{{profile.realName}}</view>
     <view class="user-sub">{{profile.phone}} · {{profile.preferredContact}}</view>

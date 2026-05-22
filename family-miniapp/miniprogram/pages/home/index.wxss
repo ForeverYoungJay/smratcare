@@ -5,6 +5,32 @@
   margin-bottom: 18rpx;
 }
 
+.runtime-tip {
+  margin-bottom: 16rpx;
+  padding: 14rpx 16rpx;
+  border-radius: 14rpx;
+  background: #eef6ff;
+  border: 1rpx solid #bfdbfe;
+  color: #1d4ed8;
+  font-size: 22rpx;
+  line-height: 1.6;
+}
+
+.state-card {
+  margin-bottom: 16rpx;
+  padding: 22rpx;
+}
+
+.state-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.state-btn {
+  margin-top: 18rpx;
+}
+
 .mini-btn {
   background: #ecf5f6;
   color: #194f5e;

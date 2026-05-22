@@ -1,7 +1,19 @@
 <view class="container">
+  <view class="runtime-tip" wx:if="{{runtimeNotice}}">{{runtimeNotice}}</view>
+
+  <view class="surface card" wx:if="{{loadError}}">
+    <view class="error-title">沟通能力暂时不可用</view>
+    <view class="section-subtitle">{{loadError}}</view>
+    <button class="ghost-btn booking-btn" bindtap="retryLoad">重新加载</button>
+  </view>
+
   <view class="surface card composer">
     <view class="section-title">在线沟通</view>
     <view class="section-subtitle">图文沟通、语音留言与探视预约统一入口</view>
+    <view class="notice-box">
+      <view class="notice-title">使用说明</view>
+      <view class="notice-text">语音留言会先上传文件，再生成沟通记录；若通知未绑定，机构仍可在后台看到消息，但你可能收不到服务通知。</view>
+    </view>
 
     <view class="row">
       <view class="field">

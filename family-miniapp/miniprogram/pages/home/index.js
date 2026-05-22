@@ -45,6 +45,8 @@ function mapStatusClass(statusType) {
 
 Page({
   data: {
+    loading: false,
+    loadError: '',
     elderIndex: 0,
     elderOptions: [],
     elders: [],
@@ -58,9 +60,11 @@ Page({
     weeklyBrief: null,
     currentTime: '',
     entries: buildEntries(0),
-    capabilityAlertCount: 0
+    capabilityAlertCount: 0,
+    runtimeNotice: ''
   },
   onLoad() {
+    this.setData({ runtimeNotice: getApp().globalData.runtimeNotice || '' });
     this.loadData();
     this.setData({ currentTime: this.formatNow() });
   },
@@ -72,6 +76,7 @@ Page({
     this.loadData(true);
   },
   async loadData(fromPullDown = false) {
+    this.setData({ loading: true, loadError: '' });
     try {
       const [raw, weeklyBrief] = await Promise.all([getHomeDashboard(), getWeeklyBrief()]);
       const elders = (raw.elders || []).map((item) => ({
@@ -101,9 +106,20 @@ Page({
         elderIndex = idx >= 0 ? idx : 0;
       }
       app.globalData.selectedElderId = elders[elderIndex] ? elders[elderIndex].elderId : null;
-      this.setData({ elders, elderOptions, dashboard: normalized, elderIndex, weeklyBrief });
+      this.setData({
+        elders,
+        elderOptions,
+        dashboard: normalized,
+        elderIndex,
+        weeklyBrief
+      });
       this.loadCapabilityStatus();
+    } catch (error) {
+      this.setData({
+        loadError: error.message || '首页信息加载失败，请稍后重试'
+      });
     } finally {
+      this.setData({ loading: false });
       if (fromPullDown) {
         wx.stopPullDownRefresh();
       }
@@ -154,6 +170,9 @@ Page({
   goMessageDetail(e) {
     const id = e.currentTarget.dataset.id;
     wx.navigateTo({ url: `/pages/message-detail/index?id=${id}` });
+  },
+  retryLoad() {
+    this.loadData();
   },
   formatNow() {
     const now = new Date();

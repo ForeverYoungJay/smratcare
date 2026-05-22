@@ -74,6 +74,8 @@ function matchOrderFilter(order, filterKey) {
 
 Page({
   data: {
+    loading: false,
+    loadError: '',
     summary: null,
     guard: null,
     history: [],
@@ -87,35 +89,54 @@ Page({
     orderFilter: 'all',
     previewBalance: '0.00',
     paying: false,
-    allowManualFallback: false
+    allowManualFallback: false,
+    runtimeNotice: ''
   },
   async onShow() {
     getApp().ensureLogin();
-    this.setData({ allowManualFallback: !!getApp().globalData.allowManualRechargeFallback });
+    this.setData({
+      allowManualFallback: !!getApp().globalData.allowManualRechargeFallback,
+      runtimeNotice: getApp().globalData.runtimeNotice || ''
+    });
     await this.loadData();
   },
   async loadData() {
-    const [summary, history, rechargeOrders, guard] = await Promise.all([
-      getBillSummary(),
-      getBillHistory(),
-      getRechargeOrders({ pageNo: 1, pageSize: 10 }),
-      getPaymentGuard()
-    ]);
-    const orderList = rechargeOrders || [];
-    const abnormalOrders = orderList.filter((item) => item && item.status !== 'PAID');
-    const filteredOrders = orderList.filter((item) => matchOrderFilter(item, this.data.orderFilter));
-    const previewBalance = toMoney((summary && summary.accountBalance) || 0) + toMoney(this.data.rechargeAmount || 0);
-    const selectedPreset = PRESET_AMOUNTS.includes(this.data.rechargeAmount) ? this.data.rechargeAmount : '';
-    this.setData({
-      summary,
-      guard,
-      history: history || [],
-      rechargeOrders: orderList,
-      abnormalOrders,
-      filteredOrders,
-      selectedPreset,
-      previewBalance: previewBalance.toFixed(2)
-    });
+    this.setData({ loading: true, loadError: '' });
+    try {
+      const [summary, history, rechargeOrders, guard] = await Promise.all([
+        getBillSummary(),
+        getBillHistory(),
+        getRechargeOrders({ pageNo: 1, pageSize: 10 }),
+        getPaymentGuard()
+      ]);
+      const orderList = rechargeOrders || [];
+      const abnormalOrders = orderList.filter((item) => item && item.status !== 'PAID');
+      const filteredOrders = orderList.filter((item) => matchOrderFilter(item, this.data.orderFilter));
+      const previewBalance = toMoney((summary && summary.accountBalance) || 0) + toMoney(this.data.rechargeAmount || 0);
+      const selectedPreset = PRESET_AMOUNTS.includes(this.data.rechargeAmount) ? this.data.rechargeAmount : '';
+      this.setData({
+        summary,
+        guard,
+        history: history || [],
+        rechargeOrders: orderList,
+        abnormalOrders,
+        filteredOrders,
+        selectedPreset,
+        previewBalance: previewBalance.toFixed(2)
+      });
+    } catch (error) {
+      this.setData({
+        loadError: error.message || '支付信息加载失败，请稍后重试',
+        summary: null,
+        guard: null,
+        history: [],
+        rechargeOrders: [],
+        abnormalOrders: [],
+        filteredOrders: []
+      });
+    } finally {
+      this.setData({ loading: false });
+    }
   },
   onRechargeInput(e) {
     const rechargeAmount = e.detail.value;
@@ -178,6 +199,10 @@ Page({
     if (this.data.paying) {
       return;
     }
+    if (!this.data.summary) {
+      wx.showToast({ title: '账单尚未加载完成', icon: 'none' });
+      return;
+    }
     const amount = Number(this.data.rechargeAmount || 0);
     if (Number.isNaN(amount) || amount <= 0) {
       wx.showToast({ title: '请输入正确充值金额', icon: 'none' });
@@ -185,6 +210,19 @@ Page({
     }
     const confirmed = await this.confirmLargeRecharge(amount);
     if (!confirmed) {
+      return;
+    }
+    const prepayPrompt = await new Promise((resolve) => {
+      wx.showModal({
+        title: '确认发起微信支付',
+        content: '支付成功后余额会实时更新。如取消支付，可在“最近充值订单”中继续查看状态。',
+        confirmText: '继续支付',
+        cancelText: '取消',
+        success: (res) => resolve(!!(res && res.confirm)),
+        fail: () => resolve(false)
+      });
+    });
+    if (!prepayPrompt) {
       return;
     }
     this.setData({ paying: true });
@@ -248,6 +286,9 @@ Page({
   },
   goPaymentGuard() {
     wx.navigateTo({ url: '/pages/payment-guard/index' });
+  },
+  retryLoad() {
+    this.loadData();
   },
   async onAutoPaySwitch(e) {
     const enabled = !!e.detail.value;

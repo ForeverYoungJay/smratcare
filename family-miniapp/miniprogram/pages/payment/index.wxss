@@ -1,4 +1,36 @@
 .card { padding: 24rpx; }
+.runtime-tip {
+  margin-bottom: 16rpx;
+  padding: 14rpx 16rpx;
+  border-radius: 14rpx;
+  background: #eef6ff;
+  border: 1rpx solid #bfdbfe;
+  color: #1d4ed8;
+  font-size: 22rpx;
+  line-height: 1.6;
+}
+.state-card {
+  padding: 22rpx;
+  margin-bottom: 16rpx;
+}
+.state-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1f2937;
+}
+.state-btn {
+  margin-top: 18rpx;
+}
+.runtime-hint {
+  margin-top: 12rpx;
+  padding: 12rpx 14rpx;
+  border-radius: 12rpx;
+  background: #f8fafc;
+  border: 1rpx solid #dbe3ea;
+  color: #475569;
+  font-size: 22rpx;
+  line-height: 1.6;
+}
 .guard-brief {
   margin-top: 16rpx;
   padding: 14rpx;

@@ -23,9 +23,13 @@ Page({
     sendingCode: false,
     countdown: 0,
     debugCodeHint: '',
+    runtimeNotice: '',
+    runtimeReady: true,
     mode: MODE_LOGIN,
     orgId: 1,
     orgName: '默认机构',
+    supportInfo: {},
+    complianceInfo: {},
     form: {
       phone: '',
       verifyCode: '',
@@ -35,10 +39,24 @@ Page({
   },
   timer: null,
   onLoad() {
+    const app = getApp();
+    this.setData({
+      runtimeNotice: app.globalData.runtimeNotice || '',
+      runtimeReady: app.globalData.runtimeReady !== false,
+      supportInfo: app.globalData.supportInfo || {},
+      complianceInfo: app.globalData.complianceInfo || {}
+    });
     this.loadBootstrap();
   },
   onShow() {
     const app = getApp();
+    this.setData({
+      runtimeNotice: app.globalData.runtimeNotice || '',
+      runtimeReady: app.globalData.runtimeReady !== false
+    });
+    if (!app.assertRuntimeReady(false)) {
+      return;
+    }
     if (app.globalData.token) {
       wx.reLaunch({ url: '/pages/home/index' });
       return;
@@ -53,6 +71,14 @@ Page({
     this.clearTimer();
   },
   async loadBootstrap() {
+    const app = getApp();
+    if (!app.assertRuntimeReady(false)) {
+      this.setData({
+        orgId: 1,
+        orgName: '待完成正式环境配置'
+      });
+      return;
+    }
     this.setData({ loadingBootstrap: true });
     try {
       const resp = await getFamilyAuthBootstrap();
@@ -119,6 +145,9 @@ Page({
     return this.data.mode === MODE_REGISTER ? 'REGISTER' : 'RESET_PASSWORD';
   },
   async sendCode() {
+    if (!getApp().assertRuntimeReady()) {
+      return;
+    }
     if (this.data.mode === MODE_LOGIN) {
       return;
     }
@@ -148,6 +177,9 @@ Page({
     }
   },
   async onSubmit() {
+    if (!getApp().assertRuntimeReady()) {
+      return;
+    }
     if (this.data.loading) {
       return;
     }

@@ -1,7 +1,21 @@
-<view class="container" wx:if="{{summary}}">
-  <view class="surface card">
+<view class="container">
+  <view class="runtime-tip" wx:if="{{runtimeNotice}}">{{runtimeNotice}}</view>
+
+  <view class="surface state-card" wx:if="{{loading}}">
+    <view class="state-title">支付信息加载中</view>
+    <view class="section-subtitle">正在同步账单、充值记录与支付保障状态。</view>
+  </view>
+
+  <view class="surface state-card" wx:if="{{!loading && loadError}}">
+    <view class="state-title">暂时无法加载支付信息</view>
+    <view class="section-subtitle">{{loadError}}</view>
+    <button class="ghost-btn state-btn" bindtap="retryLoad">重新加载</button>
+  </view>
+
+  <view class="surface card" wx:if="{{!loading && !loadError && summary}}">
     <view class="section-title">在线缴费</view>
     <view class="section-subtitle">支持微信充值，到账后可用于服务消费与商品购买</view>
+    <view class="runtime-hint">正式环境默认只走真实微信支付，不再自动回退人工记账。</view>
 
     <view class="guard-brief" wx:if="{{guard}}">
       <view class="guard-main">

@@ -35,6 +35,11 @@ public class FamilyPortalStartupValidator implements ApplicationRunner {
     validateFileStorage();
   }
 
+  private boolean isProdProfile() {
+    return Arrays.stream(environment.getActiveProfiles())
+        .anyMatch(profile -> "prod".equalsIgnoreCase(profile) || "production".equalsIgnoreCase(profile));
+  }
+
   private void validateWechatPay() {
     FamilyPortalProperties.WechatPay wechatPay = familyPortalProperties.getWechatPay();
     if (wechatPay == null || !wechatPay.isEnabled()) {
@@ -49,18 +54,26 @@ public class FamilyPortalStartupValidator implements ApplicationRunner {
     collectMissing(missing, "app.family.wechat-pay.api-v3-key", wechatPay.getApiV3Key());
     collectMissing(missing, "app.family.wechat-pay.notify-url", wechatPay.getNotifyUrl());
     if (!missing.isEmpty()) {
+      if (isProdProfile()) {
+        throw new IllegalStateException("Family wechat-pay is enabled but missing config: " + String.join(", ", missing));
+      }
       log.warn("Family wechat-pay is enabled but missing config: {}", String.join(", ", missing));
     }
-
-    boolean prodProfile = Arrays.stream(environment.getActiveProfiles())
-        .anyMatch(profile -> "prod".equalsIgnoreCase(profile) || "production".equalsIgnoreCase(profile));
-    if (prodProfile && wechatPay.isSkipNotifySignatureVerify()) {
-      log.warn("Family wechat-pay skip-notify-signature-verify is TRUE in production profile, this is unsafe");
+    String notifyUrl = defaultText(wechatPay.getNotifyUrl(), "");
+    if (isProdProfile() && notifyUrl.contains("localhost")) {
+      throw new IllegalStateException("Family wechat-pay notify-url cannot point to localhost in production");
+    }
+    if (isProdProfile() && wechatPay.isSkipNotifySignatureVerify()) {
+      throw new IllegalStateException("Family wechat-pay skip-notify-signature-verify must be false in production");
     }
   }
 
   private void validateFileStorage() {
-    if (!"oss".equalsIgnoreCase(defaultText(fileStorageProperties.getProvider(), "local"))) {
+    String provider = defaultText(fileStorageProperties.getProvider(), "local");
+    if (isProdProfile() && !"oss".equalsIgnoreCase(provider)) {
+      throw new IllegalStateException("File storage provider must be oss in production");
+    }
+    if (!"oss".equalsIgnoreCase(provider)) {
       return;
     }
     FileStorageProperties.Oss oss = fileStorageProperties.getOss();
@@ -70,6 +83,9 @@ public class FamilyPortalStartupValidator implements ApplicationRunner {
     collectMissing(missing, "app.file-storage.oss.access-key-id", oss == null ? null : oss.getAccessKeyId());
     collectMissing(missing, "app.file-storage.oss.access-key-secret", oss == null ? null : oss.getAccessKeySecret());
     if (!missing.isEmpty()) {
+      if (isProdProfile()) {
+        throw new IllegalStateException("File storage provider=oss but missing config: " + String.join(", ", missing));
+      }
       log.warn("File storage provider=oss but missing config: {}", String.join(", ", missing));
     }
   }
@@ -88,6 +104,9 @@ public class FamilyPortalStartupValidator implements ApplicationRunner {
     collectMissing(missing, "app.family.wechat-notify.app-secret", appSecret);
     collectMissing(missing, "app.family.wechat-notify.template-id", notify.getTemplateId());
     if (!missing.isEmpty()) {
+      if (isProdProfile()) {
+        throw new IllegalStateException("Family wechat-notify is enabled but missing config: " + String.join(", ", missing));
+      }
       log.warn("Family wechat-notify is enabled but missing config: {}", String.join(", ", missing));
     }
   }
@@ -98,10 +117,11 @@ public class FamilyPortalStartupValidator implements ApplicationRunner {
       return;
     }
     String provider = defaultText(smsCode.getProvider(), "mock").toLowerCase();
-    boolean prodProfile = Arrays.stream(environment.getActiveProfiles())
-        .anyMatch(profile -> "prod".equalsIgnoreCase(profile) || "production".equalsIgnoreCase(profile));
-    if (prodProfile && "mock".equals(provider)) {
-      log.warn("Family sms-code provider is MOCK in production profile, verification is not truly delivered");
+    if (isProdProfile() && "mock".equals(provider)) {
+      throw new IllegalStateException("Family sms-code provider cannot be mock in production");
+    }
+    if (isProdProfile() && smsCode.isDebugReturnCode()) {
+      throw new IllegalStateException("Family sms-code debug-return-code must be false in production");
     }
     if (!"aliyun".equals(provider)) {
       return;
@@ -113,6 +133,9 @@ public class FamilyPortalStartupValidator implements ApplicationRunner {
     collectMissing(missing, "app.family.sms-code.aliyun.access-key-id", aliyun == null ? null : aliyun.getAccessKeyId());
     collectMissing(missing, "app.family.sms-code.aliyun.access-key-secret", aliyun == null ? null : aliyun.getAccessKeySecret());
     if (!missing.isEmpty()) {
+      if (isProdProfile()) {
+        throw new IllegalStateException("Family sms-code provider=aliyun but missing config: " + String.join(", ", missing));
+      }
       log.warn("Family sms-code provider=aliyun but missing config: {}", String.join(", ", missing));
     }
   }

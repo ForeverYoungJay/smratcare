@@ -1,17 +1,48 @@
 const { getAssessmentReports, generateAiAssessmentReports } = require('../../services/family');
+const { ensureSensitiveAccess } = require('../../utils/sensitive-access');
 
 Page({
   data: {
     list: [],
-    generating: false
+    generating: false,
+    loading: false,
+    loadError: '',
+    accessGranted: true
   },
   async onShow() {
     getApp().ensureLogin();
+    await this.verifyAndLoad();
+  },
+  async verifyAndLoad() {
+    const granted = await ensureSensitiveAccess({
+      scene: 'assessment-report-list',
+      settingKey: 'verifyReports',
+      title: '评估报告访问验证'
+    });
+    if (!granted) {
+      this.setData({
+        accessGranted: false,
+        list: [],
+        loadError: ''
+      });
+      return;
+    }
+    this.setData({ accessGranted: true });
     await this.loadData();
   },
   async loadData() {
-    const list = await getAssessmentReports();
-    this.setData({ list: list || [] });
+    this.setData({ loading: true, loadError: '' });
+    try {
+      const list = await getAssessmentReports();
+      this.setData({ list: list || [] });
+    } catch (error) {
+      this.setData({
+        list: [],
+        loadError: error.message || '评估报告加载失败，请稍后重试'
+      });
+    } finally {
+      this.setData({ loading: false });
+    }
   },
   viewReport(e) {
     const id = e.currentTarget.dataset.id;
@@ -32,5 +63,8 @@ Page({
     } finally {
       this.setData({ generating: false });
     }
+  },
+  retryVerify() {
+    this.verifyAndLoad();
   }
 });

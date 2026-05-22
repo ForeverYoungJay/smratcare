@@ -22,6 +22,27 @@
   line-height: 1.6;
 }
 
+.runtime-warning,
+.runtime-tip {
+  margin-top: 18rpx;
+  padding: 14rpx 16rpx;
+  border-radius: 14rpx;
+  font-size: 22rpx;
+  line-height: 1.6;
+}
+
+.runtime-warning {
+  background: #fff1f2;
+  color: #b91c1c;
+  border: 1rpx solid #fecdd3;
+}
+
+.runtime-tip {
+  background: #eef6ff;
+  color: #1d4ed8;
+  border: 1rpx solid #bfdbfe;
+}
+
 .org-line {
   margin-top: 14rpx;
   font-size: 22rpx;
@@ -103,4 +124,25 @@
   margin-top: 12rpx;
   color: #6b7280;
   font-size: 22rpx;
+}
+
+.agreement-box {
+  margin-top: 24rpx;
+  padding: 20rpx;
+  border-radius: 16rpx;
+  background: #f8fafc;
+  border: 1rpx solid #dbe3ea;
+}
+
+.agreement-title {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.agreement-text {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: #64748b;
 }

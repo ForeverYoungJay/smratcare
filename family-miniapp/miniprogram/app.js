@@ -1,11 +1,22 @@
 const { getToken, getUser, clearAuth, setAuth } = require('./utils/auth');
 
+const RUNTIME_FLAGS_STORAGE_KEY = 'smartcare_family_runtime_flags';
+
+function normalizeRuntimeFlags(raw = {}) {
+  return {
+    enableMockFallback: !!raw.enableMockFallback,
+    enableLocalDevBypassLogin: !!raw.enableLocalDevBypassLogin,
+    allowManualRechargeFallback: !!raw.allowManualRechargeFallback,
+    baseUrlOverride: raw.baseUrlOverride ? String(raw.baseUrlOverride).trim() : ''
+  };
+}
+
 App({
   globalData: {
     baseUrl: 'http://localhost:8080',
     appName: '智养云家属端',
-    useMockFallback: true,
-    localDevBypassLogin: true,
+    useMockFallback: false,
+    localDevBypassLogin: false,
     localDevSession: {
       orgId: 1,
       familyUserId: 0,
@@ -13,6 +24,21 @@ App({
       phone: '13800138000'
     },
     allowManualRechargeFallback: false,
+    runtimeProfile: 'develop',
+    runtimeReady: true,
+    runtimeNotice: '',
+    runtimeFlags: normalizeRuntimeFlags(),
+    supportInfo: {
+      organizationName: '智养云合作机构',
+      supportPhone: '4008009000',
+      supportHours: '工作日 09:00-18:00',
+      serviceEmail: 'family-support@smartcare.example.com'
+    },
+    complianceInfo: {
+      privacyPolicyVersion: 'v2026.05',
+      serviceAgreementVersion: 'v2026.05',
+      dataUsageSummary: '仅用于家属身份校验、老人照护信息展示、缴费充值、服务通知与安全审计。'
+    },
     token: '',
     familyUser: null,
     selectedElderId: null,
@@ -21,17 +47,96 @@ App({
     mallOrdersDirty: false
   },
   onLaunch() {
+    this.initRuntimeConfig();
     this.globalData.token = getToken();
     this.globalData.familyUser = getUser();
-    if (!this.globalData.token && this.globalData.localDevBypassLogin && this.isLocalDevEnvironment()) {
+    if (!this.globalData.token && this.canUseLocalDevBypass()) {
       this.enableLocalDevSession();
     }
+  },
+  initRuntimeConfig() {
+    const runtimeProfile = this.getMiniProgramEnvVersion();
+    const runtimeFlags = this.readRuntimeFlags();
+    this.globalData.runtimeProfile = runtimeProfile;
+    this.globalData.runtimeFlags = runtimeFlags;
+    if (runtimeFlags.baseUrlOverride && runtimeProfile === 'develop') {
+      this.globalData.baseUrl = runtimeFlags.baseUrlOverride;
+    }
+    this.globalData.useMockFallback = this.isLocalDevEnvironment() && runtimeProfile === 'develop'
+      && runtimeFlags.enableMockFallback;
+    this.globalData.localDevBypassLogin = this.isLocalDevEnvironment() && runtimeProfile === 'develop'
+      && runtimeFlags.enableLocalDevBypassLogin;
+    this.globalData.allowManualRechargeFallback = this.isLocalDevEnvironment() && runtimeProfile === 'develop'
+      && runtimeFlags.allowManualRechargeFallback;
+    this.validateRuntimeConfig();
+  },
+  readRuntimeFlags() {
+    try {
+      const raw = wx.getStorageSync(RUNTIME_FLAGS_STORAGE_KEY);
+      if (!raw || typeof raw !== 'object') {
+        return normalizeRuntimeFlags();
+      }
+      return normalizeRuntimeFlags(raw);
+    } catch (error) {
+      return normalizeRuntimeFlags();
+    }
+  },
+  getMiniProgramEnvVersion() {
+    try {
+      const accountInfo = wx.getAccountInfoSync();
+      const envVersion = accountInfo && accountInfo.miniProgram && accountInfo.miniProgram.envVersion;
+      if (envVersion) {
+        return String(envVersion).toLowerCase();
+      }
+    } catch (error) {
+      // Ignore and use develop as the safest local default.
+    }
+    return 'develop';
   },
   isLocalDevEnvironment() {
     const baseUrl = String(this.globalData.baseUrl || '').toLowerCase();
     return baseUrl.includes('localhost')
       || baseUrl.includes('127.0.0.1')
       || baseUrl.includes('0.0.0.0');
+  },
+  canUseLocalDevBypass() {
+    return this.globalData.localDevBypassLogin && this.isLocalDevEnvironment();
+  },
+  validateRuntimeConfig() {
+    const runtimeProfile = this.globalData.runtimeProfile;
+    const releaseLike = runtimeProfile === 'trial' || runtimeProfile === 'release';
+    const usingLocalBaseUrl = this.isLocalDevEnvironment();
+    const hasDevOnlyFlags = this.globalData.useMockFallback
+      || this.globalData.localDevBypassLogin
+      || this.globalData.allowManualRechargeFallback;
+    if (releaseLike && usingLocalBaseUrl) {
+      this.globalData.runtimeReady = false;
+      this.globalData.runtimeNotice = '当前小程序仍指向本地联调地址，请切换为正式 HTTPS 接口后再提审或上线。';
+      return;
+    }
+    if (releaseLike && hasDevOnlyFlags) {
+      this.globalData.runtimeReady = false;
+      this.globalData.runtimeNotice = '当前小程序仍启用了开发专用能力，请关闭 mock、免登录和人工回退后再提审或上线。';
+      return;
+    }
+    this.globalData.runtimeReady = true;
+    this.globalData.runtimeNotice = releaseLike
+      ? '当前为正式发布运行模式，已禁用开发兜底能力。'
+      : '当前为开发环境，如需 mock 或本地免登录，请通过运行时开关显式启用。';
+  },
+  assertRuntimeReady(showModal = true) {
+    if (this.globalData.runtimeReady) {
+      return true;
+    }
+    if (showModal) {
+      wx.showModal({
+        title: '运行配置未就绪',
+        content: this.globalData.runtimeNotice || '请先完成正式环境配置后再继续。',
+        showCancel: false,
+        confirmText: '我知道了'
+      });
+    }
+    return false;
   },
   enableLocalDevSession() {
     const dev = this.globalData.localDevSession || {};
@@ -47,8 +152,11 @@ App({
     setAuth(token, user);
   },
   ensureLogin() {
+    if (!this.assertRuntimeReady(false)) {
+      return false;
+    }
     if (!this.globalData.token) {
-      if (this.globalData.localDevBypassLogin && this.isLocalDevEnvironment()) {
+      if (this.canUseLocalDevBypass()) {
         this.enableLocalDevSession();
         return true;
       }

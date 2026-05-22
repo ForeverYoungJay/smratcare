@@ -64,7 +64,7 @@ app:
       auto-pay-settle-cron: "${FAMILY_RECHARGE_AUTO_PAY_SETTLE_CRON:0 */30 * * * ?}"
       auto-pay-settle-batch-size: ${FAMILY_RECHARGE_AUTO_PAY_SETTLE_BATCH_SIZE:200}
     wechat-pay:
-      enabled: ${FAMILY_WECHAT_PAY_ENABLED:false}
+      enabled: ${FAMILY_WECHAT_PAY_ENABLED:true}
       app-id: ${FAMILY_WECHAT_APP_ID:}
       app-secret: ${FAMILY_WECHAT_APP_SECRET:}
       merchant-id: ${FAMILY_WECHAT_MERCHANT_ID:}
@@ -80,7 +80,7 @@ app:
       notify-allowed-skew-seconds: ${FAMILY_WECHAT_NOTIFY_ALLOWED_SKEW_SECONDS:300}
       skip-notify-signature-verify: ${FAMILY_WECHAT_SKIP_NOTIFY_SIGNATURE_VERIFY:false}
     wechat-notify:
-      enabled: ${FAMILY_WECHAT_NOTIFY_ENABLED:false}
+      enabled: ${FAMILY_WECHAT_NOTIFY_ENABLED:true}
       app-id: ${FAMILY_WECHAT_NOTIFY_APP_ID:}
       app-secret: ${FAMILY_WECHAT_NOTIFY_APP_SECRET:}
       template-id: ${FAMILY_WECHAT_NOTIFY_TEMPLATE_ID:}
@@ -96,7 +96,7 @@ app:
       retry-cron: "${FAMILY_WECHAT_NOTIFY_RETRY_CRON:0 */5 * * * ?}"
     sms-code:
       enabled: ${FAMILY_SMS_CODE_ENABLED:true}
-      provider: ${FAMILY_SMS_CODE_PROVIDER:mock}
+      provider: ${FAMILY_SMS_CODE_PROVIDER:aliyun}
       code-length: ${FAMILY_SMS_CODE_LENGTH:6}
       expire-seconds: ${FAMILY_SMS_CODE_EXPIRE_SECONDS:300}
       cooldown-seconds: ${FAMILY_SMS_CODE_COOLDOWN_SECONDS:60}
@@ -119,7 +119,7 @@ app:
         access-key-id: ${FAMILY_SMS_ALIYUN_ACCESS_KEY_ID:}
         access-key-secret: ${FAMILY_SMS_ALIYUN_ACCESS_KEY_SECRET:}
   file-storage:
-    provider: ${APP_FILE_STORAGE_PROVIDER:local}
+    provider: ${APP_FILE_STORAGE_PROVIDER:oss}
     base-dir: /app/uploads
     url-prefix: /uploads
     public-base-url: ${APP_FILE_STORAGE_PUBLIC_BASE_URL:}

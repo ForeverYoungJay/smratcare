@@ -33,3 +33,7 @@ mvn -Dtest=AuthSecurityTest test
 1. 提交前执行 `mvn test`。
 2. 涉及 Flyway 迁移时，额外执行 `./scripts/check_flyway_versions.sh`。
 3. 联调改动后，补充关键接口冒烟（登录、核心业务写接口）。
+4. 家属端正式上线前，至少执行：
+   - `./scripts/family_account_mall_regression.sh`
+   - `./scripts/family_ops_health_check.sh`
+   - 参考 `docs/FAMILY_MINIAPP_RELEASE_CHECKLIST.md` 完成真机、提审与上线巡检。

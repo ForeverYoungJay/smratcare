@@ -61,8 +61,10 @@ Page({
     filteredTemplates: [],
     draftRestored: false,
     loading: false,
+    loadError: '',
     sending: false,
-    uploadingVoice: false
+    uploadingVoice: false,
+    runtimeNotice: ''
   },
   onLoad(query) {
     const mode = query && query.mode ? String(query.mode).toLowerCase() : '';
@@ -71,8 +73,17 @@ Page({
   },
   async onShow() {
     getApp().ensureLogin();
-    await Promise.all([this.loadMessages(), this.loadTemplates()]);
-    this.restoreDraft();
+    this.setData({ runtimeNotice: getApp().globalData.runtimeNotice || '' });
+    await this.loadInitialData();
+  },
+  async loadInitialData() {
+    this.setData({ loadError: '' });
+    try {
+      await Promise.all([this.loadMessages(), this.loadTemplates()]);
+      this.restoreDraft();
+    } catch (error) {
+      this.setData({ loadError: error.message || '沟通信息加载失败，请稍后重试' });
+    }
   },
   async loadMessages() {
     this.setData({ loading: true });
@@ -85,6 +96,7 @@ Page({
         voiceDurationText: item && item.mediaDurationSec ? `${item.mediaDurationSec}秒` : ''
       }));
       this.setData({ messages });
+      return messages;
     } finally {
       this.setData({ loading: false });
     }
@@ -93,6 +105,7 @@ Page({
     const templates = await getCommunicationTemplates();
     this.setData({ templates: templates || [] });
     this.updateTemplateView();
+    return templates || [];
   },
   updateTemplateView() {
     const role = this.data.roleOptions[this.data.roleIndex] || '';
@@ -252,7 +265,7 @@ Page({
       wx.showToast({ title: '发送成功', icon: 'success' });
       await this.loadMessages();
     } catch (error) {
-      wx.showToast({ title: '发送失败，请重试', icon: 'none' });
+      wx.showToast({ title: error.message || '发送失败，请重试', icon: 'none' });
     } finally {
       this.setData({ sending: false });
     }
@@ -283,9 +296,12 @@ Page({
       wx.showToast({ title: '探视预约已提交', icon: 'success' });
       await this.loadMessages();
     } catch (error) {
-      wx.showToast({ title: '预约失败，请稍后重试', icon: 'none' });
+      wx.showToast({ title: error.message || '预约失败，请稍后重试', icon: 'none' });
     } finally {
       this.setData({ sending: false });
     }
+  },
+  retryLoad() {
+    this.loadInitialData();
   }
 });
