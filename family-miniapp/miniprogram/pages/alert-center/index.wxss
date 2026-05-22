@@ -1,6 +1,7 @@
 .hero {
   padding: 24rpx;
   background: linear-gradient(145deg, #fff7ef, #ffffff);
+  overflow: hidden;
 }
 
 .hero-head {
@@ -8,6 +9,12 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 12rpx;
+  flex-wrap: wrap;
+}
+
+.hero-copy {
+  flex: 1;
+  min-width: 0;
 }
 
 .mini-btn {
@@ -16,20 +23,23 @@
   font-size: 22rpx;
   border-radius: 999rpx;
   padding: 0 16rpx;
+  min-width: 152rpx;
+  margin: 0;
 }
 
 .count-grid {
-  margin-top: 16rpx;
+  margin-top: 18rpx;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 10rpx;
+  gap: 12rpx;
 }
 
 .count-card {
-  background: #f8fafc;
+  background: linear-gradient(145deg, #f8fafc, #ffffff);
   border: 1rpx solid #e5e7eb;
-  border-radius: 12rpx;
-  padding: 12rpx;
+  border-radius: 18rpx;
+  padding: 16rpx 18rpx;
+  min-width: 0;
 }
 
 .count-card .num {
@@ -64,6 +74,7 @@
 .panel {
   margin-top: 18rpx;
   padding: 22rpx;
+  overflow: hidden;
 }
 
 .panel-head {
@@ -87,34 +98,43 @@
   margin-top: 10rpx;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 12rpx;
+  flex-wrap: wrap;
   font-size: 23rpx;
   color: #374151;
   background: #f8fafc;
-  border-radius: 10rpx;
-  padding: 10rpx 12rpx;
+  border-radius: 14rpx;
+  padding: 14rpx 16rpx;
 }
 
 .type-name {
   font-weight: 700;
+  max-width: 100%;
+  word-break: break-word;
 }
 
 .type-count {
   color: #64748b;
+  line-height: 1.5;
+  word-break: break-word;
 }
 
 .urgent-item {
   margin-top: 12rpx;
-  border-radius: 12rpx;
+  border-radius: 18rpx;
   border: 1rpx solid #f3d1d1;
-  background: #fffafa;
-  padding: 12rpx;
+  background: linear-gradient(145deg, #fffafa, #ffffff);
+  padding: 16rpx;
+  overflow: hidden;
 }
 
 .urgent-top {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 12rpx;
+  flex-wrap: wrap;
 }
 
 .tag {
@@ -142,6 +162,7 @@
 .urgent-time {
   font-size: 22rpx;
   color: #64748b;
+  line-height: 1.5;
 }
 
 .urgent-title {
@@ -149,6 +170,8 @@
   font-size: 27rpx;
   color: #111827;
   font-weight: 700;
+  line-height: 1.45;
+  word-break: break-word;
 }
 
 .urgent-content {
@@ -156,6 +179,8 @@
   font-size: 23rpx;
   color: #475569;
   line-height: 1.55;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .urgent-bottom {
@@ -163,16 +188,21 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12rpx;
+  flex-wrap: wrap;
 }
 
 .elder {
   font-size: 22rpx;
   color: #64748b;
+  min-width: 0;
+  word-break: break-word;
 }
 
 .call-btn {
-  width: 90rpx;
-  height: 52rpx;
-  line-height: 52rpx;
+  min-width: 112rpx;
+  height: 56rpx;
+  line-height: 56rpx;
   font-size: 21rpx;
+  margin: 0;
 }

@@ -1,7 +1,7 @@
 <view class="container">
   <view class="surface hero">
     <view class="hero-head">
-      <view>
+      <view class="hero-copy">
         <view class="section-title">今日待办中心</view>
         <view class="section-subtitle">刷新于 {{todo.refreshTime || '--'}}</view>
       </view>

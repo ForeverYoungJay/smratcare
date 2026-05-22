@@ -1,7 +1,7 @@
 <view class="container">
   <view class="surface hero">
     <view class="hero-head">
-      <view>
+      <view class="hero-copy">
         <view class="section-title">预警中心</view>
         <view class="section-subtitle">统一查看未读分层与紧急事件</view>
       </view>

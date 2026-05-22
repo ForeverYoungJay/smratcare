@@ -13,7 +13,9 @@
       <view class="timeline-row">{{item}}</view>
     </block>
 
-    <button class="primary-btn action" bindtap="callNurse">联系责任护士</button>
-    <button class="ghost-btn action" bindtap="markRead">确认已读</button>
+    <view class="action-row">
+      <button class="primary-btn action action-primary" bindtap="callNurse">联系责任护士</button>
+      <button class="ghost-btn action action-secondary" bindtap="markRead">确认已读</button>
+    </view>
   </view>
 </view>
