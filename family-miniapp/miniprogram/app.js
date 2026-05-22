@@ -13,7 +13,8 @@ function normalizeRuntimeFlags(raw = {}) {
 
 App({
   globalData: {
-    baseUrl: 'http://localhost:8080',
+    baseUrl: 'https://gfyy.org.cn',
+    currentBaseUrl: 'https://gfyy.org.cn',
     appName: '智养云家属端',
     useMockFallback: false,
     localDevBypassLogin: false,
@@ -25,6 +26,7 @@ App({
     },
     allowManualRechargeFallback: false,
     runtimeProfile: 'develop',
+    clientPlatform: 'unknown',
     runtimeReady: true,
     runtimeNotice: '',
     runtimeFlags: normalizeRuntimeFlags(),
@@ -57,11 +59,14 @@ App({
   initRuntimeConfig() {
     const runtimeProfile = this.getMiniProgramEnvVersion();
     const runtimeFlags = this.readRuntimeFlags();
+    const clientPlatform = this.getClientPlatform();
     this.globalData.runtimeProfile = runtimeProfile;
     this.globalData.runtimeFlags = runtimeFlags;
+    this.globalData.clientPlatform = clientPlatform;
     if (runtimeFlags.baseUrlOverride && runtimeProfile === 'develop') {
       this.globalData.baseUrl = runtimeFlags.baseUrlOverride;
     }
+    this.globalData.currentBaseUrl = this.globalData.baseUrl;
     this.globalData.useMockFallback = this.isLocalDevEnvironment() && runtimeProfile === 'develop'
       && runtimeFlags.enableMockFallback;
     this.globalData.localDevBypassLogin = this.isLocalDevEnvironment() && runtimeProfile === 'develop'
@@ -93,22 +98,61 @@ App({
     }
     return 'develop';
   },
+  getClientPlatform() {
+    try {
+      const systemInfo = wx.getSystemInfoSync();
+      const platform = systemInfo && systemInfo.platform ? systemInfo.platform : '';
+      if (platform) {
+        return String(platform).toLowerCase();
+      }
+    } catch (error) {
+      // Ignore and use unknown.
+    }
+    return 'unknown';
+  },
+  isDevtoolsPlatform() {
+    return this.globalData.clientPlatform === 'devtools';
+  },
   isLocalDevEnvironment() {
     const baseUrl = String(this.globalData.baseUrl || '').toLowerCase();
     return baseUrl.includes('localhost')
       || baseUrl.includes('127.0.0.1')
       || baseUrl.includes('0.0.0.0');
   },
+  isHttpsBaseUrl() {
+    return String(this.globalData.baseUrl || '').trim().toLowerCase().startsWith('https://');
+  },
+  isPlaceholderBaseUrl() {
+    const baseUrl = String(this.globalData.baseUrl || '').trim().toLowerCase();
+    return !baseUrl || baseUrl.includes('your-domain.example.com');
+  },
   canUseLocalDevBypass() {
     return this.globalData.localDevBypassLogin && this.isLocalDevEnvironment();
   },
   validateRuntimeConfig() {
     const runtimeProfile = this.globalData.runtimeProfile;
+    const clientPlatform = this.globalData.clientPlatform;
     const releaseLike = runtimeProfile === 'trial' || runtimeProfile === 'release';
     const usingLocalBaseUrl = this.isLocalDevEnvironment();
+    const usingDevtools = this.isDevtoolsPlatform();
     const hasDevOnlyFlags = this.globalData.useMockFallback
       || this.globalData.localDevBypassLogin
       || this.globalData.allowManualRechargeFallback;
+    if (this.isPlaceholderBaseUrl()) {
+      this.globalData.runtimeReady = false;
+      this.globalData.runtimeNotice = '当前还没有配置家属端接口地址，请先把小程序 baseUrl 切换到可访问的后端地址。';
+      return;
+    }
+    if (!usingDevtools && usingLocalBaseUrl) {
+      this.globalData.runtimeReady = false;
+      this.globalData.runtimeNotice = '当前运行在真机或预览环境，`localhost` 只在微信开发者工具里可用。请改成已加入微信 request 合法域名的 HTTPS 接口地址。';
+      return;
+    }
+    if (!usingDevtools && !this.isHttpsBaseUrl()) {
+      this.globalData.runtimeReady = false;
+      this.globalData.runtimeNotice = '当前运行在真机或预览环境，小程序接口必须使用 HTTPS 域名。请改成已加入微信 request 合法域名的 HTTPS 接口地址。';
+      return;
+    }
     if (releaseLike && usingLocalBaseUrl) {
       this.globalData.runtimeReady = false;
       this.globalData.runtimeNotice = '当前小程序仍指向本地联调地址，请切换为正式 HTTPS 接口后再提审或上线。';
@@ -122,7 +166,9 @@ App({
     this.globalData.runtimeReady = true;
     this.globalData.runtimeNotice = releaseLike
       ? '当前为正式发布运行模式，已禁用开发兜底能力。'
-      : '当前为开发环境，如需 mock 或本地免登录，请通过运行时开关显式启用。';
+      : usingDevtools
+        ? '当前为开发环境。开发者工具可直连 localhost；真机和预览请改用微信后台已配置的 HTTPS 合法域名。'
+        : `当前为开发环境（${clientPlatform}）。请使用已加入微信 request 合法域名的 HTTPS 接口地址。`;
   },
   assertRuntimeReady(showModal = true) {
     if (this.globalData.runtimeReady) {

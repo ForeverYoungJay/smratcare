@@ -49,6 +49,16 @@
   color: #6b7280;
 }
 
+.runtime-meta {
+  margin-top: 14rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+  font-size: 20rpx;
+  color: #64748b;
+  word-break: break-all;
+}
+
 .org-loading {
   margin-left: 10rpx;
   color: #2c7a84;

@@ -25,6 +25,9 @@ Page({
     debugCodeHint: '',
     runtimeNotice: '',
     runtimeReady: true,
+    runtimeProfile: 'develop',
+    clientPlatform: 'unknown',
+    currentBaseUrl: '',
     mode: MODE_LOGIN,
     orgId: 1,
     orgName: '默认机构',
@@ -43,6 +46,9 @@ Page({
     this.setData({
       runtimeNotice: app.globalData.runtimeNotice || '',
       runtimeReady: app.globalData.runtimeReady !== false,
+      runtimeProfile: app.globalData.runtimeProfile || 'develop',
+      clientPlatform: app.globalData.clientPlatform || 'unknown',
+      currentBaseUrl: app.globalData.currentBaseUrl || app.globalData.baseUrl || '',
       supportInfo: app.globalData.supportInfo || {},
       complianceInfo: app.globalData.complianceInfo || {}
     });
@@ -52,7 +58,10 @@ Page({
     const app = getApp();
     this.setData({
       runtimeNotice: app.globalData.runtimeNotice || '',
-      runtimeReady: app.globalData.runtimeReady !== false
+      runtimeReady: app.globalData.runtimeReady !== false,
+      runtimeProfile: app.globalData.runtimeProfile || 'develop',
+      clientPlatform: app.globalData.clientPlatform || 'unknown',
+      currentBaseUrl: app.globalData.currentBaseUrl || app.globalData.baseUrl || ''
     });
     if (!app.assertRuntimeReady(false)) {
       return;

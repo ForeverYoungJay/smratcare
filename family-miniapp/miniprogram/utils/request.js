@@ -94,6 +94,19 @@ function request({ url, method = 'GET', data = {}, auth = true, timeout = 10000 
       fail: (err) => {
         const errMsg = err && err.errMsg ? err.errMsg : '网络请求失败';
         const isTimeout = errMsg.includes('timeout');
+        const lowerErr = errMsg.toLowerCase();
+        if (lowerErr.includes('url not in domain list')) {
+          const baseUrl = String((app && app.globalData && app.globalData.baseUrl) || '');
+          const usingLocalhost = /localhost|127\.0\.0\.1|0\.0\.0\.0/i.test(baseUrl);
+          const message = usingLocalhost
+            ? '当前接口地址仍是 localhost，真机和预览环境无法访问。请改成已加入微信 request 合法域名的 HTTPS 接口地址。'
+            : '当前接口域名未加入微信小程序 request 合法域名，请到微信公众平台补充该 HTTPS 域名后重试。';
+          reject(buildError(message, {
+            code: 'DOMAIN_NOT_ALLOWED',
+            rawMessage: errMsg
+          }));
+          return;
+        }
         reject(buildError(isTimeout ? '请求超时，请检查网络后重试' : errMsg, {
           code: isTimeout ? 'TIMEOUT' : 'NETWORK_ERROR'
         }));
@@ -170,6 +183,14 @@ function uploadFile({ url, filePath, name = 'file', formData = {}, auth = true, 
       fail: (err) => {
         const errMsg = err && err.errMsg ? err.errMsg : '文件上传失败';
         const isTimeout = errMsg.includes('timeout');
+        const lowerErr = errMsg.toLowerCase();
+        if (lowerErr.includes('url not in domain list')) {
+          reject(buildError('当前上传接口域名未加入微信小程序 request 合法域名，请改成已配置的 HTTPS 接口地址。', {
+            code: 'DOMAIN_NOT_ALLOWED',
+            rawMessage: errMsg
+          }));
+          return;
+        }
         reject(buildError(isTimeout ? '上传超时，请稍后重试' : errMsg, {
           code: isTimeout ? 'TIMEOUT' : 'NETWORK_ERROR'
         }));
