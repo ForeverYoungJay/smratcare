@@ -451,7 +451,7 @@
               <a-button size="small" type="link" @click="showAllCalendarTypes">显示全部</a-button>
             </a-space>
           </div>
-          <StatefulBlock :loading="calendarLoading" :error="''" :empty="!calendarRows.length" empty-text="暂无日程安排" @retry="loadCalendar">
+          <StatefulBlock :loading="calendarLoading" :error="''" :empty="false" @retry="loadCalendar">
             <FullCalendar ref="calendarRef" :options="calendarOptions" />
           </StatefulBlock>
           <div class="calendar-actions">
@@ -2064,6 +2064,28 @@ const portalBirthdayEvents = computed(() => birthdayRows.value
   })
   .filter((item): item is NonNullable<typeof item> => !!item))
 
+const calendarDisplayEvents = computed(() => [
+  ...calendarRows.value
+    .filter((task) => visibleCalendarTypes.value.includes((task.calendarType || 'WORK') as any))
+    .map((task) => ({
+      id: String(task.id),
+      title: `${task.title}${task.assigneeName ? `（${task.assigneeName}）` : ''}`,
+      start: normalizeDateTimeValue(task.startTime || task.endTime),
+      end: normalizeDateTimeValue(task.endTime || task.startTime),
+      color: resolveTaskColor(task),
+      classNames: task.status === 'DONE' ? ['calendar-event-done'] : [],
+      extendedProps: {
+        calendarType: task.calendarType || 'WORK',
+        urgency: task.urgency || 'NORMAL',
+        assigneeName: task.assigneeName || '',
+        collaboratorNames: normalizeCollaboratorNames(task.collaboratorNames).join('、'),
+        planCategory: task.planCategory || ''
+      }
+    })),
+  ...portalBirthdayEvents.value,
+  ...portalFestivalEvents.value
+].filter((item) => !!item.start))
+
 const calendarOptions = computed(() => ({
   plugins: [dayGridPlugin, interactionPlugin],
   initialView: currentCalendarView.value,
@@ -2111,27 +2133,7 @@ const calendarOptions = computed(() => ({
     const typeText = arg?.event?.extendedProps?.calendarType || 'WORK'
     message.info(`已定位到「${calendarTypeText(typeText)}」日程`)
   },
-  events: [
-    ...calendarRows.value
-      .filter((task) => visibleCalendarTypes.value.includes((task.calendarType || 'WORK') as any))
-      .map((task) => ({
-        id: String(task.id),
-        title: `${task.title}${task.assigneeName ? `（${task.assigneeName}）` : ''}`,
-        start: normalizeDateTimeValue(task.startTime || task.endTime),
-        end: normalizeDateTimeValue(task.endTime || task.startTime),
-        color: resolveTaskColor(task),
-        classNames: task.status === 'DONE' ? ['calendar-event-done'] : [],
-        extendedProps: {
-          calendarType: task.calendarType || 'WORK',
-          urgency: task.urgency || 'NORMAL',
-          assigneeName: task.assigneeName || '',
-          collaboratorNames: normalizeCollaboratorNames(task.collaboratorNames).join('、'),
-          planCategory: task.planCategory || ''
-        }
-      })),
-    ...portalBirthdayEvents.value,
-    ...portalFestivalEvents.value
-  ]
+  events: calendarDisplayEvents.value
 }))
 
 const todayAgenda = computed(() => buildAgendaByDate(dayjs()))
