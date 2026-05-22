@@ -165,11 +165,7 @@ App({
       return;
     }
     this.globalData.runtimeReady = true;
-    this.globalData.runtimeNotice = releaseLike
-      ? '当前为正式发布运行模式，已禁用开发兜底能力。'
-      : usingDevtools
-        ? '当前为开发环境。开发者工具可直连 localhost；真机和预览请改用微信后台已配置的 HTTPS 合法域名。'
-        : `当前为开发环境（${clientPlatform}）。请使用已加入微信 request 合法域名的 HTTPS 接口地址。`;
+    this.globalData.runtimeNotice = '';
   },
   assertRuntimeReady(showModal = true) {
     if (this.globalData.runtimeReady) {

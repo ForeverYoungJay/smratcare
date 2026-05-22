@@ -3,11 +3,7 @@
     <view class="brand-title">智养云家属端</view>
     <view class="brand-subtitle">连接照护现场，第一时间掌握长者状态</view>
     <view class="runtime-warning" wx:if="{{!runtimeReady}}">{{runtimeNotice}}</view>
-    <view class="runtime-tip" wx:else>{{runtimeNotice}}</view>
-    <view class="runtime-meta">
-      <text>运行环境：{{runtimeProfile}} / {{clientPlatform}}</text>
-      <text selectable="true">接口地址：{{currentBaseUrl}}</text>
-    </view>
+    <view class="runtime-tip" wx:elif="{{runtimeNotice}}">{{runtimeNotice}}</view>
     <view class="org-line">
       <text>所属机构：{{orgName}}</text>
       <text wx:if="{{loadingBootstrap}}" class="org-loading">加载中...</text>
@@ -49,7 +45,6 @@
       {{mode === 'login' ? '登录并进入首页' : (mode === 'register' ? '注册并登录' : '重置密码并登录')}}
     </button>
     <view class="tips" wx:if="{{mode !== 'login'}}">当前未接真实短信时，默认验证码为 1234。验证码有效期 5 分钟，连续输错将触发保护限制。</view>
-    <view class="tips" wx:if="{{debugCodeHint}}">{{debugCodeHint}}</view>
     <view class="agreement-box">
       <view class="agreement-title">登录即表示你已阅读并同意</view>
       <view class="agreement-text">《用户服务协议 {{complianceInfo.serviceAgreementVersion}}》与《隐私保护说明 {{complianceInfo.privacyPolicyVersion}}》</view>

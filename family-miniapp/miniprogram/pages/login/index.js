@@ -72,7 +72,6 @@ Page({
     }
     if (app.globalData.localDevBypassLogin && app.isLocalDevEnvironment()) {
       app.enableLocalDevSession();
-      wx.showToast({ title: '已进入本地调试模式', icon: 'none' });
       wx.reLaunch({ url: '/pages/home/index' });
     }
   },
@@ -177,7 +176,7 @@ Page({
       });
       const retryAfterSeconds = Number(resp && resp.retryAfterSeconds) || 60;
       this.startCountdown(retryAfterSeconds);
-      this.setData({ debugCodeHint: resp && resp.debugCode ? `调试码：${resp.debugCode}` : '' });
+      this.setData({ debugCodeHint: '' });
       wx.showToast({ title: '验证码已发送', icon: 'none' });
     } catch (error) {
       wx.showToast({ title: error.message || '验证码发送失败', icon: 'none' });

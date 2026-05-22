@@ -57,7 +57,7 @@
     </view>
     <view class="preview-line">充值后预计余额：¥{{previewBalance}}</view>
     <button class="primary-btn action" loading="{{paying}}" bindtap="rechargeNow">微信充值</button>
-    <view class="tip-text" wx:if="{{allowManualFallback}}">当前环境允许支付失败后回退为记账充值（仅测试/演练使用）。</view>
+    <view class="tip-text" wx:if="{{allowManualFallback}}">当前支持支付失败后回退为记账充值，请联系机构确认处理结果。</view>
     <view class="tip-text" wx:else>若支付失败将提示重试，不自动执行人工记账回退。</view>
 
     <view class="warn-box" wx:if="{{abnormalOrders.length > 0}}">
