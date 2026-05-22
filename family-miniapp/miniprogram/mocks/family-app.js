@@ -1771,7 +1771,7 @@ function removeFamilyBinding(elderId) {
 
 function sendFamilySmsCode(payload = {}) {
   const phone = String(payload.phone || '').trim();
-  const code = `${Math.floor(100000 + Math.random() * 900000)}`;
+  const code = '1234';
   smsState.byPhone[phone] = code;
   return {
     bizNo: `MOCK-SMS-${Date.now()}`,
@@ -1786,7 +1786,7 @@ function sendFamilySmsCode(payload = {}) {
 function verifyFamilySmsCode(payload = {}) {
   const phone = String(payload.phone || '').trim();
   const code = String(payload.verifyCode || '').trim();
-  const expected = smsState.byPhone[phone] || '123456';
+  const expected = smsState.byPhone[phone] || '1234';
   const passed = code === expected;
   return {
     passed,
@@ -1796,7 +1796,7 @@ function verifyFamilySmsCode(payload = {}) {
 }
 
 function sendSecuritySmsCode(scene = 'SECURITY') {
-  const code = `${Math.floor(100000 + Math.random() * 900000)}`;
+  const code = '1234';
   smsState.securityCode = code;
   return {
     bizNo: `MOCK-SEC-${Date.now()}`,
@@ -1810,7 +1810,7 @@ function sendSecuritySmsCode(scene = 'SECURITY') {
 
 function verifySecuritySmsCode(payload = {}) {
   const code = String(payload.verifyCode || '').trim();
-  const expected = smsState.securityCode || '123456';
+  const expected = smsState.securityCode || '1234';
   const passed = code === expected;
   return {
     passed,

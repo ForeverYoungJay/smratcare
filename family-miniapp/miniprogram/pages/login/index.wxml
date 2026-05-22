@@ -44,7 +44,7 @@
     <button class="primary-btn login-btn" loading="{{loading}}" disabled="{{!runtimeReady}}" bindtap="onSubmit">
       {{mode === 'login' ? '登录并进入首页' : (mode === 'register' ? '注册并登录' : '重置密码并登录')}}
     </button>
-    <view class="tips" wx:if="{{mode !== 'login'}}">验证码有效期 5 分钟，连续输错将触发保护限制。</view>
+    <view class="tips" wx:if="{{mode !== 'login'}}">当前未接真实短信时，默认验证码为 1234。验证码有效期 5 分钟，连续输错将触发保护限制。</view>
     <view class="tips" wx:if="{{debugCodeHint}}">{{debugCodeHint}}</view>
     <view class="agreement-box">
       <view class="agreement-title">登录即表示你已阅读并同意</view>

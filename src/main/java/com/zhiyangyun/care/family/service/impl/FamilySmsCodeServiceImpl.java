@@ -41,6 +41,7 @@ public class FamilySmsCodeServiceImpl implements FamilySmsCodeService {
   private static final String STATUS_FAILED = "FAILED";
   private static final String SCENE_LOGIN = "LOGIN";
   private static final String SCENE_SECURITY = "SECURITY";
+  private static final String MOCK_VERIFY_CODE = "1234";
 
   private final FamilySmsCodeLogMapper familySmsCodeLogMapper;
   private final FamilyUserMapper familyUserMapper;
@@ -81,7 +82,7 @@ public class FamilySmsCodeServiceImpl implements FamilySmsCodeService {
     enforceSendLimit(normalizedOrgId, normalizedPhone, normalizedScene, smsCode);
     enforceIpSendLimit(normalizedOrgId, normalizedClientIp, smsCode);
 
-    String code = generateCode(smsCode.getCodeLength());
+    String code = resolveVerifyCode(smsCode);
     String bizNo = buildBizNo(normalizedScene);
     LocalDateTime now = LocalDateTime.now();
     LocalDateTime expiresAt = now.plusSeconds(Math.max(smsCode.getExpireSeconds(), 60));
@@ -405,6 +406,14 @@ public class FamilySmsCodeServiceImpl implements FamilySmsCodeService {
     int min = (int) Math.pow(10, length - 1);
     int code = SECURE_RANDOM.nextInt(max - min) + min;
     return String.valueOf(code);
+  }
+
+  private String resolveVerifyCode(FamilyPortalProperties.SmsCode smsCode) {
+    String provider = defaultText(smsCode == null ? null : smsCode.getProvider(), "mock").toLowerCase(Locale.ROOT);
+    if ("mock".equals(provider)) {
+      return MOCK_VERIFY_CODE;
+    }
+    return generateCode(smsCode == null ? 6 : smsCode.getCodeLength());
   }
 
   private FamilyPortalProperties.SmsCode ensureSmsCodeEnabled() {
