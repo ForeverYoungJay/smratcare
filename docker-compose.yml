@@ -52,6 +52,9 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-app123456}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env or the shell environment}
       DEMO_SEED_ENABLED: ${DEMO_SEED_ENABLED:-false}
+      APP_FILE_STORAGE_PROVIDER: ${APP_FILE_STORAGE_PROVIDER:-local}
+      APP_FILE_STORAGE_BASE_DIR: ${APP_FILE_STORAGE_BASE_DIR:-/app/uploads}
+      APP_FILE_STORAGE_URL_PREFIX: ${APP_FILE_STORAGE_URL_PREFIX:-/uploads}
     volumes:
       - ./output/uploads:/app/uploads
     ports:
