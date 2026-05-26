@@ -22,7 +22,7 @@ DEALLOCATE PREPARE stmt_add_survey_template_content;
 
 SET @ddl_update_survey_template_content := IF(
   @has_survey_template_table = 1,
-  'UPDATE survey_template SET content = description WHERE content IS NULL AND description IS NOT NULL AND description <> ''''',
+  'UPDATE survey_template SET content = description WHERE content IS NULL AND description IS NOT NULL AND description <> ''''''',
   'SELECT 1'
 );
 PREPARE stmt_update_survey_template_content FROM @ddl_update_survey_template_content;
