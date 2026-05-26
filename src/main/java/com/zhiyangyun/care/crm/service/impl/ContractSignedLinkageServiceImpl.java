@@ -18,6 +18,9 @@ import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
+import com.zhiyangyun.care.elder.model.AssignBedRequest;
+import com.zhiyangyun.care.elder.model.BedStatus;
+import com.zhiyangyun.care.elder.service.ElderService;
 import com.zhiyangyun.care.finance.service.ElderAccountService;
 import com.zhiyangyun.care.health.entity.HealthInspection;
 import com.zhiyangyun.care.health.mapper.HealthInspectionMapper;
@@ -33,6 +36,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.YearMonth;
+import java.util.List;
+import java.util.Objects;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 
@@ -60,6 +65,7 @@ public class ContractSignedLinkageServiceImpl implements ContractSignedLinkageSe
   private final CareTaskDailyMapper careTaskDailyMapper;
   private final BedMapper bedMapper;
   private final RoomMapper roomMapper;
+  private final ElderService elderService;
 
   public ContractSignedLinkageServiceImpl(
       ElderAdmissionMapper admissionMapper,
@@ -74,7 +80,8 @@ public class ContractSignedLinkageServiceImpl implements ContractSignedLinkageSe
       CareTaskService careTaskService,
       CareTaskDailyMapper careTaskDailyMapper,
       BedMapper bedMapper,
-      RoomMapper roomMapper) {
+      RoomMapper roomMapper,
+      ElderService elderService) {
     this.admissionMapper = admissionMapper;
     this.elderMapper = elderMapper;
     this.leadMapper = leadMapper;
@@ -88,6 +95,7 @@ public class ContractSignedLinkageServiceImpl implements ContractSignedLinkageSe
     this.careTaskDailyMapper = careTaskDailyMapper;
     this.bedMapper = bedMapper;
     this.roomMapper = roomMapper;
+    this.elderService = elderService;
   }
 
   @Override
@@ -122,6 +130,8 @@ public class ContractSignedLinkageServiceImpl implements ContractSignedLinkageSe
       contract.setElderPhone(elder.getPhone());
     }
     backfillReservationInfo(contract, elder);
+    boolean logisticsReady = ensureBedOccupancy(contract, elder, admission, operatorId);
+    backfillReservationInfo(contract, elderMapper.selectById(elderId));
 
     summary.setElderId(elderId);
     summary.setElderName(elderName);
@@ -130,7 +140,7 @@ public class ContractSignedLinkageServiceImpl implements ContractSignedLinkageSe
     if (orgId == null) {
       summary.setFinanceAccountReady(Boolean.FALSE);
       summary.setFinanceBillReady(Boolean.FALSE);
-      summary.setLogisticsReady(Boolean.TRUE);
+      summary.setLogisticsReady(logisticsReady);
       summary.setMedicalRecordReady(Boolean.FALSE);
       return summary;
     }
@@ -176,8 +186,108 @@ public class ContractSignedLinkageServiceImpl implements ContractSignedLinkageSe
             ? null
             : starterCallbackPlan.getPlanExecuteTime().toLocalDate());
 
-    summary.setLogisticsReady(Boolean.TRUE);
+    summary.setLogisticsReady(logisticsReady);
     return summary;
+  }
+
+  private boolean ensureBedOccupancy(
+      CrmContract contract,
+      ElderProfile elder,
+      ElderAdmission admission,
+      Long operatorId) {
+    if (contract == null || elder == null || elder.getId() == null) {
+      return false;
+    }
+    if (elder.getBedId() != null) {
+      return true;
+    }
+    Bed targetBed = resolveTargetBed(contract, elder);
+    if (targetBed == null || targetBed.getId() == null) {
+      return false;
+    }
+    AssignBedRequest request = new AssignBedRequest();
+    request.setTenantId(firstNonNull(elder.getTenantId(), contract.getTenantId()));
+    request.setCreatedBy(operatorId);
+    request.setBedId(targetBed.getId());
+    request.setStartDate(resolveBedStartDate(contract, admission, elder));
+    request.setOccupancyMode("BED");
+    try {
+      elderService.assignBed(elder.getId(), request);
+    } catch (IllegalArgumentException | IllegalStateException ex) {
+      return false;
+    }
+    contract.setReservationBedId(targetBed.getId());
+    if (isBlank(contract.getReservationRoomNo()) && targetBed.getRoomId() != null) {
+      Room room = roomMapper.selectById(targetBed.getRoomId());
+      if (room != null && !isBlank(room.getRoomNo())) {
+        contract.setReservationRoomNo(room.getRoomNo());
+      }
+    }
+    return true;
+  }
+
+  private Bed resolveTargetBed(CrmContract contract, ElderProfile elder) {
+    if (contract == null || elder == null) {
+      return null;
+    }
+    if (contract.getReservationBedId() != null) {
+      Bed reservedBed = bedMapper.selectById(contract.getReservationBedId());
+      if (isAssignableBed(reservedBed, elder)) {
+        return reservedBed;
+      }
+    }
+    String roomNo = trimToNull(contract.getReservationRoomNo());
+    if (roomNo == null) {
+      return null;
+    }
+    Room room = roomMapper.selectOne(Wrappers.lambdaQuery(Room.class)
+        .eq(Room::getIsDeleted, 0)
+        .eq(contract.getTenantId() != null, Room::getTenantId, contract.getTenantId())
+        .eq(contract.getOrgId() != null, Room::getOrgId, contract.getOrgId())
+        .eq(Room::getRoomNo, roomNo)
+        .last("LIMIT 1"));
+    if (room == null || room.getId() == null) {
+      return null;
+    }
+    List<Bed> roomBeds = bedMapper.selectList(Wrappers.lambdaQuery(Bed.class)
+        .eq(Bed::getIsDeleted, 0)
+        .eq(contract.getTenantId() != null, Bed::getTenantId, contract.getTenantId())
+        .eq(contract.getOrgId() != null, Bed::getOrgId, contract.getOrgId())
+        .eq(Bed::getRoomId, room.getId())
+        .orderByAsc(Bed::getBedNo)
+        .orderByAsc(Bed::getCreateTime));
+    return roomBeds.stream()
+        .filter(bed -> isAssignableBed(bed, elder))
+        .findFirst()
+        .orElse(null);
+  }
+
+  private boolean isAssignableBed(Bed bed, ElderProfile elder) {
+    if (bed == null) {
+      return false;
+    }
+    if (bed.getElderId() != null && !Objects.equals(bed.getElderId(), elder.getId())) {
+      return false;
+    }
+    if (Objects.equals(bed.getStatus(), BedStatus.MAINTENANCE)) {
+      return false;
+    }
+    return bed.getElderId() != null
+        || bed.getStatus() == null
+        || Objects.equals(bed.getStatus(), BedStatus.AVAILABLE);
+  }
+
+  private LocalDate resolveBedStartDate(CrmContract contract, ElderAdmission admission, ElderProfile elder) {
+    if (contract != null && contract.getSignedAt() != null) {
+      return contract.getSignedAt().toLocalDate();
+    }
+    if (admission != null && admission.getAdmissionDate() != null) {
+      return admission.getAdmissionDate();
+    }
+    if (elder != null && elder.getAdmissionDate() != null) {
+      return elder.getAdmissionDate();
+    }
+    return LocalDate.now();
   }
 
   private ElderAdmission resolveAdmission(CrmContract contract) {

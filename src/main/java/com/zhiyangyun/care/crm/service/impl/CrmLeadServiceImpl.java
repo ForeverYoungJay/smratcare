@@ -594,7 +594,9 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     if (!needGenerateContractNo(request)) {
       return null;
     }
-    Long tenantId = request.getTenantId();
+    Long tenantId = request.getTenantId() != null
+        ? request.getTenantId()
+        : existingLead == null ? null : existingLead.getTenantId();
     if (tenantId == null) {
       return null;
     }
@@ -718,6 +720,27 @@ public class CrmLeadServiceImpl implements CrmLeadService {
         || normalizeAmount(request.getReservationAmount()) != null;
   }
 
+  private boolean needGenerateContractNo(CrmLead lead) {
+    if (lead == null) {
+      return false;
+    }
+    if (lead.getContractSignedFlag() != null && lead.getContractSignedFlag() == 1) {
+      return true;
+    }
+    String flowStage = blankToNull(lead.getFlowStage());
+    if (FLOW_PENDING_BED_SELECT.equals(flowStage)
+        || FLOW_PENDING_SIGN.equals(flowStage)
+        || FLOW_SIGNED.equals(flowStage)) {
+      return true;
+    }
+    if (blankToNull(lead.getContractStatus()) != null) {
+      return true;
+    }
+    return blankToNull(lead.getReservationRoomNo()) != null
+        || lead.getReservationBedId() != null
+        || (lead.getReservationAmount() != null && lead.getReservationAmount().compareTo(BigDecimal.ZERO) > 0);
+  }
+
   private Integer resolveLeadStatus(
       CrmLeadRequest request,
       CrmLead existingLead,
@@ -804,6 +827,7 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     if (lead == null || lead.getTenantId() == null) {
       return;
     }
+    ensureContractProjectionIdentity(lead);
     if (lead.getContractSignedFlag() == null || lead.getContractSignedFlag() != 1) {
       return;
     }
@@ -851,6 +875,7 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     if (lead == null || lead.getTenantId() == null) {
       return;
     }
+    ensureContractProjectionIdentity(lead);
     String contractNo = blankToNull(lead.getContractNo());
     if (contractNo == null) {
       return;
@@ -895,6 +920,17 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     } else {
       contractMapper.updateById(contract);
     }
+  }
+
+  private void ensureContractProjectionIdentity(CrmLead lead) {
+    if (lead == null || lead.getTenantId() == null || blankToNull(lead.getContractNo()) != null) {
+      return;
+    }
+    if (!needGenerateContractNo(lead)) {
+      return;
+    }
+    lead.setContractNo(generateContractNo(lead.getTenantId()));
+    leadMapper.updateById(lead);
   }
 
   private void syncLeadDeleteToContract(CrmLead lead) {

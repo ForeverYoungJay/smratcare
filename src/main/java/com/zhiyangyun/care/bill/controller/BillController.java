@@ -108,7 +108,7 @@ public class BillController {
       wrapper.in(BillMonthly::getElderId, elderIds);
     }
     String normalizedScene = scene == null ? "" : scene.trim().toUpperCase();
-    if ("ADMISSION".equals(normalizedScene) || "RESIDENT".equals(normalizedScene)) {
+    if (elderId == null && ("ADMISSION".equals(normalizedScene) || "RESIDENT".equals(normalizedScene))) {
       YearMonth targetMonth;
       try {
         targetMonth = (month == null || month.isBlank())

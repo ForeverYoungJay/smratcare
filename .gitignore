@@ -5,6 +5,7 @@ node_modules
 **/.DS_Store
 target/
 admin-web/node_modules/
+admin-web/dist/
 output/uploads/
 .git
 .idea
