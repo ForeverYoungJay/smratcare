@@ -50,6 +50,8 @@ services:
       DB_NAME: ${DB_NAME:-zhiyangyun}
       DB_USER: ${DB_USER:-app}
       DB_PASSWORD: ${DB_PASSWORD:-app123456}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env or the shell environment}
       DEMO_SEED_ENABLED: ${DEMO_SEED_ENABLED:-false}
       APP_FILE_STORAGE_PROVIDER: ${APP_FILE_STORAGE_PROVIDER:-local}
