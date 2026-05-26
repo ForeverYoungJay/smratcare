@@ -1,5 +1,11 @@
 <template>
-  <LeadPipelineTable :mode="mode" :title="title" :sub-title="subTitle" :scenario="scenario" />
+  <LeadPipelineTable
+    :mode="mode"
+    :title="title"
+    :sub-title="subTitle"
+    :scenario="scenario"
+    :callback-type="callbackType"
+  />
 </template>
 
 <script setup lang="ts">
@@ -11,10 +17,12 @@ withDefaults(
     title: string
     subTitle: string
     scenario?: string
+    callbackType?: 'checkin' | 'trial' | 'discharge'
   }>(),
   {
     mode: 'consultation',
-    scenario: ''
+    scenario: '',
+    callbackType: undefined
   }
 )
 </script>

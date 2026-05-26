@@ -295,9 +295,9 @@ const lifecycleStageCounters = computed(() => {
 })
 
 const statusCounters = computed(() => ({
-  inHospital: rows.value.filter((item) => resolveResidentLifecycleStatus(item) === 'IN_HOSPITAL').length,
-  outing: rows.value.filter((item) => resolveResidentLifecycleStatus(item) === 'OUTING').length,
-  discharged: rows.value.filter((item) => resolveResidentLifecycleStatus(item) === 'DISCHARGED').length
+  inHospital: rows.value.filter((item) => resolveResidentStatusView(item) === 'IN_HOSPITAL').length,
+  outing: rows.value.filter((item) => resolveResidentStatusView(item) === 'OUTING').length,
+  discharged: rows.value.filter((item) => resolveResidentStatusView(item) === 'DISCHARGED').length
 }))
 
 const rowSelection = computed(() => ({
@@ -344,10 +344,19 @@ function resolveResidentLifecycleStatus(item?: Partial<ElderItem>) {
   return ''
 }
 
+function resolveResidentStatusView(item?: Partial<ElderItem>) {
+  const lifecycleStage = normalizeLifecycleStage(item?.lifecycleStage, item?.lifecycleContractStatus)
+  if (lifecycleStage === 'PENDING_BED_SELECT') return 'PENDING_BED_SELECT'
+  if (lifecycleStage === 'PENDING_SIGN') return 'PENDING_SIGN'
+  return resolveResidentLifecycleStatus(item)
+}
+
 function statusText(item?: Partial<ElderItem> | number) {
   const lifecycleStatus = typeof item === 'number'
     ? resolveResidentLifecycleStatus({ status: item })
-    : resolveResidentLifecycleStatus(item)
+    : resolveResidentStatusView(item)
+  if (lifecycleStatus === 'PENDING_BED_SELECT') return '待办理入住'
+  if (lifecycleStatus === 'PENDING_SIGN') return '待签署入住'
   if (lifecycleStatus === 'INTENT') return '意向'
   if (lifecycleStatus === 'TRIAL') return '试住'
   if (lifecycleStatus === 'IN_HOSPITAL') return '在住'
@@ -362,7 +371,9 @@ function statusText(item?: Partial<ElderItem> | number) {
 function statusTag(item?: Partial<ElderItem> | number) {
   const lifecycleStatus = typeof item === 'number'
     ? resolveResidentLifecycleStatus({ status: item })
-    : resolveResidentLifecycleStatus(item)
+    : resolveResidentStatusView(item)
+  if (lifecycleStatus === 'PENDING_BED_SELECT') return 'blue'
+  if (lifecycleStatus === 'PENDING_SIGN') return 'purple'
   if (lifecycleStatus === 'INTENT') return 'gold'
   if (lifecycleStatus === 'TRIAL') return 'cyan'
   if (lifecycleStatus === 'IN_HOSPITAL') return 'green'
@@ -387,11 +398,7 @@ function sourceTypeColor(value?: string) {
 }
 
 function resolveLifecycleStage(item: ElderItem) {
-  const lifecycleStatus = resolveResidentLifecycleStatus(item)
-  const fallback = ['IN_HOSPITAL', 'OUTING', 'MEDICAL_OUTING', 'DISCHARGE_PENDING', 'DISCHARGED', 'DECEASED'].includes(lifecycleStatus)
-    ? 'SIGNED'
-    : 'PENDING_ASSESSMENT'
-  return normalizeLifecycleStage(item.lifecycleStage, item.lifecycleContractStatus || fallback)
+  return normalizeLifecycleStage(item.lifecycleStage, item.lifecycleContractStatus)
 }
 
 function requireSingleSelection(actionLabel: string) {
@@ -421,10 +428,7 @@ async function fetchData() {
       ...r,
       bedNo: r.bedNo ?? r.currentBed?.bedNo,
       roomNo: r.roomNo ?? r.currentBed?.roomNo,
-      lifecycleStage: normalizeLifecycleStage(
-        r.lifecycleStage,
-        r.lifecycleContractStatus || (['IN_HOSPITAL', 'OUTING', 'MEDICAL_OUTING', 'DISCHARGE_PENDING', 'DISCHARGED', 'DECEASED'].includes(resolveResidentLifecycleStatus(r)) ? 'SIGNED' : undefined)
-      )
+      lifecycleStage: normalizeLifecycleStage(r.lifecycleStage, r.lifecycleContractStatus)
     }))
     total.value = res.total || res.list.length
   } catch {

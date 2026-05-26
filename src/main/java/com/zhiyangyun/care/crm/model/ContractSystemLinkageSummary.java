@@ -24,4 +24,7 @@ public class ContractSystemLinkageSummary {
   private Boolean medicalCareTaskReady;
   private Long starterCareTaskId;
   private LocalDate starterCareTaskDate;
+  private Boolean callbackPlanReady;
+  private Long starterCallbackPlanId;
+  private LocalDate starterCallbackPlanDate;
 }

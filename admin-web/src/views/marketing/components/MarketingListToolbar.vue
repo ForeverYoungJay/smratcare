@@ -24,12 +24,16 @@ withDefaults(defineProps<{
 
 <style scoped>
 .marketing-list-toolbar {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(214, 225, 234, 0.86);
+  background: linear-gradient(180deg, rgba(247, 251, 253, 0.96), rgba(255, 255, 255, 0.96));
 }
 
 .toolbar-left {
@@ -48,12 +52,15 @@ withDefaults(defineProps<{
 }
 
 .toolbar-tip {
-  color: rgba(0, 0, 0, 0.45);
+  color: #68839a;
   font-size: 12px;
 }
 
 .toolbar-selected {
-  color: #1677ff;
+  color: #0f7a9d;
   font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(15, 122, 157, 0.1);
 }
 </style>

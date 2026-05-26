@@ -16,10 +16,10 @@ export function normalizeLifecycleStage(flowStage, contractStatus) {
         return stage;
     }
     const status = normalizeUpper(contractStatus);
-    if (['SIGNED', 'EFFECTIVE', 'APPROVED'].includes(status) || status.includes('签署') || status.includes('生效')) {
+    if (['SIGNED', 'EFFECTIVE'].includes(status) || status.includes('签署') || status.includes('生效')) {
         return 'SIGNED';
     }
-    if (status.includes('待签') || status.includes('签约')) {
+    if (status.includes('APPROVED') || status.includes('待签') || status.includes('签约')) {
         return 'PENDING_SIGN';
     }
     if (status.includes('入住') || status.includes('床位')) {

@@ -1,0 +1,1 @@
+import{i as n,a as l,F as e}from"./index-9MobBr3A.js";import"./auth-DRZoEyhV.js";import"./preact.module-BFQYowTw.js";const t=[n,l];function d(a){a.component("FullCalendar",e)}export{t as calendarPlugins,d as setupFullCalendar};

@@ -1,9 +1,13 @@
 package com.zhiyangyun.care.crm.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.zhiyangyun.care.crm.entity.CrmCallbackPlan;
 import com.zhiyangyun.care.bill.model.BillDetailResponse;
 import com.zhiyangyun.care.bill.service.BillService;
 import com.zhiyangyun.care.crm.entity.CrmContract;
+import com.zhiyangyun.care.crm.entity.CrmLead;
+import com.zhiyangyun.care.crm.mapper.CrmCallbackPlanMapper;
+import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
 import com.zhiyangyun.care.crm.model.ContractSystemLinkageSummary;
 import com.zhiyangyun.care.crm.service.ContractSignedLinkageService;
 import com.zhiyangyun.care.elder.entity.Bed;
@@ -39,9 +43,14 @@ public class ContractSignedLinkageServiceImpl implements ContractSignedLinkageSe
   private static final String SIGNED_INSPECTION_STATUS = "FOLLOWING";
   private static final String SIGNED_CARE_TASK_NAME = "新签约长者护理交接";
   private static final String SIGNED_CARE_TASK_SOURCE = "CONTRACT_SIGNED";
+  private static final String SIGNED_CALLBACK_TYPE = "CHECKIN";
+  private static final String SIGNED_CALLBACK_TITLE = "入住 7 天回访";
+  private static final String SIGNED_CALLBACK_CONTENT = "确认入住适应情况、照护需求、家属反馈与异常风险，并安排后续跟进节奏";
 
   private final ElderAdmissionMapper admissionMapper;
   private final ElderMapper elderMapper;
+  private final CrmLeadMapper leadMapper;
+  private final CrmCallbackPlanMapper callbackPlanMapper;
   private final ElderAccountService elderAccountService;
   private final ElderPointsAccountMapper pointsAccountMapper;
   private final BillService billService;
@@ -55,6 +64,8 @@ public class ContractSignedLinkageServiceImpl implements ContractSignedLinkageSe
   public ContractSignedLinkageServiceImpl(
       ElderAdmissionMapper admissionMapper,
       ElderMapper elderMapper,
+      CrmLeadMapper leadMapper,
+      CrmCallbackPlanMapper callbackPlanMapper,
       ElderAccountService elderAccountService,
       ElderPointsAccountMapper pointsAccountMapper,
       BillService billService,
@@ -66,6 +77,8 @@ public class ContractSignedLinkageServiceImpl implements ContractSignedLinkageSe
       RoomMapper roomMapper) {
     this.admissionMapper = admissionMapper;
     this.elderMapper = elderMapper;
+    this.leadMapper = leadMapper;
+    this.callbackPlanMapper = callbackPlanMapper;
     this.elderAccountService = elderAccountService;
     this.pointsAccountMapper = pointsAccountMapper;
     this.billService = billService;
@@ -154,6 +167,14 @@ public class ContractSignedLinkageServiceImpl implements ContractSignedLinkageSe
     summary.setMedicalCareTaskReady(starterCareTask != null);
     summary.setStarterCareTaskId(starterCareTask == null ? null : starterCareTask.getId());
     summary.setStarterCareTaskDate(starterCareTask == null ? null : starterCareTask.getTaskDate());
+
+    CrmCallbackPlan starterCallbackPlan = ensureStarterCallbackPlan(contract, elder, operatorId);
+    summary.setCallbackPlanReady(starterCallbackPlan != null);
+    summary.setStarterCallbackPlanId(starterCallbackPlan == null ? null : starterCallbackPlan.getId());
+    summary.setStarterCallbackPlanDate(
+        starterCallbackPlan == null || starterCallbackPlan.getPlanExecuteTime() == null
+            ? null
+            : starterCallbackPlan.getPlanExecuteTime().toLocalDate());
 
     summary.setLogisticsReady(Boolean.TRUE);
     return summary;
@@ -330,6 +351,39 @@ public class ContractSignedLinkageServiceImpl implements ContractSignedLinkageSe
     return task;
   }
 
+  private CrmCallbackPlan ensureStarterCallbackPlan(CrmContract contract, ElderProfile elder, Long operatorId) {
+    CrmLead lead = resolveLead(contract, elder);
+    if (lead == null || lead.getId() == null) {
+      return null;
+    }
+    CrmCallbackPlan existing = callbackPlanMapper.selectOne(Wrappers.lambdaQuery(CrmCallbackPlan.class)
+        .eq(CrmCallbackPlan::getIsDeleted, 0)
+        .eq(CrmCallbackPlan::getTenantId, lead.getTenantId())
+        .eq(CrmCallbackPlan::getLeadId, lead.getId())
+        .eq(CrmCallbackPlan::getCallbackType, SIGNED_CALLBACK_TYPE)
+        .orderByAsc(CrmCallbackPlan::getPlanExecuteTime)
+        .orderByAsc(CrmCallbackPlan::getCreateTime)
+        .last("LIMIT 1"));
+    if (existing != null) {
+      syncLeadFollowupState(lead, existing.getPlanExecuteTime());
+      return existing;
+    }
+    CrmCallbackPlan plan = new CrmCallbackPlan();
+    plan.setTenantId(lead.getTenantId());
+    plan.setOrgId(firstNonNull(lead.getOrgId(), contract == null ? null : contract.getOrgId()));
+    plan.setLeadId(lead.getId());
+    plan.setTitle(SIGNED_CALLBACK_TITLE);
+    plan.setFollowupContent(SIGNED_CALLBACK_CONTENT);
+    plan.setPlanExecuteTime(resolveStarterCallbackTime(contract, elder));
+    plan.setExecutorName(firstNonBlank(lead.getOwnerStaffName(), contract == null ? null : contract.getMarketerName()));
+    plan.setCallbackType(SIGNED_CALLBACK_TYPE);
+    plan.setStatus("PENDING");
+    plan.setCreatedBy(operatorId);
+    callbackPlanMapper.insert(plan);
+    syncLeadFollowupState(lead, plan.getPlanExecuteTime());
+    return plan;
+  }
+
   private void backfillReservationInfo(CrmContract contract, ElderProfile elder) {
     Long bedId = firstNonNull(contract.getReservationBedId(), elder == null ? null : elder.getBedId());
     if (bedId == null) {
@@ -385,6 +439,17 @@ public class ContractSignedLinkageServiceImpl implements ContractSignedLinkageSe
     return base.withMinute(0).withSecond(0).withNano(0).plusHours(1);
   }
 
+  private LocalDateTime resolveStarterCallbackTime(CrmContract contract, ElderProfile elder) {
+    LocalDateTime base = contract == null ? null : contract.getSignedAt();
+    if (base == null && elder != null && elder.getAdmissionDate() != null) {
+      base = elder.getAdmissionDate().atTime(10, 0);
+    }
+    if (base == null) {
+      base = LocalDateTime.now().withHour(10).withMinute(0).withSecond(0).withNano(0);
+    }
+    return base.plusDays(7).withHour(10).withMinute(0).withSecond(0).withNano(0);
+  }
+
   private String buildSignedInspectionRemark(CrmContract contract) {
     String contractNo = trimToNull(contract == null ? null : contract.getContractNo());
     return contractNo == null
@@ -418,6 +483,51 @@ public class ContractSignedLinkageServiceImpl implements ContractSignedLinkageSe
 
   private static String trimToNull(String value) {
     return isBlank(value) ? null : value.trim();
+  }
+
+  private CrmLead resolveLead(CrmContract contract, ElderProfile elder) {
+    if (contract == null) {
+      return null;
+    }
+    CrmLead lead = contract.getLeadId() == null ? null : leadMapper.selectById(contract.getLeadId());
+    if (lead != null && !Integer.valueOf(1).equals(lead.getIsDeleted())) {
+      return lead;
+    }
+    String contractNo = trimToNull(contract.getContractNo());
+    if (contractNo != null) {
+      lead = leadMapper.selectOne(Wrappers.lambdaQuery(CrmLead.class)
+          .eq(CrmLead::getIsDeleted, 0)
+          .eq(contract.getTenantId() != null, CrmLead::getTenantId, contract.getTenantId())
+          .eq(CrmLead::getContractNo, contractNo)
+          .orderByDesc(CrmLead::getUpdateTime)
+          .orderByDesc(CrmLead::getCreateTime)
+          .last("LIMIT 1"));
+      if (lead != null) {
+        return lead;
+      }
+    }
+    return null;
+  }
+
+  private void syncLeadFollowupState(CrmLead lead, LocalDateTime planExecuteTime) {
+    if (lead == null || lead.getId() == null) {
+      return;
+    }
+    boolean changed = false;
+    if (planExecuteTime != null) {
+      LocalDate nextDate = planExecuteTime.toLocalDate();
+      if (lead.getNextFollowDate() == null || lead.getNextFollowDate().isAfter(nextDate)) {
+        lead.setNextFollowDate(nextDate);
+        changed = true;
+      }
+    }
+    if (!"待回访".equals(trimToNull(lead.getFollowupStatus()))) {
+      lead.setFollowupStatus("待回访");
+      changed = true;
+    }
+    if (changed) {
+      leadMapper.updateById(lead);
+    }
   }
 
   private static boolean isBlank(String value) {

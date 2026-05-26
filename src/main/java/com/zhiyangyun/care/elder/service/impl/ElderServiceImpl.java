@@ -1620,11 +1620,11 @@ public class ElderServiceImpl implements ElderService {
       return null;
     }
     String normalized = mergedStatus.trim().toUpperCase();
-    if (normalized.contains("SIGNED") || normalized.contains("EFFECTIVE") || normalized.contains("APPROVED")
+    if (normalized.contains("SIGNED") || normalized.contains("EFFECTIVE")
         || normalized.contains("签署") || normalized.contains("生效")) {
       return "SIGNED";
     }
-    if (normalized.contains("待签") || normalized.contains("签约")) {
+    if (normalized.contains("APPROVED") || normalized.contains("待签") || normalized.contains("签约")) {
       return "PENDING_SIGN";
     }
     if (normalized.contains("入住") || normalized.contains("床位")) {

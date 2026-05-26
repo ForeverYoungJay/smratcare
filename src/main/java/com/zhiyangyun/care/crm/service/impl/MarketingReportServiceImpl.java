@@ -120,8 +120,13 @@ public class MarketingReportServiceImpl implements MarketingReportService {
 
     LambdaQueryWrapper<CrmLead> wrapper = Wrappers.lambdaQuery(CrmLead.class)
         .eq(CrmLead::getIsDeleted, 0)
-        .eq(tenantId != null, CrmLead::getTenantId, tenantId)
-        .eq(source != null && !source.isBlank(), CrmLead::getSource, normalizeSource(source));
+        .eq(tenantId != null, CrmLead::getTenantId, tenantId);
+    String normalizedSource = normalizeSource(source);
+    if (normalizedSource != null) {
+      wrapper.and(w -> w.eq(CrmLead::getSource, normalizedSource)
+          .or()
+          .eq(CrmLead::getInfoSource, normalizedSource));
+    }
     applyLeadStaffScope(wrapper, staffId);
     List<CrmLead> leads = crmLeadMapper.selectList(wrapper);
 
@@ -173,7 +178,7 @@ public class MarketingReportServiceImpl implements MarketingReportService {
         leadWrapperByCreateTime(tenantId, dateFrom, dateTo, null, staffId));
     Map<String, MarketingChannelReportItem> map = new LinkedHashMap<>();
     for (CrmLead lead : leads) {
-      String source = normalizeSource(lead.getSource());
+      String source = resolveLeadSource(lead);
       MarketingChannelReportItem item = map.computeIfAbsent(source, key -> {
         MarketingChannelReportItem created = new MarketingChannelReportItem();
         created.setSource(source);
@@ -213,11 +218,16 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     LambdaQueryWrapper<CrmLead> overdueWrapper = Wrappers.lambdaQuery(CrmLead.class)
         .eq(CrmLead::getIsDeleted, 0)
         .eq(tenantId != null, CrmLead::getTenantId, tenantId)
-        .eq(source != null && !source.isBlank(), CrmLead::getSource, normalizeSource(source))
         .isNotNull(CrmLead::getNextFollowDate)
         .lt(CrmLead::getNextFollowDate, today)
         .ne(CrmLead::getContractSignedFlag, 1)
         .ne(CrmLead::getStatus, 3);
+    String normalizedSource = normalizeSource(source);
+    if (normalizedSource != null) {
+      overdueWrapper.and(w -> w.eq(CrmLead::getSource, normalizedSource)
+          .or()
+          .eq(CrmLead::getInfoSource, normalizedSource));
+    }
     applyLeadStaffScope(overdueWrapper, staffId);
     long overdue = crmLeadMapper.selectCount(overdueWrapper);
 
@@ -389,8 +399,13 @@ public class MarketingReportServiceImpl implements MarketingReportService {
   private LambdaQueryWrapper<CrmLead> baseCallbackLeadWrapper(Long tenantId, String source, Long staffId) {
     LambdaQueryWrapper<CrmLead> wrapper = Wrappers.lambdaQuery(CrmLead.class)
         .eq(CrmLead::getIsDeleted, 0)
-        .eq(tenantId != null, CrmLead::getTenantId, tenantId)
-        .eq(source != null && !source.isBlank(), CrmLead::getSource, normalizeSource(source));
+        .eq(tenantId != null, CrmLead::getTenantId, tenantId);
+    String normalizedSource = normalizeSource(source);
+    if (normalizedSource != null) {
+      wrapper.and(w -> w.eq(CrmLead::getSource, normalizedSource)
+          .or()
+          .eq(CrmLead::getInfoSource, normalizedSource));
+    }
     applyLeadStaffScope(wrapper, staffId);
     return wrapper;
   }
@@ -484,7 +499,7 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     item.setId(plan.getId());
     item.setName(lead == null ? null : firstNonBlank(blankToNull(lead.getName()), blankToNull(lead.getElderName())));
     item.setPhone(lead == null ? null : firstNonBlank(blankToNull(lead.getPhone()), blankToNull(lead.getElderPhone())));
-    item.setSource(lead == null ? null : lead.getSource());
+    item.setSource(lead == null ? null : resolveLeadSource(lead));
     item.setNextFollowDate(plan.getExecutedTime() == null ? null : plan.getExecutedTime().toLocalDate().toString());
     item.setCallbackType(toClientCallbackType(resolveCallbackType(lead, List.of(plan))));
     item.setScore(resolvePlanScore(plan));
@@ -628,7 +643,7 @@ public class MarketingReportServiceImpl implements MarketingReportService {
   private String buildCallbackInferenceText(CrmLead lead, List<CrmCallbackPlan> plans) {
     StringBuilder builder = new StringBuilder();
     if (lead != null) {
-      appendInferenceText(builder, lead.getSource());
+      appendInferenceText(builder, resolveLeadSource(lead));
       appendInferenceText(builder, lead.getRemark());
       appendInferenceText(builder, lead.getContractStatus());
       appendInferenceText(builder, lead.getFollowupStatus());
@@ -700,7 +715,9 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     long missingSource = crmLeadMapper.selectCount(Wrappers.lambdaQuery(CrmLead.class)
         .eq(CrmLead::getIsDeleted, 0)
         .eq(tenantId != null, CrmLead::getTenantId, tenantId)
-        .and(w -> w.isNull(CrmLead::getSource).or().eq(CrmLead::getSource, "")));
+        .and(w -> w
+            .and(inner -> inner.isNull(CrmLead::getSource).or().eq(CrmLead::getSource, ""))
+            .and(inner -> inner.isNull(CrmLead::getInfoSource).or().eq(CrmLead::getInfoSource, ""))));
 
     long missingNextFollowDate = crmLeadMapper.selectCount(Wrappers.lambdaQuery(CrmLead.class)
         .eq(CrmLead::getIsDeleted, 0)
@@ -712,9 +729,9 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     List<CrmLead> sourceLeads = crmLeadMapper.selectList(Wrappers.lambdaQuery(CrmLead.class)
         .eq(CrmLead::getIsDeleted, 0)
         .eq(tenantId != null, CrmLead::getTenantId, tenantId)
-        .isNotNull(CrmLead::getSource));
+        .and(w -> w.isNotNull(CrmLead::getSource).or().isNotNull(CrmLead::getInfoSource)));
     long nonStandard = sourceLeads.stream()
-        .map(CrmLead::getSource)
+        .map(this::resolveLeadSource)
         .filter(value -> value != null && !value.isBlank())
         .filter(value -> !STANDARD_SOURCES.contains(normalizeSource(value)))
         .count();
@@ -893,7 +910,7 @@ public class MarketingReportServiceImpl implements MarketingReportService {
         .eq(tenantId != null, CrmLead::getTenantId, tenantId));
     int updated = 0;
     for (CrmLead lead : leads) {
-      String normalized = normalizeSource(lead.getSource());
+      String normalized = resolveLeadSource(lead);
       String original = lead.getSource();
       boolean changed = (original == null && normalized != null)
           || (original != null && !original.equals(normalized));
@@ -925,6 +942,9 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     long intentCount = leads.stream().filter(this::isIntentLead).count();
     long reservationCount = leads.stream().filter(this::hasReservationEvidence).count();
     long invalidCount = leads.stream().filter(this::isInvalidLead).count();
+    List<CrmLead> modeLeads = leads.stream()
+        .filter(lead -> matchesLeadEntryMode(lead, normalizedMode))
+        .toList();
 
     long modeCount = switch (normalizedMode) {
       case "CONSULTATION" -> consultCount;
@@ -942,28 +962,27 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     long unsignedReservationCount = leads.stream().filter(this::hasReservationEvidence).filter(lead -> !isSignedLead(lead)).count();
     long refundedReservationCount = leads.stream().filter(this::hasReservationEvidence).filter(lead -> Integer.valueOf(1).equals(lead.getRefunded())).count();
 
-    long callbackDueTodayCount = leads.stream()
+    List<CrmLead> callbackRiskLeads = "INTENT".equals(normalizedMode) || "CALLBACK".equals(normalizedMode) ? modeLeads : leads;
+    long callbackDueTodayCount = callbackRiskLeads.stream()
         .filter(lead -> !isInvalidLead(lead) && !isSignedLead(lead))
         .filter(lead -> today.equals(lead.getNextFollowDate()))
         .count();
-    long callbackOverdueCount = leads.stream()
+    long callbackOverdueCount = callbackRiskLeads.stream()
         .filter(lead -> !isInvalidLead(lead) && !isSignedLead(lead))
         .filter(lead -> lead.getNextFollowDate() != null && lead.getNextFollowDate().isBefore(today))
         .count();
 
-    long missingSourceCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
-        tenantId, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
-        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName)
-        .and(w -> w.isNull(CrmLead::getSource).or().eq(CrmLead::getSource, "")));
-    long missingNextFollowDateCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
-        tenantId, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
-        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName)
-        .ne(CrmLead::getContractSignedFlag, 1)
-        .ne(CrmLead::getStatus, 3)
-        .isNull(CrmLead::getNextFollowDate));
+    List<CrmLead> sourceQualityLeads = "CONSULTATION".equals(normalizedMode) ? modeLeads : leads;
+    long missingSourceCount = sourceQualityLeads.stream()
+        .filter(lead -> resolveLeadSource(lead) == null)
+        .count();
+    long missingNextFollowDateCount = callbackRiskLeads.stream()
+        .filter(lead -> !isInvalidLead(lead) && !isSignedLead(lead))
+        .filter(lead -> lead.getNextFollowDate() == null)
+        .count();
 
-    long nonStandardSourceCount = leads.stream()
-        .map(CrmLead::getSource)
+    long nonStandardSourceCount = sourceQualityLeads.stream()
+        .map(this::resolveLeadSource)
         .filter(value -> value != null && !value.isBlank())
         .filter(value -> !STANDARD_SOURCES.contains(normalizeSource(value)))
         .count();
@@ -993,6 +1012,20 @@ public class MarketingReportServiceImpl implements MarketingReportService {
         leadWrapperByCreateTime(tenantId, dateFrom, dateTo, source, staffId).eq(CrmLead::getStatus, status));
   }
 
+  private boolean matchesLeadEntryMode(CrmLead lead, String normalizedMode) {
+    if (lead == null || normalizedMode == null) {
+      return true;
+    }
+    return switch (normalizedMode) {
+      case "CONSULTATION" -> isConsultLead(lead);
+      case "INTENT" -> isIntentLead(lead);
+      case "RESERVATION" -> hasReservationEvidence(lead);
+      case "INVALID" -> isInvalidLead(lead);
+      case "CALLBACK" -> !isInvalidLead(lead) && !isSignedLead(lead);
+      default -> true;
+    };
+  }
+
   private long countContracts(
       Long tenantId, String dateFrom, String dateTo, String source, Long staffId) {
     return crmLeadMapper.selectCount(leadWrapperByCreateTime(tenantId, dateFrom, dateTo, source, staffId)
@@ -1020,13 +1053,6 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     }
     if (lead.getReservationAmount() != null && lead.getReservationAmount().compareTo(BigDecimal.ZERO) > 0) {
       return true;
-    }
-    String reservationStatus = blankToNull(lead.getReservationStatus());
-    if (reservationStatus != null) {
-      String normalized = reservationStatus.toLowerCase(Locale.ROOT);
-      if (normalized.contains("预") || normalized.contains("锁") || normalized.contains("reserve") || normalized.contains("lock")) {
-        return true;
-      }
     }
     String flowStage = blankToNull(lead.getFlowStage());
     return "PENDING_BED_SELECT".equalsIgnoreCase(flowStage) || "PENDING_SIGN".equalsIgnoreCase(flowStage);
@@ -1112,7 +1138,7 @@ public class MarketingReportServiceImpl implements MarketingReportService {
       return false;
     }
     String text = String.join(" ",
-        safeText(lead.getSource()),
+        safeText(resolveLeadSource(lead)),
         safeText(lead.getInfoSource()),
         safeText(lead.getMediaChannel()));
     return text.contains("医");
@@ -1146,7 +1172,7 @@ public class MarketingReportServiceImpl implements MarketingReportService {
       return false;
     }
     String leadText = normalizePlanTag(String.join(" ",
-        safeText(lead.getSource()),
+        safeText(resolveLeadSource(lead)),
         safeText(lead.getInfoSource()),
         safeText(lead.getMediaChannel()),
         safeText(lead.getCustomerTag()),
@@ -1187,9 +1213,14 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     LambdaQueryWrapper<CrmLead> wrapper = Wrappers.lambdaQuery(CrmLead.class)
         .eq(CrmLead::getIsDeleted, 0)
         .eq(tenantId != null, CrmLead::getTenantId, tenantId)
-        .eq(source != null && !source.isBlank(), CrmLead::getSource, normalizeSource(source))
         .ge(fromTime != null, CrmLead::getCreateTime, fromTime)
         .lt(toTime != null, CrmLead::getCreateTime, toTime);
+    String normalizedSource = normalizeSource(source);
+    if (normalizedSource != null) {
+      wrapper.and(w -> w.eq(CrmLead::getSource, normalizedSource)
+          .or()
+          .eq(CrmLead::getInfoSource, normalizedSource));
+    }
     applyLeadStaffScope(wrapper, staffId);
     return wrapper;
   }
@@ -1290,6 +1321,13 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     }
     String normalized = value.trim();
     return normalized.isEmpty() ? null : normalized;
+  }
+
+  private String resolveLeadSource(CrmLead lead) {
+    if (lead == null) {
+      return null;
+    }
+    return firstNonBlank(normalizeSource(lead.getSource()), normalizeSource(lead.getInfoSource()));
   }
 
   private String normalizeSource(String source) {

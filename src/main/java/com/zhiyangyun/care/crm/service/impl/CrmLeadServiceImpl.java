@@ -105,7 +105,7 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     lead.setReservationAmount(normalizeAmount(request.getReservationAmount()));
     lead.setPaymentTime(parseDateTime(request.getPaymentTime()));
     lead.setOrgName(blankToNull(request.getOrgName()));
-    lead.setSource(normalizeSource(request.getSource()));
+    lead.setSource(resolveUnifiedSource(request.getSource(), request.getInfoSource()));
     lead.setCustomerTag(request.getCustomerTag());
     Integer signedFlag = normalizeSignedFlag(request.getContractSignedFlag());
     lead.setContractSignedFlag(signedFlag);
@@ -162,7 +162,7 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     lead.setReservationAmount(normalizeAmount(request.getReservationAmount()));
     lead.setPaymentTime(parseDateTime(request.getPaymentTime()));
     lead.setOrgName(blankToNull(request.getOrgName()));
-    lead.setSource(normalizeSource(request.getSource()));
+    lead.setSource(resolveUnifiedSource(request.getSource(), request.getInfoSource()));
     lead.setCustomerTag(request.getCustomerTag());
     Integer signedFlag = normalizeSignedFlag(request.getContractSignedFlag());
     lead.setContractSignedFlag(signedFlag);
@@ -212,8 +212,11 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     if (status != null && normalizedMode == null) {
       wrapper.eq(CrmLead::getStatus, status);
     }
-    if (source != null && !source.isBlank()) {
-      wrapper.eq(CrmLead::getSource, source);
+    String normalizedSource = normalizeSource(source);
+    if (normalizedSource != null) {
+      wrapper.and(w -> w.eq(CrmLead::getSource, normalizedSource)
+          .or()
+          .eq(CrmLead::getInfoSource, normalizedSource));
     }
     if (customerTag != null && !customerTag.isBlank()) {
       wrapper.eq(CrmLead::getCustomerTag, customerTag);
@@ -262,17 +265,31 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     if (currentOwnerDept != null && !currentOwnerDept.isBlank()) {
       wrapper.eq(CrmLead::getCurrentOwnerDept, currentOwnerDept);
     }
-    if (callbackType != null && !callbackType.isBlank()) {
+    String callbackMode = blankToNull(mode) == null ? null : mode.trim().toUpperCase(Locale.ROOT);
+    String normalizedCallbackType = normalizeCallbackType(callbackType);
+    if (normalizedCallbackType != null) {
       Set<Long> leadIds = callbackPlanMapper.selectList(Wrappers.lambdaQuery(CrmCallbackPlan.class)
               .select(CrmCallbackPlan::getLeadId)
               .eq(CrmCallbackPlan::getTenantId, tenantId)
               .eq(CrmCallbackPlan::getIsDeleted, 0)
-              .eq(CrmCallbackPlan::getCallbackType, callbackType.trim()))
+              .eq(CrmCallbackPlan::getCallbackType, normalizedCallbackType))
           .stream()
           .map(CrmCallbackPlan::getLeadId)
-          .filter(id -> id != null)
+          .filter(Objects::nonNull)
           .collect(Collectors.toSet());
-      if (leadIds.isEmpty()) {
+      if ("CALLBACK".equals(callbackMode) && "CHECKIN".equals(normalizedCallbackType)) {
+        if (leadIds.isEmpty()) {
+          wrapper.and(w -> w.eq(CrmLead::getContractSignedFlag, 1)
+              .or()
+              .eq(CrmLead::getFlowStage, FLOW_SIGNED));
+        } else {
+          wrapper.and(w -> w.in(CrmLead::getId, leadIds)
+              .or()
+              .eq(CrmLead::getContractSignedFlag, 1)
+              .or()
+              .eq(CrmLead::getFlowStage, FLOW_SIGNED));
+        }
+      } else if (leadIds.isEmpty()) {
         wrapper.eq(CrmLead::getId, -1L);
       } else {
         wrapper.in(CrmLead::getId, leadIds);
@@ -315,7 +332,7 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     }
 
     List<CrmLead> filtered = leadMapper.selectList(wrapper).stream()
-        .filter(lead -> matchesLeadMode(lead, normalizedMode))
+        .filter(lead -> matchesLeadMode(lead, normalizedMode, normalizedCallbackType))
         .toList();
     long total = filtered.size();
     long fromIndex = Math.max((pageNo - 1L) * pageSize, 0L);
@@ -495,6 +512,10 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     return value;
   }
 
+  private String resolveUnifiedSource(String source, String infoSource) {
+    return firstNonBlank(normalizeSource(source), normalizeSource(infoSource));
+  }
+
   private Integer normalizeSignedFlag(Integer contractSignedFlag) {
     return contractSignedFlag != null && contractSignedFlag == 1 ? 1 : 0;
   }
@@ -511,6 +532,21 @@ public class CrmLeadServiceImpl implements CrmLeadService {
       return null;
     }
     return value.trim();
+  }
+
+  private String normalizeCallbackType(String type) {
+    String normalized = blankToNull(type);
+    if (normalized == null) {
+      return null;
+    }
+    String upper = normalized.toUpperCase(Locale.ROOT);
+    return switch (upper) {
+      case "CHECKIN", "入住", "入住后回访", "签约", "签后回访" -> "CHECKIN";
+      case "TRIAL", "试住", "试住回访" -> "TRIAL";
+      case "DISCHARGE", "退住", "退住回访", "离院" -> "DISCHARGE";
+      case "SCORE", "评分", "回访质量评分" -> "SCORE";
+      default -> upper;
+    };
   }
 
   private BigDecimal normalizeAmount(BigDecimal value) {
@@ -679,7 +715,7 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     }
     return blankToNull(request.getReservationRoomNo()) != null
         || request.getReservationBedId() != null
-        || blankToNull(request.getReservationStatus()) != null;
+        || normalizeAmount(request.getReservationAmount()) != null;
   }
 
   private Integer resolveLeadStatus(
@@ -726,8 +762,8 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     }
     if (blankToNull(request == null ? null : request.getFollowupStatus()) != null
         || blankToNull(request == null ? null : request.getContractStatus()) != null
-        || blankToNull(request == null ? null : request.getReservationStatus()) != null
         || blankToNull(request == null ? null : request.getReservationRoomNo()) != null
+        || normalizeAmount(request == null ? null : request.getReservationAmount()) != null
         || request != null && request.getReservationBedId() != null
         || parseDate(request == null ? null : request.getNextFollowDate()) != null
         || blankToNull(request == null ? null : request.getMarketerName()) != null) {
@@ -736,8 +772,8 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     return existingLead != null
         && (blankToNull(existingLead.getFollowupStatus()) != null
             || blankToNull(existingLead.getContractStatus()) != null
-            || blankToNull(existingLead.getReservationStatus()) != null
             || blankToNull(existingLead.getReservationRoomNo()) != null
+            || normalizeAmount(existingLead.getReservationAmount()) != null
             || existingLead.getReservationBedId() != null
             || existingLead.getNextFollowDate() != null
             || blankToNull(existingLead.getMarketerName()) != null);
@@ -918,7 +954,7 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     };
   }
 
-  private boolean matchesLeadMode(CrmLead lead, String mode) {
+  private boolean matchesLeadMode(CrmLead lead, String mode, String callbackType) {
     if (lead == null || mode == null) {
       return true;
     }
@@ -927,7 +963,8 @@ public class CrmLeadServiceImpl implements CrmLeadService {
       case "intent" -> isIntentLead(lead);
       case "reservation" -> hasReservationEvidence(lead);
       case "invalid" -> Integer.valueOf(3).equals(lead.getStatus());
-      case "callback" -> !Integer.valueOf(3).equals(lead.getStatus()) && !isSignedLead(lead);
+      case "callback" -> !Integer.valueOf(3).equals(lead.getStatus())
+          && ("CHECKIN".equals(callbackType) || !isSignedLead(lead));
       default -> true;
     };
   }
@@ -965,13 +1002,6 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     }
     if (lead.getReservationAmount() != null && lead.getReservationAmount().compareTo(BigDecimal.ZERO) > 0) {
       return true;
-    }
-    String reservationStatus = blankToNull(lead.getReservationStatus());
-    if (reservationStatus != null) {
-      String normalized = reservationStatus.toLowerCase(Locale.ROOT);
-      if (normalized.contains("预") || normalized.contains("锁") || normalized.contains("reserve") || normalized.contains("lock")) {
-        return true;
-      }
     }
     String flowStage = blankToNull(lead.getFlowStage());
     return FLOW_PENDING_BED_SELECT.equalsIgnoreCase(flowStage) || FLOW_PENDING_SIGN.equalsIgnoreCase(flowStage);

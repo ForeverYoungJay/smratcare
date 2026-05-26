@@ -1028,7 +1028,12 @@ watch(
 }
 
 .plan-card {
-  min-height: 228px;
+  min-height: 252px;
+  border: 1px solid rgba(214, 225, 234, 0.82);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top right, rgba(77, 187, 227, 0.1), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 250, 252, 0.96));
 }
 
 .plan-card-title {
@@ -1042,6 +1047,20 @@ watch(
   min-height: 56px;
   color: var(--muted);
   line-height: 1.6;
+}
+
+.plan-tabs :deep(.ant-tabs-nav) {
+  margin-bottom: 18px;
+}
+
+.plan-tabs :deep(.ant-tabs-tab) {
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(247, 251, 253, 0.9);
+}
+
+.plan-tabs :deep(.ant-tabs-tab.ant-tabs-tab-active) {
+  background: linear-gradient(135deg, rgba(15, 122, 157, 0.12), rgba(255, 193, 94, 0.12));
 }
 
 .plan-card-meta {
@@ -1062,5 +1081,17 @@ watch(
 .preview-content {
   white-space: pre-wrap;
   line-height: 1.7;
+}
+
+@media (max-width: 768px) {
+  .plan-card-meta {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .plan-card-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
 }
 </style>

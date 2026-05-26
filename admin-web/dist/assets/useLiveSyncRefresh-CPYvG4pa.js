@@ -1,0 +1,1 @@
+import{s as n}from"./request-i1VN4eJC.js";import{v as u,y as m}from"./auth-DRZoEyhV.js";function b(s){const o=s.debounceMs??500;let e;const t=()=>{e&&window.clearTimeout(e),e=window.setTimeout(()=>{Promise.resolve(s.refresh()).catch(()=>{})},o)};let i=()=>{};u(()=>{i=n(r=>{r.topics.some(c=>s.topics.includes(c))&&t()})}),m(()=>{i(),e&&window.clearTimeout(e)})}export{b as u};

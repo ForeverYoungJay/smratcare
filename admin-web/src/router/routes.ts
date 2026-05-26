@@ -595,22 +595,22 @@ export const routes: RouteRecordRaw[] = [
               {
                 path: 'checkin',
                 name: 'MarketingCallbackCheckin',
-                component: () => import('../views/marketing/CallbackScenarioPage.vue'),
-                props: { type: 'checkin', title: '入住后回访', subTitle: '入住后客户回访计划、执行与风险跟踪' },
+                component: () => import('../views/marketing/LeadScenarioPage.vue'),
+                props: { mode: 'callback', callbackType: 'checkin', title: '入住后回访', subTitle: '入住后客户回访计划、执行与风险跟踪' },
                 meta: { title: '入住后回访' }
               },
               {
                 path: 'trial',
                 name: 'MarketingCallbackTrial',
-                component: () => import('../views/marketing/CallbackScenarioPage.vue'),
-                props: { type: 'trial', title: '试住回访', subTitle: '试住客户回访安排与转化促进跟踪' },
+                component: () => import('../views/marketing/LeadScenarioPage.vue'),
+                props: { mode: 'callback', callbackType: 'trial', title: '试住回访', subTitle: '试住客户回访安排与转化促进跟踪' },
                 meta: { title: '试住回访' }
               },
               {
                 path: 'discharge',
                 name: 'MarketingCallbackDischarge',
-                component: () => import('../views/marketing/CallbackScenarioPage.vue'),
-                props: { type: 'discharge', title: '退住回访', subTitle: '退住客户回访与原因沉淀闭环' },
+                component: () => import('../views/marketing/LeadScenarioPage.vue'),
+                props: { mode: 'callback', callbackType: 'discharge', title: '退住回访', subTitle: '退住客户回访与原因沉淀闭环' },
                 meta: { title: '退住回访' }
               },
               {

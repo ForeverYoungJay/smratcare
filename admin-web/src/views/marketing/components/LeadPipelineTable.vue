@@ -1,139 +1,133 @@
 <template>
   <PageContainer :title="title" :sub-title="subTitle">
-    <MarketingQuickNav />
-    <a-alert
-      :type="canViewAllLeads ? 'info' : 'warning'"
-      show-icon
-      style="margin-bottom: 12px"
-      :message="canViewAllLeads ? '当前账号可查看并分配本机构营销线索。' : `当前账号仅查看本人负责线索（${currentUserDisplayName}）。`"
-    />
-    <a-alert
-      show-icon
-      type="info"
-      style="margin-bottom: 12px"
-      :message="moduleLogicMessage"
-    />
-    <SearchForm :model="query" @search="onSearch" @reset="reset">
-      <a-form-item v-if="props.mode === 'pipeline'" label="线索视图">
-        <a-radio-group v-model:value="pipelineTab" button-style="solid" @change="onPipelineTabChange">
-          <a-radio-button value="consultation">咨询</a-radio-button>
-          <a-radio-button value="intent">意向</a-radio-button>
-          <a-radio-button value="callback">待回访</a-radio-button>
-        </a-radio-group>
-      </a-form-item>
-
-      <template v-if="effectiveMode === 'consultation'">
-        <a-form-item label="咨询人姓名">
-          <a-input v-model:value="query.consultantName" placeholder="请输入 咨询人姓名" allow-clear />
-        </a-form-item>
-        <a-form-item label="联系电话">
-          <a-input v-model:value="query.consultantPhone" placeholder="请输入 联系电话" allow-clear />
-        </a-form-item>
-        <a-form-item label="老人姓名">
-          <a-input v-model:value="query.elderName" placeholder="请输入 老人姓名" allow-clear />
-        </a-form-item>
-        <a-form-item label="老人联系电话">
-          <a-input v-model:value="query.elderPhone" placeholder="请输入 老人联系电话" allow-clear />
-        </a-form-item>
-        <a-form-item label="咨询日期">
-          <a-range-picker
-            v-model:value="query.consultDateRange"
-            value-format="YYYY-MM-DD"
-            :placeholder="['开始日期', '结束日期']"
-          />
-        </a-form-item>
-        <a-form-item label="咨询类型">
-          <a-input v-model:value="query.consultType" placeholder="请选择 咨询类型" allow-clear />
-        </a-form-item>
-        <a-form-item label="媒体渠道">
-          <a-input v-model:value="query.mediaChannel" placeholder="请选择 媒体渠道" allow-clear />
-        </a-form-item>
-      </template>
-
-      <template v-else-if="effectiveMode === 'intent' || effectiveMode === 'invalid'">
-        <a-form-item label="老人姓名">
-          <a-input v-model:value="query.elderName" placeholder="请输入 老人姓名" allow-clear />
-        </a-form-item>
-        <a-form-item label="老人联系电话">
-          <a-input v-model:value="query.elderPhone" placeholder="请输入 老人联系电话" allow-clear />
-        </a-form-item>
-        <a-form-item label="信息来源">
-          <a-input v-model:value="query.infoSource" placeholder="请选择 信息来源" allow-clear />
-        </a-form-item>
-        <a-form-item label="客户标签">
-          <a-input v-model:value="query.customerTag" placeholder="请选择 客户标签" allow-clear />
-        </a-form-item>
-        <a-form-item label="负责人">
-          <a-input v-model:value="query.marketerName" placeholder="请输入 负责人/营销人员" allow-clear />
-        </a-form-item>
-      </template>
-
-      <template v-else-if="effectiveMode === 'reservation'">
-        <a-form-item label="姓名">
-          <a-input v-model:value="query.elderName" placeholder="请输入 姓名" allow-clear />
-        </a-form-item>
-        <a-form-item label="联系电话">
-          <a-input v-model:value="query.elderPhone" placeholder="请输入 联系电话" allow-clear />
-        </a-form-item>
-      </template>
-
-      <template v-else>
-        <a-form-item label="客户姓名">
-          <a-input v-model:value="query.elderName" placeholder="请输入 客户姓名" allow-clear />
-        </a-form-item>
-        <a-form-item label="联系电话">
-          <a-input v-model:value="query.elderPhone" placeholder="请输入 联系电话" allow-clear />
-        </a-form-item>
-        <a-form-item label="负责人">
-          <a-input v-model:value="query.marketerName" placeholder="请输入 负责人" allow-clear />
-        </a-form-item>
-      </template>
-    </SearchForm>
-
-    <section class="surface-toolbar marketing-toolbar">
-      <div class="surface-toolbar-title">
-        <strong>营销线索工作台</strong>
-        <span>当前模式为 {{ modeLabel }}，优先处理数据质量、回访逾期、预订转签约和批量状态推进。</span>
-      </div>
-      <a-space wrap>
-        <a-tag color="processing">{{ modeLabel }}</a-tag>
-        <a-tag color="gold">已勾选 {{ selectedCount }} 条</a-tag>
-        <a-tag color="blue">当前池 {{ summary.modeCount || 0 }}</a-tag>
-        <a-tag color="volcano" v-if="warningMessage">{{ warningMessage }}</a-tag>
-      </a-space>
-    </section>
-
-    <StatefulBlock :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
-      <a-row :gutter="[12, 12]" style="margin-top: 16px">
-        <a-col v-for="card in summaryCards" :key="card.title" :xs="12" :lg="6">
-          <a-card class="card-elevated" :bordered="false" size="small">
-            <a-statistic :title="card.title" :value="card.value || 0" />
-          </a-card>
-        </a-col>
-      </a-row>
-      <a-alert
-        v-if="warningMessage"
-        type="warning"
-        show-icon
-        style="margin-top: 12px"
-        :message="warningMessage"
-      />
-    </StatefulBlock>
-
     <section class="card-elevated marketing-workspace">
-      <div class="table-head">
+      <div class="marketing-overview">
+        <div class="marketing-overview-copy">
+          <span class="marketing-overview-kicker">{{ modeLabel }} Workspace</span>
+          <strong>{{ modeLabel }}工作区</strong>
+          <span>{{ workspaceSummary }}</span>
+        </div>
+        <div class="marketing-overview-meta">
+          <span class="overview-pill">当前列表 {{ displayTotal }} 条</span>
+          <span class="overview-pill">{{ activeFilterSummary }}</span>
+          <span class="overview-pill overview-pill--accent">已勾选 {{ selectedCount }} 条</span>
+        </div>
+      </div>
+
+      <StatefulBlock :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
+        <div class="summary-strip">
+          <div v-for="card in summaryCards" :key="card.title" class="summary-strip-card">
+            <span class="summary-card-label">{{ card.title }}</span>
+            <strong class="summary-card-value">{{ card.value || 0 }}</strong>
+          </div>
+        </div>
+        <div v-if="warningMessage" class="marketing-warning">
+          <span class="marketing-warning-dot"></span>
+          <span>{{ warningMessage }}</span>
+        </div>
+      </StatefulBlock>
+
+      <div class="marketing-query-shell">
+        <SearchForm
+          :model="query"
+          title="筛选条件"
+          description="搜索、视图切换和表格动作集中在同一块工作区里处理，减少上下跳读。"
+          search-text="刷新列表"
+          reset-text="重置条件"
+          @search="onSearch"
+          @reset="reset"
+        >
+          <a-form-item v-if="props.mode === 'pipeline'" label="线索视图">
+            <a-radio-group v-model:value="pipelineTab" button-style="solid" @change="onPipelineTabChange">
+              <a-radio-button value="consultation">咨询</a-radio-button>
+              <a-radio-button value="intent">意向</a-radio-button>
+              <a-radio-button value="callback">待回访</a-radio-button>
+            </a-radio-group>
+          </a-form-item>
+
+          <template v-if="effectiveMode === 'consultation'">
+            <a-form-item label="咨询人姓名">
+              <a-input v-model:value="query.consultantName" placeholder="请输入咨询人姓名" allow-clear />
+            </a-form-item>
+            <a-form-item label="联系电话">
+              <a-input v-model:value="query.consultantPhone" placeholder="请输入联系电话" allow-clear />
+            </a-form-item>
+            <a-form-item label="老人姓名">
+              <a-input v-model:value="query.elderName" placeholder="请输入老人姓名" allow-clear />
+            </a-form-item>
+            <a-form-item label="老人联系电话">
+              <a-input v-model:value="query.elderPhone" placeholder="请输入老人联系电话" allow-clear />
+            </a-form-item>
+            <a-form-item label="咨询日期">
+              <a-range-picker
+                v-model:value="query.consultDateRange"
+                value-format="YYYY-MM-DD"
+                :placeholder="['开始日期', '结束日期']"
+              />
+            </a-form-item>
+            <a-form-item label="咨询类型">
+              <a-input v-model:value="query.consultType" placeholder="咨询类型" allow-clear />
+            </a-form-item>
+            <a-form-item label="媒体渠道">
+              <a-input v-model:value="query.mediaChannel" placeholder="媒体渠道" allow-clear />
+            </a-form-item>
+          </template>
+
+          <template v-else-if="effectiveMode === 'intent' || effectiveMode === 'invalid'">
+            <a-form-item label="老人姓名">
+              <a-input v-model:value="query.elderName" placeholder="请输入老人姓名" allow-clear />
+            </a-form-item>
+            <a-form-item label="老人联系电话">
+              <a-input v-model:value="query.elderPhone" placeholder="请输入老人联系电话" allow-clear />
+            </a-form-item>
+            <a-form-item label="信息来源">
+              <a-input v-model:value="query.infoSource" placeholder="请输入信息来源" allow-clear />
+            </a-form-item>
+            <a-form-item label="客户标签">
+              <a-input v-model:value="query.customerTag" placeholder="请输入客户标签" allow-clear />
+            </a-form-item>
+            <a-form-item label="负责人">
+              <a-input v-model:value="query.marketerName" placeholder="请输入负责人" allow-clear />
+            </a-form-item>
+          </template>
+
+          <template v-else-if="effectiveMode === 'reservation'">
+            <a-form-item label="姓名">
+              <a-input v-model:value="query.elderName" placeholder="请输入姓名" allow-clear />
+            </a-form-item>
+            <a-form-item label="联系电话">
+              <a-input v-model:value="query.elderPhone" placeholder="请输入联系电话" allow-clear />
+            </a-form-item>
+          </template>
+
+          <template v-else>
+            <a-form-item label="客户姓名">
+              <a-input v-model:value="query.elderName" placeholder="请输入客户姓名" allow-clear />
+            </a-form-item>
+            <a-form-item label="联系电话">
+              <a-input v-model:value="query.elderPhone" placeholder="请输入联系电话" allow-clear />
+            </a-form-item>
+            <a-form-item label="负责人">
+              <a-input v-model:value="query.marketerName" placeholder="请输入负责人" allow-clear />
+            </a-form-item>
+          </template>
+        </SearchForm>
+      </div>
+
+      <div class="table-head marketing-table-head">
         <div>
           <strong>{{ modeLabel }}列表</strong>
-          <span>支持批量状态推进、回访执行、转预订与客户明细查看，方便负责人持续推进线索闭环。</span>
+          <span>筛选、批量动作和单条推进都在这张表里完成，减少来回切页。</span>
         </div>
         <a-space wrap>
           <a-tag color="default">共 {{ displayTotal }} 条</a-tag>
+          <a-tag color="blue">当前池 {{ currentSummary.modeCount || 0 }}</a-tag>
           <a-tag color="purple">已勾选 {{ selectedCount }} 条</a-tag>
         </a-space>
       </div>
       <MarketingListToolbar
         :selected-count="selectedCount"
-        :tip="selectedCount > 0 ? '批量状态操作仅处理状态不同项' : '可通过勾选后执行批量操作'"
+        :tip="selectedCount > 0 ? '批量动作只会处理需要变更的记录。' : '可勾选多条后批量推进，也可在表格右侧逐条处理。'"
       >
         <a-space>
           <a-button
@@ -162,10 +156,22 @@
           :pagination="false"
           row-key="id"
           :row-selection="rowSelection"
-          :scroll="{ x: 1600 }"
+          :scroll="{ x: tableScrollX }"
         >
           <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'gender'">
+            <template v-if="column.key === 'consultantName' || column.key === 'elderName'">
+              <div class="person-cell">
+                <strong>{{ record[column.dataIndex] || '-' }}</strong>
+                <span>
+                  {{
+                    column.key === 'consultantName'
+                      ? (record.consultantPhone || record.elderPhone || '暂无联系电话')
+                      : (record.elderPhone || record.consultantPhone || '暂无联系电话')
+                  }}
+                </span>
+              </div>
+            </template>
+            <template v-else-if="column.key === 'gender'">
               {{ genderText(record.gender) }}
             </template>
             <template v-else-if="column.key === 'refunded'">
@@ -173,6 +179,38 @@
             </template>
             <template v-else-if="column.key === 'reservationAmount'">
               {{ record.reservationAmount == null ? '-' : `¥${Number(record.reservationAmount).toFixed(2)}` }}
+            </template>
+            <template v-else-if="column.key === 'ownerDisplayName'">
+              <a-tag color="geekblue">{{ record.ownerDisplayName }}</a-tag>
+            </template>
+            <template v-else-if="column.key === 'infoSource'">
+              <a-tag :color="record.infoSource || record.source ? 'cyan' : 'default'">{{ record.infoSource || record.source || '未标记' }}</a-tag>
+            </template>
+            <template v-else-if="column.key === 'followupStatus'">
+              <a-tag :color="followupStatusColor(record.followupStatus)">{{ record.followupStatus || '未设置' }}</a-tag>
+            </template>
+            <template v-else-if="column.key === 'reservationStatus'">
+              <a-tag :color="reservationStatusColor(record)">{{ reservationStatusLabel(record) }}</a-tag>
+            </template>
+            <template v-else-if="column.key === 'planTitle'">
+              <div class="plan-cell">
+                <strong>{{ record.planTitle || '-' }}</strong>
+                <span>{{ callbackTypeLabel(record) }}</span>
+              </div>
+            </template>
+            <template v-else-if="column.key === 'action'">
+              <div class="row-action-links">
+                <a-button
+                  v-for="item in buildRowActions(record)"
+                  :key="`${record.id}-${item.key}`"
+                  type="link"
+                  size="small"
+                  :danger="item.danger"
+                  @click="handleRowAction(item.key, record)"
+                >
+                  {{ item.label }}
+                </a-button>
+              </div>
             </template>
           </template>
         </a-table>
@@ -436,7 +474,6 @@ import dayjs from 'dayjs'
 import PageContainer from '../../../components/PageContainer.vue'
 import SearchForm from '../../../components/SearchForm.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
-import MarketingQuickNav from './MarketingQuickNav.vue'
 import MarketingListToolbar from './MarketingListToolbar.vue'
 import MarketingTraceTimelineCard from './MarketingTraceTimelineCard.vue'
 import {
@@ -455,7 +492,7 @@ import {
 } from '../../../api/marketing'
 import { useStaffOptions } from '../../../composables/useStaffOptions'
 import { useUserStore } from '../../../stores/user'
-import { MARKETING_CALLBACK_TYPE_OPTIONS, MARKETING_LEAD_MODE_LABELS } from '../../../utils/marketingEnums'
+import { MARKETING_CALLBACK_TYPE_LABELS, MARKETING_CALLBACK_TYPE_OPTIONS, MARKETING_LEAD_MODE_LABELS } from '../../../utils/marketingEnums'
 import { resolveRouteAccess } from '../../../utils/routeAccess'
 import type {
   CrmLeadAssignLogItem,
@@ -569,12 +606,6 @@ const callbackSnapshot = ref<Record<string, {
   callbackType?: string
 }>>({})
 const todayText = dayjs().format('YYYY-MM-DD')
-const moduleLogicMessage = computed(() => {
-  if (effectiveMode.value === 'callback') {
-    return '客户互动中心统一承接销售跟进、回访计划和执行轨迹；签后回访仍保留独立菜单，避免销售跟进与服务回访完全混在一起。'
-  }
-  return '线索数据统一来自 crm_lead：咨询=status 0，意向=status 1，失效=status 3；预订改按锁床/金额/阶段证据识别，签约与入住阶段统一在合同模块推进。'
-})
 
 const rules: FormRules = {
   consultantName: [{ required: true, message: '请输入咨询人姓名' }],
@@ -592,6 +623,50 @@ const selectedRows = computed(() => rows.value.filter((item) => selectedRowKeys.
 const canAssignLead = computed(() =>
   resolveRouteAccess(router, userStore.roles || [], route.path, userStore.pagePermissions || []).canAccess)
 const modeLabel = computed(() => MARKETING_LEAD_MODE_LABELS[effectiveMode.value] || '营销线索')
+const workspaceSummary = computed(() => {
+  if (effectiveMode.value === 'consultation') {
+    return '把咨询线索、负责人分配和转意向动作收进同一张工作表里，适合前置筛选和首轮判断。'
+  }
+  if (effectiveMode.value === 'intent') {
+    return '围绕意向客户推进回访、标签和转预订动作，优先处理逾期跟进与缺失计划。'
+  }
+  if (effectiveMode.value === 'reservation') {
+    return '预订页专注锁床证据、金额、待签约预订与合同前准备，不再混入签约后动作。'
+  }
+  if (effectiveMode.value === 'invalid') {
+    return '失效池保留恢复、负责人补派和归档清理动作，便于复盘和二次激活。'
+  }
+  return '互动跟进页承接待回访、执行回访和顺延计划，签后客户会自动进入入住后回访节奏。'
+})
+const activeFilterCount = computed(() => {
+  const values = [
+    query.consultantName,
+    query.consultantPhone,
+    query.elderName,
+    query.elderPhone,
+    query.consultType,
+    query.mediaChannel,
+    query.infoSource,
+    query.customerTag,
+    query.marketerName,
+    ...(query.consultDateRange || [])
+  ].filter((item) => String(item || '').trim())
+  if (props.mode === 'pipeline') values.push(pipelineTab.value)
+  return values.length
+})
+const activeFilterSummary = computed(() => (
+  activeFilterCount.value > 0 ? `已启用 ${activeFilterCount.value} 个筛选条件` : '未设置筛选条件'
+))
+const hasScopedDataset = computed(() => {
+  const scenario = String(props.scenario || route.query.scenario || '').trim()
+  const filter = String(route.query.filter || '').trim()
+  const stage = String(route.query.stage || '').trim()
+  const source = String(route.query.source || '').trim()
+  const callbackType = effectiveMode.value === 'callback'
+    ? String(props.callbackType || route.query.type || '').trim()
+    : ''
+  return Boolean(scenario || filter || stage || source || callbackType)
+})
 
 const modalTitle = computed(() => form.id ? '编辑客户' : '新增客户')
 
@@ -612,7 +687,8 @@ const columns = computed(() => {
       { title: '接待人', dataIndex: 'receptionistName', key: 'receptionistName', width: 120 },
       { title: '负责人', dataIndex: 'ownerDisplayName', key: 'ownerDisplayName', width: 120 },
       { title: '家庭地址', dataIndex: 'homeAddress', key: 'homeAddress', width: 160 },
-      { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 }
+      { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 },
+      { title: '操作', key: 'action', width: 240, fixed: 'right' as const }
     ]
   }
   if (mode === 'intent') {
@@ -628,7 +704,8 @@ const columns = computed(() => {
       { title: '推荐渠道', dataIndex: 'referralChannel', key: 'referralChannel', width: 120 },
       { title: '客户标签', dataIndex: 'customerTag', key: 'customerTag', width: 120 },
       { title: '负责人', dataIndex: 'ownerDisplayName', key: 'ownerDisplayName', width: 140 },
-      { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 }
+      { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 },
+      { title: '操作', key: 'action', width: 280, fixed: 'right' as const }
     ]
   }
   if (mode === 'reservation') {
@@ -645,7 +722,8 @@ const columns = computed(() => {
       { title: '是否退款', dataIndex: 'refunded', key: 'refunded', width: 100 },
       { title: '预约渠道', dataIndex: 'reservationChannel', key: 'reservationChannel', width: 120 },
       { title: '状态', dataIndex: 'reservationStatus', key: 'reservationStatus', width: 100 },
-      { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 }
+      { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 },
+      { title: '操作', key: 'action', width: 240, fixed: 'right' as const }
     ]
   }
   if (mode === 'invalid') {
@@ -660,7 +738,8 @@ const columns = computed(() => {
       { title: '客户标签', dataIndex: 'customerTag', key: 'customerTag', width: 120 },
       { title: '负责人', dataIndex: 'ownerDisplayName', key: 'ownerDisplayName', width: 140 },
       { title: '失效时间', dataIndex: 'invalidTime', key: 'invalidTime', width: 170 },
-      { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 }
+      { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 },
+      { title: '操作', key: 'action', width: 220, fixed: 'right' as const }
     ]
   }
   return [
@@ -671,8 +750,18 @@ const columns = computed(() => {
     { title: '计划标题', dataIndex: 'planTitle', key: 'planTitle', width: 160 },
     { title: '回访内容', dataIndex: 'followupContent', key: 'followupContent', width: 220 },
     { title: '回访结果', dataIndex: 'followupResult', key: 'followupResult', width: 220 },
-    { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 }
+    { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 },
+    { title: '操作', key: 'action', width: 260, fixed: 'right' as const }
   ]
+})
+
+const tableScrollX = computed(() => {
+  const mode = effectiveMode.value
+  if (mode === 'consultation') return 1700
+  if (mode === 'intent') return 1500
+  if (mode === 'reservation') return 1450
+  if (mode === 'invalid') return 1380
+  return 1320
 })
 
 const actionButtons = computed(() => {
@@ -708,7 +797,6 @@ const actionButtons = computed(() => {
       { key: 'detail', label: '客户轨迹', type: 'default' as const, disabled: selectedCount.value !== 1 },
       { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1 || !canAssignLead.value },
       { key: 'toggleRefund', label: '退款切换', type: 'default' as const, disabled: selectedCount.value !== 1 },
-      { key: 'toAdmission', label: '转入住', type: 'default' as const, disabled: selectedCount.value !== 1 },
       { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true }
     ]
   }
@@ -750,7 +838,7 @@ const actionButtons = computed(() => {
   ]
 })
 
-const displayRows = computed(() => rows.value.map((item, index) => {
+const mappedRows = computed(() => rows.value.map((item, index) => {
   const snapshot = callbackSnapshot.value[item.id] || {}
   return {
     ...item,
@@ -761,73 +849,236 @@ const displayRows = computed(() => rows.value.map((item, index) => {
     followupResult: snapshot.followupResult
   }
 }))
-const displayTotal = computed(() => total.value)
+const displayRows = computed(() => {
+  if (!hasScopedDataset.value) {
+    return mappedRows.value
+  }
+  const start = Math.max((query.pageNo - 1) * query.pageSize, 0)
+  return mappedRows.value.slice(start, start + query.pageSize)
+})
+const displayTotal = computed(() => (hasScopedDataset.value ? mappedRows.value.length : total.value))
+
+const STANDARD_SOURCES = ['抖音', '微信', '转介绍', '自然到访', '线上咨询', '社区活动', '其他']
+
+function normalizeUnifiedSource(value?: string) {
+  const text = String(value || '').trim().replace(/　/g, ' ').replace(/\s+/g, '')
+  if (!text) return ''
+  const lower = text.toLowerCase()
+  if (lower.includes('抖音') || lower.includes('douyin') || lower === 'dy') return '抖音'
+  if (lower.includes('微信') || lower.includes('weixin') || lower === 'wx') return '微信'
+  if (lower.includes('转介绍') || lower.includes('介绍')) return '转介绍'
+  if (lower.includes('自然到访') || lower.includes('到访')) return '自然到访'
+  if (lower.includes('线上') || lower.includes('官网') || lower.includes('小程序')) return '线上咨询'
+  if (lower.includes('社区')) return '社区活动'
+  if (lower === '其他' || lower === 'other') return '其他'
+  return text
+}
+
+function resolveRowSource(item: CrmLeadItem) {
+  return normalizeUnifiedSource(item.source || item.infoSource || '')
+}
+
+function inferLeadCallbackType(item: CrmLeadItem) {
+  if (isSignedLead(item)) return 'checkin'
+  return ''
+}
+
+function buildScopedSummary(list: CrmLeadItem[]): MarketingLeadEntrySummary {
+  const today = todayText
+  const consultCount = list.filter(isConsultLead).length
+  const intentCount = list.filter(isIntentLead).length
+  const reservationCount = list.filter(hasReservationEvidence).length
+  const invalidCount = list.filter((item) => Number(item.status) === 3).length
+  const signedContractCount = list.filter(isSignedLead).length
+  const unsignedReservationCount = list.filter((item) => hasReservationEvidence(item) && !isSignedLead(item)).length
+  const refundedReservationCount = list.filter((item) => hasReservationEvidence(item) && Number(item.refunded) === 1).length
+  const callbackDueTodayCount = list.filter((item) => {
+    if (Number(item.status) === 3) return false
+    if (effectiveMode.value !== 'callback' && isSignedLead(item)) return false
+    return String(item.nextFollowDate || '').slice(0, 10) === today
+  }).length
+  const callbackOverdueCount = list.filter((item) => {
+    const nextFollow = String(item.nextFollowDate || '').slice(0, 10)
+    if (Number(item.status) === 3 || !nextFollow) return false
+    if (effectiveMode.value !== 'callback' && isSignedLead(item)) return false
+    return nextFollow < today
+  }).length
+  const missingSourceCount = list.filter((item) => !resolveRowSource(item)).length
+  const missingNextFollowDateCount = list.filter((item) => {
+    if (Number(item.status) === 3) return false
+    if (effectiveMode.value !== 'callback' && isSignedLead(item)) return false
+    return !String(item.nextFollowDate || '').slice(0, 10)
+  }).length
+  const nonStandardSourceCount = list.filter((item) => {
+    const source = resolveRowSource(item)
+    return !!source && !STANDARD_SOURCES.includes(source)
+  }).length
+
+  let modeCount = list.length
+  if (effectiveMode.value === 'consultation') modeCount = consultCount
+  if (effectiveMode.value === 'intent') modeCount = intentCount
+  if (effectiveMode.value === 'reservation') modeCount = reservationCount
+  if (effectiveMode.value === 'invalid') modeCount = invalidCount
+  if (effectiveMode.value === 'callback') modeCount = list.length
+
+  return {
+    totalCount: list.length,
+    modeCount,
+    consultCount,
+    intentCount,
+    reservationCount,
+    invalidCount,
+    signedContractCount,
+    unsignedReservationCount,
+    refundedReservationCount,
+    callbackDueTodayCount,
+    callbackOverdueCount,
+    callbackPendingCount: callbackDueTodayCount + callbackOverdueCount,
+    missingSourceCount,
+    missingNextFollowDateCount,
+    nonStandardSourceCount
+  }
+}
+
+const currentSummary = computed<MarketingLeadEntrySummary>(() => (
+  hasScopedDataset.value ? buildScopedSummary(rows.value) : { ...summary }
+))
+
 const summaryCards = computed(() => {
   const mode = effectiveMode.value
+  const metrics = currentSummary.value
   if (mode === 'consultation') {
     return [
-      { title: '当前咨询池', value: summary.modeCount },
-      { title: '总线索数', value: summary.totalCount },
-      { title: '缺失来源', value: summary.missingSourceCount },
-      { title: '非标准来源', value: summary.nonStandardSourceCount }
+      { title: '当前咨询池', value: metrics.modeCount },
+      { title: '总线索数', value: metrics.totalCount },
+      { title: '缺失来源', value: metrics.missingSourceCount },
+      { title: '非标准来源', value: metrics.nonStandardSourceCount }
     ]
   }
   if (mode === 'intent') {
     return [
-      { title: '当前意向客户', value: summary.modeCount },
-      { title: '待回访总量', value: summary.callbackPendingCount },
-      { title: '逾期回访', value: summary.callbackOverdueCount },
-      { title: '缺少下次回访', value: summary.missingNextFollowDateCount }
+      { title: '当前意向客户', value: metrics.modeCount },
+      { title: '待回访总量', value: metrics.callbackPendingCount },
+      { title: '逾期回访', value: metrics.callbackOverdueCount },
+      { title: '缺少下次回访', value: metrics.missingNextFollowDateCount }
     ]
   }
   if (mode === 'reservation') {
     return [
-      { title: '当前预订客户', value: summary.modeCount },
-      { title: '已签约', value: summary.signedContractCount },
-      { title: '待签约预订', value: summary.unsignedReservationCount },
-      { title: '退款预订', value: summary.refundedReservationCount }
+      { title: '当前预订客户', value: metrics.modeCount },
+      { title: '已签约', value: metrics.signedContractCount },
+      { title: '待签约预订', value: metrics.unsignedReservationCount },
+      { title: '退款预订', value: metrics.refundedReservationCount }
     ]
   }
   if (mode === 'invalid') {
     return [
-      { title: '失效客户', value: summary.modeCount },
-      { title: '咨询客户', value: summary.consultCount },
-      { title: '意向客户', value: summary.intentCount },
-      { title: '预订客户', value: summary.reservationCount }
+      { title: '失效客户', value: metrics.modeCount },
+      { title: '咨询客户', value: metrics.consultCount },
+      { title: '意向客户', value: metrics.intentCount },
+      { title: '预订客户', value: metrics.reservationCount }
     ]
   }
   return [
-    { title: '待回访总量', value: summary.modeCount },
-    { title: '今日到期', value: summary.callbackDueTodayCount },
-    { title: '逾期回访', value: summary.callbackOverdueCount },
-    { title: '缺少下次回访', value: summary.missingNextFollowDateCount }
+    { title: '待回访总量', value: metrics.modeCount },
+    { title: '今日到期', value: metrics.callbackDueTodayCount },
+    { title: '逾期回访', value: metrics.callbackOverdueCount },
+    { title: '缺少下次回访', value: metrics.missingNextFollowDateCount }
   ]
 })
 
 const warningMessage = computed(() => {
   const mode = effectiveMode.value
-  if (mode === 'consultation' && (summary.missingSourceCount > 0 || summary.nonStandardSourceCount > 0)) {
-    return `数据质量提醒：缺失来源 ${summary.missingSourceCount} 条，非标准来源 ${summary.nonStandardSourceCount} 条。`
+  const metrics = currentSummary.value
+  if (mode === 'consultation' && (metrics.missingSourceCount > 0 || metrics.nonStandardSourceCount > 0)) {
+    return `数据质量提醒：缺失来源 ${metrics.missingSourceCount} 条，非标准来源 ${metrics.nonStandardSourceCount} 条。`
   }
-  if (mode === 'intent' && (summary.callbackOverdueCount > 0 || summary.missingNextFollowDateCount > 0)) {
-    return `跟进风险提醒：逾期回访 ${summary.callbackOverdueCount} 条，缺失下次回访日期 ${summary.missingNextFollowDateCount} 条。`
+  if (mode === 'intent' && (metrics.callbackOverdueCount > 0 || metrics.missingNextFollowDateCount > 0)) {
+    return `跟进风险提醒：逾期回访 ${metrics.callbackOverdueCount} 条，缺失下次回访日期 ${metrics.missingNextFollowDateCount} 条。`
   }
-  if (mode === 'reservation' && (summary.unsignedReservationCount > 0 || summary.refundedReservationCount > 0)) {
-    return `签约闭环提醒：待签约预订 ${summary.unsignedReservationCount} 条，退款预订 ${summary.refundedReservationCount} 条。`
+  if (mode === 'reservation' && (metrics.unsignedReservationCount > 0 || metrics.refundedReservationCount > 0)) {
+    return `签约闭环提醒：待签约预订 ${metrics.unsignedReservationCount} 条，退款预订 ${metrics.refundedReservationCount} 条。`
   }
-  if (mode === 'callback' && (summary.callbackOverdueCount > 0 || summary.callbackDueTodayCount > 0)) {
-    return `回访提醒：今日到期 ${summary.callbackDueTodayCount} 条，逾期 ${summary.callbackOverdueCount} 条。`
+  if (mode === 'callback' && (metrics.callbackOverdueCount > 0 || metrics.callbackDueTodayCount > 0)) {
+    return `回访提醒：今日到期 ${metrics.callbackDueTodayCount} 条，逾期 ${metrics.callbackOverdueCount} 条。`
   }
   return ''
 })
 
-const canViewAllLeads = computed(() =>
-  resolveRouteAccess(router, userStore.roles || [], route.path, userStore.pagePermissions || []).canAccess)
-const currentUserDisplayName = computed(() => {
-  const realName = String(userStore.staffInfo?.realName || '').trim()
-  if (realName) return realName
-  return String(userStore.staffInfo?.username || '').trim() || '当前用户'
-})
+function buildRowActions(record: CrmLeadItem) {
+  const mode = effectiveMode.value
+  if (mode === 'consultation') {
+    return [
+      { key: 'detail', label: '轨迹' },
+      { key: 'edit', label: '编辑' },
+      { key: 'assign', label: '分配', disabled: !canAssignLead.value },
+      { key: 'setIntent', label: '转意向' },
+      { key: 'abandon', label: '放弃', danger: true }
+    ].filter((item) => !item.disabled)
+  }
+  if (mode === 'intent') {
+    return [
+      { key: 'detail', label: '轨迹' },
+      { key: 'edit', label: '编辑' },
+      { key: 'callback', label: '回访计划' },
+      { key: 'toReservation', label: '转预订' },
+      { key: 'assign', label: '分配', disabled: !canAssignLead.value },
+      { key: 'abandon', label: '放弃', danger: true }
+    ].filter((item) => !item.disabled)
+  }
+  if (mode === 'reservation') {
+    return [
+      { key: 'detail', label: '轨迹' },
+      { key: 'edit', label: '编辑' },
+      { key: 'toggleRefund', label: Number(record.refunded) === 1 ? '取消退款' : '标记退款' }
+    ]
+  }
+  if (mode === 'invalid') {
+    return [
+      { key: 'detail', label: '轨迹' },
+      { key: 'recover', label: '恢复' },
+      { key: 'assign', label: '分配', disabled: !canAssignLead.value },
+      { key: 'delete', label: '删除', danger: true }
+    ].filter((item) => !item.disabled)
+  }
+  return [
+    { key: 'detail', label: '轨迹' },
+    { key: 'execute', label: '执行回访' },
+    { key: 'callback', label: '补计划' },
+    { key: 'postponeFollow', label: '顺延3天' },
+    { key: 'toReservation', label: '转预订' }
+  ]
+}
+
+function followupStatusColor(value?: string) {
+  const text = String(value || '').trim()
+  if (text === '已回访') return 'green'
+  if (text === '待回访') return 'gold'
+  if (text === '待跟进') return 'blue'
+  return 'default'
+}
+
+function reservationStatusLabel(record: CrmLeadItem) {
+  if (isSignedLead(record)) return '已签约'
+  const status = String(record.reservationStatus || '').trim()
+  if (status) return status
+  if (hasReservationEvidence(record)) return '预订'
+  return '未锁定'
+}
+
+function reservationStatusColor(record: CrmLeadItem) {
+  if (isSignedLead(record)) return 'green'
+  if (Number(record.refunded) === 1) return 'red'
+  if (hasReservationEvidence(record)) return 'geekblue'
+  return 'default'
+}
+
+function callbackTypeLabel(record: CrmLeadItem) {
+  const snapshot = callbackSnapshot.value[String(record.id)] || {}
+  const type = String(snapshot.callbackType || '').trim().toLowerCase()
+  if (!type) return '暂无回访类型'
+  return MARKETING_CALLBACK_TYPE_LABELS[type as MarketingCallbackType] || type
+}
 
 function textContains(value: unknown, keyword: string) {
   return String(value || '').toLowerCase().includes(keyword.toLowerCase())
@@ -846,13 +1097,15 @@ function applyScenarioFilters(
   return (list || []).filter((item) => {
     const snapshot = snapshotMap[String(item.id)] || {}
     const nextFollow = String(item.nextFollowDate || '').slice(0, 10)
+    const unifiedSource = resolveRowSource(item)
     const infoSource = String(item.infoSource || '')
     const mediaChannel = String(item.mediaChannel || '')
     const customerTag = String(item.customerTag || '')
     const reservationStatus = String(item.reservationStatus || '')
     const snapshotType = String(snapshot.callbackType || '').trim().toLowerCase()
+    const effectiveCallbackType = snapshotType || inferLeadCallbackType(item)
 
-    if (callbackType && effectiveMode.value === 'callback' && snapshotType !== callbackType) {
+    if (callbackType && effectiveMode.value === 'callback' && effectiveCallbackType !== callbackType) {
       return false
     }
 
@@ -868,7 +1121,7 @@ function applyScenarioFilters(
       if (!textContains(reservationStatus, '锁')) return false
       if (!nextFollow || nextFollow < todayText || dayjs(nextFollow).diff(dayjs(todayText), 'day') > 3) return false
     }
-    if (filter === 'missing_followup' && String(item.followupStatus || '').trim()) return false
+    if (filter === 'missing_followup' && nextFollow) return false
     if (filter === 'unsigned_lock') {
       if (!textContains(reservationStatus, '锁')) return false
       if (isSignedLead(item)) return false
@@ -878,7 +1131,7 @@ function applyScenarioFilters(
       if (!textContains(customerTag, '黑')) return false
     }
     if (scenario === 'source_unknown') {
-      if (infoSource.trim()) return false
+      if (unifiedSource) return false
     }
     if (scenario === 'source_medical') {
       const isMedical = textContains(infoSource, '医') || textContains(infoSource, '门诊') || textContains(mediaChannel, '医')
@@ -942,12 +1195,12 @@ function hasReservationEvidence(item: CrmLeadItem) {
   if (isSignedLead(item) || Number(item.status) === 3) return false
   if (item.reservationBedId || String(item.reservationRoomNo || '').trim()) return true
   if (Number(item.reservationAmount || 0) > 0) return true
-  const reservationStatus = String(item.reservationStatus || '').toLowerCase()
-  if (reservationStatus.includes('锁') || reservationStatus.includes('预') || reservationStatus.includes('lock') || reservationStatus.includes('reserve')) {
-    return true
-  }
   const flowStage = String(item.flowStage || '').toUpperCase()
   return flowStage === 'PENDING_BED_SELECT' || flowStage === 'PENDING_SIGN'
+}
+
+function isConsultLead(item: CrmLeadItem) {
+  return !isSignedLead(item) && !hasReservationEvidence(item) && Number(item.status) === 0
 }
 
 function isIntentLead(item: CrmLeadItem) {
@@ -967,7 +1220,7 @@ function buildQueryParams() {
   const callbackFilter = String(route.query.filter || '').trim()
   const callbackDueOnly = isCallback && (!!callbackScenario || !!callbackFilter)
   const routeSource = String(route.query.source || '').trim()
-  const normalizedSource = query.infoSource || routeSource || undefined
+  const normalizedSource = query.infoSource || (routeSource && routeSource !== 'medical' ? routeSource : '') || undefined
   const callbackType = isCallback ? String(props.callbackType || route.query.type || '').trim() : ''
   return {
     pageNo: query.pageNo,
@@ -993,6 +1246,7 @@ function buildQueryParams() {
 
 function buildSummaryParams() {
   const mode = effectiveMode.value
+  const routeSource = String(route.query.source || '').trim()
   return {
     mode: mode as MarketingLeadMode,
     consultantName: query.consultantName || undefined,
@@ -1003,7 +1257,7 @@ function buildSummaryParams() {
     consultDateTo: query.consultDateRange?.[1] || undefined,
     consultType: query.consultType || undefined,
     mediaChannel: query.mediaChannel || undefined,
-    infoSource: query.infoSource || undefined,
+    infoSource: query.infoSource || (routeSource && routeSource !== 'medical' ? routeSource : '') || undefined,
     customerTag: query.customerTag || undefined,
     marketerName: query.marketerName || undefined
   }
@@ -1015,15 +1269,18 @@ async function fetchData() {
   tableError.value = ''
   summaryError.value = ''
   try {
-    const [page, summaryRes] = await Promise.all([
-      getLeadPage(buildQueryParams()),
+    const params = buildQueryParams()
+    const [pageData, summaryRes] = await Promise.all([
+      hasScopedDataset.value ? fetchAllLeadPages(params) : getLeadPage(params),
       getMarketingLeadEntrySummary(buildSummaryParams())
     ])
-    const rawList = (page.list || []).map((item) => ({ ...item, id: String(item.id) }))
+    const rawList = hasScopedDataset.value
+      ? (pageData as CrmLeadItem[]).map((item) => ({ ...item, id: String(item.id) }))
+      : (((pageData as any)?.list || []).map((item: CrmLeadItem) => ({ ...item, id: String(item.id) })))
     Object.assign(summary, summaryRes || {})
     const snapshots = await hydrateCallbackSnapshot(rawList)
     rows.value = applyScenarioFilters(rawList, snapshots)
-    total.value = rows.value.length
+    total.value = hasScopedDataset.value ? rows.value.length : Number((pageData as any)?.total || 0)
   } catch (error: any) {
     const text = error?.message || '请求失败，请稍后重试'
     tableError.value = text
@@ -1032,6 +1289,21 @@ async function fetchData() {
     loading.value = false
     summaryLoading.value = false
   }
+}
+
+async function fetchAllLeadPages(baseParams: Record<string, any>) {
+  const pageSize = 200
+  let pageNo = 1
+  let totalPages = 1
+  const result: CrmLeadItem[] = []
+  while (pageNo <= totalPages && pageNo <= 50) {
+    const page = await getLeadPage({ ...baseParams, pageNo, pageSize })
+    result.push(...((page?.list || []) as CrmLeadItem[]))
+    const totalCount = Number(page?.total || 0)
+    totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+    pageNo += 1
+  }
+  return result
 }
 
 async function hydrateCallbackSnapshot(list: CrmLeadItem[]) {
@@ -1210,21 +1482,7 @@ async function handleTopAction(key: string) {
     return
   }
   if (key === 'recover') {
-    const selectedIdsValue = selectedIds()
-    if (!selectedIdsValue.length) {
-      message.info('请先勾选要恢复的客户')
-      return
-    }
-    const targets = selectedRows.value.filter((item) => Number(item.status) !== 1)
-    if (!targets.length) {
-      message.info('选中客户已是意向状态，无需重复恢复')
-      return
-    }
-    const ids = targets.map((item) => item.id)
-    await batchUpdateLeadStatus({ ids, status: 1 })
-    message.success(`已恢复 ${targets.length} 条客户（仅处理状态不同项）`)
-    selectedRowKeys.value = []
-    fetchData()
+    await recoverRows()
     return
   }
   if (key === 'toggleRefund') {
@@ -1240,17 +1498,7 @@ async function handleTopAction(key: string) {
     return
   }
   if (key === 'callback') {
-    const ids = selectedIds()
-    if (!ids.length) {
-      message.info('请先勾选要添加计划的客户')
-      return
-    }
-    planForm.title = '回访'
-    planForm.callbackType = defaultCallbackType()
-    planForm.followupContent = ''
-    planForm.planExecuteTime = dayjs().format('YYYY-MM-DD HH:mm:ss')
-    planForm.executorName = ''
-    planOpen.value = true
+    openCallbackPlanForIds(selectedIds())
     return
   }
   if (key === 'tag') {
@@ -1269,21 +1517,92 @@ async function handleTopAction(key: string) {
     return
   }
   if (key === 'delete') {
-    const ids = selectedIds()
-    if (!ids.length) {
-      message.info('请先勾选要删除的数据')
-      return
-    }
-    Modal.confirm({
-      title: `确认删除选中的 ${ids.length} 条客户记录吗？`,
-      onOk: async () => {
-        await batchDeleteLeads({ ids })
-        message.success(`已删除 ${ids.length} 条记录`)
-        selectedRowKeys.value = []
-        fetchData()
-      }
-    })
+    confirmDeleteIds(selectedIds())
   }
+}
+
+async function handleRowAction(key: string, record: CrmLeadItem) {
+  if (key === 'detail') {
+    await openTraceDrawer(record)
+    return
+  }
+  if (key === 'edit') {
+    openForm(record)
+    return
+  }
+  if (key === 'assign') {
+    openAssignModal(record)
+    return
+  }
+  if (key === 'execute') {
+    await executeCallback(record)
+    return
+  }
+  if (key === 'toggleRefund') {
+    toggleRefund(record)
+    return
+  }
+  if (key === 'toAdmission') {
+    transferToAdmission(record)
+    return
+  }
+  if (key === 'callback') {
+    openCallbackPlanForIds([String(record.id)])
+    return
+  }
+  if (key === 'delete') {
+    confirmDeleteIds([String(record.id)])
+    return
+  }
+  if (key === 'setIntent') {
+    await batchMoveToIntent([record])
+    return
+  }
+  if (key === 'toReservation') {
+    await batchMoveToReservation([record])
+    return
+  }
+  if (key === 'abandon') {
+    await batchMoveToInvalid([record])
+    return
+  }
+  if (key === 'recover') {
+    await recoverRows([record])
+    return
+  }
+  if (key === 'postponeFollow') {
+    await batchPostponeFollow(3, [record])
+  }
+}
+
+function openCallbackPlanForIds(ids: string[]) {
+  if (!ids.length) {
+    message.info('请先勾选要添加计划的客户')
+    return
+  }
+  selectedRowKeys.value = [...ids]
+  planForm.title = '回访'
+  planForm.callbackType = defaultCallbackType()
+  planForm.followupContent = ''
+  planForm.planExecuteTime = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  planForm.executorName = ''
+  planOpen.value = true
+}
+
+function confirmDeleteIds(ids: string[]) {
+  if (!ids.length) {
+    message.info('请先勾选要删除的数据')
+    return
+  }
+  Modal.confirm({
+    title: `确认删除选中的 ${ids.length} 条客户记录吗？`,
+    onOk: async () => {
+      await batchDeleteLeads({ ids })
+      message.success(`已删除 ${ids.length} 条记录`)
+      selectedRowKeys.value = []
+      fetchData()
+    }
+  })
 }
 
 function openForm(row?: CrmLeadItem) {
@@ -1369,6 +1688,23 @@ async function submitCallbackPlan() {
   } finally {
     planSubmitting.value = false
   }
+}
+
+async function recoverRows(targetRows: CrmLeadItem[] = selectedRows.value) {
+  if (!targetRows.length) {
+    message.info('请先勾选要恢复的客户')
+    return
+  }
+  const targets = targetRows.filter((item) => Number(item.status) !== 1)
+  if (!targets.length) {
+    message.info('选中客户已是意向状态，无需重复恢复')
+    return
+  }
+  const ids = targets.map((item) => item.id)
+  await batchUpdateLeadStatus({ ids, status: 1 })
+  message.success(`已恢复 ${targets.length} 条客户（仅处理状态不同项）`)
+  selectedRowKeys.value = []
+  fetchData()
 }
 
 function openAssignModal(record: CrmLeadItem) {
@@ -1495,13 +1831,12 @@ function toggleRefund(record: CrmLeadItem) {
     .catch(() => message.error('更新失败'))
 }
 
-async function batchMoveToInvalid() {
-  const ids = selectedIds()
-  if (!ids.length) {
+async function batchMoveToInvalid(targetRows: CrmLeadItem[] = selectedRows.value) {
+  if (!targetRows.length) {
     message.info('请先勾选要放弃的客户')
     return
   }
-  const targets = rows.value.filter((item) => ids.some((id) => sameId(item.id, id)) && Number(item.status) !== 3)
+  const targets = targetRows.filter((item) => Number(item.status) !== 3)
   if (!targets.length) {
     message.info('选中客户已是失效状态，无需重复操作')
     return
@@ -1522,13 +1857,12 @@ async function batchMoveToInvalid() {
   })
 }
 
-async function batchMoveToIntent() {
-  const ids = selectedIds()
-  if (!ids.length) {
+async function batchMoveToIntent(targetRows: CrmLeadItem[] = selectedRows.value) {
+  if (!targetRows.length) {
     message.info('请先勾选要转为意向的客户')
     return
   }
-  const targets = rows.value.filter((item) => ids.some((id) => sameId(item.id, id)) && Number(item.status) !== 1)
+  const targets = targetRows.filter((item) => Number(item.status) !== 1)
   if (!targets.length) {
     message.info('选中客户已是意向状态，无需重复操作')
     return
@@ -1539,19 +1873,33 @@ async function batchMoveToIntent() {
   fetchData()
 }
 
-async function batchMoveToReservation() {
-  const ids = selectedIds()
-  if (!ids.length) {
+async function batchMoveToReservation(targetRows: CrmLeadItem[] = selectedRows.value) {
+  if (!targetRows.length) {
     message.info('请先勾选要转预订的客户')
     return
   }
-  const selectedRows = rows.value.filter((item) => ids.some((id) => sameId(item.id, id)) && !hasReservationEvidence(item))
-  if (!selectedRows.length) {
+  const alreadyReserved = targetRows.filter(hasReservationEvidence)
+  const missingEvidence = targetRows.filter((item) => !hasReservationEvidence(item))
+  if (!missingEvidence.length && !targetRows.length) {
     message.info('选中客户已是预订状态，无需重复操作')
     return
   }
+  if (missingEvidence.length) {
+    if (missingEvidence.length > 1) {
+      message.warning('批量转预订前，请先为每条客户补全预订房号、锁床床位或预订金额')
+      return
+    }
+    const row = missingEvidence[0]
+    message.info('请先补全预订房号、锁床床位或预订金额，再完成转预订')
+    openForm({
+      ...row,
+      status: 1,
+      reservationStatus: row.reservationStatus || '预定'
+    })
+    return
+  }
   await Promise.all(
-    selectedRows.map((item) =>
+    alreadyReserved.map((item) =>
       updateCrmLead(item.id, {
         ...item,
         status: 1,
@@ -1559,20 +1907,19 @@ async function batchMoveToReservation() {
       })
     )
   )
-  message.success(`已转入预订管理 ${selectedRows.length} 条（仅处理状态不同项）`)
+  message.success(`已转入预订管理 ${alreadyReserved.length} 条（仅处理状态不同项）`)
   selectedRowKeys.value = []
   fetchData()
 }
 
-async function batchSetTodayFollow() {
-  const targetRows = selectedRows.value
-    .filter((item) => String(item.nextFollowDate || '').slice(0, 10) !== todayText)
-  if (!targetRows.length) {
+async function batchSetTodayFollow(targetRows: CrmLeadItem[] = selectedRows.value) {
+  const rowsToUpdate = targetRows.filter((item) => String(item.nextFollowDate || '').slice(0, 10) !== todayText)
+  if (!rowsToUpdate.length) {
     message.info('选中客户的回访日期已是今天，无需重复设置')
     return
   }
   await Promise.all(
-    targetRows.map((item) =>
+    rowsToUpdate.map((item) =>
       updateCrmLead(item.id, {
         ...item,
         followupStatus: '待回访',
@@ -1580,20 +1927,19 @@ async function batchSetTodayFollow() {
       })
     )
   )
-  message.success(`已设置 ${targetRows.length} 条为今日回访`)
+  message.success(`已设置 ${rowsToUpdate.length} 条为今日回访`)
   selectedRowKeys.value = []
   fetchData()
 }
 
-async function batchPostponeFollow(days: number) {
-  const targetRows = selectedRows.value
-    .filter((item) => String(item.followupStatus || '') !== '已回访')
-  if (!targetRows.length) {
+async function batchPostponeFollow(days: number, targetRows: CrmLeadItem[] = selectedRows.value) {
+  const rowsToUpdate = targetRows.filter((item) => String(item.followupStatus || '') !== '已回访')
+  if (!rowsToUpdate.length) {
     message.info('选中客户均为已回访，无需顺延')
     return
   }
   await Promise.all(
-    targetRows.map((item) => {
+    rowsToUpdate.map((item) => {
       const current = String(item.nextFollowDate || '').slice(0, 10)
       const base = current && current > todayText ? current : todayText
       const nextFollowDate = dayjs(base).add(days, 'day').format('YYYY-MM-DD')
@@ -1604,20 +1950,19 @@ async function batchPostponeFollow(days: number) {
       })
     })
   )
-  message.success(`已顺延 ${targetRows.length} 条回访计划（+${days}天）`)
+  message.success(`已顺延 ${rowsToUpdate.length} 条回访计划（+${days}天）`)
   selectedRowKeys.value = []
   fetchData()
 }
 
-async function batchMarkFollowed() {
-  const targetRows = selectedRows.value
-    .filter((item) => String(item.followupStatus || '') !== '已回访')
-  if (!targetRows.length) {
+async function batchMarkFollowed(targetRows: CrmLeadItem[] = selectedRows.value) {
+  const rowsToUpdate = targetRows.filter((item) => String(item.followupStatus || '') !== '已回访')
+  if (!rowsToUpdate.length) {
     message.info('选中客户已全部为已回访状态')
     return
   }
   await Promise.all(
-    targetRows.map((item) =>
+    rowsToUpdate.map((item) =>
       updateCrmLead(item.id, {
         ...item,
         followupStatus: '已回访',
@@ -1625,7 +1970,7 @@ async function batchMarkFollowed() {
       })
     )
   )
-  message.success(`已标记 ${targetRows.length} 条为已回访`)
+  message.success(`已标记 ${rowsToUpdate.length} 条为已回访`)
   selectedRowKeys.value = []
   fetchData()
 }
@@ -1660,36 +2005,318 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.marketing-toolbar {
-  margin-top: 2px;
-}
-
 .marketing-workspace {
-  padding: 16px;
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  padding: 18px;
+  border-radius: 28px;
+  border: 1px solid rgba(205, 220, 228, 0.92);
+  background:
+    radial-gradient(circle at top right, rgba(27, 137, 194, 0.09), transparent 24%),
+    radial-gradient(circle at left bottom, rgba(255, 174, 76, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(247, 250, 252, 0.98) 100%);
+  box-shadow: 0 18px 44px rgba(18, 64, 96, 0.08);
+  overflow: hidden;
 }
 
-.table-head {
+.marketing-workspace > * {
+  min-width: 0;
+}
+
+.marketing-overview {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px 24px;
+  border-radius: 24px;
+  border: 1px solid rgba(177, 205, 220, 0.72);
+  background:
+    linear-gradient(135deg, rgba(242, 249, 255, 0.98) 0%, rgba(255, 255, 255, 0.98) 52%, rgba(255, 248, 237, 0.98) 100%);
+}
+
+.marketing-overview-copy {
+  display: grid;
+  gap: 8px;
+  max-width: 720px;
+}
+
+.marketing-overview-kicker {
+  color: #7290a6;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.marketing-overview-copy strong {
+  color: #133854;
+  font-size: 26px;
+  line-height: 1.08;
+}
+
+.marketing-overview-copy span:last-child {
+  color: #58738a;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.marketing-overview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.overview-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(185, 205, 217, 0.88);
+  background: rgba(255, 255, 255, 0.86);
+  color: #46647b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.overview-pill--accent {
+  border-color: rgba(255, 183, 94, 0.8);
+  background: linear-gradient(180deg, rgba(255, 245, 224, 0.96) 0%, rgba(255, 255, 255, 0.92) 100%);
+  color: #8a5600;
+}
+
+.summary-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.summary-strip-card {
+  display: grid;
+  gap: 10px;
+  align-content: space-between;
+  min-height: 108px;
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(212, 223, 231, 0.88);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(245, 249, 252, 0.98) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.summary-card-label {
+  color: #6a859d;
+  font-size: 13px;
+}
+
+.summary-card-value {
+  color: #133854;
+  font-size: 34px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.marketing-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  margin-top: 12px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 199, 120, 0.82);
+  background: rgba(255, 248, 233, 0.94);
+  color: #8f5c0e;
+  font-size: 13px;
+}
+
+.marketing-warning-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #f59e0b;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.12);
+}
+
+.marketing-query-shell {
+  min-width: 0;
+  padding: 4px;
+  border-radius: 24px;
+  border: 1px solid rgba(216, 227, 235, 0.9);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.marketing-query-shell :deep(.search-form) {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: 20px;
+  box-shadow: none;
+  background: linear-gradient(180deg, rgba(250, 252, 253, 0.96) 0%, rgba(255, 255, 255, 0.98) 100%);
+}
+
+.marketing-query-shell :deep(.search-form-card),
+.marketing-query-shell :deep(.search-form-head),
+.marketing-query-shell :deep(.search-copy),
+.marketing-query-shell :deep(.search-side),
+.marketing-query-shell :deep(.stateful-wrap),
+.marketing-query-shell :deep(.stateful-panel) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.marketing-query-shell :deep(.search-form-head) {
+  flex-wrap: wrap;
+}
+
+.marketing-query-shell :deep(.search-form__header) {
+  margin-bottom: 18px;
+}
+
+.marketing-query-shell :deep(.search-form__title) {
+  font-size: 22px;
+}
+
+.marketing-query-shell :deep(.search-actions) {
+  flex-wrap: wrap;
+}
+
+.marketing-query-shell :deep(.search-form .ant-form-item) {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.marketing-query-shell :deep(.search-form .ant-form-item-control),
+.marketing-query-shell :deep(.search-form .ant-form-item-control-input),
+.marketing-query-shell :deep(.search-form .ant-form-item-control-input-content),
+.marketing-query-shell :deep(.search-form .ant-input),
+.marketing-query-shell :deep(.search-form .ant-input-number),
+.marketing-query-shell :deep(.search-form .ant-input-number-group-wrapper),
+.marketing-query-shell :deep(.search-form .ant-picker),
+.marketing-query-shell :deep(.search-form .ant-select) {
+  width: 100%;
+  max-width: 100%;
+}
+
+.marketing-table-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 14px;
+  margin-top: 2px;
+  margin-bottom: -6px;
 }
 
-.table-head strong {
+.marketing-table-head strong {
   display: block;
   color: #173854;
-  font-size: 16px;
+  font-size: 18px;
 }
 
-.table-head span {
+.marketing-table-head span {
   color: #6d8aa3;
   font-size: 12px;
 }
 
+.marketing-table-head :deep(.ant-tag) {
+  border-radius: 999px;
+  padding-inline: 10px;
+}
+
+.marketing-workspace :deep(.list-toolbar) {
+  margin: 0;
+  border-radius: 18px;
+}
+
+.marketing-workspace :deep(.stateful-block) {
+  border-radius: 22px;
+  border-color: rgba(213, 226, 233, 0.9);
+}
+
+.marketing-workspace :deep(.ant-table-wrapper) {
+  width: 100%;
+  max-width: 100%;
+  padding: 4px 4px 0;
+  overflow-x: auto;
+}
+
+.marketing-workspace :deep(.ant-spin-nested-loading),
+.marketing-workspace :deep(.ant-spin-container),
+.marketing-workspace :deep(.ant-table-container),
+.marketing-workspace :deep(.ant-table-content) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.marketing-workspace :deep(.ant-table) {
+  border-radius: 18px;
+}
+
+.marketing-workspace :deep(.ant-table-thead > tr > th) {
+  color: #5d7891;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: #f6fafc;
+}
+
+.marketing-workspace :deep(.ant-table-tbody > tr > td) {
+  padding-top: 14px;
+  padding-bottom: 14px;
+  vertical-align: top;
+}
+
+.marketing-workspace :deep(.ant-table-tbody > tr:hover > td) {
+  background: #fbfdff;
+}
+
+.person-cell,
+.plan-cell {
+  display: grid;
+  gap: 4px;
+}
+
+.person-cell strong,
+.plan-cell strong {
+  color: #173854;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.person-cell span,
+.plan-cell span {
+  color: #70869a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.row-action-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 4px;
+  min-width: 0;
+  margin: -4px -8px;
+}
+
+.row-action-links :deep(.ant-btn-link) {
+  padding-inline: 8px;
+  border-radius: 999px;
+  color: #196696;
+  background: rgba(25, 102, 150, 0.08);
+  white-space: nowrap;
+}
+
+.row-action-links :deep(.ant-btn-link.ant-btn-dangerous) {
+  color: #c2410c;
+  background: rgba(194, 65, 12, 0.08);
+}
+
 .marketing-pagination {
-  margin-top: 16px;
+  margin-top: 18px;
   text-align: right;
 }
 
@@ -1709,10 +2336,51 @@ onMounted(() => {
   word-break: break-word;
 }
 
+@media (max-width: 1200px) {
+  .summary-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .marketing-query-shell :deep(.search-form .ant-form-item) {
+    flex-basis: calc(50% - 12px);
+  }
+}
+
+@media (max-width: 992px) {
+  .marketing-workspace {
+    padding: 14px;
+  }
+
+  .marketing-overview {
+    flex-direction: column;
+    padding: 18px;
+  }
+
+  .marketing-overview-copy strong {
+    font-size: 22px;
+  }
+
+  .marketing-overview-meta {
+    justify-content: flex-start;
+  }
+
+  .marketing-query-shell :deep(.search-form .ant-form-item) {
+    flex-basis: 100%;
+  }
+}
+
 @media (max-width: 768px) {
-  .table-head {
+  .summary-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .marketing-table-head {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .marketing-query-shell :deep(.search-form__title) {
+    font-size: 18px;
   }
 }
 </style>

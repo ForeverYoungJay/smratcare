@@ -4,7 +4,7 @@
       <div class="page-head-glow" v-if="mode === 'showcase'"></div>
       <div class="page-head-main">
         <div class="page-title-wrap">
-          <div class="page-kicker">{{ mode === 'showcase' ? 'Smart Senior Care SaaS' : '业务工作面' }}</div>
+          <div class="page-kicker">{{ mode === 'showcase' ? 'Smart Senior Care SaaS' : 'Marketing Operations' }}</div>
           <div class="page-title-row">
             <h1 class="page-title">{{ title }}</h1>
             <slot name="badge" />
@@ -43,7 +43,7 @@ const mode = props.mode
 
 .page-head {
   position: relative;
-  padding: 8px 0 4px;
+  padding: 10px 0 6px;
   border-bottom: 1px solid rgba(200, 216, 229, 0.72);
 }
 
@@ -168,6 +168,16 @@ const mode = props.mode
 
 .page-shell--workspace .page-title {
   font-size: 26px;
+}
+
+.page-shell--workspace .page-head {
+  padding: 22px 24px;
+  border: 1px solid rgba(212, 225, 235, 0.86);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(87, 215, 255, 0.1), transparent 28%),
+    linear-gradient(135deg, rgba(248, 252, 255, 0.98), rgba(241, 248, 252, 0.95));
+  box-shadow: 0 16px 36px rgba(14, 66, 103, 0.08);
 }
 
 .page-shell--workspace .page-subtitle {
