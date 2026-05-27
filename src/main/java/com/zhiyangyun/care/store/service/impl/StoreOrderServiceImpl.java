@@ -71,6 +71,9 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
   private static final int PAY_STATUS_PENDING = 0;
   private static final int PAY_STATUS_SETTLED = 1;
   private static final int PAY_STATUS_REVERSED = 2;
+  private static final String SHOP_ORDER_ITEM_TYPE = "SHOP_ORDER";
+  private static final String SHOP_ORDER_ITEM_NAME = "商城消费";
+  private static final String AUTO_PAYMENT_REMARK_PREFIX = "商城订单出库自动收款: ";
   private final ElderProfileMapper elderMapper;
   private final ElderDiseaseMapper elderDiseaseMapper;
   private final DiseaseMapper diseaseMapper;
@@ -285,17 +288,6 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
       return response;
     }
 
-    ElderPointsAccount account = pointsAccountMapper.selectOne(
-        Wrappers.lambdaQuery(ElderPointsAccount.class)
-            .eq(ElderPointsAccount::getOrgId, elder.getOrgId())
-            .eq(ElderPointsAccount::getElderId, elder.getId()));
-    if (account == null) {
-      response.setStatus(OrderStatus.INSUFFICIENT_POINTS.name());
-      response.setAllowed(false);
-      response.setMessage("Points account not found");
-      return response;
-    }
-
     int pointsRequired = preview.getPointsRequired() == null ? 0 : preview.getPointsRequired();
     BigDecimal cashAmount = product.getPrice() == null
         ? BigDecimal.ZERO
@@ -303,13 +295,28 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
     if (pointsRequired > 0 && cashAmount.compareTo(BigDecimal.ZERO) > 0) {
       throw new IllegalStateException("当前商城订单仅支持纯积分或纯金额，暂不支持混合结算");
     }
-    if (account.getPointsBalance() == null || account.getPointsBalance() < pointsRequired) {
+    ElderPointsAccount account = null;
+    if (pointsRequired > 0) {
+      account = pointsAccountMapper.selectOne(
+          Wrappers.lambdaQuery(ElderPointsAccount.class)
+              .eq(ElderPointsAccount::getOrgId, elder.getOrgId())
+              .eq(ElderPointsAccount::getElderId, elder.getId()));
+      if (account == null) {
+        response.setStatus(OrderStatus.INSUFFICIENT_POINTS.name());
+        response.setAllowed(false);
+        response.setMessage("Points account not found");
+        return response;
+      }
+    }
+    if (pointsRequired > 0 && (account.getPointsBalance() == null || account.getPointsBalance() < pointsRequired)) {
       response.setStatus(OrderStatus.INSUFFICIENT_POINTS.name());
       response.setAllowed(false);
       response.setMessage("Insufficient points");
       return response;
     }
-    int balanceAfter = account.getPointsBalance() - pointsRequired;
+    Integer balanceAfter = account == null || account.getPointsBalance() == null
+        ? null
+        : account.getPointsBalance() - pointsRequired;
 
     if (!hasSufficientInventory(elder.getOrgId(), product.getId(), request.getQty())) {
       response.setStatus(OrderStatus.INSUFFICIENT_STOCK.name());
@@ -840,22 +847,20 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
     if (monthly == null) {
       return;
     }
-    BillItem item = new BillItem();
-    item.setOrgId(order.getOrgId());
-    item.setBillMonthlyId(monthly.getId());
-    item.setItemType("SHOP_" + type);
-    item.setItemName("商城退款冲销");
-    item.setAmount(order.getTotalAmount().negate());
-    item.setRefOrderId(order.getId());
-    item.setRemark(type);
-    billItemMapper.insert(item);
-
-    if (monthly.getTotalAmount() != null) {
-      monthly.setTotalAmount(monthly.getTotalAmount().subtract(order.getTotalAmount()));
+    BigDecimal chargeAmount = appendRefundBillItem(order, monthly, type);
+    BigDecimal reversedPaymentAmount = appendPaymentReversal(order, monthly, type);
+    BigDecimal totalAmount = safe(monthly.getTotalAmount()).subtract(chargeAmount);
+    BigDecimal paidAmount = safe(monthly.getPaidAmount()).subtract(reversedPaymentAmount);
+    if (totalAmount.compareTo(BigDecimal.ZERO) < 0) {
+      totalAmount = BigDecimal.ZERO;
     }
-    if (monthly.getOutstandingAmount() != null) {
-      monthly.setOutstandingAmount(monthly.getOutstandingAmount().subtract(order.getTotalAmount()));
+    if (paidAmount.compareTo(BigDecimal.ZERO) < 0) {
+      paidAmount = BigDecimal.ZERO;
     }
+    monthly.setTotalAmount(totalAmount);
+    monthly.setPaidAmount(paidAmount);
+    BigDecimal outstandingAmount = totalAmount.subtract(paidAmount);
+    monthly.setOutstandingAmount(outstandingAmount.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : outstandingAmount);
     billMonthlyMapper.updateById(monthly);
   }
 
@@ -868,24 +873,116 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
     if (monthly == null) {
       return;
     }
-    PaymentRecord record = new PaymentRecord();
-    record.setOrgId(order.getOrgId());
-    record.setBillMonthlyId(monthly.getId());
-    record.setAmount(order.getPayableAmount());
+    BigDecimal totalDelta = upsertShopBillCharge(order, monthly);
+    BigDecimal paidDelta = upsertAutoPaymentRecord(order, monthly, paidAt);
+    monthly.setTotalAmount(safe(monthly.getTotalAmount()).add(totalDelta));
+    monthly.setPaidAmount(safe(monthly.getPaidAmount()).add(paidDelta));
+    monthly.setOutstandingAmount(monthly.getTotalAmount().subtract(monthly.getPaidAmount()));
+    billMonthlyMapper.updateById(monthly);
+  }
+
+  private BigDecimal upsertShopBillCharge(StoreOrder order, BillMonthly monthly) {
+    BillItem chargeItem = billItemMapper.selectOne(
+        Wrappers.lambdaQuery(BillItem.class)
+            .eq(BillItem::getIsDeleted, 0)
+            .eq(BillItem::getOrgId, order.getOrgId())
+            .eq(BillItem::getBillMonthlyId, monthly.getId())
+            .eq(BillItem::getRefOrderId, order.getId())
+            .eq(BillItem::getItemType, SHOP_ORDER_ITEM_TYPE)
+            .last("LIMIT 1"));
+    BigDecimal targetAmount = safe(order.getPayableAmount());
+    if (chargeItem == null) {
+      chargeItem = new BillItem();
+      chargeItem.setOrgId(order.getOrgId());
+      chargeItem.setBillMonthlyId(monthly.getId());
+      chargeItem.setItemType(SHOP_ORDER_ITEM_TYPE);
+      chargeItem.setItemName(SHOP_ORDER_ITEM_NAME);
+      chargeItem.setAmount(targetAmount);
+      chargeItem.setRefOrderId(order.getId());
+      chargeItem.setRemark(order.getOrderNo());
+      billItemMapper.insert(chargeItem);
+      return targetAmount;
+    }
+    BigDecimal currentAmount = safe(chargeItem.getAmount());
+    chargeItem.setAmount(targetAmount);
+    chargeItem.setItemName(SHOP_ORDER_ITEM_NAME);
+    chargeItem.setRemark(order.getOrderNo());
+    billItemMapper.updateById(chargeItem);
+    return targetAmount.subtract(currentAmount);
+  }
+
+  private BigDecimal upsertAutoPaymentRecord(StoreOrder order, BillMonthly monthly, LocalDateTime paidAt) {
+    String remark = AUTO_PAYMENT_REMARK_PREFIX + order.getOrderNo();
+    PaymentRecord record = paymentRecordMapper.selectOne(
+        Wrappers.lambdaQuery(PaymentRecord.class)
+            .eq(PaymentRecord::getIsDeleted, 0)
+            .eq(PaymentRecord::getOrgId, order.getOrgId())
+            .eq(PaymentRecord::getBillMonthlyId, monthly.getId())
+            .eq(PaymentRecord::getRemark, remark)
+            .last("LIMIT 1"));
+    BigDecimal targetAmount = safe(order.getPayableAmount());
+    if (record == null) {
+      record = new PaymentRecord();
+      record.setOrgId(order.getOrgId());
+      record.setBillMonthlyId(monthly.getId());
+      record.setAmount(targetAmount);
+      record.setPayMethod("CASH");
+      record.setPaidAt(paidAt);
+      record.setRemark(remark);
+      paymentRecordMapper.insert(record);
+      return targetAmount;
+    }
+    BigDecimal currentAmount = safe(record.getAmount());
+    record.setAmount(targetAmount);
     record.setPayMethod("CASH");
     record.setPaidAt(paidAt);
-    record.setRemark("商城订单出库自动收款: " + order.getOrderNo());
-    paymentRecordMapper.insert(record);
+    paymentRecordMapper.updateById(record);
+    return targetAmount.subtract(currentAmount);
+  }
 
-    if (monthly.getPaidAmount() == null) {
-      monthly.setPaidAmount(BigDecimal.ZERO);
+  private BigDecimal appendRefundBillItem(StoreOrder order, BillMonthly monthly, String type) {
+    List<BillItem> chargeItems = billItemMapper.selectList(
+        Wrappers.lambdaQuery(BillItem.class)
+            .eq(BillItem::getIsDeleted, 0)
+            .eq(BillItem::getOrgId, order.getOrgId())
+            .eq(BillItem::getBillMonthlyId, monthly.getId())
+            .eq(BillItem::getRefOrderId, order.getId())
+            .eq(BillItem::getItemType, SHOP_ORDER_ITEM_TYPE));
+    BigDecimal chargeAmount = chargeItems.stream()
+        .map(BillItem::getAmount)
+        .filter(java.util.Objects::nonNull)
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
+    if (chargeAmount.compareTo(BigDecimal.ZERO) <= 0) {
+      return BigDecimal.ZERO;
     }
-    monthly.setPaidAmount(monthly.getPaidAmount().add(order.getPayableAmount()));
-    if (monthly.getTotalAmount() != null && monthly.getTotalAmount().compareTo(BigDecimal.ZERO) > 0) {
-      BigDecimal outstanding = monthly.getTotalAmount().subtract(monthly.getPaidAmount());
-      monthly.setOutstandingAmount(outstanding);
+    for (BillItem chargeItem : chargeItems) {
+      chargeItem.setIsDeleted(1);
+      chargeItem.setRemark(order.getOrderNo() + " [" + type + "]");
+      billItemMapper.updateById(chargeItem);
     }
-    billMonthlyMapper.updateById(monthly);
+    return chargeAmount;
+  }
+
+  private BigDecimal appendPaymentReversal(StoreOrder order, BillMonthly monthly, String type) {
+    List<PaymentRecord> sourcePayments = paymentRecordMapper.selectList(
+        Wrappers.lambdaQuery(PaymentRecord.class)
+            .eq(PaymentRecord::getIsDeleted, 0)
+            .eq(PaymentRecord::getOrgId, order.getOrgId())
+            .eq(PaymentRecord::getBillMonthlyId, monthly.getId())
+            .eq(PaymentRecord::getRemark, AUTO_PAYMENT_REMARK_PREFIX + order.getOrderNo()));
+    BigDecimal paidAmount = sourcePayments.stream()
+        .map(PaymentRecord::getAmount)
+        .filter(java.util.Objects::nonNull)
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
+    if (paidAmount.compareTo(BigDecimal.ZERO) <= 0) {
+      return BigDecimal.ZERO;
+    }
+    for (PaymentRecord sourcePayment : sourcePayments) {
+      sourcePayment.setIsDeleted(1);
+      sourcePayment.setRemark(AUTO_PAYMENT_REMARK_PREFIX + order.getOrderNo() + " [" + type + "]");
+      paymentRecordMapper.updateById(sourcePayment);
+    }
+    return paidAmount;
   }
 
   private BillMonthly ensureBillMonthly(Long orgId, Long elderId, LocalDateTime paidAt) {
@@ -911,6 +1008,10 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
     monthly.setStatus(0);
     billMonthlyMapper.insert(monthly);
     return monthly;
+  }
+
+  private BigDecimal safe(BigDecimal value) {
+    return value == null ? BigDecimal.ZERO : value;
   }
 
   private void createFulfillTodos(StoreOrder order) {

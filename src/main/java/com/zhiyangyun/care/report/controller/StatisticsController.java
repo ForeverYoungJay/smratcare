@@ -55,6 +55,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class StatisticsController {
   private static final String MONTH_PATTERN = "^\\d{4}-(0[1-9]|1[0-2])$";
   private static final String DATE_PATTERN = "^\\d{4}-(0[1-9]|1[0-2])-([0-2]\\d|3[0-1])$";
+  private static final int STORE_ORDER_STATUS_FULFILLED = 3;
+  private static final int STORE_ORDER_PAY_STATUS_SETTLED = 1;
 
   private final ElderAdmissionMapper admissionMapper;
   private final ElderDischargeMapper dischargeMapper;
@@ -186,8 +188,10 @@ public class StatisticsController {
             .eq(StoreOrder::getIsDeleted, 0)
             .eq(scopedOrgId != null, StoreOrder::getOrgId, scopedOrgId)
             .eq(elderId != null, StoreOrder::getElderId, elderId)
-            .ge(StoreOrder::getCreateTime, startTime)
-            .lt(StoreOrder::getCreateTime, endTime));
+            .eq(StoreOrder::getOrderStatus, STORE_ORDER_STATUS_FULFILLED)
+            .eq(StoreOrder::getPayStatus, STORE_ORDER_PAY_STATUS_SETTLED)
+            .ge(StoreOrder::getPayTime, startTime)
+            .lt(StoreOrder::getPayTime, endTime));
 
     Map<String, BigDecimal> billByMonth = initMonthAmountMap(start, end);
     Map<String, BigDecimal> storeByMonth = initMonthAmountMap(start, end);
@@ -204,12 +208,12 @@ public class StatisticsController {
       }
     }
     for (StoreOrder order : orders) {
-      if (order.getCreateTime() == null) {
+      if (order.getPayTime() == null) {
         continue;
       }
       BigDecimal amount = safeAmount(order.getTotalAmount());
       totalStore = totalStore.add(amount);
-      String month = YearMonth.from(order.getCreateTime()).toString();
+      String month = YearMonth.from(order.getPayTime()).toString();
       storeByMonth.put(month, storeByMonth.getOrDefault(month, BigDecimal.ZERO).add(amount));
       if (order.getElderId() != null) {
         topByElder.merge(order.getElderId(), amount, BigDecimal::add);

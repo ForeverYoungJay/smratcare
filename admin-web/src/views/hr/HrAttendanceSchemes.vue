@@ -61,6 +61,10 @@
           </a-form>
           <a-space wrap>
             <a-button type="primary" @click="generateSchedule">自动生成排班表</a-button>
+            <a-button type="primary" ghost :loading="publishing" :disabled="rows.length === 0" @click="publishSchedule">
+              保存并实施
+            </a-button>
+            <a-button :loading="loadingPublished" @click="loadPublishedSchedule">加载已实施排班</a-button>
             <a-button @click="saveDraft">保存草稿</a-button>
             <a-button @click="resetPlan">重置</a-button>
           </a-space>
@@ -148,8 +152,10 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import DataTable from '../../components/DataTable.vue'
 import { useStaffOptions } from '../../composables/useStaffOptions'
+import { createSchedule, deleteSchedule, getSchedulePage, updateSchedule } from '../../api/schedule'
 import { exportCsv } from '../../utils/export'
 import { openPrintTableReport } from '../../utils/print'
+import type { Id, PageResult, ScheduleItem } from '../../types'
 
 type ScheduleRow = {
   date: string
@@ -157,13 +163,15 @@ type ScheduleRow = {
   requiredCount: number
   staffNames: string
   staffNamesList: string[]
+  staffAssignments: Array<{ id?: string | number; name: string }>
   isHoliday: boolean
   primaryStaffName?: string
+  primaryStaffId?: string | number
   remark?: string
 }
 
 type ScheduleConflict = {
-  type: 'HOLIDAY_PRIMARY_MISSING' | 'DUPLICATE_ASSIGNMENT' | 'HEADCOUNT_MISMATCH'
+  type: 'HOLIDAY_PRIMARY_MISSING' | 'DUPLICATE_ASSIGNMENT' | 'HEADCOUNT_MISMATCH' | 'UNRESOLVED_STAFF'
   date: string
   message: string
 }
@@ -190,6 +198,8 @@ const plan = reactive({
 })
 const rows = ref<ScheduleRow[]>([])
 const importing = ref(false)
+const publishing = ref(false)
+const loadingPublished = ref(false)
 const scheduleConflicts = ref<ScheduleConflict[]>([])
 const dateRangeValue = ref<[Dayjs, Dayjs] | undefined>([dayjs().startOf('month'), dayjs().endOf('month')])
 const startTimeValue = ref<Dayjs | undefined>(dayjs().hour(8).minute(0).second(0))
@@ -268,18 +278,18 @@ function generateSchedule() {
   for (let cursor = start.startOf('day'); !cursor.isAfter(end, 'day'); cursor = cursor.add(1, 'day')) {
     const date = cursor.format('YYYY-MM-DD')
     const isHoliday = plan.holidayDates.includes(date)
-    const assigned: string[] = []
+    const assignments: Array<{ id?: string | number; name: string }> = []
 
     if (isHoliday && primaryName) {
-      assigned.push(primaryName)
+      assignments.push({ id: plan.holidayPrimaryStaffId, name: primaryName })
     }
 
-    while (assigned.length < plan.requiredCount) {
+    while (assignments.length < plan.requiredCount) {
       const next = selectedStaff[rotateIndex % selectedStaff.length]
       rotateIndex += 1
       if (!next) break
-      if (!assigned.includes(next.name)) {
-        assigned.push(next.name)
+      if (!assignments.some((item) => item.name === next.name)) {
+        assignments.push({ id: next.id, name: next.name })
       }
     }
 
@@ -287,10 +297,12 @@ function generateSchedule() {
       date,
       shiftTime,
       requiredCount: plan.requiredCount,
-      staffNames: assigned.join('、'),
-      staffNamesList: assigned,
+      staffNames: assignments.map((item) => item.name).join('、'),
+      staffNamesList: assignments.map((item) => item.name),
+      staffAssignments: assignments,
       isHoliday,
       primaryStaffName: isHoliday ? primaryName : '',
+      primaryStaffId: isHoliday ? plan.holidayPrimaryStaffId : undefined,
       remark: isHoliday ? firstNonEmpty(`节日值班，负责人：${primaryName || '待定'}`, plan.remark) : plan.remark
     })
   }
@@ -376,17 +388,192 @@ function parseCsv(text: string) {
   return lines.slice(1).map((line) => {
     const [date, shiftTime, staffNames, requiredCount, isHoliday, primaryStaffName, remark] = line.split(',').map((item) => item.trim())
     const staffNamesList = staffNames ? staffNames.split(/[、;；|]/).map((item) => item.trim()).filter(Boolean) : []
+    const staffAssignments = staffNamesList.map((name) => resolveStaffAssignment(name))
+    const primaryAssignment = resolveStaffAssignment(primaryStaffName)
     return {
       date,
       shiftTime,
       requiredCount: Number(requiredCount || staffNamesList.length || 0),
       staffNames,
       staffNamesList,
+      staffAssignments,
       isHoliday: ['1', 'true', 'TRUE', '节日', '是'].includes(isHoliday),
       primaryStaffName,
+      primaryStaffId: primaryAssignment?.id,
       remark
     } as ScheduleRow
   })
+}
+
+function resolveStaffAssignment(name: string | undefined) {
+  const normalized = String(name || '').trim()
+  if (!normalized) return { id: undefined, name: '' }
+  const hit = staffOptions.value.find((item) => item.label === normalized || item.name === normalized)
+  return {
+    id: hit?.value,
+    name: normalized
+  }
+}
+
+function parseShiftTime(shiftTime: string | undefined, dutyDate: string) {
+  const [start = '', end = ''] = String(shiftTime || '').split('-').map((item) => item.trim())
+  return {
+    startTime: start ? `${dutyDate}T${start}:00` : undefined,
+    endTime: end ? `${dutyDate}T${end}:00` : undefined
+  }
+}
+
+function buildPlanDateRange() {
+  if (!dateRangeValue.value?.[0] || !dateRangeValue.value?.[1]) return undefined
+  return {
+    dateFrom: dayjs(dateRangeValue.value[0]).format('YYYY-MM-DD'),
+    dateTo: dayjs(dateRangeValue.value[1]).format('YYYY-MM-DD')
+  }
+}
+
+async function fetchPublishedEntries() {
+  const range = buildPlanDateRange()
+  if (!range) return []
+  const res: PageResult<ScheduleItem> = await getSchedulePage({
+    pageNo: 1,
+    pageSize: 500,
+    dateFrom: range.dateFrom,
+    dateTo: range.dateTo
+  })
+  return (res.list || []).filter((item) => item.sourceTemplateName === plan.name)
+}
+
+function hydrateRowsFromSchedules(items: ScheduleItem[]) {
+  const grouped = new Map<string, ScheduleItem[]>()
+  items.forEach((item) => {
+    const key = item.dutyDate || ''
+    if (!key) return
+    if (!grouped.has(key)) grouped.set(key, [])
+    grouped.get(key)?.push(item)
+  })
+  const nextRows = Array.from(grouped.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, schedules]) => {
+      const first = schedules[0]
+      const assignments = schedules.map((item) => ({
+        id: item.staffId,
+        name: item.staffName || String(item.staffId || '')
+      }))
+      const shiftTime = first?.startTime && first?.endTime
+        ? `${dayjs(first.startTime).format('HH:mm')}-${dayjs(first.endTime).format('HH:mm')}`
+        : ''
+      const primary = assignments[0]
+      const isHoliday = plan.holidayDates.includes(date)
+      return {
+        date,
+        shiftTime,
+        requiredCount: schedules.length,
+        staffNames: assignments.map((item) => item.name).join('、'),
+        staffNamesList: assignments.map((item) => item.name),
+        staffAssignments: assignments,
+        isHoliday,
+        primaryStaffName: isHoliday ? primary?.name || '' : '',
+        primaryStaffId: isHoliday ? primary?.id : undefined,
+        remark: first?.sourceTemplateName ? `已实施：${first.sourceTemplateName}` : ''
+      } as ScheduleRow
+    })
+  rows.value = nextRows
+  scheduleConflicts.value = collectScheduleConflicts(nextRows)
+}
+
+async function publishSchedule() {
+  if (!validatePlan()) return
+  if (!rows.value.length) {
+    message.warning('请先生成排班表')
+    return
+  }
+  if (scheduleConflicts.value.length) {
+    message.warning('请先处理排班冲突后再实施')
+    return
+  }
+  const unresolved = rows.value.filter((item) => item.staffAssignments.some((assignment) => !assignment.id))
+  if (unresolved.length) {
+    message.warning(`存在 ${unresolved.length} 天未匹配到员工档案，请补全后再实施`)
+    return
+  }
+
+  publishing.value = true
+  try {
+    const existing = await fetchPublishedEntries()
+    const existingMap = new Map(existing.map((item) => [`${item.dutyDate}::${item.staffId}`, item]))
+    const nextKeys = new Set<string>()
+    let createdCount = 0
+    let updatedCount = 0
+
+    for (const row of rows.value) {
+      const timeRange = parseShiftTime(row.shiftTime, row.date)
+      for (const assignment of row.staffAssignments) {
+        const key = `${row.date}::${assignment.id}`
+        nextKeys.add(key)
+        const payload: Partial<ScheduleItem> = {
+          staffId: assignment.id as Id,
+          dutyDate: row.date,
+          shiftCode: row.isHoliday ? '行政值班-节日' : '行政值班',
+          startTime: timeRange.startTime,
+          endTime: timeRange.endTime,
+          sourceTemplateName: plan.name,
+          status: 1
+        }
+        const matched = existingMap.get(key)
+        if (matched?.id) {
+          await updateSchedule(matched.id, payload)
+          updatedCount += 1
+        } else {
+          await createSchedule(payload)
+          createdCount += 1
+        }
+      }
+    }
+
+    const stale = existing.filter((item) => !nextKeys.has(`${item.dutyDate}::${item.staffId}`))
+    for (const item of stale) {
+      if (item.id != null) {
+        await deleteSchedule(item.id)
+      }
+    }
+
+    const summary = [`新增 ${createdCount} 条`, `更新 ${updatedCount} 条`]
+    if (stale.length) {
+      summary.push(`清理 ${stale.length} 条旧排班`)
+    }
+    message.success(`排班已实施，${summary.join('，')}，并已同步 OA 日程与值班提醒`)
+    await loadPublishedSchedule()
+  } catch (error) {
+    console.error(error)
+    message.error('实施失败，请稍后重试')
+  } finally {
+    publishing.value = false
+  }
+}
+
+async function loadPublishedSchedule() {
+  const range = buildPlanDateRange()
+  if (!range) {
+    message.warning('请先选择排班日期范围')
+    return
+  }
+  loadingPublished.value = true
+  try {
+    const schedules = await fetchPublishedEntries()
+    if (!schedules.length) {
+      rows.value = []
+      scheduleConflicts.value = []
+      message.info('当前方案在所选日期范围内还没有已实施排班')
+      return
+    }
+    hydrateRowsFromSchedules(schedules)
+    message.success(`已加载 ${schedules.length} 条已实施排班`)
+  } catch (error) {
+    console.error(error)
+    message.error('加载已实施排班失败')
+  } finally {
+    loadingPublished.value = false
+  }
 }
 
 function downloadCsv() {
@@ -454,6 +641,17 @@ function collectScheduleConflicts(sourceRows: ScheduleRow[]) {
         message: `排班人数与需求不一致，当前 ${item.staffNamesList.length} 人，需求 ${item.requiredCount} 人`
       })
     }
+
+    ;(item.staffAssignments || []).forEach((assignment) => {
+      if (!assignment?.name) return
+      if (!assignment?.id) {
+        conflicts.push({
+          type: 'UNRESOLVED_STAFF',
+          date: item.date,
+          message: `${assignment.name} 未匹配到员工档案，暂不能实施`
+        })
+      }
+    })
 
     ;(item.staffNamesList || []).forEach((name) => {
       const key = `${item.date}::${name}`

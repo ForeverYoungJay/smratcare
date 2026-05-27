@@ -679,6 +679,7 @@ public class FinanceReportController {
 
   private String normalizeCategory(String itemType, String itemName) {
     String text = (normalizeText(itemType, "") + " " + normalizeText(itemName, "")).toLowerCase(Locale.ROOT);
+    if (text.contains("shop") || text.contains("mall") || text.contains("商城")) return "RETAIL";
     if (text.contains("bed") || text.contains("房") || text.contains("床")) return "ROOM";
     if (text.contains("nurs") || text.contains("护理")) return "NURSING";
     if (text.contains("med") || text.contains("医") || text.contains("药")) return "MEDICAL";
@@ -690,6 +691,7 @@ public class FinanceReportController {
   }
 
   private String categoryLabel(String category) {
+    if ("RETAIL".equals(category)) return "商城零售";
     if ("ROOM".equals(category)) return "房费";
     if ("NURSING".equals(category)) return "护理";
     if ("MEDICAL".equals(category)) return "医护";

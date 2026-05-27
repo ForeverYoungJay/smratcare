@@ -605,6 +605,8 @@ public class AdminHrController {
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String scene) {
     Long orgId = AuthContext.getOrgId();
+    String normalizedKeyword = keyword == null ? null : keyword.trim();
+    Long keywordId = parseKeywordId(normalizedKeyword);
     var wrapper = Wrappers.lambdaQuery(OaApproval.class)
         .eq(OaApproval::getIsDeleted, 0)
         .eq(orgId != null, OaApproval::getOrgId, orgId)
@@ -613,11 +615,16 @@ public class AdminHrController {
     if (scene != null && !scene.isBlank()) {
       wrapper.like(OaApproval::getFormData, "\"" + "scene" + "\":\"" + scene + "\"");
     }
-    if (keyword != null && !keyword.isBlank()) {
-      wrapper.and(w -> w.like(OaApproval::getTitle, keyword.trim())
-          .or().like(OaApproval::getApplicantName, keyword.trim())
-          .or().like(OaApproval::getRemark, keyword.trim())
-          .or().like(OaApproval::getFormData, keyword.trim()));
+    if (normalizedKeyword != null && !normalizedKeyword.isBlank()) {
+      wrapper.and(w -> {
+        if (keywordId != null) {
+          w.eq(OaApproval::getId, keywordId).or();
+        }
+        w.like(OaApproval::getTitle, normalizedKeyword)
+            .or().like(OaApproval::getApplicantName, normalizedKeyword)
+            .or().like(OaApproval::getRemark, normalizedKeyword)
+            .or().like(OaApproval::getFormData, normalizedKeyword);
+      });
     }
     wrapper.orderByDesc(OaApproval::getCreateTime);
     IPage<OaApproval> page = oaApprovalMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
@@ -2312,6 +2319,8 @@ public class AdminHrController {
       @RequestParam(required = false) String dateTo) {
     Long orgId = AuthContext.getOrgId();
     String resolvedScene = normalizeTrainingScene(scene, "RECORD");
+    String normalizedKeyword = keyword == null ? null : keyword.trim();
+    Long keywordId = parseKeywordId(normalizedKeyword);
     var wrapper = Wrappers.lambdaQuery(StaffTrainingRecord.class)
         .eq(StaffTrainingRecord::getIsDeleted, 0)
         .eq(orgId != null, StaffTrainingRecord::getOrgId, orgId)
@@ -2319,12 +2328,21 @@ public class AdminHrController {
         .eq(departmentId != null, StaffTrainingRecord::getDepartmentId, departmentId)
         .eq(trainingYear != null, StaffTrainingRecord::getTrainingYear, trainingYear)
         .eq(StaffTrainingRecord::getTrainingScene, resolvedScene);
-    if (keyword != null && !keyword.isBlank()) {
-      wrapper.and(w -> w.like(StaffTrainingRecord::getTrainingName, keyword)
-          .or().like(StaffTrainingRecord::getProvider, keyword)
-          .or().like(StaffTrainingRecord::getInstructor, keyword)
-          .or().like(StaffTrainingRecord::getStaffNo, keyword)
-          .or().like(StaffTrainingRecord::getDepartmentName, keyword));
+    if (normalizedKeyword != null && !normalizedKeyword.isBlank()) {
+      wrapper.and(w -> {
+        if (keywordId != null) {
+          w.eq(StaffTrainingRecord::getId, keywordId)
+              .or().eq(StaffTrainingRecord::getStaffId, keywordId)
+              .or();
+        }
+        w.like(StaffTrainingRecord::getTrainingName, normalizedKeyword)
+            .or().like(StaffTrainingRecord::getTrainingType, normalizedKeyword)
+            .or().like(StaffTrainingRecord::getProvider, normalizedKeyword)
+            .or().like(StaffTrainingRecord::getInstructor, normalizedKeyword)
+            .or().like(StaffTrainingRecord::getStaffNo, normalizedKeyword)
+            .or().like(StaffTrainingRecord::getDepartmentName, normalizedKeyword)
+            .or().like(StaffTrainingRecord::getRemark, normalizedKeyword);
+      });
     }
     if (dateFrom != null && !dateFrom.isBlank()) {
       LocalDate start = parseDate(dateFrom);
@@ -2475,7 +2493,10 @@ public class AdminHrController {
     response.setRemark(item == null ? null : item.getRemark());
     response.setApplicantName(item == null ? null : item.getApplicantName());
     response.setCreateTime(item == null ? null : item.getCreateTime());
-    response.setHeadcount(item == null || item.getAmount() == null ? asInt(ext.get("headcount")) : item.getAmount().intValue());
+    Integer headcount = item == null || item.getAmount() == null
+        ? asInt(ext.get("headcount"))
+        : Integer.valueOf(item.getAmount().intValue());
+    response.setHeadcount(headcount);
     response.setPositionName(asString(ext.get("positionName")));
     response.setDepartmentName(asString(ext.get("departmentName")));
     response.setScene(asString(ext.get("scene")));
@@ -3053,6 +3074,17 @@ public class AdminHrController {
         .eq(orgId != null, StaffAccount::getOrgId, orgId)
         .eq(StaffAccount::getIsDeleted, 0)
         .last("LIMIT 1"));
+  }
+
+  private Long parseKeywordId(String keyword) {
+    if (keyword == null || keyword.isBlank()) {
+      return null;
+    }
+    try {
+      return Long.parseLong(keyword.trim());
+    } catch (NumberFormatException ex) {
+      return null;
+    }
   }
 
   private List<StaffAccount> listActiveStaff(Long orgId) {

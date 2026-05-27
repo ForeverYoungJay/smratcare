@@ -411,8 +411,17 @@ public class BillServiceImpl implements BillService {
         Wrappers.lambdaQuery(BillItem.class)
             .eq(BillItem::getBillMonthlyId, billId)
             .eq(BillItem::getIsDeleted, 0));
+    boolean hasShopOrderItem = items.stream()
+        .anyMatch(item -> "SHOP_ORDER".equals(item.getItemType())
+            && item.getAmount() != null
+            && item.getAmount().compareTo(BigDecimal.ZERO) > 0);
     List<BillItemDetail> details = new ArrayList<>();
     for (BillItem item : items) {
+      if (hasShopOrderItem
+          && "SHOP".equals(item.getItemType())
+          && (item.getAmount() == null || item.getAmount().compareTo(BigDecimal.ZERO) == 0)) {
+        continue;
+      }
       BillItemDetail detail = new BillItemDetail();
       detail.setItemType(item.getItemType());
       detail.setItemName(item.getItemName());

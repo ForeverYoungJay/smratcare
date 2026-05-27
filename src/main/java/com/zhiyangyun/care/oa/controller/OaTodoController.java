@@ -499,6 +499,8 @@ public class OaTodoController {
 
   private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaTodo> buildQuery(
       Long orgId, Long staffId, boolean adminView, boolean mineOnly, String normalizedStatus, String normalizedSourceType, String keyword) {
+    String normalizedKeyword = keyword == null ? null : keyword.trim();
+    Long keywordId = parseKeywordId(normalizedKeyword);
     var wrapper = Wrappers.lambdaQuery(OaTodo.class)
         .eq(OaTodo::getIsDeleted, 0)
         .eq(orgId != null, OaTodo::getOrgId, orgId)
@@ -521,12 +523,31 @@ public class OaTodoController {
               .notLike(OaTodo::getContent, "[APPROVAL_FLOW:"))
           .or().isNull(OaTodo::getContent));
     }
-    if (keyword != null && !keyword.isBlank()) {
-      wrapper.and(w -> w.like(OaTodo::getTitle, keyword)
-          .or().like(OaTodo::getContent, keyword)
-          .or().like(OaTodo::getAssigneeName, keyword));
+    if (normalizedKeyword != null && !normalizedKeyword.isBlank()) {
+      wrapper.and(w -> {
+        if (keywordId != null) {
+          w.eq(OaTodo::getId, keywordId)
+              .or().eq(OaTodo::getAssigneeId, keywordId)
+              .or().eq(OaTodo::getCreatedBy, keywordId)
+              .or();
+        }
+        w.like(OaTodo::getTitle, normalizedKeyword)
+            .or().like(OaTodo::getContent, normalizedKeyword)
+            .or().like(OaTodo::getAssigneeName, normalizedKeyword);
+      });
     }
     return wrapper;
+  }
+
+  private Long parseKeywordId(String keyword) {
+    if (keyword == null || keyword.isBlank()) {
+      return null;
+    }
+    try {
+      return Long.parseLong(keyword.trim());
+    } catch (NumberFormatException ex) {
+      return null;
+    }
   }
 
   private long count(Long value) {

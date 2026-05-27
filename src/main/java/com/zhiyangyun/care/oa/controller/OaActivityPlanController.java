@@ -525,7 +525,7 @@ public class OaActivityPlanController {
     step.put("roleCode", roleCode);
     step.put("label", label);
     step.put("status", status);
-    StaffAccount assignee = findFirstActiveStaffByRole(orgId, roleCode);
+    StaffAccount assignee = findExpectedApprover(orgId, roleCode);
     if (assignee != null) {
       step.put("expectedApproverId", assignee.getId());
       step.put("expectedApproverName", trimToNull(assignee.getRealName()) != null ? assignee.getRealName() : assignee.getUsername());
@@ -611,6 +611,16 @@ public class OaActivityPlanController {
     return false;
   }
 
+  private StaffAccount findExpectedApprover(Long orgId, String roleCode) {
+    if (AuthContext.isAdmin()) {
+      StaffAccount current = findActiveStaffById(orgId, AuthContext.getStaffId());
+      if (current != null && canApproveByRole(roleCode)) {
+        return current;
+      }
+    }
+    return findFirstActiveStaffByRole(orgId, roleCode);
+  }
+
   private StaffAccount findFirstActiveStaffByRole(Long orgId, String roleCode) {
     if (orgId == null || roleCode == null || roleCode.isBlank()) {
       return null;
@@ -631,6 +641,26 @@ public class OaActivityPlanController {
       }
     }
     return null;
+  }
+
+  private StaffAccount findActiveStaffById(Long orgId, Long staffId) {
+    if (orgId == null || staffId == null) {
+      return null;
+    }
+    StaffAccount account = staffMapper.selectById(staffId);
+    if (account == null) {
+      return null;
+    }
+    if (!Objects.equals(account.getOrgId(), orgId)) {
+      return null;
+    }
+    if (account.getIsDeleted() != null && account.getIsDeleted() != 0) {
+      return null;
+    }
+    if (account.getStatus() != null && account.getStatus() == 0) {
+      return null;
+    }
+    return account;
   }
 
   private List<String> resolveRoleCandidates(String roleCode) {
