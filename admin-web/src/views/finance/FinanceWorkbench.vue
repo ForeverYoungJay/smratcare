@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="财务工作台" subTitle="把今天要处理的收费、欠费、退款、对账和经营观察收在一个入口里。" mode="showcase">
+  <PageContainer title="财务工作台" subTitle="把今天要处理的收费、欠费、退款、对账和经营观察收在一个入口里。" mode="showcase" kicker="经营运营">
     <template #meta>
       <span class="soft-pill">业务日期 {{ overview?.bizDate || '-' }}</span>
       <span class="soft-pill">当前视角 {{ roleTone }}</span>

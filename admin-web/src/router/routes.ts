@@ -39,13 +39,13 @@ export const routes: RouteRecordRaw[] = [
         path: 'portal',
         name: 'Portal',
         component: () => import('../views/Portal.vue'),
-        meta: { title: '首页', icon: 'HomeOutlined' }
+        meta: { title: '首页', icon: 'HomeOutlined', navSection: 'core', navOrder: 10, navPinned: true }
       },
       {
         path: 'workbench',
         name: 'Workbench',
         component: () => import('../layouts/RouteView.vue'),
-        meta: { title: '工作台', icon: 'AppstoreOutlined' },
+        meta: { title: '工作台', icon: 'AppstoreOutlined', navSection: 'core', navOrder: 20, navPinned: true },
         redirect: '/workbench/overview',
         children: [
           {
@@ -95,7 +95,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'elder',
         name: 'Elder',
-        meta: { title: '长者管理', icon: 'TeamOutlined' },
+        meta: { title: '长者管理', icon: 'TeamOutlined', navSection: 'core', navOrder: 30, navPinned: true },
         redirect: '/elder/resident-360',
         children: [
           {
@@ -365,7 +365,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'marketing',
         name: 'Marketing',
-        meta: { title: '营销管理', icon: 'FundProjectionScreenOutlined', roles: ['MARKETING_EMPLOYEE', 'MARKETING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
+        meta: { title: '营销管理', icon: 'FundProjectionScreenOutlined', navSection: 'operations', navOrder: 50, navPinned: true, roles: ['MARKETING_EMPLOYEE', 'MARKETING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
         redirect: '/marketing/workbench',
         children: [
           {
@@ -746,7 +746,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'logistics',
         name: 'Logistics',
-        meta: { title: '后勤保障', icon: 'ToolOutlined', roles: ['LOGISTICS_EMPLOYEE', 'LOGISTICS_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
+        meta: { title: '后勤保障', icon: 'ToolOutlined', navSection: 'assurance', navOrder: 80, navPinned: true, roles: ['LOGISTICS_EMPLOYEE', 'LOGISTICS_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
         redirect: '/logistics/workbench',
         children: [
           {
@@ -1276,7 +1276,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'finance',
         name: 'Finance',
-        meta: { title: '财务运营中心', icon: 'AccountBookOutlined', roles: ['FINANCE_EMPLOYEE', 'FINANCE_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
+        meta: { title: '财务运营中心', icon: 'AccountBookOutlined', navSection: 'operations', navOrder: 60, navPinned: true, roles: ['FINANCE_EMPLOYEE', 'FINANCE_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
         redirect: '/finance/workbench',
         children: [
           {
@@ -1941,7 +1941,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'medical-care',
         name: 'MedicalCare',
-        meta: { title: '医护健康服务', icon: 'MedicineBoxOutlined', roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
+        meta: { title: '医护健康服务', icon: 'MedicineBoxOutlined', navSection: 'core', navOrder: 40, navPinned: true, roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
         redirect: '/medical-care/center',
         children: [
           {
@@ -2054,6 +2054,9 @@ export const routes: RouteRecordRaw[] = [
         meta: {
           title: '消防安全管理',
           icon: 'SafetyOutlined',
+          navSection: 'assurance',
+          navOrder: 90,
+          navPinned: true,
           roles: ['GUARD', 'LOGISTICS_EMPLOYEE', 'LOGISTICS_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
         },
         redirect: '/fire/facility-management',
@@ -2111,7 +2114,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'stats',
         name: 'Stats',
-        meta: { title: '统计分析', icon: 'BarChartOutlined' },
+        meta: { title: '统计分析', icon: 'BarChartOutlined', navSection: 'operations', navOrder: 70, navPinned: true },
         redirect: '/stats/check-in',
         children: [
           {
@@ -2437,6 +2440,9 @@ export const routes: RouteRecordRaw[] = [
         meta: {
           title: '行政管理',
           icon: 'ApartmentOutlined',
+          navSection: 'assurance',
+          navOrder: 100,
+          navPinned: true,
           roles: [
             'STAFF',
             'HR_EMPLOYEE', 'HR_MINISTER',
@@ -2705,7 +2711,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'hr',
         name: 'Hr',
-        meta: { title: '人力资源', icon: 'TeamOutlined', roles: ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
+        meta: { title: '人力资源', icon: 'TeamOutlined', navSection: 'assurance', navOrder: 110, navPinned: true, roles: ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
         redirect: '/hr/overview',
         children: [
           {
@@ -3041,7 +3047,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'base-config',
         name: 'BaseConfig',
-        meta: { title: '基础数据配置', icon: 'DatabaseOutlined', roles: ['ADMIN'] },
+        meta: { title: '基础数据配置', icon: 'DatabaseOutlined', navSection: 'system', navOrder: 120, navPinned: true, roles: ['ADMIN'] },
         redirect: '/base-config/elder-type',
         children: [
           {
@@ -3179,7 +3185,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'system',
         name: 'System',
-        meta: { title: '系统管理', icon: 'SettingOutlined', roles: ['DIRECTOR', 'SYS_ADMIN', 'ADMIN', 'HR_MINISTER'] },
+        meta: { title: '系统管理', icon: 'SettingOutlined', navSection: 'system', navOrder: 130, navPinned: true, roles: ['DIRECTOR', 'SYS_ADMIN', 'ADMIN', 'HR_MINISTER'] },
         redirect: '/system/site-config',
         children: [
           {

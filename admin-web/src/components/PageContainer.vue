@@ -1,10 +1,13 @@
 <template>
   <div class="page-container page-shell" :class="[`page-shell--${mode}`]">
     <section class="page-head" :class="{ 'page-head--showcase': mode === 'showcase' }">
+      <div class="page-head-accent"></div>
       <div class="page-head-glow" v-if="mode === 'showcase'"></div>
       <div class="page-head-main">
         <div class="page-title-wrap">
-          <div class="page-kicker">{{ mode === 'showcase' ? 'Smart Senior Care SaaS' : 'Marketing Operations' }}</div>
+          <div class="page-kicker" v-if="kicker">
+            <span class="page-kicker-chip">{{ kicker }}</span>
+          </div>
           <div class="page-title-row">
             <h1 class="page-title">{{ title }}</h1>
             <slot name="badge" />
@@ -15,11 +18,13 @@
           <slot name="extra" />
         </div>
       </div>
-      <div class="page-head-meta" v-if="$slots.meta">
-        <slot name="meta" />
-      </div>
-      <div class="page-head-stats" v-if="$slots.stats">
-        <slot name="stats" />
+      <div class="page-head-foot" v-if="$slots.meta || $slots.stats">
+        <div class="page-head-meta" v-if="$slots.meta">
+          <slot name="meta" />
+        </div>
+        <div class="page-head-stats" v-if="$slots.stats">
+          <slot name="stats" />
+        </div>
       </div>
     </section>
     <section class="page-body">
@@ -29,34 +34,44 @@
 </template>
 
 <script setup lang="ts">
-const props = withDefaults(defineProps<{ title: string; subTitle?: string; subTitleAlias?: string; mode?: 'workspace' | 'showcase' }>(), {
+const props = withDefaults(defineProps<{ title: string; subTitle?: string; subTitleAlias?: string; mode?: 'workspace' | 'showcase'; kicker?: string }>(), {
   mode: 'workspace'
 })
 const subTitleAlias = props.subTitleAlias
 const mode = props.mode
+const kicker = props.kicker
 </script>
 
 <style scoped>
 .page-shell {
-  gap: 20px;
+  gap: 18px;
 }
 
 .page-head {
   position: relative;
-  padding: 10px 0 6px;
-  border-bottom: 1px solid rgba(200, 216, 229, 0.72);
+  padding: 22px 24px;
+  border: 1px solid rgba(206, 220, 231, 0.9);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at top right, rgba(120, 211, 237, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(252, 254, 255, 0.98), rgba(244, 249, 252, 0.96));
+  box-shadow: 0 18px 42px rgba(16, 68, 103, 0.08);
+  overflow: hidden;
+}
+
+.page-head-accent {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(180deg, #3cc7d8 0%, #1f7dbd 100%);
+  border-radius: 999px;
 }
 
 .page-head--showcase {
-  padding: 24px 26px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
   background:
-    radial-gradient(320px 220px at 100% 0%, rgba(87, 215, 255, 0.12), transparent 70%),
-    radial-gradient(240px 180px at 0% 100%, rgba(121, 177, 255, 0.1), transparent 72%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(246, 250, 253, 0.96) 52%, rgba(240, 248, 252, 0.94) 100%);
-  box-shadow: var(--shadow-md);
-  overflow: hidden;
+    radial-gradient(320px 220px at 100% 0%, rgba(87, 215, 255, 0.15), transparent 68%),
+    radial-gradient(240px 180px at 0% 100%, rgba(121, 177, 255, 0.12), transparent 72%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.99) 0%, rgba(246, 251, 253, 0.97) 52%, rgba(239, 248, 252, 0.95) 100%);
 }
 
 .page-head--showcase::before,
@@ -96,15 +111,15 @@ const mode = props.mode
 .page-head-main {
   position: relative;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 20px;
 }
 
 .page-title-wrap {
   min-width: 0;
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .page-title-row {
@@ -115,27 +130,38 @@ const mode = props.mode
 }
 
 .page-kicker {
-  color: #7f96aa;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
+  display: flex;
+  align-items: center;
+}
+
+.page-kicker-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(29, 125, 189, 0.08);
+  color: #23658f;
+  font-size: 12px;
+  letter-spacing: 0.08em;
   font-weight: 700;
 }
 
 .page-title {
   margin: 0;
-  font-size: 30px;
-  line-height: 1.08;
+  font-size: 28px;
+  line-height: 1.12;
   letter-spacing: 0.01em;
   color: #12314d;
 }
 
 .page-subtitle {
   margin: 0;
-  max-width: 820px;
-  font-size: 13px;
-  color: #5f7b95;
-  line-height: 1.72;
+  max-width: 760px;
+  font-size: 14px;
+  color: #5e7890;
+  line-height: 1.7;
 }
 
 .page-head-extra {
@@ -143,21 +169,42 @@ const mode = props.mode
   align-items: center;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
+  align-self: stretch;
+}
+
+.page-head-extra :deep(.ant-space) {
+  justify-content: flex-end;
+}
+
+.page-head-extra :deep(.ant-btn),
+.page-head-extra :deep(.ant-select-selector),
+.page-head-extra :deep(.ant-input-affix-wrapper) {
+  border-radius: 12px;
+}
+
+.page-head-foot {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(208, 221, 231, 0.76);
 }
 
 .page-head-meta {
-  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  margin-top: 16px;
 }
 
 .page-head-stats {
-  position: relative;
-  margin-top: 18px;
+  min-width: 0;
+  flex: 1 1 320px;
 }
 
 .page-body {
@@ -167,43 +214,69 @@ const mode = props.mode
 }
 
 .page-shell--workspace .page-title {
-  font-size: 26px;
+  font-size: 24px;
 }
 
 .page-shell--workspace .page-head {
-  padding: 22px 24px;
-  border: 1px solid rgba(212, 225, 235, 0.86);
-  border-radius: 24px;
   background:
-    radial-gradient(circle at top right, rgba(87, 215, 255, 0.1), transparent 28%),
-    linear-gradient(135deg, rgba(248, 252, 255, 0.98), rgba(241, 248, 252, 0.95));
-  box-shadow: 0 16px 36px rgba(14, 66, 103, 0.08);
+    radial-gradient(circle at top right, rgba(87, 215, 255, 0.09), transparent 28%),
+    linear-gradient(180deg, rgba(250, 253, 255, 0.98), rgba(243, 248, 252, 0.95));
+}
+
+.page-shell--workspace .page-head-accent {
+  background: linear-gradient(180deg, #5dc0c8 0%, #317fb4 100%);
+}
+
+.page-shell--showcase .page-title {
+  font-size: 30px;
 }
 
 .page-shell--workspace .page-subtitle {
   max-width: 620px;
+  font-size: 13px;
+}
+
+.page-shell--workspace .page-kicker-chip {
+  background: rgba(54, 151, 193, 0.08);
+  color: #3b7392;
+}
+
+.page-head-meta :deep(.ant-tag),
+.page-head-meta :deep(.ant-space-item > .soft-pill),
+.page-head-meta :deep(.ant-space-item > .selection-pill) {
+  margin-inline-end: 0;
 }
 
 @media (max-width: 992px) {
   .page-head {
-    padding: 4px 0 2px;
-  }
-
-  .page-head--showcase {
     padding: 18px;
   }
 
   .page-head-main {
     flex-direction: column;
+    align-items: flex-start;
   }
 
   .page-head-extra {
     justify-content: flex-start;
     width: 100%;
+    align-self: auto;
+  }
+
+  .page-head-extra :deep(.ant-space) {
+    justify-content: flex-start;
+  }
+
+  .page-head-foot {
+    flex-direction: column;
   }
 
   .page-title {
     font-size: 24px;
+  }
+
+  .page-shell--workspace .page-title {
+    font-size: 22px;
   }
 }
 </style>

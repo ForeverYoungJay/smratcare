@@ -36,8 +36,11 @@ export function getOrgBedUsage(params?: { orgId?: Id }) {
   return request.get<BedUsageStatsResponse>('/api/stats/org/bed-usage', { params })
 }
 
-export function getMonthlyRevenueStats(params?: { from?: string; to?: string; months?: number; orgId?: Id }) {
-  return request.get<MonthlyRevenueStatsResponse>('/api/stats/monthly-revenue', { params })
+export function getMonthlyRevenueStats(
+  params?: { from?: string; to?: string; months?: number; orgId?: Id },
+  config?: Record<string, any>
+) {
+  return request.get<MonthlyRevenueStatsResponse>('/api/stats/monthly-revenue', { params, ...(config || {}) })
 }
 
 export function getElderFlowReport(params?: {

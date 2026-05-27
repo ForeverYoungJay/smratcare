@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="后勤工作台" subTitle="资产、物资、餐饮、维修的一体化运营看板" mode="showcase">
+  <PageContainer title="后勤工作台" subTitle="资产、物资、餐饮、维修的一体化运营看板" mode="showcase" kicker="机构保障">
     <template #meta>
       <span class="soft-pill">统计窗口 {{ configuredQuery.windowDays }} 天</span>
       <span class="soft-pill">值班模式 {{ dutyMode ? '高密度' : '标准' }}</span>

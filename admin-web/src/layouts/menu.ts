@@ -43,6 +43,9 @@ function buildMenu(routes: RouteRecordRaw[], roles: string[], pagePermissions: s
           roles: r.meta?.roles as string[] | undefined
         }
         if (children.length > 0) {
+          if (selfAccessible) {
+            node.path = routePath
+          }
           node.children = children
         } else if (fullPath && selfAccessible) {
           node.path = fullPath

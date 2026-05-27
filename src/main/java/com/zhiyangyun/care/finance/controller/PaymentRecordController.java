@@ -17,6 +17,7 @@ import com.zhiyangyun.care.finance.service.FinanceService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -77,7 +78,7 @@ public class PaymentRecordController {
         .filter(Objects::nonNull)
         .distinct()
         .collect(Collectors.collectingAndThen(Collectors.toList(), ids -> ids.isEmpty()
-            ? Map.<Long, StaffAccount>of()
+            ? Collections.<Long, StaffAccount>emptyMap()
             : staffMapper.selectList(Wrappers.lambdaQuery(StaffAccount.class)
                 .eq(StaffAccount::getIsDeleted, 0)
                 .in(StaffAccount::getId, ids)).stream()
@@ -91,7 +92,7 @@ public class PaymentRecordController {
       row.setPayMethod(item.getPayMethod());
       row.setPaidAt(item.getPaidAt());
       row.setOperatorStaffId(item.getOperatorStaffId());
-      StaffAccount operator = staffMap.get(item.getOperatorStaffId());
+      StaffAccount operator = item.getOperatorStaffId() == null ? null : staffMap.get(item.getOperatorStaffId());
       row.setOperatorStaffName(operator == null ? null : operator.getRealName());
       row.setRemark(item.getRemark());
       row.setExternalTxnId(item.getExternalTxnId());
