@@ -7,6 +7,7 @@ target/
 admin-web/node_modules/
 admin-web/dist/
 output/uploads/
+output/qa/*.png
 .git
 .idea
 *.iml
