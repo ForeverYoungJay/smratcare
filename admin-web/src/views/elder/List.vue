@@ -6,38 +6,6 @@
       <span v-for="tag in activeFilterTags.slice(0, 4)" :key="tag" class="selection-pill">{{ tag }}</span>
     </template>
 
-    <template #extra>
-      <a-space wrap>
-        <a-button type="primary" @click="goCreate">新建长者</a-button>
-        <a-button @click="exportCsvData">导出名单</a-button>
-      </a-space>
-    </template>
-
-    <template #stats>
-      <div class="elder-overview-grid">
-        <div class="overview-card overview-card--primary">
-          <span>当前列表</span>
-          <strong>{{ total }}</strong>
-          <small>按当前筛选口径统计</small>
-        </div>
-        <div class="overview-card overview-card--success">
-          <span>在院长者</span>
-          <strong>{{ statusCounters.inHospital }}</strong>
-          <small>需持续照护与跟进</small>
-        </div>
-        <div class="overview-card overview-card--warning">
-          <span>待办理入住</span>
-          <strong>{{ lifecycleStageCounters.pendingBedSelect }}</strong>
-          <small>优先推进选床与入住</small>
-        </div>
-        <div class="overview-card overview-card--danger">
-          <span>已选记录</span>
-          <strong>{{ selectedCount }}</strong>
-          <small>批量动作可直接执行</small>
-        </div>
-      </div>
-    </template>
-
     <SearchForm :model="query" @search="runSearch" @reset="reset">
       <a-form-item label="姓名">
         <ElderNameAutocomplete v-model:value="query.fullName" placeholder="姓名(编号)" width="220px" @select="runSearch" />
@@ -105,14 +73,20 @@
         </template>
         <template #toolbar>
           <div class="table-head">
-            <div>
+            <div class="table-head__copy">
               <strong>长者列表</strong>
               <span>支持排序、批量选择和在院动作直达。</span>
             </div>
-            <a-space wrap>
-              <a-tag color="processing">第 {{ query.pageNo }} / {{ totalPageCount }} 页</a-tag>
-              <a-tag color="default">共 {{ total }} 条</a-tag>
-            </a-space>
+            <div class="table-head__actions">
+              <a-space wrap>
+                <a-button type="primary" @click="goCreate">新建长者</a-button>
+                <a-button @click="exportCsvData">导出名单</a-button>
+              </a-space>
+              <a-space wrap>
+                <a-tag color="processing">第 {{ query.pageNo }} / {{ totalPageCount }} 页</a-tag>
+                <a-tag color="default">共 {{ total }} 条</a-tag>
+              </a-space>
+            </div>
           </div>
         </template>
         <template #bodyCell="{ column, record }">
@@ -277,28 +251,6 @@ const emptyStateDescription = computed(() => (
     ? '可以先清空筛选范围重新查看，或直接创建新的长者档案。'
     : '从这里新建第一位长者，后续就能继续入住、评估、合同和家属绑定等业务。'
 ))
-const lifecycleStageCounters = computed(() => {
-  const counters = {
-    pendingAssessment: 0,
-    pendingBedSelect: 0,
-    pendingSign: 0,
-    signed: 0
-  }
-  rows.value.forEach((item) => {
-    const stage = resolveLifecycleStage(item)
-    if (stage === 'PENDING_ASSESSMENT') counters.pendingAssessment += 1
-    if (stage === 'PENDING_BED_SELECT') counters.pendingBedSelect += 1
-    if (stage === 'PENDING_SIGN') counters.pendingSign += 1
-    if (stage === 'SIGNED') counters.signed += 1
-  })
-  return counters
-})
-
-const statusCounters = computed(() => ({
-  inHospital: rows.value.filter((item) => resolveResidentStatusView(item) === 'IN_HOSPITAL').length,
-  outing: rows.value.filter((item) => resolveResidentStatusView(item) === 'OUTING').length,
-  discharged: rows.value.filter((item) => resolveResidentStatusView(item) === 'DISCHARGED').length
-}))
 
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
@@ -819,50 +771,16 @@ watch(
 </script>
 
 <style scoped>
-.elder-overview-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.overview-card {
-  display: grid;
-  gap: 6px;
-  padding: 16px 18px;
-  border-radius: 16px;
-  border: 1px solid #dce9f2;
-  background: rgba(255, 255, 255, 0.9);
-}
-
-.overview-card--primary {
-  background: linear-gradient(180deg, rgba(19, 108, 181, 0.1) 0%, rgba(255, 255, 255, 0.96) 100%);
-}
-
-.overview-card--success {
-  background: linear-gradient(180deg, rgba(47, 155, 102, 0.1) 0%, rgba(255, 255, 255, 0.96) 100%);
-}
-
-.overview-card--warning {
-  background: linear-gradient(180deg, rgba(217, 137, 34, 0.1) 0%, rgba(255, 255, 255, 0.96) 100%);
-}
-
-.overview-card--danger {
-  background: linear-gradient(180deg, rgba(214, 76, 95, 0.1) 0%, rgba(255, 255, 255, 0.96) 100%);
-}
-
-.overview-card span,
-.table-head span {
+.table-head span,
+.action-toolbar-copy span,
+.elder-name-cell span {
   color: #6d8aa3;
   font-size: 12px;
 }
 
-.overview-card strong {
-  color: #173854;
-  font-size: 24px;
-}
-
-.overview-card small {
-  color: #7a97b0;
+.table-head span {
+  color: #6d8aa3;
+  font-size: 12px;
 }
 
 .elder-workspace {
@@ -927,6 +845,18 @@ watch(
   flex-wrap: wrap;
 }
 
+.table-head__copy {
+  min-width: 0;
+}
+
+.table-head__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .table-head strong {
   display: block;
   color: #173854;
@@ -969,17 +899,7 @@ watch(
   color: var(--muted);
 }
 
-@media (max-width: 1200px) {
-  .elder-overview-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 768px) {
-  .elder-overview-grid {
-    grid-template-columns: 1fr;
-  }
-
   .elder-workspace {
     padding: 12px;
   }
