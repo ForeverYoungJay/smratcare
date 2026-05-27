@@ -1,168 +1,126 @@
 <template>
   <div
-    v-if="manualCollapsed && !sidebarPeekOpen"
-    class="sider-edge-sensor"
-    @mouseenter="openSidebarPeek"
+    v-if="isMobileViewport && mobileSidebarOpen"
+    class="mobile-sider-backdrop"
+    @click="mobileSidebarOpen = false"
   ></div>
-  <a-layout class="app-layout">
-    <a-layout-sider
-      :collapsed="siderCollapsed"
-      collapsible
-      :trigger="null"
-      :width="244"
-      :collapsed-width="0"
-      class="app-sider"
-      :class="{ 'is-peek-open': sidebarPeekOpen, 'is-manual-collapsed': manualCollapsed }"
-      @mouseleave="handleSidebarMouseLeave"
-    >
-      <div class="brand">
-        <div class="logo">
-          <img :src="brandLogoUrl" alt="龟峰颐养中心logo" class="logo-image" />
-        </div>
-        <div class="brand-text" v-if="!siderCollapsed">
-          <div class="title">龟峰颐养</div>
-          <div class="subtitle">运营管理中台</div>
-        </div>
-      </div>
-      <a-menu
-        theme="light"
-        mode="inline"
-        :selectedKeys="selectedKeys"
-        :openKeys="openKeys"
-        @openChange="onOpenChange"
-        :items="menuItems"
-        @click="onMenuClick"
-        class="side-menu"
+  <AppShell :show-peek-sensor="!isMobileViewport && manualCollapsed && !sidebarPeekOpen" @peek-open="openSidebarPeek">
+    <template #sider>
+      <PrimarySider
+        :collapsed="siderCollapsed"
+        :is-peek-open="sidebarPeekOpen"
+        :manual-collapsed="manualCollapsed"
+        :menu-items="menuItems"
+        :mobile="isMobileViewport"
+        :open-keys="openKeys"
+        :selected-keys="selectedKeys"
+        @mouseleave="handleSidebarMouseLeave"
+        @menu-click="onMenuClick"
+        @open-change="onOpenChange"
       />
-    </a-layout-sider>
+    </template>
 
-    <a-layout class="app-main">
-      <a-layout-header class="app-header">
-        <div class="header-left">
-          <div class="header-left-top">
-            <a-button size="small" class="sider-toggle-btn" @click="toggleSidebar">
-              {{ manualCollapsed ? '展开导航' : '收起导航' }}
-            </a-button>
-            <div class="page-title">{{ currentTitle || '工作台' }}</div>
-          </div>
-          <a-breadcrumb class="breadcrumb">
-            <a-breadcrumb-item v-for="(bc, idx) in breadcrumbs" :key="idx">
-              {{ bc }}
-            </a-breadcrumb-item>
-          </a-breadcrumb>
-        </div>
-        <div class="header-right">
-          <div class="header-status-cluster">
-            <span class="today-label">{{ todayLabel }}</span>
-            <a-badge status="processing" text="系统运行中" class="system-status" />
-            <span class="system-name">龟峰颐养中心智慧养老管理平台</span>
-          </div>
-          <div class="header-action-cluster">
-            <a-dropdown trigger="click">
-              <a-tag :color="presenceStatus.color" class="presence-tag">{{ presenceStatus.label }}</a-tag>
-              <template #overlay>
-                <a-menu>
-                  <a-menu-item @click="setPresenceTraining(2)">外出培训 2 小时</a-menu-item>
-                  <a-menu-item @click="setPresenceTraining(4)">外出培训 4 小时</a-menu-item>
-                  <a-menu-item @click="clearPresenceTraining">结束培训状态</a-menu-item>
-                  <a-menu-item @click="toggleDnd">{{ quickChatDnd ? '关闭免打扰' : '开启免打扰' }}</a-menu-item>
-                </a-menu>
-              </template>
-            </a-dropdown>
-            <a-tag v-if="quickChatDnd" color="red">免打扰</a-tag>
-            <a-dropdown trigger="click">
-              <a-badge :count="quickNotifyItems.length" size="small">
-                <a-button size="small">通知</a-button>
-              </a-badge>
-              <template #overlay>
-                <a-menu>
-                  <a-menu-item v-for="item in quickNotifyItems" :key="item.title" @click="onQuickNotifyClick(item)">
-                    {{ item.title }}
-                  </a-menu-item>
-                </a-menu>
-              </template>
-            </a-dropdown>
-            <a-badge :count="quickChatUnreadCount" size="small">
-              <a-button size="small" @click="openQuickChat">聊天</a-button>
-            </a-badge>
-            <a-badge :count="quickChatTodoPendingCount" size="small">
-              <a-button size="small" @click="openQuickChatTodoDrawer">待办</a-button>
-            </a-badge>
-            <a-tag v-if="quickChatPressureTag" :color="quickChatPressureTag.color">{{ quickChatPressureTag.text }}</a-tag>
-          </div>
-          <a-dropdown>
-            <a class="user-link user-entry">
-              <a-avatar :size="28" :src="headerSettings.avatarUrl || undefined">
-                {{ (userStore.staffInfo?.realName || '管').slice(0, 1) }}
-              </a-avatar>
-              <span>{{ displayUserName }}</span>
-            </a>
-            <template #overlay>
-              <a-menu>
-                <a-menu-item @click="openHeaderSettings">个人设置</a-menu-item>
-                <a-menu-item @click="router.push('/hr/profile/account-access')">账号与赋权</a-menu-item>
-                <a-menu-item @click="logout">退出</a-menu-item>
-              </a-menu>
-            </template>
-          </a-dropdown>
-        </div>
-      </a-layout-header>
+    <template #header>
+      <GlobalHeader
+        :avatar-url="headerSettings.avatarUrl || undefined"
+        :breadcrumbs="breadcrumbs"
+        :collapsed="manualCollapsed"
+        :notification-count="quickNotifyItems.length"
+        :page-title="currentTitle || '工作台'"
+        platform-name="龟峰颐养中心运营管理平台"
+        search-placeholder="搜索页面、常用动作或最近访问"
+        :todo-count="quickChatTodoPendingCount"
+        :today-label="todayLabel"
+        :user-initial="userInitial"
+        :user-name="displayUserName"
+        @open-search="openGlobalSearch"
+        @toggle-sidebar="toggleSidebar"
+      >
+        <template #notification-overlay>
+          <a-menu>
+            <a-menu-item v-for="item in quickNotifyItems" :key="item.title" @click="onQuickNotifyClick(item)">
+              {{ item.title }}
+            </a-menu-item>
+          </a-menu>
+        </template>
 
-      <div ref="routeTabsWrapRef" class="route-tabs-wrap">
-        <a-tabs
-          v-model:activeKey="activeTabKey"
-          type="editable-card"
-          hide-add
-          size="small"
+        <template #todo-overlay>
+          <a-menu>
+            <a-menu-item @click="handleHeaderQuickTodoClick">进入我的待办</a-menu-item>
+            <a-menu-item @click="router.push('/workbench/approvals')">处理我的审批</a-menu-item>
+            <a-menu-item @click="openQuickChatTodoDrawer">查看聊天任务</a-menu-item>
+          </a-menu>
+        </template>
+
+        <template #user-overlay>
+          <a-menu>
+            <a-menu-item @click="openHeaderSettings">个人设置</a-menu-item>
+            <a-menu-item @click="router.push('/hr/profile/account-access')">账号与赋权</a-menu-item>
+            <a-menu-item @click="logout">退出</a-menu-item>
+          </a-menu>
+        </template>
+      </GlobalHeader>
+    </template>
+
+    <template #utility>
+      <UtilityBar :summary-text="utilitySummaryText">
+        <a-badge status="processing" text="系统运行中" />
+        <a-dropdown trigger="click">
+          <a-tag :color="presenceStatus.color" class="presence-tag">{{ presenceStatus.label }}</a-tag>
+          <template #overlay>
+            <a-menu>
+              <a-menu-item @click="setPresenceTraining(2)">外出培训 2 小时</a-menu-item>
+              <a-menu-item @click="setPresenceTraining(4)">外出培训 4 小时</a-menu-item>
+              <a-menu-item @click="clearPresenceTraining">结束培训状态</a-menu-item>
+              <a-menu-item @click="toggleDnd">{{ quickChatDnd ? '关闭免打扰' : '开启免打扰' }}</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+        <a-tag v-if="quickChatDnd" color="red">免打扰</a-tag>
+        <a-badge :count="quickChatUnreadCount" size="small">
+          <a-button size="small" @click="openQuickChat">快捷聊天</a-button>
+        </a-badge>
+        <a-badge :count="quickChatTodoPendingCount" size="small">
+          <a-button size="small" @click="openQuickChatTodoDrawer">聊天待办</a-button>
+        </a-badge>
+        <a-tag v-if="quickChatPressureTag" :color="quickChatPressureTag.color">{{ quickChatPressureTag.text }}</a-tag>
+        <a-button size="small" @click="openHeaderSettings">个人设置</a-button>
+      </UtilityBar>
+    </template>
+
+    <template #tabs>
+      <div ref="routeTabsWrapRef">
+        <RouteTabsBar
+          :active-tab-key="activeTabKey"
+          :drag-key="tabDrag.dragKey || undefined"
+          :over-key="tabDrag.overKey || undefined"
+          :route-tabs="routeTabs"
           @change="onTabChange"
+          @context-menu="openTabContextMenu"
+          @drag-end="onTabDragEnd"
+          @drag-over="onTabDragOver"
+          @drag-start="onTabDragStart"
+          @drop="onTabDrop"
           @edit="onTabEdit"
         >
-          <a-tab-pane
-            v-for="tab in routeTabs"
-            :key="tab.key"
-            :closable="tab.closable"
-          >
-            <template #tab>
-              <span
-                class="route-tab-title"
-                :class="{
-                  'route-tab-dragging': tabDrag.dragKey === tab.key,
-                  'route-tab-over': tabDrag.overKey === tab.key && tabDrag.dragKey !== tab.key
-                }"
-                draggable="true"
-                @dragstart="onTabDragStart(tab.key)"
-                @dragover.prevent="onTabDragOver($event, tab.key)"
-                @drop.prevent="onTabDrop(tab.key)"
-                @dragend="onTabDragEnd"
-                @contextmenu.prevent="openTabContextMenu($event, tab.key)"
-              >
-                {{ tab.title }}
-              </span>
-            </template>
-          </a-tab-pane>
-        </a-tabs>
-        <a-dropdown trigger="click">
-          <a-button size="small" class="tab-tools-btn">标签操作</a-button>
-          <template #overlay>
+          <template #tab-tools-overlay>
             <a-menu>
               <a-menu-item @click="refreshCurrentTab">刷新当前</a-menu-item>
               <a-menu-item @click="closeOtherTabs">关闭其他</a-menu-item>
               <a-menu-item @click="closeAllTabs">关闭全部</a-menu-item>
             </a-menu>
           </template>
-        </a-dropdown>
+        </RouteTabsBar>
       </div>
+    </template>
 
-      <a-layout-content class="app-content">
-        <router-view v-slot="{ Component }">
-          <keep-alive :max="aliveViewMax">
-            <component v-if="shouldCacheCurrentRoute" :is="Component" :key="viewRenderKey" />
-          </keep-alive>
-          <component v-if="!shouldCacheCurrentRoute" :is="Component" :key="viewRenderKey" />
-        </router-view>
-      </a-layout-content>
-    </a-layout>
-  </a-layout>
+    <router-view v-slot="{ Component }">
+      <keep-alive :max="aliveViewMax">
+        <component v-if="shouldCacheCurrentRoute" :is="Component" :key="viewRenderKey" />
+      </keep-alive>
+      <component v-if="!shouldCacheCurrentRoute" :is="Component" :key="viewRenderKey" />
+    </router-view>
+  </AppShell>
 
   <div
     v-if="tabContext.visible"
@@ -263,11 +221,10 @@
     </a-form>
   </a-drawer>
 
-  <a-drawer
+  <QuickChatDrawer
     v-model:open="quickChatOpen"
     title="快捷聊天"
     :width="quickChatDrawerWidth"
-    placement="right"
     :z-index="1600"
     class="quick-chat-drawer"
   >
@@ -538,7 +495,7 @@
         </div>
       </div>
     </div>
-  </a-drawer>
+  </QuickChatDrawer>
 
   <a-modal
     v-model:open="quickChatRoomEditorOpen"
@@ -879,6 +836,17 @@
       <a-button type="primary" @click="exportQuickChatTodoWeeklySummary">导出周报</a-button>
     </a-space>
   </a-modal>
+
+  <GlobalSearchPalette
+    :action-items="searchActionItems"
+    :keyword="globalSearchKeyword"
+    :open="globalSearchOpen"
+    :page-items="searchPageItems"
+    :recent-items="searchRecentItems"
+    @close="closeGlobalSearch"
+    @select="handleSearchSelection"
+    @update:keyword="globalSearchKeyword = $event"
+  />
 </template>
 
 <script setup lang="ts">
@@ -900,7 +868,15 @@ import { canBeDirectLeader, canBeIndirectLeader, ensureSupervisorOrder } from '.
 import { emitLiveSync, subscribeLiveSync, type LiveSyncPayload } from '../utils/liveSync'
 import { getToken } from '../utils/auth'
 import type { AttendanceDashboardOverview } from '../types'
-import brandLogoUrl from '../assets/guifeng-logo.png'
+import AppShell from './components/AppShell.vue'
+import GlobalHeader from './components/GlobalHeader.vue'
+import GlobalSearchPalette, { type SearchPaletteItem } from './components/GlobalSearchPalette.vue'
+import PrimarySider from './components/PrimarySider.vue'
+import QuickChatDrawer from './components/QuickChatDrawer.vue'
+import RouteTabsBar from './components/RouteTabsBar.vue'
+import UtilityBar from './components/UtilityBar.vue'
+import { buildGroupedMenuItems } from './navigation'
+import { loadRecentVisits, saveRecentVisit, type RecentVisitItem } from '../utils/recentVisits'
 
 const MAX_RESTORED_ROUTE_TABS = 8
 const MAX_ALIVE_VIEW_CACHE = 3
@@ -918,7 +894,12 @@ const NON_CACHED_ROUTE_PATH_PATTERNS = [
 
 const manualCollapsed = ref(false)
 const sidebarPeekOpen = ref(false)
-const siderCollapsed = computed(() => manualCollapsed.value && !sidebarPeekOpen.value)
+const isMobileViewport = ref(false)
+const mobileSidebarOpen = ref(false)
+const siderCollapsed = computed(() => {
+  if (isMobileViewport.value) return !mobileSidebarOpen.value
+  return manualCollapsed.value && !sidebarPeekOpen.value
+})
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
@@ -927,6 +908,9 @@ const routeTabsWrapRef = ref<HTMLElement | null>(null)
 const routeTabs = ref<Array<{ key: string; path: string; title: string; closable: boolean }>>([])
 const activeTabKey = ref('')
 const tabRefreshSeeds = reactive<Record<string, number>>({})
+const globalSearchOpen = ref(false)
+const globalSearchKeyword = ref('')
+const recentVisitItems = ref<RecentVisitItem[]>([])
 const tabContext = reactive({
   visible: false,
   x: 0,
@@ -1013,8 +997,13 @@ const displayUserName = computed(() => {
   if (realName && loginId) return `${realName}（${loginId}）`
   return realName || loginId || '管理员'
 })
+const userInitial = computed(() => (userStore.staffInfo?.realName || headerSettings.realName || '管').slice(0, 1))
 
 function toggleSidebar() {
+  if (isMobileViewport.value) {
+    mobileSidebarOpen.value = !mobileSidebarOpen.value
+    return
+  }
   manualCollapsed.value = !manualCollapsed.value
   if (!manualCollapsed.value) {
     sidebarPeekOpen.value = false
@@ -1022,11 +1011,13 @@ function toggleSidebar() {
 }
 
 function openSidebarPeek() {
+  if (isMobileViewport.value) return
   if (!manualCollapsed.value) return
   sidebarPeekOpen.value = true
 }
 
 function handleSidebarMouseLeave() {
+  if (isMobileViewport.value) return
   if (!manualCollapsed.value) return
   sidebarPeekOpen.value = false
 }
@@ -1645,9 +1636,10 @@ const menuItems = computed(() => {
       key: item.path || item.key,
       label: renderMenuLabel(String(item.label || '')),
       title: String(item.label || ''),
+      icon: item.icon,
       children: item.children ? map(item.children) : undefined
     }))
-  return map(filteredMenu.value)
+  return buildGroupedMenuItems(filteredMenu.value)
 })
 
 const selectedKeys = computed(() => [route.path])
@@ -1658,6 +1650,64 @@ const viewRenderKey = computed(() => `${currentRouteTabKey.value}::${tabRefreshS
 const currentTitle = computed(() => {
   const title = route.meta?.title as string | undefined
   return title || ''
+})
+const searchPageItems = computed<SearchPaletteItem[]>(() => {
+  const collect = (items: any[], parents: string[] = []): SearchPaletteItem[] =>
+    items.flatMap((item) => {
+      const title = String(item.label || '')
+      const nextParents = [...parents, title]
+      if (item.children?.length) {
+        const parentEntry: SearchPaletteItem[] = item.path
+          ? [{
+              key: String(item.path || item.key),
+              title,
+              description: nextParents.join(' / '),
+              group: '一级模块',
+              path: String(item.path || item.key)
+            }]
+          : []
+        return [...parentEntry, ...collect(item.children, nextParents)]
+      }
+      return [{
+        key: String(item.path || item.key),
+        title,
+        description: nextParents.join(' / '),
+        group: parents.length > 0 ? parents[0] : '页面',
+        path: String(item.path || item.key)
+      }]
+    })
+  const keyword = globalSearchKeyword.value.trim().toLowerCase()
+  const list = collect(filteredMenu.value)
+  if (!keyword) return list.slice(0, 16)
+  return list.filter((item) => `${item.title} ${item.description}`.toLowerCase().includes(keyword)).slice(0, 16)
+})
+const searchActionItems = computed<SearchPaletteItem[]>(() => {
+  const items: SearchPaletteItem[] = [
+    { key: 'action-search-todo', title: '打开我的待办', description: '进入个人待办中心', group: '常用动作', path: '/workbench/todo' },
+    { key: 'action-search-approvals', title: '打开我的审批', description: '进入审批处理页', group: '常用动作', path: '/workbench/approvals' },
+    { key: 'action-search-chat', title: '打开快捷聊天', description: '查看聊天与协作消息', group: '常用动作', action: 'openQuickChat' },
+    { key: 'action-search-chat-todo', title: '打开聊天任务', description: '查看聊天任务与催办清单', group: '常用动作', action: 'openQuickChatTodo' },
+    { key: 'action-search-profile', title: '打开个人设置', description: '查看头像、手机号与主题设置', group: '常用动作', action: 'openHeaderSettings' }
+  ]
+  const keyword = globalSearchKeyword.value.trim().toLowerCase()
+  if (!keyword) return items
+  return items.filter((item) => `${item.title} ${item.description}`.toLowerCase().includes(keyword))
+})
+const searchRecentItems = computed<SearchPaletteItem[]>(() => {
+  const keyword = globalSearchKeyword.value.trim().toLowerCase()
+  const base = recentVisitItems.value.map((item) => ({
+    key: item.key,
+    title: item.title,
+    description: item.path,
+    group: '最近访问',
+    path: item.path
+  }))
+  if (!keyword) return base.slice(0, 8)
+  return base.filter((item) => `${item.title} ${item.description}`.toLowerCase().includes(keyword)).slice(0, 8)
+})
+const utilitySummaryText = computed(() => {
+  const unreadText = quickChatUnreadCount.value > 0 ? `未读会话 ${quickChatUnreadCount.value}` : '会话清爽'
+  return `系统运行中 · ${unreadText} · 聊天待办 ${quickChatTodoPendingCount.value}`
 })
 
 const breadcrumbs = computed(() => {
@@ -1672,10 +1722,101 @@ const todayLabel = computed(() => {
   return now.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit', weekday: 'short' })
 })
 
+function recentVisitScope() {
+  if (userStore.staffInfo?.id) return `id_${String(userStore.staffInfo.id)}`
+  if (userStore.staffInfo?.username) return `u_${String(userStore.staffInfo.username)}`
+  return 'default'
+}
+
+function syncRecentVisits() {
+  recentVisitItems.value = loadRecentVisits(recentVisitScope())
+}
+
+function recordRecentVisit(path: string) {
+  const title = String(route.meta?.title || currentTitle.value || '')
+  if (!path || !title || route.meta?.hidden) return
+  saveRecentVisit(recentVisitScope(), {
+    key: normalizeTabKey(path) || path,
+    path,
+    title
+  })
+  syncRecentVisits()
+}
+
+function openGlobalSearch() {
+  syncRecentVisits()
+  globalSearchOpen.value = true
+}
+
+function closeGlobalSearch() {
+  globalSearchOpen.value = false
+}
+
+function handleSearchSelection(item: SearchPaletteItem) {
+  closeGlobalSearch()
+  globalSearchKeyword.value = ''
+  if (item.action === 'openQuickChat') {
+    openQuickChat()
+    return
+  }
+  if (item.action === 'openQuickChatTodo') {
+    openQuickChatTodoDrawer()
+    return
+  }
+  if (item.action === 'openHeaderSettings') {
+    openHeaderSettings()
+    return
+  }
+  if (item.path) {
+    router.push(item.path)
+  }
+}
+
+function handleGlobalShortcut(event: KeyboardEvent) {
+  const target = event.target as HTMLElement | null
+  const tagName = String(target?.tagName || '').toLowerCase()
+  const isTyping =
+    tagName === 'input' ||
+    tagName === 'textarea' ||
+    target?.isContentEditable ||
+    target?.closest('.ant-select-selection-search-input')
+
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+    event.preventDefault()
+    openGlobalSearch()
+    return
+  }
+
+  if (!isTyping && event.key === '/') {
+    event.preventDefault()
+    openGlobalSearch()
+    return
+  }
+
+  if (event.key === 'Escape' && globalSearchOpen.value) {
+    event.preventDefault()
+    closeGlobalSearch()
+  }
+}
+
+function handleHeaderQuickTodoClick() {
+  router.push('/workbench/todo')
+}
+
+function updateViewportState() {
+  if (typeof window === 'undefined') return
+  const nextIsMobile = window.innerWidth < 992
+  isMobileViewport.value = nextIsMobile
+  if (!nextIsMobile) {
+    mobileSidebarOpen.value = false
+  }
+}
+
 watch(
   () => route.fullPath,
   (fullPath) => {
     syncRouteTab(route.path, fullPath)
+    recordRecentVisit(route.path)
     const path = route.path
     const trail = findMenuTrail(path)
     if (trail.length > 1) {
@@ -2054,6 +2195,7 @@ function onMenuClick(info: any) {
     const targetPath = resolveMenuPathByKey(info.key, filteredMenu.value)
     const target = targetPath || info.key
     if (normalizeTabKey(route.path) === normalizeTabKey(target)) return
+    mobileSidebarOpen.value = false
     router.push(target)
   }
 }
@@ -5427,7 +5569,9 @@ function setupQuickChatTodoEscalationTimer() {
 }
 
 onMounted(() => {
+  updateViewportState()
   updateQuickChatDrawerWidth()
+  syncRecentVisits()
   hydrateCurrentStaffInfo()
     .then(() => {
       syncDepartmentName()
@@ -5468,9 +5612,11 @@ onMounted(() => {
   })
   setupQuickChatTodoEscalationTimer()
   window.setTimeout(() => runAutoEscalationIfNeeded(), 800)
+  window.addEventListener('resize', updateViewportState)
   window.addEventListener('resize', updateQuickChatDrawerWidth)
   window.addEventListener('storage', onQuickChatStorageChange)
   window.addEventListener('focus', onQuickChatCloudVisibilityChange)
+  window.addEventListener('keydown', handleGlobalShortcut)
   document.addEventListener('visibilitychange', onQuickChatCloudVisibilityChange)
   document.addEventListener('click', closeTabContextMenu)
 })
@@ -5507,9 +5653,11 @@ onBeforeUnmount(() => {
     window.clearInterval(quickChatTodoEscalationTimer)
     quickChatTodoEscalationTimer = undefined
   }
+  window.removeEventListener('resize', updateViewportState)
   window.removeEventListener('resize', updateQuickChatDrawerWidth)
   window.removeEventListener('storage', onQuickChatStorageChange)
   window.removeEventListener('focus', onQuickChatCloudVisibilityChange)
+  window.removeEventListener('keydown', handleGlobalShortcut)
   document.removeEventListener('visibilitychange', onQuickChatCloudVisibilityChange)
   document.removeEventListener('click', closeTabContextMenu)
 })
@@ -5534,6 +5682,14 @@ function onQuickChatStorageChange(event: StorageEvent) {
     radial-gradient(900px 320px at 100% 0%, rgba(19, 108, 181, 0.06), transparent 46%),
     linear-gradient(180deg, #f7fbfd 0%, var(--bg) 32%, #f1f6fa 100%);
   overflow: hidden;
+}
+
+.mobile-sider-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  background: rgba(15, 40, 64, 0.18);
+  backdrop-filter: blur(2px);
 }
 
 .sider-edge-sensor {

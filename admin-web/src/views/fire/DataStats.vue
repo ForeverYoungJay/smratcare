@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="数据报表统计" subTitle="消防安全管理数据总览、日报/月报与打印版" mode="showcase">
+  <PageContainer title="数据报表统计" subTitle="消防安全管理数据总览、日报/月报与打印版" mode="showcase" kicker="机构保障">
     <template #meta>
       <span class="soft-pill">统计区间 {{ printRangeText }}</span>
       <span class="soft-pill">生成时间 {{ generatedAt }}</span>

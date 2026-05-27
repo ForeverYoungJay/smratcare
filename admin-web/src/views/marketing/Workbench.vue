@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="销售运营工作台" sub-title="运营总览、风险预警、快捷动作与营销任务集中处理" mode="showcase">
+  <PageContainer title="销售运营工作台" sub-title="运营总览、风险预警、快捷动作与营销任务集中处理" mode="showcase" kicker="经营运营">
     <template #meta>
       <span class="soft-pill">统计范围 {{ quickRangeLabel }}</span>
       <span class="soft-pill">自动刷新 {{ autoRefresh ? '已开启' : '已关闭' }}</span>

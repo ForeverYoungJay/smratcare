@@ -21,8 +21,8 @@ export function getLogisticsEquipmentPage(params: any) {
   return fetchPage<LogisticsEquipmentArchive>('/api/logistics/equipment/page', params)
 }
 
-export function getLogisticsEquipmentSummary(params: any) {
-  return request.get<LogisticsEquipmentArchiveSummary>('/api/logistics/equipment/summary', { params })
+export function getLogisticsEquipmentSummary(params: any, config?: Record<string, any>) {
+  return request.get<LogisticsEquipmentArchiveSummary>('/api/logistics/equipment/summary', { params, ...(config || {}) })
 }
 
 export function createLogisticsEquipment(data: Partial<LogisticsEquipmentArchive>) {

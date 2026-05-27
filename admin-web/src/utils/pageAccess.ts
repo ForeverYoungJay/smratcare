@@ -104,7 +104,7 @@ const pageTitleMap = new Map(pagePermissionFlat.map((item) => [item.path, item.t
 const knownPagePaths = new Set(pagePermissionFlat.map((item) => item.path))
 
 const commonPersonalPaths = ['/portal', '/workbench', '/workbench/overview', '/workbench/todo', '/workbench/my-info', '/workbench/attendance', '/workbench/reports', '/workbench/approvals']
-const adminManagementPaths = ['/elder', '/medical-care', '/care', '/finance', '/logistics', '/marketing', '/hr', '/oa', '/stats', '/system', '/base-config']
+const allKnownPagePaths = pagePermissionFlat.map((item) => item.path)
 
 export const ROLE_PAGE_PRESETS: Record<string, RolePagePreset> = {
   NURSING_MINISTER: {
@@ -175,17 +175,17 @@ export const ROLE_PAGE_PRESETS: Record<string, RolePagePreset> = {
   ADMIN: {
     label: '管理员',
     description: '拥有全平台业务和系统设置权限',
-    paths: [...commonPersonalPaths, ...adminManagementPaths]
+    paths: allKnownPagePaths
   },
   SYS_ADMIN: {
     label: '系统超管',
     description: '最高权限，自动包含管理员全部页面和系统配置能力',
-    paths: [...commonPersonalPaths, ...adminManagementPaths]
+    paths: allKnownPagePaths
   },
   DIRECTOR: {
     label: '院长',
     description: '跨部门经营管理和全局查看权限',
-    paths: [...commonPersonalPaths, ...adminManagementPaths]
+    paths: allKnownPagePaths
   }
 }
 
