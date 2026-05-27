@@ -70,8 +70,8 @@ function onEdit(targetKey: string | MouseEvent, action: 'add' | 'remove') {
 .route-tabs-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 6px 24px 0;
+  gap: 10px;
+  padding: 2px 20px 0;
 }
 
 .route-tabs-bar__tabs {
@@ -84,10 +84,10 @@ function onEdit(targetKey: string | MouseEvent, action: 'add' | 'remove') {
 }
 
 .route-tabs-bar__tabs :deep(.ant-tabs-tab) {
-  min-height: 34px;
-  padding: 0 12px !important;
+  min-height: 30px;
+  padding: 0 10px !important;
   border: 1px solid rgba(214, 225, 232, 0.9) !important;
-  border-radius: 12px 12px 0 0 !important;
+  border-radius: 10px 10px 0 0 !important;
   background: rgba(247, 251, 253, 0.72) !important;
   transition: all 0.2s ease;
 }
@@ -101,7 +101,7 @@ function onEdit(targetKey: string | MouseEvent, action: 'add' | 'remove') {
   display: inline-flex;
   align-items: center;
   min-width: 0;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
 }
 
@@ -110,7 +110,8 @@ function onEdit(targetKey: string | MouseEvent, action: 'add' | 'remove') {
 }
 
 .route-tabs-bar__tools {
-  border-radius: 12px;
+  height: 30px;
+  border-radius: 10px;
   border-color: rgba(207, 220, 230, 0.9);
   background: rgba(255, 255, 255, 0.9);
 }
