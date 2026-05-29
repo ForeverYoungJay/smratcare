@@ -163,7 +163,7 @@ const heroAlerts = computed(() => ([
 const heroMetrics = computed(() => ([
   { label: '生日待办', value: summary.birthdayTodoCount || 0, path: '/workbench/todo?keyword=生日提醒' },
   { label: '进行中任务', value: summary.ongoingTaskCount || 0, path: '/oa/work-execution/task' },
-  { label: '今日日程', value: summary.todayScheduleCount || 0, path: '/oa/work-execution/calendar' },
+  { label: '今日日程', value: summary.todayScheduleCount || 0, path: '/workbench/schedule' },
   { label: '问卷草稿', value: summary.surveyDraftCount || 0, path: '/survey/template' },
   { label: '已发布问卷', value: summary.surveyPublishedCount || 0, path: '/survey/template?status=1' },
   { label: '今日回收', value: summary.surveyTodaySubmissionCount || 0, path: '/survey/stats' }

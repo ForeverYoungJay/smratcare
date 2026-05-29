@@ -10,13 +10,16 @@ import com.zhiyangyun.care.dashboard.model.DashboardMetricDefinition;
 import com.zhiyangyun.care.dashboard.model.DashboardSummary;
 import com.zhiyangyun.care.dashboard.model.DashboardThresholdDefaultsResponse;
 import com.zhiyangyun.care.elder.entity.Bed;
+import com.zhiyangyun.care.elder.entity.ElderBedRelation;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderAdmission;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderDischarge;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
+import com.zhiyangyun.care.elder.mapper.ElderBedRelationMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeMapper;
+import com.zhiyangyun.care.elder.model.ElderLifecycleStatus;
 import com.zhiyangyun.care.entity.CareTaskDaily;
 import com.zhiyangyun.care.mapper.CareTaskDailyMapper;
 import com.zhiyangyun.care.store.entity.StoreOrder;
@@ -58,6 +61,7 @@ public class DashboardController {
   private final StoreOrderMapper storeOrderMapper;
   private final BedMapper bedMapper;
   private final ElderMapper elderMapper;
+  private final ElderBedRelationMapper elderBedRelationMapper;
   private final MaterialCenterOverviewService materialCenterOverviewService;
 
   public DashboardController(CareTaskDailyMapper careTaskDailyMapper,
@@ -67,6 +71,7 @@ public class DashboardController {
       StoreOrderMapper storeOrderMapper,
       BedMapper bedMapper,
       ElderMapper elderMapper,
+      ElderBedRelationMapper elderBedRelationMapper,
       MaterialCenterOverviewService materialCenterOverviewService) {
     this.careTaskDailyMapper = careTaskDailyMapper;
     this.billMonthlyMapper = billMonthlyMapper;
@@ -75,6 +80,7 @@ public class DashboardController {
     this.storeOrderMapper = storeOrderMapper;
     this.bedMapper = bedMapper;
     this.elderMapper = elderMapper;
+    this.elderBedRelationMapper = elderBedRelationMapper;
     this.materialCenterOverviewService = materialCenterOverviewService;
   }
 
@@ -161,7 +167,11 @@ public class DashboardController {
             .eq(Bed::getIsDeleted, 0)
             .eq(orgId != null, Bed::getOrgId, orgId));
     long totalBeds = beds.size();
-    long occupiedBeds = beds.stream().filter(item -> item.getStatus() != null && item.getStatus() == 2).count();
+    java.util.Set<Long> inHospitalElderIds = resolveInHospitalElderIds(orgId);
+    java.util.Set<Long> relationOccupiedBedIds = resolveRelationOccupiedBedIds(orgId, beds, inHospitalElderIds);
+    long occupiedBeds = beds.stream()
+        .filter(item -> isBedOccupiedByInHospitalResident(item, inHospitalElderIds, relationOccupiedBedIds))
+        .count();
     long maintenanceBeds = beds.stream().filter(item -> item.getStatus() != null && item.getStatus() == 3).count();
     long availableBeds = totalBeds - occupiedBeds - maintenanceBeds;
     if (availableBeds < 0) {
@@ -211,6 +221,54 @@ public class DashboardController {
     summary.setMetricEffectiveDate(METRIC_EFFECTIVE_DATE);
     summary.setDataRefreshedAt(LocalDateTime.now().toString());
     return Result.ok(summary);
+  }
+
+  private java.util.Set<Long> resolveInHospitalElderIds(Long orgId) {
+    return elderMapper.selectList(
+            Wrappers.lambdaQuery(ElderProfile.class)
+                .select(ElderProfile::getId)
+                .eq(ElderProfile::getIsDeleted, 0)
+                .eq(orgId != null, ElderProfile::getOrgId, orgId)
+                .eq(ElderProfile::getLifecycleStatus, ElderLifecycleStatus.IN_HOSPITAL))
+        .stream()
+        .map(ElderProfile::getId)
+        .filter(java.util.Objects::nonNull)
+        .collect(java.util.stream.Collectors.toSet());
+  }
+
+  private java.util.Set<Long> resolveRelationOccupiedBedIds(Long orgId, List<Bed> beds, java.util.Set<Long> inHospitalElderIds) {
+    if (beds == null || beds.isEmpty() || inHospitalElderIds.isEmpty()) {
+      return java.util.Set.of();
+    }
+    List<Long> bedIds = beds.stream()
+        .map(Bed::getId)
+        .filter(java.util.Objects::nonNull)
+        .toList();
+    if (bedIds.isEmpty()) {
+      return java.util.Set.of();
+    }
+    return elderBedRelationMapper.selectList(
+            Wrappers.lambdaQuery(ElderBedRelation.class)
+                .select(ElderBedRelation::getBedId)
+                .eq(ElderBedRelation::getIsDeleted, 0)
+                .eq(orgId != null, ElderBedRelation::getOrgId, orgId)
+                .eq(ElderBedRelation::getActiveFlag, 1)
+                .in(ElderBedRelation::getBedId, bedIds)
+                .in(ElderBedRelation::getElderId, inHospitalElderIds))
+        .stream()
+        .map(ElderBedRelation::getBedId)
+        .filter(java.util.Objects::nonNull)
+        .collect(java.util.stream.Collectors.toSet());
+  }
+
+  private boolean isBedOccupiedByInHospitalResident(Bed bed, java.util.Set<Long> inHospitalElderIds, java.util.Set<Long> relationOccupiedBedIds) {
+    if (bed == null) {
+      return false;
+    }
+    if (bed.getId() != null && relationOccupiedBedIds.contains(bed.getId())) {
+      return true;
+    }
+    return bed.getElderId() != null && inHospitalElderIds.contains(bed.getElderId());
   }
 
   @GetMapping("/metric-catalog")

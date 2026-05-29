@@ -24,6 +24,7 @@ import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.elder.model.BedRequest;
 import com.zhiyangyun.care.elder.model.BedResponse;
 import com.zhiyangyun.care.elder.model.BedStatus;
+import com.zhiyangyun.care.elder.model.ElderLifecycleStatus;
 import com.zhiyangyun.care.elder.service.BedService;
 import com.zhiyangyun.care.elder.util.QrCodeUtil;
 import com.zhiyangyun.care.health.entity.HealthDataRecord;
@@ -449,6 +450,7 @@ public class BedServiceImpl implements BedService {
       if (elder != null) {
         response.setElderName(elder.getFullName());
         response.setElderGender(elder.getGender());
+        response.setElderLifecycleStatus(ElderLifecycleStatus.normalize(elder.getLifecycleStatus()));
         response.setCareLevel(elder.getCareLevel());
       }
       return response;

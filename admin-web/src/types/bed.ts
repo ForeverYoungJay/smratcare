@@ -38,6 +38,7 @@ export interface BedItem {
   lastReleasedAt?: string
   elderName?: string
   elderGender?: number
+  elderLifecycleStatus?: string
   careLevel?: string
   roomNo?: string
   building?: string

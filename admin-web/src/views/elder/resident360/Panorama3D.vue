@@ -24,7 +24,7 @@
       <div class="scene-legend">
         <div class="legend-chip status-occupied">在住</div>
         <div class="legend-chip status-empty">空床</div>
-        <div class="legend-chip status-warning">外出</div>
+        <div class="legend-chip status-warning">外出/待退住</div>
         <div class="legend-chip status-ai">观察</div>
         <div class="legend-chip status-alert">异常</div>
       </div>
@@ -272,21 +272,57 @@ function createBuildingMass(totalFloors: number) {
 function createBedUnit(bed: any, width: number, depth: number) {
   const state = resolveBedVisualState(bed)
   const group = new THREE.Group()
-  const frameHeight = 0.2
+  const frameHeight = 0.18
 
-  const base = new THREE.Mesh(
-    new THREE.BoxGeometry(width, frameHeight, depth),
-    new THREE.MeshStandardMaterial({ color: 0xeaf0f6, metalness: 0.06, roughness: 0.54 })
-  )
-  base.position.y = frameHeight / 2
-  group.add(base)
+  const frameMaterial = new THREE.MeshStandardMaterial({ color: 0xe5edf6, metalness: 0.12, roughness: 0.38 })
+  const frameRailGeo = new THREE.BoxGeometry(width, frameHeight, 0.08)
+  const sideRailGeo = new THREE.BoxGeometry(0.08, frameHeight, depth - 0.18)
+  ;[-1, 1].forEach((direction) => {
+    const rail = new THREE.Mesh(frameRailGeo, frameMaterial)
+    rail.position.set(0, frameHeight / 2, direction * (depth / 2 - 0.04))
+    group.add(rail)
+  })
+  ;[-1, 1].forEach((direction) => {
+    const rail = new THREE.Mesh(sideRailGeo, frameMaterial)
+    rail.position.set(direction * (width / 2 - 0.04), frameHeight / 2, 0)
+    group.add(rail)
+  })
+
+  ;[-1, 1].forEach((xDirection) => {
+    ;[-1, 1].forEach((zDirection) => {
+      const leg = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.035, 0.05, 0.24, 10),
+        new THREE.MeshStandardMaterial({ color: 0xc8d6e4, metalness: 0.18, roughness: 0.36 })
+      )
+      leg.position.set(xDirection * (width / 2 - 0.12), 0.12, zDirection * (depth / 2 - 0.12))
+      group.add(leg)
+    })
+  })
 
   const mattressMaterial = materialForState(state)
-  const mattress = new THREE.Mesh(new THREE.BoxGeometry(width * 0.82, 0.14, depth * 0.7), mattressMaterial)
-  mattress.position.y = frameHeight + 0.08
+  const mattress = new THREE.Mesh(new THREE.BoxGeometry(width * 0.8, 0.12, depth * 0.68), mattressMaterial)
+  mattress.position.y = frameHeight + 0.06
   mattress.userData = { type: 'bed', bed, originalMat: mattressMaterial, state }
   group.add(mattress)
   interactableObjects.push(mattress)
+
+  const pillow = new THREE.Mesh(
+    new THREE.BoxGeometry(width * 0.42, 0.08, depth * 0.16),
+    new THREE.MeshStandardMaterial({ color: 0xfafcff, roughness: 0.62, metalness: 0.02 })
+  )
+  pillow.position.set(0, frameHeight + 0.14, -depth * 0.2)
+  group.add(pillow)
+
+  const blanket = new THREE.Mesh(
+    new THREE.BoxGeometry(width * 0.76, 0.07, depth * 0.32),
+    new THREE.MeshStandardMaterial({
+      color: state === 'alert' ? 0xffd6dc : state === 'ai' ? 0xe4dcff : state === 'warning' ? 0xffebca : 0xddeaf4,
+      roughness: 0.7,
+      metalness: 0.02
+    })
+  )
+  blanket.position.set(0, frameHeight + 0.13, depth * 0.08)
+  group.add(blanket)
 
   const headboard = new THREE.Mesh(
     new THREE.BoxGeometry(width * 0.84, 0.3, 0.08),
@@ -294,6 +330,35 @@ function createBedUnit(bed: any, width: number, depth: number) {
   )
   headboard.position.set(0, 0.3, -depth * 0.34)
   group.add(headboard)
+
+  const tailboard = new THREE.Mesh(
+    new THREE.BoxGeometry(width * 0.72, 0.18, 0.06),
+    new THREE.MeshStandardMaterial({ color: 0xd9e4f0, metalness: 0.08, roughness: 0.36 })
+  )
+  tailboard.position.set(0, 0.2, depth * 0.33)
+  group.add(tailboard)
+
+  const bedsideMonitor = new THREE.Group()
+  const monitorPole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.022, 0.03, 0.42, 10),
+    new THREE.MeshStandardMaterial({ color: 0xc6d3e1, metalness: 0.22, roughness: 0.26 })
+  )
+  monitorPole.position.y = 0.28
+  bedsideMonitor.add(monitorPole)
+  const monitorScreen = new THREE.Mesh(
+    new THREE.BoxGeometry(0.18, 0.11, 0.03),
+    new THREE.MeshStandardMaterial({
+      color: state === 'alert' ? 0x2f1820 : 0x182432,
+      emissive: state === 'alert' ? 0xff6d89 : state === 'ai' ? 0xa997ff : 0x57d7ff,
+      emissiveIntensity: state === 'alert' ? 0.35 : 0.18,
+      roughness: 0.34,
+      metalness: 0.18
+    })
+  )
+  monitorScreen.position.set(0, 0.54, 0)
+  bedsideMonitor.add(monitorScreen)
+  bedsideMonitor.position.set(width / 2 + 0.14, 0, -depth * 0.18)
+  group.add(bedsideMonitor)
 
   const halo = new THREE.Mesh(
     new THREE.RingGeometry(Math.min(width, depth) * 0.38, Math.min(width, depth) * 0.52, 32),
@@ -553,6 +618,17 @@ function buildSceneData() {
         roomGroup.add(roomTile)
         interactableObjects.push(roomTile)
 
+        const roomCarpet = new THREE.Mesh(
+          new THREE.BoxGeometry(roomSize - 0.42, 0.02, roomSize - 0.42),
+          new THREE.MeshStandardMaterial({
+            color: roomItem.occupiedBeds ? 0xf8f4ed : 0xf3f7fb,
+            roughness: 0.92,
+            metalness: 0.01
+          })
+        )
+        roomCarpet.position.y = 0.2
+        roomGroup.add(roomCarpet)
+
         const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xf8fbff, roughness: 0.86, metalness: 0.02 })
         const wallHeight = 1.08
         const wallThickness = 0.08
@@ -577,6 +653,49 @@ function buildSceneData() {
         )
         doorLintel.position.set(0, wallHeight + 0.02, roomSize / 2 - wallThickness / 2)
         roomGroup.add(doorLintel)
+
+        const windowBand = new THREE.Mesh(
+          new THREE.BoxGeometry(roomSize * 0.56, 0.22, 0.02),
+          new THREE.MeshStandardMaterial({
+            color: 0xd7ebff,
+            emissive: 0xbfe4ff,
+            emissiveIntensity: 0.12,
+            roughness: 0.12,
+            metalness: 0.06,
+            transparent: true,
+            opacity: 0.84
+          })
+        )
+        windowBand.position.set(0, wallHeight * 0.72, -roomSize / 2 + 0.05)
+        roomGroup.add(windowBand)
+
+        const roomLight = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.36, 0.36, 0.04, 18),
+          new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            emissive: roomItem.occupiedBeds ? 0xf8f6d8 : 0xe7eef8,
+            emissiveIntensity: roomItem.occupiedBeds ? 0.16 : 0.08,
+            roughness: 0.22,
+            metalness: 0.02
+          })
+        )
+        roomLight.position.set(0, wallHeight + 0.08, 0)
+        roomGroup.add(roomLight)
+
+        if (roomItem.beds.some((bed: any) => String(bed.riskLevel || '') === 'HIGH')) {
+          const beacon = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.08, 0.12, 0.12, 16),
+            new THREE.MeshStandardMaterial({
+              color: 0xffe1e6,
+              emissive: 0xff6d89,
+              emissiveIntensity: 0.4,
+              roughness: 0.24,
+              metalness: 0.02
+            })
+          )
+          beacon.position.set(roomSize / 2 - 0.4, wallHeight + 0.12, -roomSize / 2 + 0.4)
+          roomGroup.add(beacon)
+        }
 
         const roomEdges = new THREE.LineSegments(
           new THREE.EdgesGeometry(new THREE.BoxGeometry(roomSize, 0.18, roomSize)),

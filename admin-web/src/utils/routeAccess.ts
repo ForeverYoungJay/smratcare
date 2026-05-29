@@ -16,6 +16,8 @@ const routePathAliases: Record<string, string[]> = {
   '/oa/my-info': ['/workbench/my-info'],
   '/workbench/attendance': ['/oa/attendance-leave'],
   '/oa/attendance-leave': ['/workbench/attendance'],
+  '/workbench/schedule': ['/oa/work-execution/calendar'],
+  '/oa/work-execution/calendar': ['/workbench/schedule'],
   '/workbench/reports': ['/oa/work-report'],
   '/oa/work-report': ['/workbench/reports'],
   '/workbench/approvals': ['/oa/approval'],

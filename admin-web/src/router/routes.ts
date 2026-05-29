@@ -73,6 +73,12 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '我的考勤与请假' }
           },
           {
+            path: 'schedule',
+            name: 'WorkbenchSchedule',
+            component: () => import('../views/oa/Calendar.vue'),
+            meta: { title: '我的日程' }
+          },
+          {
             path: 'reports',
             name: 'WorkbenchReports',
             component: () => import('../views/oa/WorkReport.vue'),
@@ -2477,8 +2483,8 @@ export const routes: RouteRecordRaw[] = [
               {
                 path: 'calendar',
                 name: 'OaCalendar',
-                component: () => import('../views/oa/Calendar.vue'),
-                meta: { title: '行政日历 / 协同日历' }
+                redirect: '/workbench/schedule',
+                meta: { title: '行政日历 / 协同日历', hidden: true }
               },
               {
                 path: 'daily-report',

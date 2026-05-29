@@ -20,6 +20,7 @@ const LEGACY_PERMISSION_PATH_MAP: Record<string, string> = {
   '/oa/todo': '/workbench/todo',
   '/oa/my-info': '/workbench/my-info',
   '/oa/attendance-leave': '/workbench/attendance',
+  '/oa/work-execution/calendar': '/workbench/schedule',
   '/oa/work-report': '/workbench/reports',
   '/hr/workbench': '/hr/overview',
   '/oa/activity': '/oa/activity-center/records',
@@ -103,7 +104,7 @@ flattenTree(pagePermissionTree, pagePermissionFlat)
 const pageTitleMap = new Map(pagePermissionFlat.map((item) => [item.path, item.title]))
 const knownPagePaths = new Set(pagePermissionFlat.map((item) => item.path))
 
-const commonPersonalPaths = ['/portal', '/workbench', '/workbench/overview', '/workbench/todo', '/workbench/my-info', '/workbench/attendance', '/workbench/reports', '/workbench/approvals']
+const commonPersonalPaths = ['/portal', '/workbench', '/workbench/overview', '/workbench/todo', '/workbench/my-info', '/workbench/attendance', '/workbench/schedule', '/workbench/reports', '/workbench/approvals']
 const allKnownPagePaths = pagePermissionFlat.map((item) => item.path)
 
 export const ROLE_PAGE_PRESETS: Record<string, RolePagePreset> = {

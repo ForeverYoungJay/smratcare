@@ -124,14 +124,196 @@
         </div>
       </SectionPanel>
     </section>
+
+    <section class="portal-grid portal-grid--support">
+      <SectionPanel
+        title="老人生日计划"
+        description="把今日关怀、7 天内提醒和本月名单前置到首页，方便活动准备、物资安排和家属关怀一起闭环。"
+      >
+        <template #extra>
+          <a-space wrap>
+            <a-button size="small" @click="openBirthdayModal('today')">今日名单</a-button>
+            <a-button size="small" @click="launchMonthlyBirthdayActivity">发起本月集体庆生</a-button>
+            <a-button size="small" @click="openBirthdayMaterialPrep">物资准备</a-button>
+            <a-button size="small" @click="router.push('/oa/life/birthday')">查看全部</a-button>
+            <a-button size="small" @click="router.push('/workbench/schedule')">同步到我的日程</a-button>
+          </a-space>
+        </template>
+
+        <div class="portal-grid portal-grid--birthday-metrics">
+          <OverviewMetricCard
+            clickable
+            label="今日生日"
+            :value="displayNumber(birthdayStats.today)"
+            helper="优先安排祝福、探访与活动"
+            tone="warning"
+            @click="router.push('/oa/life/birthday?scope=today')"
+          />
+          <OverviewMetricCard
+            clickable
+            label="未来 7 天"
+            :value="displayNumber(birthdayStats.next7Days)"
+            helper="提前准备活动与物资"
+            tone="brand"
+            @click="router.push('/oa/life/birthday?scope=next7')"
+          />
+          <OverviewMetricCard
+            clickable
+            label="本月生日"
+            :value="displayNumber(birthdayStats.thisMonth)"
+            helper="适合统筹月度集体庆生"
+            tone="success"
+            @click="router.push('/oa/life/birthday?scope=month')"
+          />
+          <OverviewMetricCard
+            clickable
+            label="80+ / 90+"
+            :value="birthdayAgeBandLabel"
+            helper="高龄长者关怀优先级"
+            tone="default"
+            @click="router.push('/oa/life/birthday')"
+          />
+        </div>
+
+        <div class="birthday-highlight-row">
+          <div class="birthday-highlight-copy">
+            <strong>{{ birthdayHeadline.title }}</strong>
+            <p>{{ birthdayHeadline.description }}</p>
+          </div>
+          <a-space wrap>
+            <StatusTag :text="`今日 ${birthdayStats.today}`" tone="warning" />
+            <StatusTag :text="`7天内 ${birthdayStats.next7Days}`" tone="pending" />
+            <StatusTag :text="`本月 ${birthdayStats.thisMonth}`" tone="normal" />
+          </a-space>
+        </div>
+
+        <div class="birthday-action-row">
+          <button type="button" class="birthday-action-card" @click="openBirthdayModal('today')">
+            <strong>今日生日弹窗名单</strong>
+            <span>现场确认今天需要祝福、探访和家属联络的长者名单。</span>
+          </button>
+          <button type="button" class="birthday-action-card" @click="launchMonthlyBirthdayActivity">
+            <strong>本月集体庆生快捷发起</strong>
+            <span>自动带入当前月份和预计人数，直接进入活动创建。</span>
+          </button>
+          <button type="button" class="birthday-action-card" @click="openBirthdayMaterialPrep">
+            <strong>生日物资准备快捷入口</strong>
+            <span>直接进入出库/备料场景，减少活动当天临时找物资。</span>
+          </button>
+        </div>
+
+        <div class="birthday-list">
+          <button
+            v-for="item in birthdayPreviewList"
+            :key="`${item.elderId}_${item.nextBirthday}`"
+            type="button"
+            class="birthday-item"
+            @click="router.push(`/oa/life/birthday?elderName=${encodeURIComponent(item.elderName || '')}`)"
+          >
+            <div>
+              <strong>{{ item.elderName }}</strong>
+              <span>{{ birthdayMetaText(item) }}</span>
+            </div>
+            <StatusTag :text="birthdayDueText(item.daysUntil)" :tone="birthdayDueTone(item.daysUntil)" />
+          </button>
+          <a-empty v-if="!birthdayPreviewList.length" description="近期暂无生日提醒" />
+        </div>
+
+        <div class="birthday-footer-actions">
+          <a-space wrap>
+            <a-button size="small" @click="router.push('/oa/life/birthday?minAge=80')">查看 80+ 生日名单</a-button>
+            <a-button size="small" @click="router.push('/oa/life/birthday?minAge=90')">查看 90+ 生日名单</a-button>
+            <a-button size="small" @click="router.push('/workbench/todo?keyword=生日提醒')">生日待办</a-button>
+            <a-button size="small" @click="printBirthdayPreview">打印近期名单</a-button>
+          </a-space>
+        </div>
+      </SectionPanel>
+
+      <SectionPanel
+        title="协同与待办速览"
+        description="首页保留最值得院长和主管第一眼看到的协同信号：待办、审批、今日日程、生日关怀和超时事项。"
+      >
+        <template #extra>
+          <a-space wrap>
+            <a-button size="small" @click="router.push('/workbench/todo')">待办中心</a-button>
+            <a-button size="small" @click="router.push('/workbench/schedule')">我的日程</a-button>
+          </a-space>
+        </template>
+
+        <div class="portal-grid portal-grid--collab-metrics">
+          <OverviewMetricCard
+            v-for="item in collaborationMetrics"
+            :key="item.label"
+            clickable
+            :label="item.label"
+            :value="item.value"
+            :helper="item.helper"
+            :tone="item.tone"
+            @click="router.push(item.path)"
+          />
+        </div>
+
+        <div class="collab-list">
+          <button
+            v-for="item in collaborationFocusList"
+            :key="item.title"
+            type="button"
+            class="collab-list-item"
+            @click="router.push(item.path)"
+          >
+            <div>
+              <strong>{{ item.title }}</strong>
+              <span>{{ item.desc }}</span>
+            </div>
+            <StatusTag :text="item.tag" :tone="item.tone" />
+          </button>
+          <a-empty v-if="!collaborationFocusList.length" description="暂无需要特别关注的协同事项" />
+        </div>
+      </SectionPanel>
+    </section>
+
+    <a-modal
+      v-model:open="birthdayModalOpen"
+      :title="birthdayModalTitle"
+      width="860px"
+      :footer="null"
+      destroy-on-close
+    >
+      <a-table
+        :columns="birthdayColumns"
+        :data-source="birthdayModalRows"
+        row-key="elderId"
+        size="small"
+        :pagination="false"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'actions'">
+            <a-space size="small">
+              <a @click="openBirthdayProfile(record)">长者档案</a>
+              <a @click="openBirthdayMaterialForRecord(record)">物资准备</a>
+              <a @click="openBirthdayActivityForRecord(record)">创建活动</a>
+            </a-space>
+          </template>
+        </template>
+      </a-table>
+      <div class="birthday-modal-actions">
+        <a-space wrap>
+          <a-button @click="printBirthdayModalRows">打印名单</a-button>
+          <a-button @click="router.push('/oa/life/birthday?scope=today')">进入完整生日页面</a-button>
+        </a-space>
+      </div>
+    </a-modal>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import dayjs from 'dayjs'
 import { useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
 import VChart from 'vue-echarts'
 import PageContainer from '../components/PageContainer.vue'
+import { getBirthdayPage } from '../api/life'
 import EntitySummaryCard from '../components/smartcare/EntitySummaryCard.vue'
 import OverviewMetricCard from '../components/smartcare/OverviewMetricCard.vue'
 import QuickActionTile from '../components/smartcare/QuickActionTile.vue'
@@ -139,6 +321,8 @@ import RiskList from '../components/smartcare/RiskList.vue'
 import SectionPanel from '../components/smartcare/SectionPanel.vue'
 import StatusTag from '../components/smartcare/StatusTag.vue'
 import { getHomeOverviewBundle, type HomeOverviewBundle } from '../api/home'
+import type { BirthdayReminder } from '../types'
+import { openPrintTableReport } from '../utils/print'
 
 type RiskItemWithPath = {
   actionLabel?: string
@@ -154,6 +338,9 @@ type RiskItemWithPath = {
 const router = useRouter()
 const loading = ref(false)
 const bundle = ref<HomeOverviewBundle | null>(null)
+const birthdayRows = ref<BirthdayReminder[]>([])
+const birthdayModalOpen = ref(false)
+const birthdayModalScope = ref<'today' | 'next7'>('today')
 const refreshedAt = ref('--')
 
 const dashboard = computed(() => bundle.value?.dashboard || null)
@@ -179,6 +366,12 @@ function displayCurrency(value?: number | null) {
 function percentText(value?: number | null) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '--'
   return `${Math.round(Number(value) * 100) / 100}%`
+}
+
+function normalizeBirthdayDate(value?: string | null) {
+  if (!value) return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
 }
 
 const todayAlertCount = computed(() => {
@@ -378,6 +571,219 @@ const quickActions = [
   { title: '数据报表', description: '查看入住、收入与服务质量报表。', icon: '报', path: '/stats/org/monthly-operation' }
 ]
 
+const birthdayStats = computed(() => {
+  const today = new Date()
+  return birthdayRows.value.reduce((acc, item) => {
+    const nextBirthday = normalizeBirthdayDate(item.nextBirthday)
+    if (!nextBirthday) return acc
+    const daysUntil = Number(item.daysUntil ?? 9999)
+    if (daysUntil <= 0) acc.today += 1
+    if (daysUntil >= 0 && daysUntil <= 7) acc.next7Days += 1
+    if (
+      nextBirthday.getFullYear() === today.getFullYear()
+      && nextBirthday.getMonth() === today.getMonth()
+    ) {
+      acc.thisMonth += 1
+    }
+    if (Number(item.ageOnNextBirthday || 0) >= 80) acc.age80Plus += 1
+    if (Number(item.ageOnNextBirthday || 0) >= 90) acc.age90Plus += 1
+    return acc
+  }, { today: 0, next7Days: 0, thisMonth: 0, age80Plus: 0, age90Plus: 0 })
+})
+
+const birthdayAgeBandLabel = computed(() => `${birthdayStats.value.age80Plus} / ${birthdayStats.value.age90Plus}`)
+
+const birthdayPreviewList = computed(() => [...birthdayRows.value]
+  .sort((left, right) => Number(left.daysUntil ?? 9999) - Number(right.daysUntil ?? 9999))
+  .slice(0, 6))
+
+const birthdayModalRows = computed(() => {
+  if (birthdayModalScope.value === 'today') {
+    return birthdayRows.value.filter((item) => Number(item.daysUntil ?? 9999) <= 0)
+  }
+  return birthdayRows.value.filter((item) => {
+    const days = Number(item.daysUntil ?? 9999)
+    return days >= 0 && days <= 7
+  })
+})
+
+const birthdayModalTitle = computed(() => (birthdayModalScope.value === 'today' ? '今日生日名单' : '未来 7 天生日名单'))
+
+const birthdayColumns = [
+  { title: '长者姓名', dataIndex: 'elderName', key: 'elderName', width: 120 },
+  { title: '下次生日', dataIndex: 'nextBirthday', key: 'nextBirthday', width: 120 },
+  { title: '剩余天数', dataIndex: 'daysUntil', key: 'daysUntil', width: 100 },
+  { title: '届时年龄', dataIndex: 'ageOnNextBirthday', key: 'ageOnNextBirthday', width: 100 },
+  { title: '房间 / 床位', key: 'room', width: 180, customRender: ({ record }: { record: BirthdayReminder }) => [record.roomNo, record.bedNo].filter(Boolean).join(' / ') || '-' },
+  { title: '操作', key: 'actions', width: 220 }
+] as const
+
+const birthdayHeadline = computed(() => {
+  if (birthdayStats.value.today > 0) {
+    return {
+      title: `今天有 ${birthdayStats.value.today} 位长者过生日`,
+      description: '建议优先安排探访、祝福、餐食加菜或小型集体庆生活动，避免关怀遗漏。'
+    }
+  }
+  if (birthdayStats.value.next7Days > 0) {
+    return {
+      title: `未来 7 天有 ${birthdayStats.value.next7Days} 位长者生日`,
+      description: '现在就可以开始安排家属通知、物资准备和本月集体活动排期。'
+    }
+  }
+  return {
+    title: '近期生日关怀节奏平稳',
+    description: '本月生日名单仍然保留在首页，方便提前规划关怀活动和物资。'
+  }
+})
+
+function birthdayMetaText(item: BirthdayReminder) {
+  const age = item.ageOnNextBirthday ? `${item.ageOnNextBirthday}岁` : '年龄待补充'
+  const room = [item.roomNo, item.bedNo].filter(Boolean).join(' / ') || '房间床位待补充'
+  const date = item.nextBirthday || '--'
+  return `${date} · ${age} · ${room}`
+}
+
+function openBirthdayModal(scope: 'today' | 'next7') {
+  birthdayModalScope.value = scope
+  birthdayModalOpen.value = true
+}
+
+function openBirthdayProfile(record: BirthdayReminder) {
+  if (record.elderId != null) {
+    router.push(`/elder/detail/${record.elderId}`)
+    return
+  }
+  router.push(`/elder/list?keyword=${encodeURIComponent(record.elderName || '')}`)
+}
+
+function openBirthdayMaterialForRecord(record: BirthdayReminder) {
+  router.push(`/inventory/outbound?scene=birthday&elderName=${encodeURIComponent(record.elderName || '')}`)
+}
+
+function openBirthdayActivityForRecord(record: BirthdayReminder) {
+  router.push(`/life/activity?quick=create&elderName=${encodeURIComponent(record.elderName || '')}`)
+}
+
+function launchMonthlyBirthdayActivity() {
+  if (!birthdayStats.value.thisMonth) {
+    message.info('本月暂无生日长者')
+    return
+  }
+  const month = dayjs().format('YYYY-MM')
+  router.push(`/life/activity?quick=create&scope=monthly-birthday&month=${month}&count=${birthdayStats.value.thisMonth}`)
+}
+
+function openBirthdayMaterialPrep() {
+  const firstName = birthdayPreviewList.value[0]?.elderName
+  const query = firstName ? `&elderName=${encodeURIComponent(firstName)}` : ''
+  router.push(`/inventory/outbound?scene=birthday${query}`)
+}
+
+function printBirthdayRows(title: string, rows: BirthdayReminder[]) {
+  if (!rows.length) {
+    message.info('暂无可打印名单')
+    return
+  }
+  openPrintTableReport({
+    title,
+    subtitle: `打印时间：${dayjs().format('YYYY-MM-DD HH:mm:ss')}`,
+    columns: [
+      { key: 'elderName', title: '长者姓名' },
+      { key: 'nextBirthday', title: '下次生日' },
+      { key: 'daysUntil', title: '剩余天数' },
+      { key: 'ageOnNextBirthday', title: '届时年龄' },
+      { key: 'roomNo', title: '房间号' },
+      { key: 'bedNo', title: '床位号' }
+    ],
+    rows: rows as any
+  })
+}
+
+function printBirthdayPreview() {
+  printBirthdayRows('近期生日名单', birthdayPreviewList.value)
+}
+
+function printBirthdayModalRows() {
+  printBirthdayRows(birthdayModalTitle.value, birthdayModalRows.value)
+}
+
+function birthdayDueText(daysUntil?: number | null) {
+  const value = Number(daysUntil ?? 9999)
+  if (value <= 0) return '今天'
+  if (value <= 7) return `${value}天内`
+  return `${value}天后`
+}
+
+function birthdayDueTone(daysUntil?: number | null) {
+  const value = Number(daysUntil ?? 9999)
+  if (value <= 0) return 'warning'
+  if (value <= 7) return 'pending'
+  return 'offline'
+}
+
+const collaborationMetrics = computed(() => ([
+  {
+    label: '开放待办',
+    value: displayNumber(portal.value?.openTodoCount),
+    helper: `逾期 ${displayNumber(portal.value?.overdueTodoCount)}`,
+    tone: 'brand' as const,
+    path: '/workbench/todo'
+  },
+  {
+    label: '进行中任务',
+    value: displayNumber(portal.value?.ongoingTaskCount),
+    helper: '任务推进与跨部门执行',
+    tone: 'success' as const,
+    path: '/oa/work-execution/task'
+  },
+  {
+    label: '今日日程',
+    value: displayNumber(portal.value?.todayScheduleCount),
+    helper: '个人、部门与协同安排',
+    tone: 'warning' as const,
+    path: '/workbench/schedule'
+  },
+  {
+    label: '生日待办',
+    value: displayNumber(portal.value?.birthdayTodoCount),
+    helper: '关怀类提醒与后续处理',
+    tone: 'default' as const,
+    path: '/workbench/todo?keyword=生日提醒'
+  }
+]))
+
+const collaborationFocusList = computed(() => ([
+  {
+    title: '逾期待办',
+    desc: '优先处理已经超期的事项，避免继续积压到跨班次。',
+    tag: `逾期 ${displayNumber(portal.value?.overdueTodoCount)}`,
+    tone: numberValue(portal.value?.overdueTodoCount) > 0 ? 'danger' as const : 'offline' as const,
+    path: '/workbench/todo?status=OVERDUE'
+  },
+  {
+    title: '待我审批',
+    desc: '财务、人事、行政等流程审批集中处理。',
+    tag: `待审 ${displayNumber(portal.value?.pendingApprovalCount)}`,
+    tone: numberValue(portal.value?.pendingApprovalCount) > 0 ? 'warning' as const : 'offline' as const,
+    path: '/workbench/approvals'
+  },
+  {
+    title: '生日关怀待办',
+    desc: '把生日祝福、活动与物资准备转成具体可追踪动作。',
+    tag: `提醒 ${displayNumber(portal.value?.birthdayTodoCount)}`,
+    tone: numberValue(portal.value?.birthdayTodoCount) > 0 ? 'pending' as const : 'offline' as const,
+    path: '/workbench/todo?keyword=生日提醒'
+  },
+  {
+    title: '协同日程',
+    desc: '查看今日与本周跨部门安排，避免执行撞车。',
+    tag: `日程 ${displayNumber(portal.value?.todayScheduleCount)}`,
+    tone: numberValue(portal.value?.todayScheduleCount) > 0 ? 'normal' as const : 'offline' as const,
+    path: '/workbench/schedule'
+  }
+]).filter((item) => !item.tag.includes('--')))
+
 const revenueTrendOption = computed(() => {
   const revenueList = revenue.value?.monthlyRevenue || []
   return {
@@ -429,7 +835,12 @@ const revenueTrendOption = computed(() => {
 async function loadOverview() {
   loading.value = true
   try {
-    bundle.value = await getHomeOverviewBundle()
+    const [homeBundle, birthdays] = await Promise.all([
+      getHomeOverviewBundle(),
+      getBirthdayPage({ pageNo: 1, pageSize: 12, daysAhead: 31 }, { silent403: true, silentError: true }).catch(() => null)
+    ])
+    bundle.value = homeBundle
+    birthdayRows.value = birthdays?.list || []
     refreshedAt.value = new Date().toLocaleString('zh-CN', {
       month: '2-digit',
       day: '2-digit',
@@ -461,14 +872,102 @@ onMounted(() => {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.portal-grid--support {
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+}
+
 .portal-grid--operating {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .portal-grid--risk-cards,
 .portal-grid--work,
-.portal-grid--quick-actions {
+.portal-grid--quick-actions,
+.portal-grid--birthday-metrics,
+.portal-grid--collab-metrics {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.birthday-highlight-row,
+.birthday-item,
+.collab-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.birthday-highlight-row {
+  padding: 14px 16px;
+  border: 1px solid rgba(228, 217, 187, 0.8);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(255, 248, 235, 0.95), rgba(255, 255, 255, 0.92));
+}
+
+.birthday-highlight-copy strong,
+.birthday-item strong,
+.collab-list-item strong {
+  display: block;
+  color: var(--ink);
+}
+
+.birthday-highlight-copy p,
+.birthday-item span,
+.collab-list-item span {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.birthday-list,
+.collab-list {
+  display: grid;
+  gap: 12px;
+}
+
+.birthday-action-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.birthday-action-card {
+  padding: 14px 16px;
+  border: 1px solid rgba(216, 225, 232, 0.9);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(252, 254, 255, 0.96), rgba(246, 250, 252, 0.94));
+  text-align: left;
+  cursor: pointer;
+}
+
+.birthday-action-card strong {
+  display: block;
+  color: var(--ink);
+}
+
+.birthday-action-card span {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.birthday-item,
+.collab-list-item {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid rgba(212, 224, 232, 0.9);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  text-align: left;
+  cursor: pointer;
+}
+
+.birthday-footer-actions,
+.birthday-modal-actions {
+  margin-top: 12px;
 }
 
 .trend-chart {
@@ -479,11 +978,18 @@ onMounted(() => {
   .portal-grid--metrics,
   .portal-grid--main,
   .portal-grid--secondary,
+  .portal-grid--support,
   .portal-grid--operating,
   .portal-grid--risk-cards,
   .portal-grid--work,
-  .portal-grid--quick-actions {
+  .portal-grid--quick-actions,
+  .portal-grid--birthday-metrics,
+  .portal-grid--collab-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .birthday-action-row {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -491,11 +997,21 @@ onMounted(() => {
   .portal-grid--metrics,
   .portal-grid--main,
   .portal-grid--secondary,
+  .portal-grid--support,
   .portal-grid--operating,
   .portal-grid--risk-cards,
   .portal-grid--work,
-  .portal-grid--quick-actions {
+  .portal-grid--quick-actions,
+  .portal-grid--birthday-metrics,
+  .portal-grid--collab-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .birthday-highlight-row,
+  .birthday-item,
+  .collab-list-item {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

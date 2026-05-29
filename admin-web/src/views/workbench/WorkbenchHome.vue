@@ -33,22 +33,73 @@
       <WorkbenchModuleCard title="我的日程" eyebrow="Today">
         <div class="schedule-head">
           <div>
-            <strong>{{ attendanceOverview.todayStatusLabel || '未打卡' }}</strong>
+            <strong>{{ selectedDateLabel }}</strong>
             <p>{{ attendanceWindowLabel }}</p>
           </div>
-          <StatusTag :text="attendanceOverview.todayStatusLabel || '待打卡'" :tone="attendanceTone" />
+          <a-space size="small">
+            <StatusTag :text="attendanceOverview.todayStatusLabel || '待打卡'" :tone="attendanceTone" />
+            <a-button type="link" @click="openPath('/workbench/schedule')">查看完整日历</a-button>
+          </a-space>
         </div>
-        <div class="workbench-chip-grid">
-          <button
-            v-for="item in scheduleItems"
-            :key="item.label"
-            type="button"
-            class="workbench-chip"
-            @click="openPath(item.path)"
-          >
-            <strong>{{ item.value }}</strong>
-            <span>{{ item.label }}</span>
-          </button>
+
+        <div class="schedule-calendar-shell">
+          <div class="schedule-calendar-panel">
+            <div class="schedule-calendar-toolbar">
+              <a-button size="small" @click="moveCalendar(-1)">上月</a-button>
+              <strong>{{ calendarMonthLabel }}</strong>
+              <a-space size="small">
+                <a-button size="small" @click="jumpToToday">今天</a-button>
+                <a-button size="small" @click="moveCalendar(1)">下月</a-button>
+              </a-space>
+            </div>
+            <FullCalendar ref="calendarRef" :options="calendarOptions" />
+          </div>
+
+          <div class="schedule-side-panel">
+            <div class="schedule-status-card">
+              <div class="schedule-status-copy">
+                <strong>{{ attendanceOverview.todayStatusLabel || '未打卡' }}</strong>
+                <span>{{ selectedDateHint }}</span>
+              </div>
+              <StatusTag :text="todayScheduleTagText" :tone="todayScheduleTagTone" />
+            </div>
+
+            <div class="workbench-chip-grid">
+              <button
+                v-for="item in scheduleItems"
+                :key="item.label"
+                type="button"
+                class="workbench-chip"
+                @click="openPath(item.path)"
+              >
+                <strong>{{ item.value }}</strong>
+                <span>{{ item.label }}</span>
+              </button>
+            </div>
+
+            <div class="schedule-agenda">
+              <div class="schedule-agenda-head">
+                <strong>当日安排</strong>
+                <span>{{ selectedDateAgenda.length }} 项</span>
+              </div>
+              <div v-if="selectedDateAgenda.length" class="schedule-agenda-list">
+                <button
+                  v-for="item in selectedDateAgenda.slice(0, 4)"
+                  :key="item.id"
+                  type="button"
+                  class="schedule-agenda-item"
+                  @click="openPath('/workbench/schedule')"
+                >
+                  <div>
+                    <strong>{{ item.title }}</strong>
+                    <span>{{ agendaTimeText(item.startTime, item.endTime) }}</span>
+                  </div>
+                  <StatusTag :text="agendaTypeText(item.calendarType)" :tone="agendaTone(item)" />
+                </button>
+              </div>
+              <a-empty v-else description="这一天暂无安排" />
+            </div>
+          </div>
         </div>
       </WorkbenchModuleCard>
 
@@ -127,6 +178,10 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import dayjs, { type Dayjs } from 'dayjs'
+import FullCalendar from '@fullcalendar/vue3'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import interactionPlugin from '@fullcalendar/interaction'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import OverviewMetricCard from '../../components/smartcare/OverviewMetricCard.vue'
@@ -134,9 +189,9 @@ import QuickActionTile from '../../components/smartcare/QuickActionTile.vue'
 import StatusTag from '../../components/smartcare/StatusTag.vue'
 import WorkbenchModuleCard from '../../components/smartcare/WorkbenchModuleCard.vue'
 import { getLogisticsWorkbenchSummary } from '../../api/logistics'
-import { getPortalSummary } from '../../api/oa'
+import { getOaTaskCalendar, getPortalSummary } from '../../api/oa'
 import { getAttendanceOverview, punchAttendance } from '../../api/schedule'
-import type { AttendanceDashboardOverview, OaPortalSummary, LogisticsWorkbenchSummary } from '../../types'
+import type { AttendanceDashboardOverview, OaPortalSummary, LogisticsWorkbenchSummary, OaTask } from '../../types'
 import { useUserStore } from '../../stores/user'
 import { useRouter } from 'vue-router'
 import { resolveRouteAccess } from '../../utils/routeAccess'
@@ -169,6 +224,10 @@ const userStore = useUserStore()
 const loading = ref(false)
 const attendanceSubmitting = ref(false)
 const refreshedAt = ref('--')
+const calendarRef = ref<InstanceType<typeof FullCalendar> | null>(null)
+const selectedDate = ref(dayjs())
+const calendarCursor = ref(dayjs().startOf('month'))
+const calendarRows = ref<OaTask[]>([])
 const portalSummary = ref<OaPortalSummary | null>(null)
 const logisticsSummary = ref<LogisticsWorkbenchSummary | null>(null)
 const attendanceOverview = reactive<AttendanceDashboardOverview>({
@@ -224,6 +283,15 @@ const attendanceWindowLabel = computed(() => {
   return `今日班次 ${start} - ${end}`
 })
 
+const calendarMonthLabel = computed(() => calendarCursor.value.format('YYYY 年 M 月'))
+
+const selectedDateLabel = computed(() => selectedDate.value.format('M 月 D 日 dddd'))
+
+const selectedDateHint = computed(() => {
+  if (selectedDate.value.isSame(dayjs(), 'day')) return '今天的日程和打卡状态会优先显示在这里'
+  return `${selectedDate.value.format('M 月 D 日')} 的安排摘要`
+})
+
 const attendanceActionButtons = computed<AttendanceAction[]>(() => {
   const status = String(attendanceOverview.todayStatus || '').toUpperCase()
   if (!status || status === 'NOT_CHECKED_IN') return ['IN']
@@ -268,8 +336,44 @@ const scheduleItems = computed(() => ([
   { label: '当月在岗', value: `${displayNumber(attendanceOverview.onDutyDays)} 天`, path: '/workbench/attendance' },
   { label: '请假天数', value: `${displayNumber(attendanceOverview.leaveDays)} 天`, path: '/workbench/attendance' },
   { label: '考勤异常', value: `${displayNumber(attendanceOverview.abnormalCount)} 次`, path: '/workbench/attendance' },
-  { label: '今日日程', value: `${displayNumber(portalSummary.value?.todayScheduleCount)} 项`, path: '/workbench/my-info' }
+  { label: '今日日程', value: `${displayNumber(portalSummary.value?.todayScheduleCount)} 项`, path: '/workbench/schedule' }
 ]))
+
+const selectedDateAgenda = computed(() => {
+  const target = selectedDate.value.format('YYYY-MM-DD')
+  return calendarRows.value.filter((item) => {
+    const start = item.startTime || item.endTime
+    return start ? dayjs(start).format('YYYY-MM-DD') === target : false
+  })
+})
+
+const todayScheduleTagText = computed(() => {
+  const count = selectedDateAgenda.value.length
+  return count ? `${count} 项待查看` : '暂无安排'
+})
+
+const todayScheduleTagTone = computed(() => (selectedDateAgenda.value.length ? 'pending' : 'offline'))
+
+function agendaTypeText(type?: string) {
+  if (type === 'PERSONAL') return '个人'
+  if (type === 'DAILY') return '日常'
+  if (type === 'COLLAB') return '协同'
+  return '工作'
+}
+
+function agendaTone(item: OaTask) {
+  if (item.urgency === 'EMERGENCY') return 'danger'
+  if (item.status === 'DONE') return 'normal'
+  if (item.calendarType === 'COLLAB') return 'warning'
+  return 'pending'
+}
+
+function agendaTimeText(startTime?: string, endTime?: string) {
+  if (!startTime && !endTime) return '全天安排'
+  const start = startTime ? dayjs(startTime).format('HH:mm') : '--:--'
+  const end = endTime ? dayjs(endTime).format('HH:mm') : '--:--'
+  return `${start} - ${end}`
+}
 
 const allModules = computed<PrimaryModule[]>(() => ([
   {
@@ -387,6 +491,85 @@ const commonActions = computed(() => {
   return actions.filter((item) => canAccess(item.path))
 })
 
+const calendarOptions = computed(() => ({
+  plugins: [dayGridPlugin, interactionPlugin],
+  initialView: 'dayGridMonth',
+  locale: 'zh-cn',
+  height: 'auto',
+  fixedWeekCount: false,
+  headerToolbar: false,
+  dayMaxEventRows: 2,
+  events: calendarRows.value.map((task) => ({
+    id: String(task.id),
+    title: task.title,
+    start: task.startTime || task.endTime,
+    end: task.endTime || task.startTime,
+    color: task.urgency === 'EMERGENCY' ? '#d9485f' : task.calendarType === 'COLLAB' ? '#f59e0b' : '#2f8f83',
+    classNames: [
+      selectedDate.value.isSame(task.startTime || task.endTime || '', 'day') ? 'workbench-calendar-event--focus' : '',
+      task.status === 'DONE' ? 'workbench-calendar-event--done' : ''
+    ].filter(Boolean)
+  })),
+  datesSet: (arg: { start: Date; end: Date; view: { currentStart?: Date } }) => {
+    const currentStart = dayjs(arg.view?.currentStart || arg.start)
+    if (!currentStart.isSame(calendarCursor.value, 'month')) {
+      calendarCursor.value = currentStart.startOf('month')
+      loadCalendar(currentStart)
+    }
+  },
+  dateClick: (arg: { dateStr: string }) => {
+    selectedDate.value = dayjs(arg.dateStr)
+  },
+  dayCellClassNames: (arg: { date: Date }) => {
+    const cellDate = dayjs(arg.date)
+    return [
+      cellDate.isSame(dayjs(), 'day') ? 'workbench-calendar-day--today' : '',
+      cellDate.isSame(selectedDate.value, 'day') ? 'workbench-calendar-day--selected' : ''
+    ].filter(Boolean)
+  }
+}))
+
+async function loadCalendar(base = calendarCursor.value) {
+  if (!canAccess('/workbench/schedule')) {
+    calendarRows.value = []
+    return
+  }
+  const monthStart = dayjs(base).startOf('month')
+  const monthEnd = monthStart.endOf('month')
+  try {
+    const rows = await getOaTaskCalendar({
+      startDate: monthStart.format('YYYY-MM-DD'),
+      endDate: monthEnd.format('YYYY-MM-DD')
+    })
+    calendarRows.value = Array.isArray(rows) ? rows : []
+  } catch {
+    calendarRows.value = []
+  }
+}
+
+function moveCalendar(offset: number) {
+  const api = calendarRef.value?.getApi?.()
+  if (!api) {
+    const next = calendarCursor.value.add(offset, 'month')
+    calendarCursor.value = next.startOf('month')
+    loadCalendar(next)
+    return
+  }
+  if (offset > 0) api.next()
+  else api.prev()
+}
+
+function jumpToToday() {
+  selectedDate.value = dayjs()
+  const api = calendarRef.value?.getApi?.()
+  if (api) {
+    api.today()
+    return
+  }
+  calendarCursor.value = dayjs().startOf('month')
+  loadCalendar(dayjs())
+}
+
 async function refreshAttendance() {
   const data = await getAttendanceOverview({
     staffId: (userStore.staffInfo?.id as string | number | undefined) || undefined
@@ -400,7 +583,8 @@ async function loadWorkbench() {
     const [portal, logistics] = await Promise.all([
       getPortalSummary({ silent403: true, silentError: true }).catch(() => null),
       getLogisticsWorkbenchSummary(undefined, { silent403: true, silentError: true }).catch(() => null),
-      refreshAttendance().catch(() => undefined)
+      refreshAttendance().catch(() => undefined),
+      loadCalendar(calendarCursor.value).catch(() => undefined)
     ])
     portalSummary.value = portal
     logisticsSummary.value = logistics
@@ -483,17 +667,101 @@ onMounted(() => {
   font-size: 13px;
 }
 
+.schedule-calendar-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.95fr);
+  gap: 16px;
+}
+
+.schedule-calendar-panel,
+.schedule-side-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.schedule-calendar-toolbar,
+.schedule-status-card,
+.schedule-agenda-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.schedule-calendar-toolbar strong,
+.schedule-status-copy strong,
+.schedule-agenda-head strong {
+  color: var(--ink);
+}
+
+.schedule-status-card,
+.schedule-agenda,
+.workbench-chip,
+.workbench-list-item,
+.recent-visit-item {
+  border: 1px solid rgba(212, 224, 232, 0.9);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.schedule-status-card {
+  padding: 14px 16px;
+}
+
+.schedule-status-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.schedule-status-copy span,
+.schedule-agenda-head span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.schedule-agenda {
+  padding: 14px 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.schedule-agenda-list {
+  display: grid;
+  gap: 10px;
+}
+
+.schedule-agenda-item {
+  width: 100%;
+  border: 1px solid rgba(225, 233, 238, 0.95);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(248, 252, 253, 0.96), rgba(241, 247, 248, 0.96));
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.schedule-agenda-item strong {
+  display: block;
+  color: var(--ink);
+}
+
+.schedule-agenda-item span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .workbench-chip-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .workbench-chip,
 .workbench-list-item,
 .recent-visit-item {
   width: 100%;
-  border: 1px solid rgba(212, 224, 232, 0.9);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.94);
   text-align: left;
   cursor: pointer;
 }
@@ -538,12 +806,64 @@ onMounted(() => {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+:deep(.fc) {
+  --fc-border-color: rgba(222, 232, 236, 0.9);
+  --fc-event-border-color: transparent;
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: rgba(243, 248, 249, 0.9);
+  --fc-today-bg-color: rgba(47, 143, 131, 0.08);
+  font-size: 13px;
+}
+
+:deep(.fc-theme-standard td),
+:deep(.fc-theme-standard th),
+:deep(.fc-theme-standard .fc-scrollgrid) {
+  border-color: rgba(222, 232, 236, 0.9);
+}
+
+:deep(.fc .fc-col-header-cell-cushion) {
+  padding: 10px 0;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+:deep(.fc .fc-daygrid-day-number) {
+  color: var(--ink);
+  padding: 8px 10px 0;
+}
+
+:deep(.fc .workbench-calendar-day--selected) {
+  background: rgba(47, 143, 131, 0.12);
+}
+
+:deep(.fc .workbench-calendar-day--today) .fc-daygrid-day-number {
+  color: #2f8f83;
+  font-weight: 700;
+}
+
+:deep(.fc .fc-daygrid-event) {
+  border-radius: 999px;
+  padding: 1px 6px;
+  font-size: 11px;
+}
+
+:deep(.fc .workbench-calendar-event--done) {
+  opacity: 0.55;
+}
+
+:deep(.fc .workbench-calendar-event--focus) {
+  box-shadow: 0 0 0 1px rgba(15, 104, 96, 0.18);
+}
+
 @media (max-width: 1280px) {
   .workbench-summary-grid,
   .workbench-shell,
-  .workbench-chip-grid,
   .common-actions-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .schedule-calendar-shell {
+    grid-template-columns: 1fr;
   }
 }
 

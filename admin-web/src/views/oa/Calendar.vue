@@ -1,5 +1,13 @@
 <template>
-  <PageContainer title="我的行政日历 / 协同日历" subTitle="只显示与当前员工相关的个人、部门工作、日常计划和协同日历">
+  <PageContainer title="我的日程" subTitle="聚合个人、部门工作、日常计划和协同安排，按我的工作视角查看、创建和闭环每一天。" kicker="个人工作区">
+    <template #extra>
+      <a-space wrap>
+        <a-button @click="applyQuickScope('today')">回到今天</a-button>
+        <a-button @click="openPath('/oa/work-execution/task')">任务管理</a-button>
+        <a-button type="primary" @click="openCreate(selectedDate || dayjs())">新增日程</a-button>
+      </a-space>
+    </template>
+
     <SearchForm :model="query" @search="fetchAll" @reset="onReset">
       <a-form-item label="日历种类">
         <a-select v-model:value="query.calendarType" :options="calendarTypeOptions" allow-clear style="width: 160px" />
@@ -15,51 +23,134 @@
       </a-form-item>
       <template #extra>
         <a-space wrap>
-          <a-button type="primary" @click="openCreate()">新增行政日程</a-button>
+          <a-button type="primary" @click="openCreate(selectedDate || dayjs())">新增日程</a-button>
+          <a-button @click="applyQuickScope('today')">今天</a-button>
           <a-button @click="fetchAll">刷新</a-button>
         </a-space>
       </template>
     </SearchForm>
 
     <a-card class="card-elevated calendar-surface" :bordered="false">
-      <div class="calendar-toolbar">
-        <div class="calendar-toolbar-copy">
-          <div class="calendar-eyebrow">Personal Calendar Workspace</div>
-          <div class="calendar-title-tip">日历分层：个人、部门工作、日常计划、协同日历，仅显示当前员工相关内容</div>
-          <a-space size="small" wrap class="calendar-insights">
-            <a-tag v-for="item in calendarInsights" :key="item.label" :color="item.color">{{ item.label }} {{ item.value }}</a-tag>
-          </a-space>
-        </div>
-        <a-space wrap class="calendar-filter-pills">
-          <a-checkable-tag
-            v-for="item in calendarBuckets"
-            :key="item.type"
-            :checked="visibleCalendarTypes.includes(item.type)"
-            @change="toggleCalendarType(item.type)"
-          >
-            <span class="legend-dot" :style="{ background: item.color }"></span>
-            {{ item.label }} {{ item.count }}
-          </a-checkable-tag>
-          <a-button size="small" type="link" @click="showAllCalendarTypes">显示全部</a-button>
-        </a-space>
-      </div>
-      <div class="calendar-legend-grid">
-        <div
-          v-for="item in calendarLegendCards"
-          :key="item.type"
-          class="calendar-legend-card"
-          :class="`calendar-legend-card--${item.type.toLowerCase()}`"
-        >
-          <div class="calendar-legend-head">
-            <span class="calendar-legend-swatch" :style="{ background: item.color }"></span>
-            <strong>{{ item.label }}</strong>
-            <small>{{ item.count }} 项</small>
+      <div class="calendar-layout">
+        <div class="calendar-main">
+          <div class="calendar-toolbar">
+            <div class="calendar-toolbar-copy">
+              <div class="calendar-eyebrow">My Schedule Workspace</div>
+              <div class="calendar-title-tip">按我的工作节奏查看个人、部门、日常和协同安排，今天优先、风险优先、待完成优先。</div>
+              <a-space size="small" wrap class="calendar-insights">
+                <a-tag v-for="item in calendarInsights" :key="item.label" :color="item.color">{{ item.label }} {{ item.value }}</a-tag>
+              </a-space>
+            </div>
+            <a-space wrap class="calendar-filter-pills">
+              <a-checkable-tag
+                v-for="item in calendarBuckets"
+                :key="item.type"
+                :checked="visibleCalendarTypes.includes(item.type)"
+                @change="(checked) => toggleCalendarType(item.type, checked)"
+              >
+                <span class="legend-dot" :style="{ background: item.color }"></span>
+                {{ item.label }} {{ item.count }}
+              </a-checkable-tag>
+              <a-button size="small" type="link" @click="showAllCalendarTypes">显示全部</a-button>
+            </a-space>
           </div>
-          <p>{{ item.desc }}</p>
+
+          <div class="calendar-quick-scopes">
+            <button
+              v-for="item in quickScopeOptions"
+              :key="item.key"
+              type="button"
+              class="calendar-scope-pill"
+              :class="{ 'calendar-scope-pill--active': quickScope === item.key }"
+              @click="applyQuickScope(item.key)"
+            >
+              <strong>{{ item.label }}</strong>
+              <span>{{ item.helper }}</span>
+            </button>
+          </div>
+
+          <div class="calendar-legend-grid">
+            <div
+              v-for="item in calendarLegendCards"
+              :key="item.type"
+              class="calendar-legend-card"
+              :class="`calendar-legend-card--${item.type.toLowerCase()}`"
+            >
+              <div class="calendar-legend-head">
+                <span class="calendar-legend-swatch" :style="{ background: item.color }"></span>
+                <strong>{{ item.label }}</strong>
+                <small>{{ item.count }} 项</small>
+              </div>
+              <p>{{ item.desc }}</p>
+            </div>
+          </div>
+
+          <div class="calendar-frame">
+            <FullCalendar ref="calendarRef" :options="calendarOptions" />
+          </div>
         </div>
-      </div>
-      <div class="calendar-frame">
-        <FullCalendar ref="calendarRef" :options="calendarOptions" />
+
+        <aside class="calendar-side">
+          <div class="calendar-side-card">
+            <div class="calendar-side-head">
+              <div>
+                <strong>{{ selectedDateTitle }}</strong>
+                <p>{{ selectedDateSubtitle }}</p>
+              </div>
+              <a-button type="link" @click="openDayDrawer(selectedDate || dayjs())">展开详情</a-button>
+            </div>
+            <div class="calendar-side-metrics">
+              <div class="calendar-side-metric">
+                <span>总安排</span>
+                <strong>{{ selectedDayOverview.total }}</strong>
+              </div>
+              <div class="calendar-side-metric">
+                <span>待完成</span>
+                <strong>{{ selectedDayOverview.pending }}</strong>
+              </div>
+              <div class="calendar-side-metric">
+                <span>提醒项</span>
+                <strong>{{ selectedDayOverview.readonly }}</strong>
+              </div>
+              <div class="calendar-side-metric">
+                <span>紧急项</span>
+                <strong>{{ selectedDayEmergencyCount }}</strong>
+              </div>
+            </div>
+            <div class="calendar-side-actions">
+              <a-button block @click="openCreate(selectedDate || dayjs())">给这一天新建日程</a-button>
+              <a-button block @click="applyQuickScope('today')">回到今天</a-button>
+            </div>
+          </div>
+
+          <div class="calendar-side-card">
+            <div class="calendar-side-head">
+              <div>
+                <strong>当日安排</strong>
+                <p>直接浏览这一天最需要处理的事项</p>
+              </div>
+            </div>
+            <div v-if="selectedDayTimelineItems.length" class="calendar-side-agenda">
+              <button
+                v-for="item in selectedDayTimelineItems.slice(0, 6)"
+                :key="item.key"
+                type="button"
+                class="calendar-side-agenda-item"
+                @click="openDayDrawer(selectedDate || dayjs())"
+              >
+                <div>
+                  <strong>{{ item.timeLabel }} · {{ item.title }}</strong>
+                  <span>{{ item.typeLabel }} · {{ item.summary }}</span>
+                </div>
+                <a-tag :color="item.urgency === 'EMERGENCY' ? 'red' : 'blue'">{{ item.urgency === 'EMERGENCY' ? '紧急' : '常规' }}</a-tag>
+              </button>
+            </div>
+            <div v-else class="calendar-side-empty">
+              <strong>这一天目前比较空</strong>
+              <p>可以直接新增个人计划、日常计划或协同安排。</p>
+            </div>
+          </div>
+        </aside>
       </div>
     </a-card>
 
@@ -70,7 +161,7 @@
     >
       <div class="drawer-actions">
         <a-space wrap>
-          <a-button type="primary" @click="openCreate(selectedDate || dayjs())">新增该日计划</a-button>
+              <a-button type="primary" @click="openCreate(selectedDate || dayjs())">新增该日程</a-button>
           <a-button @click="quickCreateTemplate('基础办公')">基础办公</a-button>
           <a-button @click="quickCreateTemplate('行政日常')">行政日常</a-button>
           <a-button @click="quickCreateTemplate('协同会议')">协同会议</a-button>
@@ -134,7 +225,7 @@
       <div v-else class="calendar-empty-state">
         <div class="calendar-empty-art">+</div>
         <strong>这一天还没有安排</strong>
-        <p>{{ selectedDate ? `${selectedDate.format('M月D日')}` : '当天' }} 目前是空白时段，可以直接从上方快速创建基础办公、行政日常或协同会议。</p>
+        <p>{{ selectedDate ? `${selectedDate.format('M月D日')}` : '当天' }} 目前是空白时段，可以直接从上方快速创建基础办公、日常计划或协同会议。</p>
       </div>
     </a-drawer>
 
@@ -148,7 +239,7 @@
     >
       <a-form layout="vertical">
         <a-form-item label="标题" required>
-          <a-input v-model:value="form.title" placeholder="例如：月度行政例会" />
+          <a-input v-model:value="form.title" placeholder="例如：月度沟通会、护理排班复盘、家属回访" />
         </a-form-item>
         <a-row :gutter="12">
           <a-col :span="12">
@@ -231,7 +322,7 @@
                 show-search
                 :filter-option="false"
                 :options="departmentOptions"
-                placeholder="可选择多个部门，系统会自动同步到这些部门成员的协同日历"
+                placeholder="可选择多个部门，系统会自动同步到这些部门成员的日程视图"
                 @search="searchDepartments"
                 @focus="() => !departmentOptions.length && searchDepartments('')"
               />
@@ -311,6 +402,7 @@ import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import { message, Modal } from 'ant-design-vue'
+import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import { getOaTaskCalendar, createOaTask, updateOaTask, completeOaTask, deleteOaTask, checkOaTaskConflicts } from '../../api/oa'
@@ -325,7 +417,9 @@ import type { BirthdayReminder, Id, OaTask } from '../../types'
 type CalendarType = 'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB'
 type UrgencyType = 'NORMAL' | 'EMERGENCY'
 type RecurrenceType = 'DAILY' | 'WEEKLY' | 'MONTHLY'
+type QuickScopeKey = 'all' | 'today' | 'week' | 'month' | 'pending' | 'emergency' | 'collab'
 
+const router = useRouter()
 const userStore = useUserStore()
 const rows = ref<OaTask[]>([])
 const birthdayRows = ref<BirthdayReminder[]>([])
@@ -339,9 +433,10 @@ const conflictPreviewLoading = ref(false)
 const conflictPreviewItems = ref<Array<{ title?: string; assigneeName?: string; startTime?: string; endTime?: string; reason?: string }>>([])
 const editOpen = ref(false)
 const dayDrawerOpen = ref(false)
-const selectedDate = ref<Dayjs>()
+const selectedDate = ref<Dayjs>(dayjs())
 const editingTaskId = ref<Id | null>(null)
 const calendarRef = ref<any>(null)
+const quickScope = ref<QuickScopeKey>('all')
 let syncTimer: number | undefined
 
 const { departmentOptions, searchDepartments } = useDepartmentOptions({ pageSize: 240, preloadSize: 500 })
@@ -512,6 +607,16 @@ const calendarInsights = computed(() => {
   ]
 })
 
+const quickScopeOptions = [
+  { key: 'all' as const, label: '全部视图', helper: '恢复完整月历' },
+  { key: 'today' as const, label: '今天', helper: '只看今日安排' },
+  { key: 'week' as const, label: '本周', helper: '聚焦本周节奏' },
+  { key: 'month' as const, label: '本月', helper: '查看整月排布' },
+  { key: 'pending' as const, label: '待完成', helper: '只看未完成事项' },
+  { key: 'emergency' as const, label: '紧急', helper: '优先处理高风险' },
+  { key: 'collab' as const, label: '协同', helper: '查看跨部门安排' }
+]
+
 const selectedDayEvents = computed<DayAgendaItem[]>(() => {
   if (!selectedDate.value) return []
   const selected = selectedDate.value.format('YYYY-MM-DD')
@@ -578,6 +683,17 @@ const selectedDayOverview = computed(() => {
   }
 })
 
+const selectedDayEmergencyCount = computed(() => selectedDayEvents.value.filter((item) => item.urgency === 'EMERGENCY' && item.status !== 'DONE').length)
+
+const selectedDateTitle = computed(() => (selectedDate.value || dayjs()).format('M 月 D 日 dddd'))
+
+const selectedDateSubtitle = computed(() => {
+  if ((selectedDate.value || dayjs()).isSame(dayjs(), 'day')) {
+    return '今天的安排会优先显示在这里，适合快速查看和补录。'
+  }
+  return `已定位到 ${(selectedDate.value || dayjs()).format('YYYY-MM-DD')}，可以继续查看详情或新增安排。`
+})
+
 const selectedDayTimelineItems = computed(() => selectedDayEvents.value.map((item, index) => {
   const start = normalizeDateTimeValue(item.startTime || item.endTime)
   const end = normalizeDateTimeValue(item.endTime || item.startTime)
@@ -612,7 +728,7 @@ const selectedDayTimelineItems = computed(() => selectedDayEvents.value.map((ite
   }
 }))
 
-const modalTitle = computed(() => (editingTaskId.value != null ? '编辑行政日程' : '新增行政日程'))
+const modalTitle = computed(() => (editingTaskId.value != null ? '编辑日程' : '新增日程'))
 const collaboratorTip = computed(() => {
   if (form.calendarType !== 'COLLAB') return ''
   const deptCount = form.collaboratorDeptIds.length
@@ -811,12 +927,14 @@ function calendarDayState(dateText: string) {
   }
 }
 
-function toggleCalendarType(type: CalendarType) {
-  if (visibleCalendarTypes.value.length === 1 && visibleCalendarTypes.value[0] === type) {
-    visibleCalendarTypes.value = ['PERSONAL', 'WORK', 'DAILY', 'COLLAB']
+function toggleCalendarType(type: CalendarType, checked?: boolean) {
+  if (checked === false) {
+    if (visibleCalendarTypes.value.length === 1) return
+    visibleCalendarTypes.value = visibleCalendarTypes.value.filter((item) => item !== type)
     return
   }
-  visibleCalendarTypes.value = [type]
+  if (visibleCalendarTypes.value.includes(type)) return
+  visibleCalendarTypes.value = [...visibleCalendarTypes.value, type]
 }
 
 function showAllCalendarTypes() {
@@ -891,6 +1009,54 @@ function focusCalendarDate(dateText: string) {
 function openDayDrawer(date: Dayjs) {
   selectedDate.value = date
   dayDrawerOpen.value = true
+}
+
+function openPath(path: string) {
+  router.push(path)
+}
+
+async function applyQuickScope(scope: QuickScopeKey) {
+  quickScope.value = scope
+  const today = dayjs()
+  const startOfWeek = today.startOf('week')
+  const endOfWeek = today.endOf('week')
+  const startOfMonth = today.startOf('month')
+  const endOfMonth = today.endOf('month')
+
+  query.status = undefined
+  query.calendarType = undefined
+  query.urgency = undefined
+  query.range = undefined
+  showAllCalendarTypes()
+
+  const api = calendarRef.value?.getApi?.()
+
+  if (scope === 'today') {
+    query.range = [today, today]
+    selectedDate.value = today
+    api?.changeView('dayGridDay')
+    api?.gotoDate(today.format('YYYY-MM-DD'))
+  } else if (scope === 'week') {
+    query.range = [startOfWeek, endOfWeek]
+    selectedDate.value = today
+    api?.changeView('dayGridWeek')
+    api?.gotoDate(today.format('YYYY-MM-DD'))
+  } else if (scope === 'month') {
+    query.range = [startOfMonth, endOfMonth]
+    selectedDate.value = today
+    api?.changeView('dayGridMonth')
+    api?.gotoDate(today.format('YYYY-MM-DD'))
+  } else if (scope === 'pending') {
+    query.status = 'OPEN'
+  } else if (scope === 'emergency') {
+    query.status = 'OPEN'
+    query.urgency = 'EMERGENCY'
+  } else if (scope === 'collab') {
+    query.calendarType = 'COLLAB'
+    visibleCalendarTypes.value = ['COLLAB']
+  }
+
+  await fetchAll()
 }
 
 function formatRange(startTime?: string, endTime?: string) {
@@ -1106,10 +1272,12 @@ async function fetchDepartmentOptions() {
 }
 
 function onReset() {
+  quickScope.value = 'all'
   query.status = undefined
   query.calendarType = undefined
   query.urgency = undefined
   query.range = undefined
+  showAllCalendarTypes()
   fetchAll()
 }
 
@@ -1451,6 +1619,21 @@ useLiveSyncRefresh({
   pointer-events: none;
 }
 
+.calendar-layout {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.82fr);
+  gap: 18px;
+}
+
+.calendar-main,
+.calendar-side {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
 .calendar-toolbar {
   position: relative;
   z-index: 1;
@@ -1496,6 +1679,53 @@ useLiveSyncRefresh({
 
 .calendar-filter-pills {
   justify-content: flex-end;
+}
+
+.calendar-quick-scopes {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.calendar-scope-pill {
+  padding: 12px 14px;
+  border: 1px solid rgba(214, 226, 236, 0.92);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.86);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.calendar-scope-pill strong,
+.calendar-side-head strong,
+.calendar-side-empty strong,
+.calendar-side-agenda-item strong {
+  display: block;
+  color: #0f172a;
+}
+
+.calendar-scope-pill span,
+.calendar-side-head p,
+.calendar-side-empty p,
+.calendar-side-agenda-item span {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.calendar-scope-pill:hover,
+.calendar-side-agenda-item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(147, 197, 253, 0.96);
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.08);
+}
+
+.calendar-scope-pill--active {
+  border-color: rgba(37, 99, 235, 0.94);
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.98) 0%, rgba(255, 255, 255, 0.92) 100%);
 }
 
 .calendar-legend-grid {
@@ -1581,6 +1811,90 @@ useLiveSyncRefresh({
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.92),
     0 12px 32px rgba(15, 23, 42, 0.06);
+}
+
+.calendar-side-card {
+  padding: 16px;
+  border: 1px solid rgba(226, 232, 240, 0.88);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(247, 250, 252, 0.95) 100%);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+}
+
+.calendar-side-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.calendar-side-head p {
+  margin: 6px 0 0;
+}
+
+.calendar-side-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.calendar-side-metric {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.94);
+  border: 1px solid rgba(226, 232, 240, 0.92);
+}
+
+.calendar-side-metric span {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.calendar-side-metric strong {
+  display: block;
+  margin-top: 6px;
+  color: #0f172a;
+  font-size: 22px;
+}
+
+.calendar-side-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.calendar-side-agenda {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.calendar-side-agenda-item {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.calendar-side-empty {
+  margin-top: 14px;
+  padding: 20px 16px;
+  border-radius: 18px;
+  border: 1px dashed rgba(191, 219, 254, 0.92);
+  background: rgba(248, 250, 252, 0.8);
+}
+
+.calendar-side-empty p {
+  margin: 8px 0 0;
 }
 
 .drawer-actions {
@@ -2092,7 +2406,19 @@ useLiveSyncRefresh({
   font-weight: 600;
 }
 
+@media (max-width: 1280px) {
+  .calendar-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-quick-scopes {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 768px) {
+  .calendar-layout,
+  .calendar-quick-scopes,
   .calendar-legend-grid,
   .day-overview-bar {
     grid-template-columns: 1fr;

@@ -5,33 +5,25 @@
       <div class="scene-glow scene-glow-left"></div>
       <div class="scene-glow scene-glow-right"></div>
 
-      <header class="hud-topbar">
-        <div class="command-marquee">
+      <header class="hud-topbar hud-topbar--command">
+        <div class="command-marquee command-marquee--hero">
           <div class="hud-topbar__brand">
             <div class="brand-mark"><span></span></div>
             <div class="brand-copy">
-              <div class="brand-kicker">智慧养老平台</div>
-              <strong>床态全景</strong>
-              <small>{{ lifecycleContext.active ? '入住联动模式已开启，楼层与床位状态同步更新。' : '实时掌握床位状态，提升照护效率与安全。' }}</small>
+              <div class="brand-kicker">龟峰颐养中心 · 数字孪生</div>
+              <strong>长者床态指挥舱</strong>
+              <small>{{ lifecycleContext.active ? '当前为入住联动模式，空床调配、房间清洁与状态闭环同步可见。' : '围绕楼栋、楼层、房间与床位建立可钻取的 3D 运营视图。' }}</small>
             </div>
           </div>
 
-          <div class="campus-scope">
-            <span class="brand-kicker">当前视角</span>
+          <div class="campus-scope campus-scope--focus">
+            <span class="brand-kicker">当前焦点</span>
             <strong>{{ focusHeadline.title }}</strong>
             <small>{{ focusHeadline.meta }}</small>
           </div>
         </div>
 
-        <div class="hud-topbar__metrics">
-          <button v-for="item in overviewCards" :key="item.label" class="metric-pill" :class="item.tone">
-            <span>{{ item.label }}</span>
-            <strong><AnimatedMetricNumber :value="item.numericValue" :suffix="item.suffix || ''" /></strong>
-            <small>{{ item.meta }}</small>
-          </button>
-        </div>
-
-        <div class="hud-topbar__ops">
+        <div class="hud-topbar__ops hud-topbar__ops--command">
           <a-input-search
             v-model:value="keyword"
             class="topbar-search"
@@ -56,6 +48,14 @@
               <small>{{ operatorRole }}</small>
             </div>
           </div>
+        </div>
+
+        <div class="hud-topbar__metrics hud-topbar__metrics--ribbon">
+          <button v-for="item in overviewCards" :key="item.label" class="metric-pill" :class="item.tone">
+            <span>{{ item.label }}</span>
+            <strong><AnimatedMetricNumber :value="item.numericValue" :suffix="item.suffix || ''" /></strong>
+            <small>{{ item.meta }}</small>
+          </button>
         </div>
       </header>
 
@@ -126,6 +126,24 @@
 
             <div class="sidebar-section">
               <div class="sidebar-section__head">
+                <span class="panel-kicker">运营口径</span>
+                <strong>占床与在住</strong>
+              </div>
+              <div class="sidebar-mini-grid">
+                <div v-for="item in leftStatCards" :key="item.label" class="sidebar-mini-card" :class="item.tone">
+                  <span>{{ item.label }}</span>
+                  <strong>{{ item.value }}</strong>
+                  <small>{{ item.meta }}</small>
+                </div>
+              </div>
+              <div class="metric-note-card" :class="{ 'is-warning': occupancyDriftCount > 0 }">
+                <strong>{{ occupancyDriftCount > 0 ? '占床口径高于在住口径' : '当前口径已对齐' }}</strong>
+                <p>{{ occupancyDriftDescription }}</p>
+              </div>
+            </div>
+
+            <div class="sidebar-section">
+              <div class="sidebar-section__head">
                 <span class="panel-kicker">床态分布</span>
                 <strong>运营概览</strong>
               </div>
@@ -141,23 +159,90 @@
                 </div>
               </div>
             </div>
+
+            <div class="sidebar-section">
+              <div class="sidebar-section__head">
+                <span class="panel-kicker">AI 指挥建议</span>
+                <strong>优先动作</strong>
+              </div>
+              <div class="suggestion-list">
+                <div v-for="item in aiSuggestionFeed" :key="item.key" class="suggestion-card" :class="item.tone">
+                  <strong>{{ item.title }}</strong>
+                  <p>{{ item.description }}</p>
+                </div>
+              </div>
+            </div>
           </section>
         </aside>
 
         <section class="dashboard-stage">
-          <section class="focus-ribbon">
-            <div class="focus-ribbon__main">
-              <div class="focus-ribbon__item">
-                <span>空间层级</span>
-                <strong>{{ currentScopeLabel }}</strong>
+          <section class="stage-brief">
+            <div class="stage-brief__main">
+              <div class="focus-ribbon">
+                <div class="focus-ribbon__main">
+                  <div class="focus-ribbon__item">
+                    <span>空间层级</span>
+                    <strong>{{ currentScopeLabel }}</strong>
+                  </div>
+                  <div class="focus-ribbon__item focus-ribbon__item--wide">
+                    <span>当前范围</span>
+                    <strong>{{ bedGuardSubject }}</strong>
+                  </div>
+                  <div class="focus-ribbon__item">
+                    <span>当前动作</span>
+                    <strong>{{ focusActionText }}</strong>
+                  </div>
+                </div>
               </div>
-              <div class="focus-ribbon__item focus-ribbon__item--wide">
-                <span>当前范围</span>
-                <strong>{{ bedGuardSubject }}</strong>
+
+              <div class="stage-quick-actions">
+                <button
+                  v-for="item in stageQuickActions"
+                  :key="item.key"
+                  class="stage-quick-action"
+                  :class="item.tone"
+                  @click="handleCommandAction(item.key)"
+                >
+                  <strong>{{ item.label }}</strong>
+                  <span>{{ item.description }}</span>
+                </button>
               </div>
-              <div class="focus-ribbon__item">
-                <span>当前动作</span>
-                <strong>{{ focusActionText }}</strong>
+            </div>
+
+            <div class="stage-brief__side">
+              <div class="bed-guard-card">
+                <div class="bed-guard-card__head">
+                  <span class="panel-kicker">流程状态</span>
+                  <strong>{{ bedGuardStageText }}</strong>
+                </div>
+                <div class="bed-guard-steps">
+                  <div
+                    v-for="(step, index) in bedGuardSteps"
+                    :key="step"
+                    class="bed-guard-step"
+                    :class="{
+                      'is-current': index === bedGuardCurrentIndex,
+                      'is-done': index < bedGuardCurrentIndex
+                    }"
+                  >
+                    <span>{{ index + 1 }}</span>
+                    <strong>{{ step }}</strong>
+                  </div>
+                </div>
+                <div v-if="bedGuardBlockers.length" class="bed-guard-blockers">
+                  <div v-for="item in bedGuardBlockers" :key="item.code" class="bed-guard-blocker">
+                    <div>
+                      <strong>{{ item.code }}</strong>
+                      <p>{{ item.text }}</p>
+                    </div>
+                    <a-button v-if="item.actionKey" size="small" @click="handleBedGuardAction(item)">
+                      {{ item.actionLabel }}
+                    </a-button>
+                  </div>
+                </div>
+                <div v-else class="bed-guard-blockers bed-guard-blockers--quiet">
+                  <p>{{ bedGuardHint }}</p>
+                </div>
               </div>
             </div>
           </section>
@@ -188,6 +273,21 @@
             </div>
 
             <template v-if="activeResidentBed">
+              <div class="context-tone-strip">
+                <div>
+                  <span>床位状态</span>
+                  <strong>{{ resolveStatus(activeResidentBed) }}</strong>
+                </div>
+                <div>
+                  <span>长者口径</span>
+                  <strong>{{ activeResidentBed.elderLifecycleStatus === 'IN_HOSPITAL' ? '在住长者' : '占床长者' }}</strong>
+                </div>
+                <div>
+                  <span>当前风险</span>
+                  <strong>{{ activeResidentBed.riskLabel || '平稳' }}</strong>
+                </div>
+              </div>
+
               <div class="resident-profile">
                 <div class="resident-profile__avatar">
                   <a-avatar :size="72" class="resident-avatar">{{ residentAvatarText }}</a-avatar>
@@ -323,7 +423,7 @@
       <a-descriptions v-if="selectedBed" :column="1" size="small" bordered>
         <a-descriptions-item label="床位">{{ selectedBed.bedNo || '-' }}</a-descriptions-item>
         <a-descriptions-item label="楼栋/楼层/房间">{{ selectedBed.building || '-' }} / {{ selectedBed.floorNo || '-' }} / {{ selectedBed.roomNo || '-' }}</a-descriptions-item>
-        <a-descriptions-item label="在住长者">{{ selectedBed.elderName || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="占床长者">{{ selectedBed.elderName || '-' }}</a-descriptions-item>
         <a-descriptions-item label="护理等级">{{ selectedBed.careLevel || '-' }}</a-descriptions-item>
         <a-descriptions-item label="风险级别">{{ bedRiskLabel(selectedBed) || '无' }}</a-descriptions-item>
         <a-descriptions-item label="风险来源">{{ selectedBed.riskSource || '-' }}</a-descriptions-item>
@@ -348,7 +448,7 @@
       <a-descriptions bordered size="small" :column="2" style="margin-bottom: 12px">
         <a-descriptions-item label="房型">{{ resolveRoomTypeLabel(selectedRoom?.roomType) }}</a-descriptions-item>
         <a-descriptions-item label="容量">{{ selectedRoom?.capacity || 0 }} 床</a-descriptions-item>
-        <a-descriptions-item label="在住人数">{{ selectedRoom?.elderCount || 0 }} 人</a-descriptions-item>
+        <a-descriptions-item label="占床人数">{{ selectedRoom?.elderCount || 0 }} 人</a-descriptions-item>
         <a-descriptions-item label="空床">{{ selectedRoom?.emptyBeds || 0 }} 床</a-descriptions-item>
         <a-descriptions-item label="公开备注" :span="2">{{ resolveVisibleRemark(selectedRoom?.remark) || '-' }}</a-descriptions-item>
         <a-descriptions-item label="全部备注" :span="2">{{ resolveAllRemark(selectedRoom?.remark) || '-' }}</a-descriptions-item>
@@ -527,12 +627,23 @@ const stats = computed(() => {
     const st = resolveStatus(b)
     if (st === '空闲') s.idle += 1
     if (st === '预定') s.reserved += 1
-    if (st === '在住') s.occupied += 1
+    if (b.elderId) s.occupied += 1
     if (st === '维修') s.maintenance += 1
     if (st === '清洁中') s.cleaning += 1
     if (st === '锁定') s.locked += 1
   })
   return s
+})
+
+const inHospitalResidentCount = computed(() => beds.value.filter((bed) => {
+  if (!bed.elderId) return false
+  return String(bed.elderLifecycleStatus || '').trim().toUpperCase() === 'IN_HOSPITAL'
+}).length)
+const occupancyDriftCount = computed(() => Math.max(stats.value.occupied - inHospitalResidentCount.value, 0))
+const occupancyDriftDescription = computed(() => {
+  if (!stats.value.occupied) return '当前没有占床长者。'
+  if (!occupancyDriftCount.value) return `当前 ${inHospitalResidentCount.value} 位在住长者与占床口径一致。`
+  return `当前有 ${stats.value.occupied} 位占床长者，其中 ${inHospitalResidentCount.value} 位为在住，另有 ${occupancyDriftCount.value} 位处于外出、待退住或占床未释放状态。`
 })
 
 const alertBeds = computed(() => [...sourceBeds.value]
@@ -636,7 +747,8 @@ const commandCenterStatus = computed(() => lifecycleContext.value.active ? '入�
 
 const overviewCards = computed(() => ([
   { label: '总床位', numericValue: beds.value.length, meta: `${matrixBuildings.value.length} 栋 ${matrixFloors.value.length} 层`, tone: 'tone-blue' },
-  { label: '入住率', numericValue: occupiedRate.value, suffix: '%', meta: `${stats.value.occupied} 位在住长者`, tone: 'tone-green' },
+  { label: '床位占用率', numericValue: occupiedRate.value, suffix: '%', meta: `${stats.value.occupied} 张已占用床位`, tone: 'tone-green' },
+  { label: '在住长者', numericValue: inHospitalResidentCount.value, meta: occupancyDriftCount.value ? `与占床相差 ${occupancyDriftCount.value} 位` : '与占床口径一致', tone: 'tone-cyan' },
   { label: '高风险长者', numericValue: concernCount.value, meta: `${alertBeds.value.length} 位重点关注`, tone: 'tone-red' },
   { label: '待处理提醒', numericValue: emergencyCount.value, meta: `${alertFeed.value.length} 条待闭环`, tone: 'tone-orange' },
   { label: '维修床位', numericValue: stats.value.maintenance, meta: '待恢复上线', tone: 'tone-purple' }
@@ -644,7 +756,8 @@ const overviewCards = computed(() => ([
 
 const leftStatCards = computed(() => ([
   { label: '空床位', value: stats.value.idle, meta: '待迎接入住', tone: 'tone-gray' },
-  { label: '在住长者', value: stats.value.occupied, meta: '持续守护中', tone: 'tone-cyan' },
+  { label: '占床长者', value: stats.value.occupied, meta: '床位已被占用', tone: 'tone-cyan' },
+  { label: '在住长者', value: inHospitalResidentCount.value, meta: '长者列表在住口径', tone: 'tone-green' },
   { label: '离床观察', value: awayObservationCount.value, meta: '夜巡重点', tone: 'tone-orange' },
   { label: '需关注长者', value: concernCount.value, meta: '风险与异常联动', tone: 'tone-red' },
   { label: '维修设备', value: stats.value.maintenance, meta: '待恢复上线', tone: 'tone-orange' },
@@ -686,7 +799,7 @@ const statusDistributionRows = computed(() => {
   const total = Math.max(1, beds.value.length)
   return [
     { label: '空床位', value: stats.value.idle, percent: Math.round((stats.value.idle / total) * 100), tone: 'fill-gray' },
-    { label: '在住长者', value: stats.value.occupied, percent: Math.round((stats.value.occupied / total) * 100), tone: 'fill-cyan' },
+    { label: '占床床位', value: stats.value.occupied, percent: Math.round((stats.value.occupied / total) * 100), tone: 'fill-cyan' },
     { label: 'AI关注', value: aiFocusCount.value, percent: Math.round((aiFocusCount.value / total) * 100), tone: 'fill-purple' },
     { label: '离床观察', value: awayObservationCount.value, percent: Math.round((awayObservationCount.value / total) * 100), tone: 'fill-orange' },
     { label: '实时风险提醒', value: concernCount.value, percent: Math.round((concernCount.value / total) * 100), tone: 'fill-red' }
@@ -877,7 +990,7 @@ const bedGuardBlockers = computed(() => {
     return blockers
   }
   if (quickFilter.value === 'IDLE' && stats.value.idle === 0) blockers.push({ code: 'B202', text: '暂无可分配空床' })
-  if (quickFilter.value === 'OCCUPIED' && stats.value.occupied === 0) blockers.push({ code: 'B203', text: '当前无在住床位' })
+  if (quickFilter.value === 'OCCUPIED' && stats.value.occupied === 0) blockers.push({ code: 'B203', text: '当前无占床床位' })
   return blockers
 })
 
@@ -924,7 +1037,7 @@ const stageQuickActions = computed(() => ([
 ]))
 
 const commandDeck = computed(() => ([
-  { key: 'open-profile', label: '长者档案', description: '查看在住档案与照护信息', tone: 'tone-blue' },
+  { key: 'open-profile', label: '长者档案', description: '查看长者档案与照护信息', tone: 'tone-blue' },
   { key: 'allocate-bed', label: '床位分配', description: '为空床发起入住分配', tone: 'tone-cyan' },
   { key: 'open-assessment', label: '评估档案', description: '进入能力评估归档', tone: 'tone-purple' },
   { key: 'open-contracts', label: '合同票据', description: '处理合同与账单联动', tone: 'tone-green' },
@@ -1004,8 +1117,8 @@ const activeTrendPanel = computed(() => {
   }
   return {
     eyebrow: '24小时床态趋势',
-    title: '在住与空床节奏',
-    summary: `${stats.value.occupied} 位在住，${stats.value.idle} 张空床，适合总览调配节奏`,
+    title: '占床与空床节奏',
+    summary: `${stats.value.occupied} 张占床，${stats.value.idle} 张空床，适合总览调配节奏`,
     option: occupancyTrendOption.value
   }
 })
@@ -1305,7 +1418,13 @@ function parseChineseNumber(text: string) {
 }
 
 function resolveStatus(bed: BedItem): '空闲' | '预定' | '在住' | '维修' | '清洁中' | '锁定' {
-  if (bed.elderId) return '在住'
+  const lifecycleStatus = String(bed.elderLifecycleStatus || '').trim().toUpperCase()
+  if (bed.elderId) {
+    if (lifecycleStatus === 'OUTING' || lifecycleStatus === 'MEDICAL_OUTING' || lifecycleStatus === 'DISCHARGE_PENDING') {
+      return '预定'
+    }
+    return '在住'
+  }
   if (bed.status === 0) return '锁定'
   if (bed.occupancySource === 'CLEANING') return '清洁中'
   if (bed.status === 3 || bed.occupancySource === 'MAINTENANCE') return '维修'
@@ -2247,6 +2366,231 @@ watch(
   gap: 12px;
 }
 
+.hud-topbar--command {
+  gap: 12px;
+}
+
+.command-marquee--hero {
+  align-items: center;
+}
+
+.campus-scope--focus {
+  padding: 10px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(170, 190, 214, 0.22);
+  background: rgba(248, 251, 255, 0.72);
+}
+
+.hud-topbar__ops--command {
+  align-items: stretch;
+}
+
+.hud-topbar__metrics--ribbon {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.sidebar-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sidebar-mini-card {
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(170, 190, 214, 0.18);
+  background: rgba(255, 255, 255, 0.7);
+  display: grid;
+  gap: 4px;
+}
+
+.sidebar-mini-card span,
+.metric-note-card p,
+.suggestion-card p,
+.stage-quick-action span,
+.bed-guard-blocker p,
+.bed-guard-blockers--quiet p,
+.context-tone-strip span {
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.sidebar-mini-card strong,
+.metric-note-card strong,
+.suggestion-card strong,
+.stage-quick-action strong,
+.bed-guard-card__head strong,
+.bed-guard-step strong,
+.bed-guard-blocker strong,
+.context-tone-strip strong {
+  color: var(--text-strong);
+}
+
+.metric-note-card {
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(244, 249, 255, 0.9), rgba(255, 255, 255, 0.84));
+  border: 1px solid rgba(170, 190, 214, 0.2);
+  display: grid;
+  gap: 6px;
+}
+
+.metric-note-card.is-warning {
+  background: linear-gradient(180deg, rgba(255, 246, 233, 0.92), rgba(255, 252, 246, 0.88));
+  border-color: rgba(242, 171, 69, 0.28);
+}
+
+.suggestion-list {
+  display: grid;
+  gap: 10px;
+}
+
+.suggestion-card {
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: inset 0 0 0 1px rgba(170, 190, 214, 0.16);
+  display: grid;
+  gap: 6px;
+}
+
+.suggestion-card.dot-red {
+  background: linear-gradient(180deg, rgba(255, 242, 244, 0.92), rgba(255, 250, 250, 0.84));
+}
+
+.suggestion-card.dot-purple {
+  background: linear-gradient(180deg, rgba(244, 240, 255, 0.92), rgba(251, 249, 255, 0.84));
+}
+
+.suggestion-card.dot-cyan {
+  background: linear-gradient(180deg, rgba(242, 249, 255, 0.92), rgba(249, 252, 255, 0.84));
+}
+
+.stage-brief {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 14px;
+}
+
+.stage-brief__main,
+.stage-brief__side {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.stage-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stage-quick-action,
+.bed-guard-card,
+.context-tone-strip > div {
+  border: 1px solid var(--hud-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 251, 255, 0.88));
+  box-shadow: var(--hud-shadow);
+  backdrop-filter: blur(12px);
+}
+
+.stage-quick-action {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 18px;
+  text-align: left;
+  display: grid;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.bed-guard-card {
+  padding: 14px;
+  border-radius: 22px;
+  display: grid;
+  gap: 12px;
+}
+
+.bed-guard-card__head {
+  display: grid;
+  gap: 4px;
+}
+
+.bed-guard-steps {
+  display: grid;
+  gap: 8px;
+}
+
+.bed-guard-step {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(248, 251, 255, 0.82);
+  box-shadow: inset 0 0 0 1px rgba(170, 190, 214, 0.16);
+}
+
+.bed-guard-step span {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  align-items: center;
+  justify-content: center;
+  background: rgba(165, 178, 194, 0.16);
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.bed-guard-step.is-current span {
+  background: rgba(111, 149, 255, 0.16);
+  color: #416ee8;
+}
+
+.bed-guard-step.is-done span {
+  background: rgba(79, 194, 145, 0.16);
+  color: #17865b;
+}
+
+.bed-guard-blockers {
+  display: grid;
+  gap: 8px;
+}
+
+.bed-guard-blocker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255, 247, 236, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(242, 171, 69, 0.16);
+}
+
+.bed-guard-blockers--quiet {
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(243, 248, 252, 0.7);
+}
+
+.context-tone-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.context-tone-strip > div {
+  padding: 10px 12px;
+  border-radius: 16px;
+  display: grid;
+  gap: 4px;
+}
+
 .stream-card {
   padding: 12px 14px;
   border-radius: 18px;
@@ -2290,12 +2634,16 @@ watch(
 }
 
 @media (max-width: 1440px) {
-  .hud-topbar__metrics {
+  .hud-topbar__metrics--ribbon {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .dashboard-main {
     grid-template-columns: 260px minmax(0, 1fr) 320px;
+  }
+
+  .stage-brief {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -2313,8 +2661,8 @@ watch(
     gap: 10px;
   }
 
-  .hud-topbar__metrics {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+  .hud-topbar__metrics--ribbon {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
   }
 
@@ -2330,6 +2678,10 @@ watch(
   .dashboard-main {
     grid-template-columns: 232px minmax(0, 1fr) 288px;
     gap: 14px;
+  }
+
+  .stage-quick-actions {
+    grid-template-columns: 1fr;
   }
 
   .activity-stream {
@@ -2383,9 +2735,11 @@ watch(
   }
 
   .hud-topbar__metrics,
+  .sidebar-mini-grid,
   .detail-grid,
   .action-grid,
   .focus-ribbon__main,
+  .context-tone-strip,
   .activity-stream {
     grid-template-columns: 1fr;
   }

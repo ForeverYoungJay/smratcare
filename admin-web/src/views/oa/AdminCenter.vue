@@ -97,7 +97,7 @@ const sections = computed<CenterSection[]>(() => [
     color: 'blue',
     actions: filterActions([
       { label: '任务管理', path: '/oa/work-execution/task', tip: '新增、跟进和归档协作任务' },
-      { label: '协同日历', path: '/oa/work-execution/calendar', tip: '查看行政与协作日程' },
+      { label: '我的日程', path: '/workbench/schedule', tip: '查看行政与协作日程' },
       { label: '通知公告', path: '/oa/notice', tip: '发布内部通知和公告' },
       { label: '审批中心', path: '/oa/approval', tip: '处理固定审批和业务审批' },
       { label: '文档中心', path: '/oa/document', tip: '统一管理制度、资料和归档文件' },

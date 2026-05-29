@@ -957,7 +957,7 @@ const quickNotifyItems = computed(() => {
     { title: `执行总览（${quickChatExecutionOverview.value.totalPressure}）`, action: 'openQuickChatTodo' },
     { title: '我的待办', route: '/workbench/todo' },
     { title: '待我审批', route: '/oa/approval?scope=PENDING_REVIEW' },
-    { title: '行政日历/协同日历', route: '/oa/work-execution/calendar' },
+    { title: '我的日程', route: '/workbench/schedule' },
     { title: '会员生日', route: '/oa/life/birthday' }
   ]
 })
@@ -4832,7 +4832,7 @@ async function syncQuickChatTodoToCalendar(todoId: string) {
   try {
     if (row.calendarTaskId) {
       router.push({
-        path: '/oa/work-execution/calendar',
+        path: '/workbench/schedule',
         query: quickChatTodoCalendarQuery(row)
       })
       quickChatTodoOpen.value = false
@@ -4860,7 +4860,7 @@ async function syncQuickChatTodoToCalendar(todoId: string) {
     row.updatedAt = dayjs().toISOString()
     persistQuickChatTodo()
     router.push({
-      path: '/oa/work-execution/calendar',
+      path: '/workbench/schedule',
       query: quickChatTodoCalendarQuery(row, row.calendarTaskId)
     })
     quickChatTodoOpen.value = false
