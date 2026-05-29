@@ -88,6 +88,21 @@ export function getBirthdayPage(params: any, config?: Record<string, any>) {
   return fetchPage<BirthdayReminder>('/api/life/birthday/page', params, config)
 }
 
+export async function getBirthdayAll(params: any = {}, config?: Record<string, any>) {
+  const pageSize = 500
+  const firstPage = await getBirthdayPage({ ...params, pageNo: 1, pageSize }, config)
+  const list = [...(firstPage?.list || [])]
+  const total = Number(firstPage?.total || list.length)
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+
+  for (let pageNo = 2; pageNo <= totalPages; pageNo += 1) {
+    const page = await getBirthdayPage({ ...params, pageNo, pageSize }, config)
+    list.push(...(page?.list || []))
+  }
+
+  return list
+}
+
 export function getRoomCleaningPage(params: any) {
   return fetchPage<RoomCleaningTask>('/api/life/room-cleaning/page', params)
 }

@@ -20,7 +20,7 @@
 
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
-        <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
+        <ElderNameAutocomplete v-model:value="query.keyword" placeholder="长者姓名(编号)" width="220px" />
       </a-form-item>
       <a-form-item label="月份">
         <a-select v-model:value="query.month" :options="monthOptions" allow-clear style="width: 140px" />
@@ -54,7 +54,7 @@
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'actions'">
           <a-space size="small">
-            <a @click="goElderDetail(record)">老人档案</a>
+            <a @click="goElderDetail(record)">长者档案</a>
             <a @click="createBirthdayActivity(record)">创建活动</a>
             <a @click="openBirthdayMaterial(record)">物资准备</a>
           </a-space>
@@ -73,19 +73,20 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
-import { getBirthdayPage } from '../../api/life'
+import { getBirthdayAll } from '../../api/life'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import type { BirthdayReminder, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<BirthdayReminder[]>([])
+const birthdayRows = ref<BirthdayReminder[]>([])
 const route = useRoute()
 const router = useRouter()
 const currentMonth = dayjs().month() + 1
 const query = reactive({
   keyword: '',
   month: undefined as number | undefined,
-  daysAhead: 30 as number | undefined,
+  daysAhead: undefined as number | undefined,
   minAge: undefined as number | undefined,
   pageNo: 1,
   pageSize: 10
@@ -102,29 +103,42 @@ const columns = [
   { title: '操作', key: 'actions', width: 280 }
 ]
 const monthOptions = Array.from({ length: 12 }).map((_, i) => ({ label: `${i + 1}月`, value: i + 1 }))
-const todayCount = computed(() => rows.value.filter((item) => Number(item.daysUntil || 9999) === 0).length)
-const next7Count = computed(() => rows.value.filter((item) => Number(item.daysUntil || 9999) >= 0 && Number(item.daysUntil || 9999) <= 7).length)
-const monthCount = computed(() => rows.value.filter((item) => {
-  if (!item.nextBirthday) return false
-  return dayjs(item.nextBirthday).month() + 1 === currentMonth
-}).length)
+const todayCount = computed(() => birthdayRows.value.filter((item) => Number(item.daysUntil || 9999) === 0).length)
+const next7Count = computed(() => birthdayRows.value.filter((item) => Number(item.daysUntil || 9999) >= 0 && Number(item.daysUntil || 9999) <= 7).length)
+const monthCount = computed(() => birthdayRows.value.filter((item) => birthdayMonthMatches(item, currentMonth)).length)
+
+function birthdayMonthMatches(item: BirthdayReminder, month: number) {
+  if (!item.birthDate) return false
+  const parsed = dayjs(item.birthDate)
+  return parsed.isValid() && parsed.month() + 1 === month
+}
+
+function applyFilters(items: BirthdayReminder[]) {
+  return items.filter((item) => {
+    if (query.minAge && Number(item.ageOnNextBirthday || 0) < Number(query.minAge || 0)) return false
+    if (query.month && !birthdayMonthMatches(item, Number(query.month))) return false
+    if (query.daysAhead != null && Number(item.daysUntil ?? 9999) > Number(query.daysAhead)) return false
+    return true
+  })
+}
+
+function syncPagedRows() {
+  const from = Math.max((pagination.current - 1) * pagination.pageSize, 0)
+  const to = from + pagination.pageSize
+  rows.value = birthdayRows.value.slice(from, to)
+  pagination.total = birthdayRows.value.length
+}
 
 async function fetchData() {
   loading.value = true
   try {
-    const res: PageResult<BirthdayReminder> = await getBirthdayPage({
+    const list = await getBirthdayAll({
       keyword: query.keyword || undefined,
-      month: query.month,
-      daysAhead: query.daysAhead,
-      minAge: query.minAge,
-      pageNo: query.pageNo,
-      pageSize: query.pageSize
+      month: undefined,
+      daysAhead: undefined
     })
-    rows.value = (res.list || []).filter((item) => {
-      if (!query.minAge) return true
-      return Number(item.ageOnNextBirthday || 0) >= Number(query.minAge || 0)
-    })
-    pagination.total = res.total || res.list.length
+    birthdayRows.value = applyFilters(list)
+    syncPagedRows()
   } finally {
     loading.value = false
   }
@@ -135,13 +149,13 @@ function handleTableChange(pag: any) {
   pagination.pageSize = pag.pageSize
   query.pageNo = pag.current
   query.pageSize = pag.pageSize
-  fetchData()
+  syncPagedRows()
 }
 
 function onReset() {
   query.keyword = ''
   query.month = undefined
-  query.daysAhead = 30
+  query.daysAhead = undefined
   query.minAge = undefined
   query.pageNo = 1
   pagination.current = 1
@@ -166,6 +180,8 @@ function quickDays(days: number) {
 
 function quickAge(age: number) {
   query.minAge = age
+  query.month = undefined
+  query.daysAhead = undefined
   query.pageNo = 1
   pagination.current = 1
   fetchData()
@@ -224,12 +240,26 @@ function printYearPlan() {
 }
 
 function applyRouteQuery() {
+  query.keyword = typeof route.query.keyword === 'string'
+    ? route.query.keyword
+    : typeof route.query.elderName === 'string'
+      ? route.query.elderName
+      : ''
+  query.month = undefined
+  query.daysAhead = undefined
+  query.minAge = undefined
   const month = Number(route.query.month || NaN)
   const daysAhead = Number(route.query.daysAhead || NaN)
   const minAge = Number(route.query.minAge || NaN)
+  const scope = String(route.query.scope || '').trim()
+  if (scope === 'today') query.daysAhead = 0
+  if (scope === 'next7') query.daysAhead = 7
+  if (scope === 'month') query.month = currentMonth
   if (Number.isFinite(month) && month >= 1 && month <= 12) query.month = month
   if (Number.isFinite(daysAhead) && daysAhead >= 0 && daysAhead <= 365) query.daysAhead = daysAhead
   if (Number.isFinite(minAge) && minAge >= 0) query.minAge = minAge
+  query.pageNo = 1
+  pagination.current = 1
 }
 
 watch(

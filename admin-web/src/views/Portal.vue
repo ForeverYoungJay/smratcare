@@ -132,9 +132,6 @@
       >
         <template #extra>
           <a-space wrap>
-            <a-button size="small" @click="openBirthdayModal('today')">今日名单</a-button>
-            <a-button size="small" @click="launchMonthlyBirthdayActivity">发起本月集体庆生</a-button>
-            <a-button size="small" @click="openBirthdayMaterialPrep">物资准备</a-button>
             <a-button size="small" @click="router.push('/oa/life/birthday')">查看全部</a-button>
             <a-button size="small" @click="router.push('/workbench/schedule')">同步到我的日程</a-button>
           </a-space>
@@ -313,7 +310,7 @@ import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import VChart from 'vue-echarts'
 import PageContainer from '../components/PageContainer.vue'
-import { getBirthdayPage } from '../api/life'
+import { getBirthdayAll } from '../api/life'
 import EntitySummaryCard from '../components/smartcare/EntitySummaryCard.vue'
 import OverviewMetricCard from '../components/smartcare/OverviewMetricCard.vue'
 import QuickActionTile from '../components/smartcare/QuickActionTile.vue'
@@ -372,6 +369,12 @@ function normalizeBirthdayDate(value?: string | null) {
   if (!value) return null
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? null : date
+}
+
+function birthdayMonthMatches(item?: BirthdayReminder | null, month = dayjs().month() + 1) {
+  if (!item?.birthDate) return false
+  const parsed = dayjs(item.birthDate)
+  return parsed.isValid() && parsed.month() + 1 === month
 }
 
 const todayAlertCount = computed(() => {
@@ -572,17 +575,11 @@ const quickActions = [
 ]
 
 const birthdayStats = computed(() => {
-  const today = new Date()
   return birthdayRows.value.reduce((acc, item) => {
-    const nextBirthday = normalizeBirthdayDate(item.nextBirthday)
-    if (!nextBirthday) return acc
     const daysUntil = Number(item.daysUntil ?? 9999)
-    if (daysUntil <= 0) acc.today += 1
+    if (daysUntil === 0) acc.today += 1
     if (daysUntil >= 0 && daysUntil <= 7) acc.next7Days += 1
-    if (
-      nextBirthday.getFullYear() === today.getFullYear()
-      && nextBirthday.getMonth() === today.getMonth()
-    ) {
+    if (birthdayMonthMatches(item)) {
       acc.thisMonth += 1
     }
     if (Number(item.ageOnNextBirthday || 0) >= 80) acc.age80Plus += 1
@@ -597,9 +594,11 @@ const birthdayPreviewList = computed(() => [...birthdayRows.value]
   .sort((left, right) => Number(left.daysUntil ?? 9999) - Number(right.daysUntil ?? 9999))
   .slice(0, 6))
 
+const birthdayMonthList = computed(() => birthdayRows.value.filter((item) => birthdayMonthMatches(item)))
+
 const birthdayModalRows = computed(() => {
   if (birthdayModalScope.value === 'today') {
-    return birthdayRows.value.filter((item) => Number(item.daysUntil ?? 9999) <= 0)
+    return birthdayRows.value.filter((item) => Number(item.daysUntil ?? 9999) === 0)
   }
   return birthdayRows.value.filter((item) => {
     const days = Number(item.daysUntil ?? 9999)
@@ -666,16 +665,16 @@ function openBirthdayActivityForRecord(record: BirthdayReminder) {
 }
 
 function launchMonthlyBirthdayActivity() {
-  if (!birthdayStats.value.thisMonth) {
+  if (!birthdayMonthList.value.length) {
     message.info('本月暂无生日长者')
     return
   }
   const month = dayjs().format('YYYY-MM')
-  router.push(`/life/activity?quick=create&scope=monthly-birthday&month=${month}&count=${birthdayStats.value.thisMonth}`)
+  router.push(`/life/activity?quick=create&scope=monthly-birthday&month=${month}&count=${birthdayMonthList.value.length}`)
 }
 
 function openBirthdayMaterialPrep() {
-  const firstName = birthdayPreviewList.value[0]?.elderName
+  const firstName = birthdayMonthList.value[0]?.elderName || birthdayPreviewList.value[0]?.elderName
   const query = firstName ? `&elderName=${encodeURIComponent(firstName)}` : ''
   router.push(`/inventory/outbound?scene=birthday${query}`)
 }
@@ -837,10 +836,10 @@ async function loadOverview() {
   try {
     const [homeBundle, birthdays] = await Promise.all([
       getHomeOverviewBundle(),
-      getBirthdayPage({ pageNo: 1, pageSize: 12, daysAhead: 31 }, { silent403: true, silentError: true }).catch(() => null)
+      getBirthdayAll({}, { silent403: true, silentError: true }).catch(() => [])
     ])
     bundle.value = homeBundle
-    birthdayRows.value = birthdays?.list || []
+    birthdayRows.value = birthdays || []
     refreshedAt.value = new Date().toLocaleString('zh-CN', {
       month: '2-digit',
       day: '2-digit',
