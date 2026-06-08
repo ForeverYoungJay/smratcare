@@ -2201,7 +2201,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     boolean wechatPayEnabled = wechatPay != null && wechatPay.isEnabled();
     boolean wechatNotifyEnabled = wechatNotify != null && wechatNotify.isEnabled();
     boolean wechatNotifyBound = familyUser != null && hasText(defaultText(familyUser.getOpenId(), null));
-    boolean securityPasswordEnabled = true;
+    boolean securityPasswordEnabled = hasSecurityPasswordConfigured(security);
     boolean legacyApiEnabled = familyPortalProperties.isLegacyApiEnabled();
     String legacyApiSunsetDate = defaultText(familyPortalProperties.getLegacyApiSunsetDate(), "");
     boolean legacyApiSunsetReached = isLegacySunsetReached(legacyApiSunsetDate);
