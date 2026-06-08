@@ -1,4 +1,4 @@
-const { ensureAccessibleElderId, getWeeklyBrief, getWeeklyBriefHistory } = require('../../services/family');
+const { getWeeklyBrief, getWeeklyBriefHistory } = require('../../services/family');
 
 function overallClass(level) {
   if (level === 'warning') return 'overall-warning';
@@ -48,15 +48,9 @@ Page({
   async loadData(fromPullDown = false) {
     this.setData({ loading: true, loadError: '' });
     try {
-      const elderId = await ensureAccessibleElderId();
-      if (!elderId) {
-        this.setData({ brief: null, history: [], loadError: '请先绑定并选择老人后再查看家属周报' });
-        wx.showToast({ title: '请先绑定并选择老人', icon: 'none' });
-        return;
-      }
       const [brief, history] = await Promise.all([
-        getWeeklyBrief({ elderId }),
-        getWeeklyBriefHistory({ elderId, weeks: 8 })
+        getWeeklyBrief({ elderId: null }),
+        getWeeklyBriefHistory({ elderId: null, weeks: 8 })
       ]);
       const vitalBadges = (brief.vitalBadges || []).map((item) => ({
         ...item,

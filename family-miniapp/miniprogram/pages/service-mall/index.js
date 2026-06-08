@@ -232,7 +232,7 @@ Page({
     }
     this.setData({ loadingOrders: true });
     try {
-      const list = await getMallOrders({ pageNo: 1, pageSize: 40, elderId: this.data.selectedElderId || undefined });
+      const list = await getMallOrders({ pageNo: 1, pageSize: 40, elderId: null });
       const orders = (list || []).map(resolveOrderSummary);
       this.setData({ orders });
       this.applyOrderFilter();
@@ -283,13 +283,12 @@ Page({
     return elderId;
   },
   async doPreview(productId) {
-    const elderId = this.selectedElderIdOrToast();
-    if (!elderId) {
+    if (!this.selectedElderIdOrToast()) {
       return null;
     }
     const qty = this.resolveQty(productId);
     return previewMallOrder({
-      elderId,
+      elderId: null,
       productId: Number(productId),
       qty
     });
@@ -348,12 +347,11 @@ Page({
       if (!confirm || !confirm.confirm) {
         return;
       }
-      const elderId = this.selectedElderIdOrToast();
-      if (!elderId) {
+      if (!this.selectedElderIdOrToast()) {
         return;
       }
       const submit = await submitMallOrder({
-        elderId,
+        elderId: null,
         productId: Number(productId),
         qty: this.resolveQty(productId)
       });

@@ -29,6 +29,12 @@ function resolveCurrentElderId(inputElderId) {
   return app.globalData.selectedElderId || null;
 }
 
+function resolveOptionElderId(options = {}) {
+  return Object.prototype.hasOwnProperty.call(options, 'elderId')
+    ? (options.elderId || null)
+    : resolveCurrentElderId();
+}
+
 function toPositiveNumber(value) {
   const num = Number(value || 0);
   return Number.isFinite(num) && num > 0 ? num : 0;
@@ -172,9 +178,7 @@ async function getMyElders() {
 }
 
 async function getHomeDashboard(options = {}) {
-  const elderId = Object.prototype.hasOwnProperty.call(options, 'elderId')
-    ? (options.elderId || null)
-    : resolveCurrentElderId();
+  const elderId = resolveOptionElderId(options);
   return withFallback(
     async () => request({ url: '/api/family/dashboard/home', data: { elderId } }),
     async () => {
@@ -200,7 +204,7 @@ async function getHomeDashboard(options = {}) {
 }
 
 async function getWeeklyBrief(options = {}) {
-  const elderId = resolveCurrentElderId(options.elderId);
+  const elderId = resolveOptionElderId(options);
   return withFallback(
     async () => request({ url: '/api/family/dashboard/weekly-brief', data: { elderId } }),
     () => mock.getWeeklyBrief()
@@ -208,7 +212,7 @@ async function getWeeklyBrief(options = {}) {
 }
 
 async function getWeeklyBriefHistory(options = {}) {
-  const elderId = resolveCurrentElderId(options.elderId);
+  const elderId = resolveOptionElderId(options);
   const weeks = options.weeks || 8;
   return withFallback(
     async () => request({ url: '/api/family/dashboard/weekly-brief/history', data: { elderId, weeks } }),
@@ -360,7 +364,7 @@ async function getEmergencyContacts() {
 }
 
 async function getBillSummary(options = {}) {
-  const elderId = resolveCurrentElderId(options.elderId);
+  const elderId = resolveOptionElderId(options);
   const month = options.month || currentMonth();
   return withFallback(
     async () => request({ url: '/api/family/payment/summary', data: { elderId, month } }),
@@ -369,7 +373,7 @@ async function getBillSummary(options = {}) {
 }
 
 async function getPaymentGuard(options = {}) {
-  const elderId = resolveCurrentElderId(options.elderId);
+  const elderId = resolveOptionElderId(options);
   return withFallback(
     async () => request({ url: '/api/family/payment/guard', data: { elderId } }),
     () => mock.getPaymentGuard()
@@ -377,7 +381,7 @@ async function getPaymentGuard(options = {}) {
 }
 
 async function getBillHistory(options = {}) {
-  const elderId = resolveCurrentElderId(options.elderId);
+  const elderId = resolveOptionElderId(options);
   return withFallback(
     async () => request({ url: '/api/family/payment/history', data: { elderId } }),
     () => mock.getBillHistory()
@@ -385,7 +389,7 @@ async function getBillHistory(options = {}) {
 }
 
 async function toggleAutoPay(enable, authorizeConfirmed = false, options = {}) {
-  const elderId = resolveCurrentElderId(options.elderId);
+  const elderId = resolveOptionElderId(options);
   return withFallback(
     async () => request({
       url: '/api/family/payment/auto-pay',
@@ -397,7 +401,7 @@ async function toggleAutoPay(enable, authorizeConfirmed = false, options = {}) {
 }
 
 async function rechargeBalance(amount, options = {}) {
-  const elderId = resolveCurrentElderId(options.elderId);
+  const elderId = resolveOptionElderId(options);
   return withFallback(
     async () => request({
       url: '/api/family/payment/recharge',
@@ -414,7 +418,7 @@ async function rechargeBalance(amount, options = {}) {
 }
 
 async function createWechatRechargePrepay(amount, options = {}) {
-  const elderId = resolveCurrentElderId(options.elderId);
+  const elderId = resolveOptionElderId(options);
   return withFallback(
     async () => request({
       url: '/api/family/payment/wechat/prepay',
@@ -458,7 +462,7 @@ async function getRechargeOrder(outTradeNo) {
 }
 
 async function getRechargeOrders(options = {}) {
-  const elderId = resolveCurrentElderId(options.elderId);
+  const elderId = resolveOptionElderId(options);
   const pageNo = options.pageNo || 1;
   const pageSize = options.pageSize || 20;
   return withFallback(
@@ -475,7 +479,7 @@ async function getServiceCatalog() {
 }
 
 async function getServiceOrders(options = {}) {
-  const elderId = resolveCurrentElderId(options.elderId);
+  const elderId = resolveOptionElderId(options);
   return withFallback(
     async () => request({ url: '/api/family/service/orders', data: { elderId } }),
     () => mock.getServiceOrders()
@@ -512,7 +516,7 @@ async function getMallProducts(options = {}) {
 }
 
 async function previewMallOrder(payload = {}) {
-  const targetElderId = resolveCurrentElderId(payload.elderId);
+  const targetElderId = resolveOptionElderId(payload);
   return withFallback(
     async () => request({
       url: '/api/family/mall/orders/preview',
@@ -528,7 +532,7 @@ async function previewMallOrder(payload = {}) {
 }
 
 async function submitMallOrder(payload = {}) {
-  const targetElderId = resolveCurrentElderId(payload.elderId);
+  const targetElderId = resolveOptionElderId(payload);
   return withFallback(
     async () => request({
       url: '/api/family/mall/orders/submit',
@@ -544,7 +548,7 @@ async function submitMallOrder(payload = {}) {
 }
 
 async function getMallOrders(options = {}) {
-  const targetElderId = resolveCurrentElderId(options.elderId);
+  const targetElderId = resolveOptionElderId(options);
   return withFallback(
     async () => request({
       url: '/api/family/mall/orders',

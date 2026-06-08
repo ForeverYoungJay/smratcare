@@ -1,4 +1,4 @@
-const { ensureAccessibleElderId, getPaymentGuard } = require('../../services/family');
+const { getPaymentGuard } = require('../../services/family');
 
 function normalizeStatusClass(status) {
   if (status === 'PAID') return 'status-paid';
@@ -34,13 +34,7 @@ Page({
   async loadData(fromPullDown = false) {
     this.setData({ loading: true, loadError: '' });
     try {
-      const elderId = await ensureAccessibleElderId();
-      if (!elderId) {
-        this.setData({ guard: null, loadError: '请先绑定并选择老人后再查看支付保障' });
-        wx.showToast({ title: '请先绑定并选择老人', icon: 'none' });
-        return;
-      }
-      const guard = await getPaymentGuard({ elderId });
+      const guard = await getPaymentGuard({ elderId: null });
       const recentOrders = (guard.recentOrders || []).map((item) => ({
         ...item,
         statusText: normalizeStatusText(item.statusText, item.status),

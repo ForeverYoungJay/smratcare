@@ -1,5 +1,4 @@
 const {
-  ensureAccessibleElderId,
   getBillSummary,
   getBillHistory,
   getPaymentGuard,
@@ -108,24 +107,11 @@ Page({
   async loadData() {
     this.setData({ loading: true, loadError: '' });
     try {
-      const elderId = await ensureAccessibleElderId();
-      if (!elderId) {
-        this.setData({
-          loadError: '请先绑定并选择老人后再查看缴费信息',
-          summary: null,
-          guard: null,
-          history: [],
-          rechargeOrders: [],
-          abnormalOrders: [],
-          filteredOrders: []
-        });
-        return;
-      }
       const [summary, history, rechargeOrders, guard] = await Promise.all([
-        getBillSummary({ elderId }),
-        getBillHistory({ elderId }),
-        getRechargeOrders({ elderId, pageNo: 1, pageSize: 10 }),
-        getPaymentGuard({ elderId })
+        getBillSummary({ elderId: null }),
+        getBillHistory({ elderId: null }),
+        getRechargeOrders({ elderId: null, pageNo: 1, pageSize: 10 }),
+        getPaymentGuard({ elderId: null })
       ]);
       const orderList = rechargeOrders || [];
       const abnormalOrders = orderList.filter((item) => item && item.status !== 'PAID');
@@ -191,12 +177,7 @@ Page({
     return null;
   },
   async doManualRecharge(amount) {
-    const elderId = await ensureAccessibleElderId();
-    if (!elderId) {
-      wx.showToast({ title: '请先绑定并选择老人', icon: 'none' });
-      return;
-    }
-    const res = await rechargeBalance(amount, { elderId, method: 'MANUAL_FALLBACK', remark: '预下单失败回退人工充值' });
+    const res = await rechargeBalance(amount, { elderId: null, method: 'MANUAL_FALLBACK', remark: '预下单失败回退人工充值' });
     if (!res) {
       wx.showToast({ title: '充值失败，请重试', icon: 'none' });
       return;
@@ -251,13 +232,9 @@ Page({
     this.setData({ paying: true });
     wx.showLoading({ title: '创建支付单', mask: true });
     try {
-      const elderId = await ensureAccessibleElderId();
-      if (!elderId) {
-        throw new Error('请先绑定并选择老人');
-      }
       const loginCode = await wxLogin();
       const prepay = await createWechatRechargePrepay(amount, {
-        elderId,
+        elderId: null,
         loginCode,
         description: '家属端账户充值'
       });
@@ -339,11 +316,7 @@ Page({
       }
     }
     try {
-      const elderId = await ensureAccessibleElderId();
-      if (!elderId) {
-        throw new Error('请先绑定并选择老人');
-      }
-      await toggleAutoPay(enabled, authorizeConfirmed, { elderId });
+      await toggleAutoPay(enabled, authorizeConfirmed, { elderId: null });
       this.setData({ 'summary.autoPayEnabled': enabled });
       wx.showToast({ title: enabled ? '自动扣费已开启' : '自动扣费已关闭', icon: 'none' });
     } catch (error) {
