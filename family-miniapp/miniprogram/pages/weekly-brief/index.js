@@ -1,4 +1,4 @@
-const { getWeeklyBrief, getWeeklyBriefHistory } = require('../../services/family');
+const { ensureCurrentElderId, getWeeklyBrief, getWeeklyBriefHistory } = require('../../services/family');
 
 function overallClass(level) {
   if (level === 'warning') return 'overall-warning';
@@ -16,7 +16,8 @@ Page({
   data: {
     brief: null,
     history: [],
-    loading: false
+    loading: false,
+    loadError: ''
   },
   onLoad(query) {
     const elderId = Number(query.elderId || 0);
@@ -45,11 +46,17 @@ Page({
     this.loadData(true);
   },
   async loadData(fromPullDown = false) {
-    this.setData({ loading: true });
+    this.setData({ loading: true, loadError: '' });
     try {
+      const elderId = await ensureCurrentElderId();
+      if (!elderId) {
+        this.setData({ brief: null, history: [], loadError: '请先绑定并选择老人后再查看家属周报' });
+        wx.showToast({ title: '请先绑定并选择老人', icon: 'none' });
+        return;
+      }
       const [brief, history] = await Promise.all([
-        getWeeklyBrief(),
-        getWeeklyBriefHistory({ weeks: 8 })
+        getWeeklyBrief({ elderId }),
+        getWeeklyBriefHistory({ elderId, weeks: 8 })
       ]);
       const vitalBadges = (brief.vitalBadges || []).map((item) => ({
         ...item,
@@ -67,12 +74,21 @@ Page({
         },
         history: historyList
       });
+    } catch (error) {
+      this.setData({
+        brief: null,
+        history: [],
+        loadError: error.message || '家属周报加载失败，请稍后重试'
+      });
     } finally {
       this.setData({ loading: false });
       if (fromPullDown) {
         wx.stopPullDownRefresh();
       }
     }
+  },
+  retryLoad() {
+    this.loadData();
   },
   toHealth() {
     wx.navigateTo({ url: '/pages/health/index' });

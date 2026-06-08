@@ -305,6 +305,23 @@
   line-height: 1.45;
 }
 
+.chat-image {
+  display: block;
+  width: 280rpx;
+  height: 210rpx;
+  border-radius: 16rpx;
+  background: #dbe5e1;
+}
+
+.chat-video {
+  display: block;
+  width: 360rpx;
+  height: 240rpx;
+  border-radius: 16rpx;
+  overflow: hidden;
+  background: #1f2d29;
+}
+
 .chat-bottom {
   height: 42rpx;
 }
@@ -320,6 +337,46 @@
   background: #ffffff;
   border: 1rpx solid #dce8e2;
   box-shadow: 0 18rpx 54rpx rgba(31, 49, 43, 0.18);
+}
+
+.tool-grid {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 22rpx;
+}
+
+.tool-item {
+  flex: 1;
+  padding: 0;
+  background: #f5faf7;
+  border: 1rpx solid #dbe8e2;
+  border-radius: 18rpx;
+  height: 118rpx;
+}
+
+.tool-icon {
+  display: block;
+  width: 48rpx;
+  height: 48rpx;
+  line-height: 48rpx;
+  margin: 18rpx auto 8rpx;
+  border-radius: 14rpx;
+  background: #1f7a69;
+  color: #ffffff;
+  font-size: 22rpx;
+  font-weight: 800;
+}
+
+.tool-label {
+  display: block;
+  font-size: 22rpx;
+  color: #34443f;
+  line-height: 1;
+}
+
+.muted-tool .tool-icon {
+  background: #e8f1ed;
+  color: #1f7a69;
 }
 
 .visit-panel-head {

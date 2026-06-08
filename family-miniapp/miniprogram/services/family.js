@@ -29,6 +29,35 @@ function resolveCurrentElderId(inputElderId) {
   return app.globalData.selectedElderId || null;
 }
 
+function toPositiveNumber(value) {
+  const num = Number(value || 0);
+  return Number.isFinite(num) && num > 0 ? num : 0;
+}
+
+async function ensureCurrentElderId(inputElderId) {
+  const app = getApp();
+  const requested = toPositiveNumber(inputElderId || (app.globalData && app.globalData.selectedElderId));
+  const bindings = await getMyElders();
+  const list = Array.isArray(bindings) ? bindings : [];
+  if (list.length === 0) {
+    if (app.globalData) {
+      app.globalData.selectedElderId = null;
+    }
+    return null;
+  }
+  const matched = requested
+    ? list.find((item) => toPositiveNumber(item.elderId) === requested)
+    : null;
+  const primary = matched
+    || list.find((item) => !!item.isPrimary)
+    || list[0];
+  const elderId = toPositiveNumber(primary && primary.elderId);
+  if (app.globalData) {
+    app.globalData.selectedElderId = elderId || null;
+  }
+  return elderId || null;
+}
+
 function currentMonth() {
   const now = new Date();
   const month = now.getMonth() + 1;
@@ -120,8 +149,8 @@ async function getMyElders() {
   );
 }
 
-async function getHomeDashboard() {
-  const elderId = resolveCurrentElderId();
+async function getHomeDashboard(options = {}) {
+  const elderId = resolveCurrentElderId(options.elderId);
   return withFallback(
     async () => request({ url: '/api/family/dashboard/home', data: { elderId } }),
     async () => {
@@ -331,8 +360,8 @@ async function getBillHistory(options = {}) {
   );
 }
 
-async function toggleAutoPay(enable, authorizeConfirmed = false) {
-  const elderId = resolveCurrentElderId();
+async function toggleAutoPay(enable, authorizeConfirmed = false, options = {}) {
+  const elderId = resolveCurrentElderId(options.elderId);
   return withFallback(
     async () => request({
       url: '/api/family/payment/auto-pay',
@@ -678,6 +707,16 @@ async function uploadVoiceMessage(filePath, options = {}) {
   });
 }
 
+async function uploadCommunicationMedia(filePath, options = {}) {
+  return uploadFile({
+    url: '/api/files/upload',
+    filePath,
+    formData: {
+      bizType: options.bizType || 'family-communication-media'
+    }
+  });
+}
+
 async function uploadAffectionMedia(filePath, options = {}) {
   return withFallback(
     async () => uploadFile({
@@ -809,6 +848,7 @@ module.exports = {
   getFamilyAuthBootstrap,
   bindElder,
   getMyElders,
+  ensureCurrentElderId,
   getHomeDashboard,
   getWeeklyBrief,
   getWeeklyBriefHistory,
@@ -864,6 +904,7 @@ module.exports = {
   setSecurityPassword,
   verifySecurityPassword,
   uploadVoiceMessage,
+  uploadCommunicationMedia,
   uploadAffectionMedia,
   getCommunicationMessages,
   sendCommunicationMessage,

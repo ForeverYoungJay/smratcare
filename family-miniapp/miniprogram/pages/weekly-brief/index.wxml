@@ -1,3 +1,18 @@
+<view class="container" wx:if="{{loading}}">
+  <view class="surface panel">
+    <view class="panel-title">家属周报加载中</view>
+    <view class="list-empty">正在同步本周健康、护理和活动数据...</view>
+  </view>
+</view>
+
+<view class="container" wx:if="{{!loading && !brief}}">
+  <view class="surface panel">
+    <view class="panel-title">暂时没有周报</view>
+    <view class="list-empty">{{loadError || '当前老人暂无可展示的周报数据'}}</view>
+    <button class="ghost-btn action-btn" bindtap="retryLoad">重新加载</button>
+  </view>
+</view>
+
 <view class="container" wx:if="{{brief}}">
   <view class="surface hero {{brief.overallClass}}">
     <view class="hero-head">

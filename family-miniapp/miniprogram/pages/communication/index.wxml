@@ -63,6 +63,22 @@
               <view class="visit-title">探视预约</view>
               <view class="visit-text">{{msg.content}}</view>
             </block>
+            <block wx:elif="{{msg.isImage}}">
+              <image
+                class="chat-image"
+                src="{{msg.playableUrl}}"
+                mode="aspectFill"
+                data-url="{{msg.playableUrl}}"
+                bindtap="previewImage" />
+            </block>
+            <block wx:elif="{{msg.isMediaVideo}}">
+              <video
+                class="chat-video"
+                src="{{msg.playableUrl}}"
+                controls
+                show-center-play-btn
+                object-fit="cover"></video>
+            </block>
             <block wx:else>
               <view class="message-text">{{msg.content}}</view>
             </block>
@@ -75,6 +91,20 @@
   </scroll-view>
 
   <view class="visit-panel" wx:if="{{showVisitPanel}}">
+    <view class="tool-grid">
+      <button class="tool-item" bindtap="chooseImage">
+        <text class="tool-icon">图</text>
+        <text class="tool-label">照片</text>
+      </button>
+      <button class="tool-item" bindtap="chooseVideo">
+        <text class="tool-icon">视</text>
+        <text class="tool-label">视频</text>
+      </button>
+      <view class="tool-item muted-tool">
+        <text class="tool-icon">访</text>
+        <text class="tool-label">探视</text>
+      </view>
+    </view>
     <view class="visit-panel-head">
       <view>
         <view class="visit-panel-title">预约探视时间</view>

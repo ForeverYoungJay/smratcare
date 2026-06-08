@@ -1,3 +1,18 @@
+<view class="container" wx:if="{{loading}}">
+  <view class="surface panel">
+    <view class="panel-title">支付保障加载中</view>
+    <view class="list-empty">正在同步余额、待缴金额和充值订单...</view>
+  </view>
+</view>
+
+<view class="container" wx:if="{{!loading && !guard}}">
+  <view class="surface panel">
+    <view class="panel-title">暂时没有支付保障数据</view>
+    <view class="list-empty">{{loadError || '当前老人暂无可展示的支付保障信息'}}</view>
+    <button class="ghost-btn mini-btn" bindtap="retryLoad">重新加载</button>
+  </view>
+</view>
+
 <view class="container" wx:if="{{guard}}">
   <view class="surface hero">
     <view class="hero-head">

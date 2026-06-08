@@ -1,4 +1,4 @@
-const { getPaymentGuard } = require('../../services/family');
+const { ensureCurrentElderId, getPaymentGuard } = require('../../services/family');
 
 function normalizeStatusClass(status) {
   if (status === 'PAID') return 'status-paid';
@@ -21,7 +21,8 @@ function normalizeStatusText(statusText, status) {
 Page({
   data: {
     guard: null,
-    loading: false
+    loading: false,
+    loadError: ''
   },
   onShow() {
     getApp().ensureLogin();
@@ -31,9 +32,15 @@ Page({
     this.loadData(true);
   },
   async loadData(fromPullDown = false) {
-    this.setData({ loading: true });
+    this.setData({ loading: true, loadError: '' });
     try {
-      const guard = await getPaymentGuard();
+      const elderId = await ensureCurrentElderId();
+      if (!elderId) {
+        this.setData({ guard: null, loadError: '请先绑定并选择老人后再查看支付保障' });
+        wx.showToast({ title: '请先绑定并选择老人', icon: 'none' });
+        return;
+      }
+      const guard = await getPaymentGuard({ elderId });
       const recentOrders = (guard.recentOrders || []).map((item) => ({
         ...item,
         statusText: normalizeStatusText(item.statusText, item.status),
@@ -45,12 +52,20 @@ Page({
           recentOrders
         }
       });
+    } catch (error) {
+      this.setData({
+        guard: null,
+        loadError: error.message || '支付保障加载失败，请稍后重试'
+      });
     } finally {
       this.setData({ loading: false });
       if (fromPullDown) {
         wx.stopPullDownRefresh();
       }
     }
+  },
+  retryLoad() {
+    this.loadData();
   },
   toPayment() {
     wx.navigateTo({ url: '/pages/payment/index' });

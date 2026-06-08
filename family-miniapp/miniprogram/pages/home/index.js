@@ -1,4 +1,4 @@
-const { getHomeDashboard, getWeeklyBrief, getCapabilityStatus } = require('../../services/family');
+const { ensureCurrentElderId, getHomeDashboard, getWeeklyBrief, getCapabilityStatus } = require('../../services/family');
 
 const CAPABILITY_ALERT_STATUSES = new Set(['OFF', 'MOCK', 'BIND_REQUIRED', 'DEPRECATED']);
 
@@ -11,7 +11,7 @@ function countCapabilityAlerts(status) {
 
 function buildEntries(capabilityAlertCount = 0) {
   const count = Math.max(0, Number(capabilityAlertCount) || 0);
-  return [
+  const entries = [
     { title: '预警中心', sub: '紧急提醒', path: '/pages/alert-center/index' },
     { title: '健康资料', sub: '档案/就医/评估', path: '/pages/health/index' },
     { title: '缴费充值', sub: '账单/余额/异常', path: '/pages/payment/index' },
@@ -19,14 +19,17 @@ function buildEntries(capabilityAlertCount = 0) {
     { title: '在线沟通', sub: '图文语音', path: '/pages/communication/index' },
     { title: '紧急联系人', sub: '一键拨号', path: '/pages/emergency-contacts/index' },
     { title: '相册视频', sub: '活动/亲情互动', path: '/pages/activity-album/index' },
-    { title: '更多服务', sub: '周报/日程/护理', path: '/pages/services/index' },
-    {
-      title: '能力状态',
+    { title: '更多服务', sub: '周报/日程/护理', path: '/pages/services/index' }
+  ];
+  if (count > 0) {
+    entries.push({
+      title: '系统提醒',
       sub: count > 0 ? `待处理 ${count} 项` : '链路巡检',
       path: '/pages/capability-status/index',
       badge: count > 0 ? (count > 99 ? '99+' : String(count)) : ''
-    }
-  ];
+    });
+  }
+  return entries;
 }
 
 function mapStatusClass(statusType) {
@@ -86,7 +89,8 @@ Page({
   async loadData(fromPullDown = false, hasRetried = false) {
     this.setData({ loading: true, loadError: '' });
     try {
-      const [raw, weeklyBrief] = await Promise.all([getHomeDashboard(), getWeeklyBrief()]);
+      const ensuredElderId = await ensureCurrentElderId();
+      const raw = await getHomeDashboard({ elderId: ensuredElderId || undefined });
       const elders = (raw.elders || []).map((item) => ({
         ...item,
         avatarText: item.elderName ? item.elderName.slice(0, 1) : '长',
@@ -113,7 +117,9 @@ Page({
         const idx = elders.findIndex((item) => item.elderId === app.globalData.selectedElderId);
         elderIndex = idx >= 0 ? idx : 0;
       }
-      app.globalData.selectedElderId = elders[elderIndex] ? elders[elderIndex].elderId : null;
+      const selectedElderId = elders[elderIndex] ? elders[elderIndex].elderId : null;
+      app.globalData.selectedElderId = selectedElderId;
+      const weeklyBrief = selectedElderId ? await getWeeklyBrief({ elderId: selectedElderId }) : null;
       this.setData({
         elders,
         elderOptions,

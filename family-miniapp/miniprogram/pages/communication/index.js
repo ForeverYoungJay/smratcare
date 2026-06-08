@@ -3,6 +3,7 @@ const {
   getCommunicationMessages,
   resolveFileUrl,
   sendCommunicationMessage,
+  uploadCommunicationMedia,
   uploadVoiceMessage
 } = require('../../services/family');
 
@@ -27,6 +28,7 @@ function resolveTypeLabel(type) {
   if (type === 'voice') return '语音';
   if (type === 'video') return '探视预约';
   if (type === 'image') return '图片';
+  if (type === 'media_video') return '视频';
   return '消息';
 }
 
@@ -126,6 +128,8 @@ Page({
           mine: isMineMessage(item),
           isVoice: msgType === 'voice',
           isVisit: msgType === 'video',
+          isImage: msgType === 'image',
+          isMediaVideo: msgType === 'media_video',
           playableUrl: resolveFileUrl(item.mediaUrl || ''),
           voiceDurationText: item && item.mediaDurationSec ? `${item.mediaDurationSec}"` : ''
         };
@@ -279,6 +283,61 @@ Page({
       this.setData({ sending: false });
     }
   },
+  chooseImage() {
+    this.chooseChatMedia('image');
+  },
+  chooseVideo() {
+    this.chooseChatMedia('video');
+  },
+  async chooseChatMedia(mediaType) {
+    if (this.data.sending) {
+      return;
+    }
+    try {
+      const chooseResult = await new Promise((resolve, reject) => {
+        wx.chooseMedia({
+          count: 1,
+          mediaType: [mediaType],
+          sourceType: ['album', 'camera'],
+          maxDuration: 60,
+          camera: 'back',
+          success: resolve,
+          fail: reject
+        });
+      });
+      const file = chooseResult && chooseResult.tempFiles && chooseResult.tempFiles[0];
+      const filePath = file && (file.tempFilePath || file.path);
+      if (!filePath) {
+        throw new Error(mediaType === 'image' ? '未获取到图片' : '未获取到视频');
+      }
+      this.setData({ sending: true });
+      wx.showLoading({ title: '正在上传', mask: true });
+      const uploaded = await uploadCommunicationMedia(filePath, {
+        bizType: mediaType === 'image' ? 'family-chat-image' : 'family-chat-video'
+      });
+      const msgType = mediaType === 'image' ? 'image' : 'media_video';
+      await sendCommunicationMessage({
+        targetRole: this.data.activeRole || ROLE_OPTIONS[0].value,
+        msgType,
+        content: mediaType === 'image' ? '图片' : '视频',
+        mediaUrl: uploaded.fileUrl || '',
+        mediaName: uploaded.originalFileName || uploaded.fileName || (mediaType === 'image' ? '图片' : '视频'),
+        mediaDurationSec: mediaType === 'video' && file.duration ? Math.max(1, Math.round(Number(file.duration))) : undefined
+      });
+      this.setData({ showVisitPanel: false });
+      await this.loadMessages();
+    } catch (error) {
+      const message = error && error.errMsg && error.errMsg.includes('cancel')
+        ? ''
+        : (error.message || '发送失败，请重试');
+      if (message) {
+        wx.showToast({ title: message, icon: 'none' });
+      }
+    } finally {
+      wx.hideLoading();
+      this.setData({ sending: false });
+    }
+  },
   playVoice(e) {
     const id = String(e.currentTarget.dataset.id || '');
     const url = e.currentTarget.dataset.url;
@@ -298,6 +357,16 @@ Page({
     });
     this.setData({ playingId: id });
     audio.play();
+  },
+  previewImage(e) {
+    const url = e.currentTarget.dataset.url;
+    if (!url) {
+      return;
+    }
+    wx.previewImage({
+      current: url,
+      urls: [url]
+    });
   },
   stopVoice() {
     if (this.audioContext) {
