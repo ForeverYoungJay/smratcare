@@ -150,7 +150,9 @@ async function getMyElders() {
 }
 
 async function getHomeDashboard(options = {}) {
-  const elderId = resolveCurrentElderId(options.elderId);
+  const elderId = Object.prototype.hasOwnProperty.call(options, 'elderId')
+    ? (options.elderId || null)
+    : resolveCurrentElderId();
   return withFallback(
     async () => request({ url: '/api/family/dashboard/home', data: { elderId } }),
     async () => {

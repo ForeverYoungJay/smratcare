@@ -1,4 +1,4 @@
-const { ensureCurrentElderId, getHomeDashboard, getWeeklyBrief, getCapabilityStatus } = require('../../services/family');
+const { getHomeDashboard, getWeeklyBrief, getCapabilityStatus } = require('../../services/family');
 
 const CAPABILITY_ALERT_STATUSES = new Set(['OFF', 'MOCK', 'BIND_REQUIRED', 'DEPRECATED']);
 
@@ -89,8 +89,7 @@ Page({
   async loadData(fromPullDown = false, hasRetried = false) {
     this.setData({ loading: true, loadError: '' });
     try {
-      const ensuredElderId = await ensureCurrentElderId();
-      const raw = await getHomeDashboard({ elderId: ensuredElderId || undefined });
+      const raw = await getHomeDashboard({ elderId: null });
       const elders = (raw.elders || []).map((item) => ({
         ...item,
         avatarText: item.elderName ? item.elderName.slice(0, 1) : '长',
@@ -178,7 +177,8 @@ Page({
     }
   },
   async loadWeeklyBrief() {
-    const weeklyBrief = await getWeeklyBrief();
+    const elder = this.data.elders[this.data.elderIndex];
+    const weeklyBrief = elder ? await getWeeklyBrief({ elderId: elder.elderId }) : null;
     this.setData({ weeklyBrief });
   },
   onElderChange(e) {
