@@ -48,6 +48,7 @@ Page({
     activeRole: ROLE_OPTIONS[0].value,
     activeRoleDesc: ROLE_OPTIONS[0].desc,
     content: '',
+    canSend: false,
     allMessages: [],
     messages: [],
     loading: false,
@@ -59,7 +60,8 @@ Page({
     playingId: '',
     runtimeNotice: '',
     videoTime: nextDayVideoTime(),
-    showVisitPanel: false
+    showVisitPanel: false,
+    bookingOpen: false
   },
   onLoad(query) {
     const mode = query && query.mode ? String(query.mode).toLowerCase() : '';
@@ -69,7 +71,8 @@ Page({
       roleIndex,
       activeRole: role.value,
       activeRoleDesc: role.desc,
-      showVisitPanel: mode === 'video'
+      showVisitPanel: mode === 'video',
+      bookingOpen: mode === 'video'
     });
     this.initRecorder();
     this.restoreDraft();
@@ -160,7 +163,9 @@ Page({
       activeRole: role.value,
       activeRoleDesc: role.desc,
       content: wx.getStorageSync(draftKey(role.value)) || '',
-      showVisitPanel: false
+      canSend: !!String(wx.getStorageSync(draftKey(role.value)) || '').trim(),
+      showVisitPanel: false,
+      bookingOpen: false
     });
     this.applyConversationMessages();
   },
@@ -177,8 +182,8 @@ Page({
   },
   onContentInput(e) {
     const content = e.detail.value;
-    this.setData({ content });
     const trimmed = String(content || '').trim();
+    this.setData({ content, canSend: !!trimmed });
     if (trimmed) {
       wx.setStorageSync(draftKey(this.data.activeRole), content);
     } else {
@@ -188,7 +193,7 @@ Page({
   restoreDraft() {
     const draft = wx.getStorageSync(draftKey(this.data.activeRole)) || '';
     if (draft) {
-      this.setData({ content: draft });
+      this.setData({ content: draft, canSend: !!String(draft).trim() });
     }
   },
   toggleVoiceMode() {
@@ -204,7 +209,7 @@ Page({
       content
     });
     wx.removeStorageSync(draftKey(this.data.activeRole));
-    this.setData({ content: '' });
+    this.setData({ content: '', canSend: false });
   },
   async sendChatMessage(payload) {
     const targetRole = this.data.activeRole || ROLE_OPTIONS[0].value;
@@ -324,7 +329,7 @@ Page({
         mediaName: uploaded.originalFileName || uploaded.fileName || (mediaType === 'image' ? '图片' : '视频'),
         mediaDurationSec: mediaType === 'video' && file.duration ? Math.max(1, Math.round(Number(file.duration))) : undefined
       });
-      this.setData({ showVisitPanel: false });
+      this.setData({ showVisitPanel: false, bookingOpen: false });
       await this.loadMessages();
     } catch (error) {
       const message = error && error.errMsg && error.errMsg.includes('cancel')
@@ -377,10 +382,15 @@ Page({
     this.setData({ playingId: '' });
   },
   toggleVisitPanel() {
+    const nextVisible = !this.data.showVisitPanel;
     this.setData({
-      showVisitPanel: !this.data.showVisitPanel,
+      showVisitPanel: nextVisible,
+      bookingOpen: nextVisible ? false : this.data.bookingOpen,
       voiceMode: false
     });
+  },
+  openBookingPanel() {
+    this.setData({ bookingOpen: true, voiceMode: false });
   },
   onTimeInput(e) {
     this.setData({ videoTime: e.detail.value });
@@ -412,6 +422,7 @@ Page({
       const managerIndex = ROLE_OPTIONS.findIndex((item) => item.value === '生活管家');
       this.setData({
         showVisitPanel: false,
+        bookingOpen: false,
         roleIndex: managerIndex,
         activeRole: '生活管家',
         activeRoleDesc: ROLE_OPTIONS[managerIndex].desc

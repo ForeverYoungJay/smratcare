@@ -91,6 +91,7 @@
   </scroll-view>
 
   <view class="visit-panel" wx:if="{{showVisitPanel}}">
+    <button class="visit-close panel-close" bindtap="toggleVisitPanel">×</button>
     <view class="tool-grid">
       <button class="tool-item" bindtap="chooseImage">
         <text class="tool-icon">图</text>
@@ -100,21 +101,22 @@
         <text class="tool-icon">视</text>
         <text class="tool-label">视频</text>
       </button>
-      <view class="tool-item muted-tool">
+      <button class="tool-item visit-tool {{bookingOpen ? 'active' : ''}}" bindtap="openBookingPanel">
         <text class="tool-icon">访</text>
         <text class="tool-label">探视</text>
-      </view>
+      </button>
     </view>
-    <view class="visit-panel-head">
-      <view>
-        <view class="visit-panel-title">预约探视时间</view>
-        <view class="visit-panel-subtitle">提交后会进入生活管家会话</view>
+    <view class="visit-booking" wx:if="{{bookingOpen}}">
+      <view class="visit-panel-head">
+        <view>
+          <view class="visit-panel-title">预约探视时间</view>
+          <view class="visit-panel-subtitle">提交后会进入生活管家会话</view>
+        </view>
       </view>
-      <button class="visit-close" bindtap="toggleVisitPanel">×</button>
-    </view>
-    <view class="visit-panel-row">
-      <input class="visit-input" value="{{videoTime}}" bindinput="onTimeInput" />
-      <button class="primary-btn visit-submit" loading="{{sending}}" bindtap="submitVideoBooking">提交</button>
+      <view class="visit-panel-row">
+        <input class="visit-input" value="{{videoTime}}" bindinput="onTimeInput" />
+        <button class="primary-btn visit-submit" loading="{{sending}}" bindtap="submitVideoBooking">提交</button>
+      </view>
     </view>
   </view>
 
@@ -145,6 +147,7 @@
       bindinput="onContentInput"
       bindconfirm="sendText" />
     <button
+      wx:if="{{voiceMode || !canSend}}"
       class="icon-btn voice-toggle"
       aria-label="{{voiceMode ? '切换键盘' : '切换语音'}}"
       bindtap="toggleVoiceMode">
@@ -153,6 +156,6 @@
       </view>
       <view wx:else class="mic-glyph"></view>
     </button>
-    <button wx:if="{{!voiceMode}}" class="send-btn" loading="{{sending}}" disabled="{{!content}}" bindtap="sendText">发送</button>
+    <button wx:else class="send-btn" loading="{{sending}}" disabled="{{sending}}" bindtap="sendText">发送</button>
   </view>
 </view>
