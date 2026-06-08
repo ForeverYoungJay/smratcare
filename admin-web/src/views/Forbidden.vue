@@ -23,7 +23,7 @@ function goPortal() {
 }
 
 function goEnterpriseHome() {
-  router.push('/home')
+  window.location.assign('/')
 }
 
 function contactAdmin() {

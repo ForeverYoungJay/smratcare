@@ -166,7 +166,7 @@ async function onSubmit() {
 }
 
 function goEnterpriseHome() {
-  router.replace('/home')
+  window.location.assign('/')
 }
 </script>
 

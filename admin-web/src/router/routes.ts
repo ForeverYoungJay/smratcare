@@ -3,19 +3,24 @@ import type { RouteRecordRaw } from 'vue-router'
 export const routes: RouteRecordRaw[] = [
   {
     path: '/enterprise',
-    redirect: '/home',
+    beforeEnter() {
+      window.location.replace('/')
+      return false
+    },
     meta: { title: '企业首页', hidden: true }
+  },
+  {
+    path: '/home',
+    beforeEnter() {
+      window.location.replace('/')
+      return false
+    },
+    meta: { title: '弋阳龟峰颐养中心', hidden: true }
   },
   {
     path: '/admin',
     redirect: '/login?redirect=/portal',
     meta: { title: '后台入口', hidden: true }
-  },
-  {
-    path: '/home',
-    name: 'EnterpriseHome',
-    component: () => import('../views/EnterpriseHome.vue'),
-    meta: { title: '弋阳龟峰颐养中心', hidden: true }
   },
   {
     path: '/login',
