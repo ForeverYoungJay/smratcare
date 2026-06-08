@@ -31,13 +31,23 @@ public class OaSuggestionController {
   public Result<IPage<OaSuggestion>> page(
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "10") long pageSize,
-      @RequestParam(required = false) String status) {
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String keyword,
+      @RequestParam(defaultValue = "false") boolean familyCommunicationOnly) {
     Long orgId = AuthContext.getOrgId();
     String normalizedStatus = normalizeStatus(status);
+    String normalizedKeyword = keyword == null ? null : keyword.trim();
     var wrapper = Wrappers.lambdaQuery(OaSuggestion.class)
         .eq(OaSuggestion::getIsDeleted, 0)
         .eq(orgId != null, OaSuggestion::getOrgId, orgId)
         .eq(normalizedStatus != null, OaSuggestion::getStatus, normalizedStatus)
+        .like(familyCommunicationOnly, OaSuggestion::getContent, "[家属沟通]")
+        .and(normalizedKeyword != null && !normalizedKeyword.isBlank(), nested -> nested
+            .like(OaSuggestion::getContent, normalizedKeyword)
+            .or()
+            .like(OaSuggestion::getProposerName, normalizedKeyword)
+            .or()
+            .like(OaSuggestion::getContact, normalizedKeyword))
         .orderByDesc(OaSuggestion::getCreateTime);
     return Result.ok(suggestionMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
   }
@@ -82,8 +92,15 @@ public class OaSuggestionController {
       return null;
     }
     String normalized = status.trim().toUpperCase();
-    if (!"PENDING".equals(normalized) && !"ADOPTED".equals(normalized) && !"REJECTED".equals(normalized)) {
-      throw new IllegalArgumentException("status 仅支持 PENDING/ADOPTED/REJECTED");
+    if ("ADOPTED".equals(normalized)) {
+      return "DONE";
+    }
+    if ("REJECTED".equals(normalized)) {
+      return "CLOSED";
+    }
+    if (!"PENDING".equals(normalized) && !"PROCESSING".equals(normalized)
+        && !"DONE".equals(normalized) && !"CLOSED".equals(normalized)) {
+      throw new IllegalArgumentException("status 仅支持 PENDING/PROCESSING/DONE/CLOSED");
     }
     return normalized;
   }

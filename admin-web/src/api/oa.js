@@ -17,6 +17,9 @@ export function getSuggestionPage(params) {
 export function createSuggestion(data) {
     return request.post('/api/oa/suggestion', data);
 }
+export function updateSuggestionStatus(id, status) {
+    return request.put(`/api/oa/suggestion/${id}/status`, null, { params: { status } });
+}
 export function getNoticePage(params) {
     return fetchPage('/api/oa/notice/page', params);
 }

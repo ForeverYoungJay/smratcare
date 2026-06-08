@@ -1,138 +1,104 @@
-<view class="container">
+<view class="chat-page">
   <view class="runtime-tip" wx:if="{{runtimeNotice}}">{{runtimeNotice}}</view>
 
-  <view class="surface card" wx:if="{{loadError}}">
-    <view class="error-title">沟通能力暂时不可用</view>
-    <view class="section-subtitle">{{loadError}}</view>
-    <button class="ghost-btn booking-btn" bindtap="retryLoad">重新加载</button>
+  <view class="chat-header">
+    <view>
+      <view class="chat-title">在线沟通</view>
+      <view class="chat-subtitle">与机构照护团队实时留言</view>
+    </view>
+    <picker mode="selector" range="{{roleOptions}}" value="{{roleIndex}}" bindchange="onRoleChange">
+      <view class="role-pill">{{roleOptions[roleIndex]}}</view>
+    </picker>
   </view>
 
-  <view class="surface card composer">
-    <view class="section-title">在线沟通</view>
-    <view class="section-subtitle">图文沟通、语音留言与探视预约统一入口</view>
-    <view class="notice-box">
-      <view class="notice-title">使用说明</view>
-      <view class="notice-text">语音留言会先上传文件，再生成沟通记录；若通知未绑定，机构仍可在后台看到消息，但你可能收不到服务通知。</view>
-    </view>
-
-    <view class="row">
-      <view class="field">
-        <view class="field-label">沟通对象</view>
-        <picker mode="selector" range="{{roleOptions}}" value="{{roleIndex}}" bindchange="onRoleChange">
-          <view class="picker">{{roleOptions[roleIndex]}}</view>
-        </picker>
-      </view>
-      <view class="field">
-        <view class="field-label">消息类型</view>
-        <picker mode="selector" range="{{typeOptions}}" range-key="label" value="{{typeIndex}}" bindchange="onTypeChange">
-          <view class="picker">{{typeOptions[typeIndex].label}}</view>
-        </picker>
-      </view>
-    </view>
-
-    <view class="field">
-      <view class="field-label">快捷模板</view>
-      <view class="template-wrap">
-        <block wx:for="{{filteredTemplates}}" wx:key="id">
-          <view class="template-chip" data-index="{{index}}" bindtap="useTemplate">
-            <text class="template-title">{{item.title}}</text>
-            <text class="template-scene">{{item.scene}}</text>
-          </view>
-        </block>
-      </view>
-    </view>
-
-    <view class="field">
-      <view class="field-head">
-        <view class="field-label">发送内容</view>
-        <view class="draft-hint" wx:if="{{draftRestored}}">已恢复草稿</view>
-      </view>
-      <textarea
-        class="textarea"
-        placeholder="输入需要沟通的事项，例如：请反馈午后血压复测结果"
-        maxlength="200"
-        value="{{content}}"
-        bindinput="onContentInput" />
-      <view class="content-count">{{content.length}} / 200</view>
-    </view>
-
-    <view class="field" wx:if="{{typeOptions[typeIndex].value === 'voice'}}">
-      <view class="field-label">语音文件</view>
-      <view class="voice-file" wx:if="{{voiceFileUrl}}">
-        <text class="voice-name">{{voiceFileName}}</text>
-        <text class="voice-duration" wx:if="{{voiceDurationSec}}">{{voiceDurationSec}}秒</text>
-      </view>
-      <view class="voice-empty" wx:else>尚未上传语音文件</view>
-      <view class="action-row compact">
-        <button class="ghost-btn action-btn" loading="{{recording}}" bindtap="startRecord" wx:if="{{!recording}}">直接录音</button>
-        <button class="ghost-btn action-btn danger" bindtap="stopRecord" wx:else>结束录音</button>
-        <button class="ghost-btn action-btn" loading="{{uploadingVoice}}" bindtap="chooseVoiceFile">选择语音文件</button>
-        <button class="ghost-btn action-btn" wx:if="{{voiceFileUrl}}" bindtap="clearVoiceFile">清空文件</button>
-      </view>
-    </view>
-
-    <view class="field" wx:if="{{typeOptions[typeIndex].value === 'voice'}}">
-      <view class="field-label">语音文字备注（可选）</view>
-      <textarea
-        class="textarea transcript"
-        placeholder="可填写语音内容摘要，便于护工快速理解"
-        maxlength="200"
-        value="{{voiceTranscript}}"
-        bindinput="onTranscriptInput" />
-    </view>
-
-    <view class="action-row">
-      <button class="primary-btn action-btn" loading="{{sending}}" bindtap="sendMessage">
-        {{typeOptions[typeIndex].value === 'voice' ? '发送语音留言' : '发送消息'}}
-      </button>
-      <button class="ghost-btn action-btn" loading="{{uploadingVoice}}" bindtap="chooseVoiceFile" wx:if="{{typeOptions[typeIndex].value === 'voice'}}">上传语音</button>
-    </view>
+  <view class="error-card" wx:if="{{loadError}}">
+    <view class="error-title">沟通暂时不可用</view>
+    <view class="error-text">{{loadError}}</view>
+    <button class="ghost-btn retry-btn" bindtap="retryLoad">重新加载</button>
   </view>
 
-  <view class="surface card booking">
-    <view class="card-title">探视预约（非实时）</view>
-    <view class="section-subtitle">用于预约护工协助的探视时段，格式建议：YYYY-MM-DD HH:mm</view>
-    <input class="input" value="{{videoTime}}" bindinput="onTimeInput" />
-    <button class="ghost-btn booking-btn" loading="{{sending}}" bindtap="submitVideoBooking">提交探视预约</button>
-  </view>
-
-  <view class="surface card history">
-    <view class="history-head">
-      <view class="card-title">沟通记录</view>
-      <view class="muted">{{messages.length}} 条</view>
+  <scroll-view
+    class="message-scroll"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+    scroll-into-view="chat-bottom">
+    <view wx:if="{{loading}}" class="loading-text">正在同步沟通记录...</view>
+    <view wx:if="{{!loading && messages.length === 0}}" class="empty-chat">
+      <view class="empty-title">还没有沟通记录</view>
+      <view class="empty-text">直接输入文字，或按住说话给照护团队留言。</view>
     </view>
-    <view wx:if="{{loading}}" class="list-empty">记录加载中...</view>
-    <view wx:if="{{!loading && messages.length === 0}}" class="list-empty">暂无沟通记录</view>
-    <block wx:if="{{!loading && messages.length > 0}}" wx:for="{{messages}}" wx:for-item="msg" wx:key="id">
-      <view class="message-item">
-        <view class="message-head">
-          <view class="msg-role">{{msg.targetRole}}</view>
-          <view class="msg-time">{{msg.time}}</view>
-        </view>
-        <view class="meta-row">
-          <view class="msg-type">{{msg.msgTypeText}}</view>
-          <view class="msg-status">{{msg.status}}</view>
-        </view>
-        <view class="voice-card" wx:if="{{msg.isVoice}}">
-          <view class="voice-row">
-            <text class="voice-name">{{msg.mediaName || '语音留言'}}</text>
-            <text class="voice-duration" wx:if="{{msg.voiceDurationText}}">{{msg.voiceDurationText}}</text>
+
+    <block wx:for="{{messages}}" wx:for-item="msg" wx:key="id">
+      <view class="time-divider" wx:if="{{msg.showTime}}">{{msg.time}}</view>
+      <view class="message-row {{msg.mine ? 'mine' : 'theirs'}}">
+        <view class="avatar">{{msg.avatarText}}</view>
+        <view class="bubble-wrap">
+          <view class="sender-name" wx:if="{{!msg.mine}}">{{msg.targetRole}}</view>
+          <view class="bubble {{msg.isVoice ? 'voice-bubble' : ''}} {{msg.isVisit ? 'visit-bubble' : ''}}">
+            <block wx:if="{{msg.isVoice}}">
+              <view
+                class="voice-content"
+                data-id="{{msg.idText}}"
+                data-url="{{msg.playableUrl}}"
+                bindtap="playVoice">
+                <view class="voice-icon {{playingId === msg.idText ? 'playing' : ''}}"></view>
+                <view class="wave">
+                  <text></text><text></text><text></text><text></text><text></text>
+                </view>
+                <view class="voice-duration">{{msg.voiceDurationText || '语音'}}</view>
+              </view>
+            </block>
+            <block wx:elif="{{msg.isVisit}}">
+              <view class="visit-title">探视预约</view>
+              <view class="visit-text">{{msg.content}}</view>
+            </block>
+            <block wx:else>
+              <view class="message-text">{{msg.content}}</view>
+            </block>
           </view>
-          <view class="voice-url">{{msg.mediaUrl ? '语音文件已上传，可直接播放' : '语音文件待补充'}}</view>
-          <view class="action-row compact" wx:if="{{msg.playableUrl}}">
-            <button
-              class="ghost-btn action-btn"
-              data-id="{{msg.idText}}"
-              data-url="{{msg.playableUrl}}"
-              bindtap="playVoice"
-              wx:if="{{playingId !== msg.idText}}">播放语音</button>
-            <button class="ghost-btn action-btn danger" bindtap="stopVoice" wx:else>停止播放</button>
-          </view>
-          <view class="voice-transcript" wx:if="{{msg.transcript}}">备注：{{msg.transcript}}</view>
+          <view class="message-status">{{msg.status}} · {{msg.msgTypeText}}</view>
         </view>
-        <view class="msg-content">{{msg.content}}</view>
-        <view class="msg-sender">发送人：{{msg.sender}}</view>
       </view>
     </block>
+    <view id="chat-bottom" class="chat-bottom"></view>
+  </scroll-view>
+
+  <view class="visit-panel" wx:if="{{showVisitPanel}}">
+    <view class="visit-panel-title">预约探视时间</view>
+    <view class="visit-panel-row">
+      <input class="visit-input" value="{{videoTime}}" bindinput="onTimeInput" />
+      <button class="primary-btn visit-submit" loading="{{sending}}" bindtap="submitVideoBooking">提交</button>
+    </view>
+  </view>
+
+  <view class="record-mask" wx:if="{{recording}}">
+    <view class="record-card">
+      <view class="record-mic"></view>
+      <view class="record-title">正在录音</view>
+      <view class="record-text">松开发送，时间太短不会发送</view>
+    </view>
+  </view>
+
+  <view class="composer-bar">
+    <button class="icon-btn" bindtap="toggleVisitPanel">＋</button>
+    <button class="mode-btn" bindtap="toggleVoiceMode">{{voiceMode ? '键盘' : '语音'}}</button>
+    <button
+      wx:if="{{voiceMode}}"
+      class="hold-voice {{recording ? 'recording' : ''}}"
+      bindtouchstart="startRecord"
+      bindtouchend="stopRecord"
+      bindtouchcancel="cancelRecord">
+      {{recording ? '松开发送' : '按住说话'}}
+    </button>
+    <input
+      wx:else
+      class="chat-input"
+      confirm-type="send"
+      placeholder="输入消息"
+      value="{{content}}"
+      bindinput="onContentInput"
+      bindconfirm="sendText" />
+    <button class="send-btn" loading="{{sending}}" disabled="{{!content && !voiceMode}}" bindtap="sendText">发送</button>
   </view>
 </view>

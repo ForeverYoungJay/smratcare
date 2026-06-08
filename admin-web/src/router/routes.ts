@@ -2481,6 +2481,12 @@ export const routes: RouteRecordRaw[] = [
                 meta: { title: '任务管理' }
               },
               {
+                path: 'family-communication',
+                name: 'OaFamilyCommunication',
+                component: () => import('../views/oa/FamilyCommunication.vue'),
+                meta: { title: '家属沟通' }
+              },
+              {
                 path: 'calendar',
                 name: 'OaCalendar',
                 redirect: '/workbench/schedule',

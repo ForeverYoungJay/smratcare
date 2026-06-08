@@ -628,6 +628,8 @@ public final class FamilyPortalModels {
   @Data
   public static class CommunicationMessageItem {
     private Long id;
+    private Long ticketId;
+    private String direction;
     private String targetRole;
     private String msgType;
     private String content;

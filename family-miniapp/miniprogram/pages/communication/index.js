@@ -1,31 +1,13 @@
 const {
   bookVideoVisit,
   getCommunicationMessages,
-  getCommunicationTemplates,
   resolveFileUrl,
   sendCommunicationMessage,
   uploadVoiceMessage
 } = require('../../services/family');
 
-const ROLE_OPTIONS = ['责任护士', '责任护工', '生活管家', '客服中心'];
-const TYPE_OPTIONS = [
-  { value: 'text', label: '图文消息' },
-  { value: 'voice', label: '语音留言' },
-  { value: 'service', label: '服务咨询' },
-  { value: 'video', label: '探视预约' }
-];
-const DRAFT_KEY_PREFIX = 'family_comm_draft_';
-
-function resolveTypeLabel(type) {
-  const found = TYPE_OPTIONS.find((item) => item.value === type);
-  if (found) {
-    return found.label;
-  }
-  if (type === 'video') {
-    return '探视预约';
-  }
-  return '普通消息';
-}
+const ROLE_OPTIONS = ['照护团队', '责任护士', '责任护工', '生活管家', '客服中心'];
+const DRAFT_KEY = 'family_comm_chat_draft';
 
 function nextDayVideoTime() {
   const now = new Date();
@@ -36,53 +18,54 @@ function nextDayVideoTime() {
   return `${year}-${month}-${day} 15:00`;
 }
 
-function resolveTypeIndex(msgType) {
-  const idx = TYPE_OPTIONS.findIndex((item) => item.value === msgType);
-  return idx >= 0 ? idx : 0;
+function resolveTypeLabel(type) {
+  if (type === 'voice') return '语音';
+  if (type === 'video') return '探视预约';
+  if (type === 'image') return '图片';
+  return '消息';
 }
 
-function draftKey(role, msgType) {
-  return `${DRAFT_KEY_PREFIX}${role || 'default'}_${msgType || 'text'}`;
+function isMineMessage(item = {}) {
+  const direction = String(item.direction || 'FAMILY_TO_STAFF').toUpperCase();
+  return direction !== 'STAFF_TO_FAMILY';
 }
 
 Page({
   data: {
     roleOptions: ROLE_OPTIONS,
-    typeOptions: TYPE_OPTIONS,
     roleIndex: 0,
-    typeIndex: 0,
-    videoTime: nextDayVideoTime(),
     content: '',
-    voiceTranscript: '',
-    voiceFileUrl: '',
-    voiceFileName: '',
-    voiceDurationSec: null,
-    recording: false,
-    playingId: '',
     messages: [],
-    templates: [],
-    filteredTemplates: [],
-    draftRestored: false,
     loading: false,
     loadError: '',
     sending: false,
-    uploadingVoice: false,
-    runtimeNotice: ''
+    recording: false,
+    recordStartAt: 0,
+    voiceMode: false,
+    playingId: '',
+    runtimeNotice: '',
+    videoTime: nextDayVideoTime(),
+    showVisitPanel: false
   },
   onLoad(query) {
     const mode = query && query.mode ? String(query.mode).toLowerCase() : '';
-    const idx = resolveTypeIndex(mode === 'video' ? 'video' : mode === 'voice' ? 'voice' : 'text');
-    this.setData({ typeIndex: idx });
+    this.setData({
+      roleIndex: mode === 'video' ? 3 : 0,
+      showVisitPanel: mode === 'video'
+    });
     this.initRecorder();
+    this.restoreDraft();
+  },
+  async onShow() {
+    getApp().ensureLogin();
+    this.setData({ runtimeNotice: getApp().globalData.runtimeNotice || '' });
+    await this.loadMessages();
   },
   onUnload() {
     if (this.recorderManager && this.data.recording) {
       this.recorderManager.stop();
     }
-    if (this.audioContext) {
-      this.audioContext.destroy();
-      this.audioContext = null;
-    }
+    this.stopVoice();
   },
   initRecorder() {
     if (!wx.getRecorderManager) {
@@ -90,180 +73,108 @@ Page({
     }
     this.recorderManager = wx.getRecorderManager();
     this.recorderManager.onStop(async (res) => {
-      this.setData({ recording: false });
+      const durationMs = Math.max(0, Date.now() - Number(this.data.recordStartAt || 0));
+      this.setData({ recording: false, recordStartAt: 0 });
+      if (durationMs < 800) {
+        wx.showToast({ title: '说话时间太短', icon: 'none' });
+        return;
+      }
       const tempFilePath = res && res.tempFilePath;
       if (!tempFilePath) {
         wx.showToast({ title: '录音文件生成失败', icon: 'none' });
         return;
       }
-      await this.uploadVoicePath(tempFilePath, {
-        name: '现场录音.m4a',
-        durationSec: res.duration ? Math.max(1, Math.round(res.duration / 1000)) : null
+      await this.sendVoicePath(tempFilePath, {
+        durationSec: res.duration ? Math.max(1, Math.round(res.duration / 1000)) : Math.max(1, Math.round(durationMs / 1000))
       });
     });
     this.recorderManager.onError(() => {
-      this.setData({ recording: false });
+      this.setData({ recording: false, recordStartAt: 0 });
       wx.showToast({ title: '录音失败，请检查麦克风权限', icon: 'none' });
     });
   },
-  async onShow() {
-    getApp().ensureLogin();
-    this.setData({ runtimeNotice: getApp().globalData.runtimeNotice || '' });
-    await this.loadInitialData();
-  },
-  async loadInitialData() {
-    this.setData({ loadError: '' });
-    try {
-      await Promise.all([this.loadMessages(), this.loadTemplates()]);
-      this.restoreDraft();
-    } catch (error) {
-      this.setData({ loadError: error.message || '沟通信息加载失败，请稍后重试' });
-    }
-  },
   async loadMessages() {
-    this.setData({ loading: true });
+    this.setData({ loading: true, loadError: '' });
     try {
-      const list = await getCommunicationMessages(1, 50);
-      const messages = (list || []).map((item) => ({
+      const list = await getCommunicationMessages(1, 80);
+      const messages = (list || []).map((item) => {
+        const msgType = String(item.msgType || 'text').toLowerCase();
+        return {
+          ...item,
+          idText: String(item.id || ''),
+          avatarText: isMineMessage(item) ? '我' : String(item.targetRole || '照').slice(0, 1),
+          msgType,
+          msgTypeText: resolveTypeLabel(msgType),
+          mine: isMineMessage(item),
+          isVoice: msgType === 'voice',
+          isVisit: msgType === 'video',
+          playableUrl: resolveFileUrl(item.mediaUrl || ''),
+          voiceDurationText: item && item.mediaDurationSec ? `${item.mediaDurationSec}"` : ''
+        };
+      }).reverse().map((item, index, rows) => ({
         ...item,
-        idText: String(item.id || ''),
-        msgTypeText: resolveTypeLabel(item.msgType || ''),
-        isVoice: String(item.msgType || '').toLowerCase() === 'voice',
-        playableUrl: resolveFileUrl(item.mediaUrl || ''),
-        voiceDurationText: item && item.mediaDurationSec ? `${item.mediaDurationSec}秒` : ''
+        showTime: index === 0 || rows[index - 1].time !== item.time
       }));
       this.setData({ messages });
       return messages;
+    } catch (error) {
+      this.setData({ loadError: error.message || '沟通信息加载失败，请稍后重试' });
+      return [];
     } finally {
       this.setData({ loading: false });
     }
   },
-  async loadTemplates() {
-    const templates = await getCommunicationTemplates();
-    this.setData({ templates: templates || [] });
-    this.updateTemplateView();
-    return templates || [];
-  },
-  updateTemplateView() {
-    const role = this.data.roleOptions[this.data.roleIndex] || '';
-    const type = this.data.typeOptions[this.data.typeIndex] || TYPE_OPTIONS[0];
-    const list = this.data.templates || [];
-    const filteredTemplates = list.filter((item) => item.targetRole === role || item.msgType === type.value);
-    this.setData({
-      filteredTemplates: filteredTemplates.length > 0 ? filteredTemplates : list.slice(0, 5)
-    });
-  },
   onRoleChange(e) {
-    this.setData({ roleIndex: Number(e.detail.value), draftRestored: false });
-    this.updateTemplateView();
-    this.restoreDraft();
-  },
-  onTypeChange(e) {
-    this.setData({ typeIndex: Number(e.detail.value), draftRestored: false });
-    this.updateTemplateView();
-    this.restoreDraft();
+    this.setData({ roleIndex: Number(e.detail.value || 0) });
   },
   onContentInput(e) {
     const content = e.detail.value;
     this.setData({ content });
-    this.saveDraft(content);
-  },
-  onTimeInput(e) {
-    this.setData({ videoTime: e.detail.value });
-  },
-  onTranscriptInput(e) {
-    this.setData({ voiceTranscript: e.detail.value });
-  },
-  useTemplate(e) {
-    const idx = Number(e.currentTarget.dataset.index);
-    const template = this.data.filteredTemplates[idx];
-    if (!template) {
-      return;
+    const trimmed = String(content || '').trim();
+    if (trimmed) {
+      wx.setStorageSync(DRAFT_KEY, content);
+    } else {
+      wx.removeStorageSync(DRAFT_KEY);
     }
-    const roleIndex = this.data.roleOptions.findIndex((item) => item === template.targetRole);
-    const typeIndex = resolveTypeIndex(template.msgType);
-    this.setData({
-      roleIndex: roleIndex >= 0 ? roleIndex : this.data.roleIndex,
-      typeIndex,
-      content: template.content,
-      draftRestored: false
-    });
-    this.updateTemplateView();
-    this.saveDraft(template.content);
-  },
-  currentDraftKey() {
-    const role = this.data.roleOptions[this.data.roleIndex] || '';
-    const type = (this.data.typeOptions[this.data.typeIndex] || TYPE_OPTIONS[0]).value;
-    return draftKey(role, type);
   },
   restoreDraft() {
-    const key = this.currentDraftKey();
-    const draft = wx.getStorageSync(key) || '';
-    if (!draft) {
-      this.setData({ content: '', draftRestored: false });
+    const draft = wx.getStorageSync(DRAFT_KEY) || '';
+    if (draft) {
+      this.setData({ content: draft });
+    }
+  },
+  toggleVoiceMode() {
+    this.setData({ voiceMode: !this.data.voiceMode });
+  },
+  async sendText() {
+    const content = String(this.data.content || '').trim();
+    if (!content || this.data.sending) {
       return;
     }
-    this.setData({
-      content: draft,
-      draftRestored: true
+    await this.sendChatMessage({
+      msgType: 'text',
+      content
     });
+    wx.removeStorageSync(DRAFT_KEY);
+    this.setData({ content: '' });
   },
-  saveDraft(content) {
-    const key = this.currentDraftKey();
-    const trimmed = (content || '').trim();
-    if (!trimmed) {
-      wx.removeStorageSync(key);
-      this.setData({ draftRestored: false });
-      return;
-    }
-    wx.setStorageSync(key, content);
-  },
-  async chooseVoiceFile() {
-    if (this.data.uploadingVoice) {
-      return;
-    }
-    this.setData({ uploadingVoice: true });
+  async sendChatMessage(payload) {
+    const targetRole = this.data.roleOptions[this.data.roleIndex] || '照护团队';
+    this.setData({ sending: true });
     try {
-      const chooseResult = await new Promise((resolve, reject) => {
-        wx.chooseMessageFile({
-          count: 1,
-          type: 'file',
-          extension: ['m4a', 'mp3', 'wav', 'aac', 'amr'],
-          success: resolve,
-          fail: reject
-        });
+      await sendCommunicationMessage({
+        targetRole,
+        ...payload
       });
-      const file = chooseResult && chooseResult.tempFiles && chooseResult.tempFiles[0];
-      if (!file || !file.path) {
-        throw new Error('未获取到语音文件');
-      }
-      await this.uploadVoicePath(file.path, {
-        name: file.name || '语音留言',
-        durationSec: file.time ? Number(file.time) : null
-      });
+      await this.loadMessages();
     } catch (error) {
-      wx.showToast({ title: error.message || '语音上传失败', icon: 'none' });
+      wx.showToast({ title: error.message || '发送失败，请重试', icon: 'none' });
     } finally {
-      this.setData({ uploadingVoice: false });
-    }
-  },
-  async uploadVoicePath(filePath, options = {}) {
-    this.setData({ uploadingVoice: true });
-    try {
-      const uploaded = await uploadVoiceMessage(filePath, { bizType: 'family-voice' });
-      this.setData({
-        voiceFileUrl: uploaded.fileUrl || '',
-        voiceFileName: uploaded.originalFileName || uploaded.fileName || options.name || '语音留言',
-        voiceDurationSec: options.durationSec || null
-      });
-      wx.showToast({ title: '语音上传成功', icon: 'none' });
-    } finally {
-      this.setData({ uploadingVoice: false });
+      this.setData({ sending: false });
     }
   },
   async startRecord() {
-    if (!this.recorderManager) {
-      wx.showToast({ title: '当前微信版本不支持录音', icon: 'none' });
+    if (!this.recorderManager || this.data.recording || this.data.sending) {
       return;
     }
     const authorized = await new Promise((resolve) => {
@@ -274,10 +185,15 @@ Page({
       });
     });
     if (!authorized) {
-      wx.showToast({ title: '请先允许麦克风权限', icon: 'none' });
+      wx.showModal({
+        title: '需要麦克风权限',
+        content: '请在小程序设置中允许录音后，再按住发送语音。',
+        confirmText: '知道了',
+        showCancel: false
+      });
       return;
     }
-    this.setData({ recording: true });
+    this.setData({ recording: true, recordStartAt: Date.now() });
     this.recorderManager.start({
       duration: 60000,
       sampleRate: 16000,
@@ -292,6 +208,33 @@ Page({
     }
     this.recorderManager.stop();
   },
+  cancelRecord() {
+    if (!this.recorderManager || !this.data.recording) {
+      return;
+    }
+    this.setData({ recordStartAt: 0 });
+    this.recorderManager.stop();
+  },
+  async sendVoicePath(filePath, options = {}) {
+    this.setData({ sending: true });
+    try {
+      const uploaded = await uploadVoiceMessage(filePath, { bizType: 'family-voice' });
+      const durationSec = Number(options.durationSec || 0);
+      await sendCommunicationMessage({
+        targetRole: this.data.roleOptions[this.data.roleIndex] || '照护团队',
+        msgType: 'voice',
+        content: '语音留言',
+        mediaUrl: uploaded.fileUrl || '',
+        mediaName: uploaded.originalFileName || uploaded.fileName || '语音留言.mp3',
+        mediaDurationSec: durationSec > 0 ? durationSec : undefined
+      });
+      await this.loadMessages();
+    } catch (error) {
+      wx.showToast({ title: error.message || '语音发送失败', icon: 'none' });
+    } finally {
+      this.setData({ sending: false });
+    }
+  },
   playVoice(e) {
     const id = String(e.currentTarget.dataset.id || '');
     const url = e.currentTarget.dataset.url;
@@ -299,11 +242,7 @@ Page({
       wx.showToast({ title: '暂无可播放语音', icon: 'none' });
       return;
     }
-    if (this.audioContext) {
-      this.audioContext.stop();
-      this.audioContext.destroy();
-      this.audioContext = null;
-    }
+    this.stopVoice();
     const audio = wx.createInnerAudioContext();
     this.audioContext = audio;
     audio.src = url;
@@ -319,65 +258,16 @@ Page({
   stopVoice() {
     if (this.audioContext) {
       this.audioContext.stop();
+      this.audioContext.destroy();
+      this.audioContext = null;
     }
     this.setData({ playingId: '' });
   },
-  clearVoiceFile() {
-    this.setData({
-      voiceFileUrl: '',
-      voiceFileName: '',
-      voiceDurationSec: null
-    });
+  toggleVisitPanel() {
+    this.setData({ showVisitPanel: !this.data.showVisitPanel });
   },
-  async sendMessage() {
-    const targetRole = this.data.roleOptions[this.data.roleIndex] || '责任护士';
-    const type = this.data.typeOptions[this.data.typeIndex] || TYPE_OPTIONS[0];
-    let content = (this.data.content || '').trim();
-    const payload = {
-      targetRole,
-      msgType: type.value
-    };
-    if (type.value === 'voice') {
-      if (!(this.data.voiceFileUrl || '').trim()) {
-        wx.showToast({ title: '请先上传语音文件', icon: 'none' });
-        return;
-      }
-      if (!content) {
-        content = '已发送语音留言，请协助播放给老人。';
-      }
-      payload.mediaUrl = this.data.voiceFileUrl;
-      payload.mediaName = this.data.voiceFileName || 'family-voice.m4a';
-      if (this.data.voiceDurationSec) {
-        payload.mediaDurationSec = Number(this.data.voiceDurationSec);
-      }
-      const transcript = (this.data.voiceTranscript || '').trim();
-      if (transcript) {
-        payload.transcript = transcript;
-      }
-    } else if (!content) {
-      wx.showToast({ title: '请输入消息内容', icon: 'none' });
-      return;
-    }
-    payload.content = content;
-    this.setData({ sending: true });
-    try {
-      await sendCommunicationMessage(payload);
-      wx.removeStorageSync(this.currentDraftKey());
-      this.setData({
-        content: '',
-        voiceTranscript: '',
-        voiceFileUrl: '',
-        voiceFileName: '',
-        voiceDurationSec: null,
-        draftRestored: false
-      });
-      wx.showToast({ title: '发送成功', icon: 'success' });
-      await this.loadMessages();
-    } catch (error) {
-      wx.showToast({ title: error.message || '发送失败，请重试', icon: 'none' });
-    } finally {
-      this.setData({ sending: false });
-    }
+  onTimeInput(e) {
+    this.setData({ videoTime: e.detail.value });
   },
   async submitVideoBooking() {
     const app = getApp();
@@ -386,7 +276,8 @@ Page({
       wx.showToast({ title: '请先绑定并选择老人', icon: 'none' });
       return;
     }
-    if (!(this.data.videoTime || '').trim()) {
+    const videoTime = String(this.data.videoTime || '').trim();
+    if (!videoTime) {
       wx.showToast({ title: '请填写预约时间', icon: 'none' });
       return;
     }
@@ -394,14 +285,15 @@ Page({
     try {
       await bookVideoVisit({
         elderId,
-        bookingTime: this.data.videoTime,
+        bookingTime: videoTime,
         remark: '家属预约视频探视'
       });
       await sendCommunicationMessage({
         targetRole: '生活管家',
         msgType: 'video',
-        content: `已提交探视预约：${this.data.videoTime}`
+        content: `已提交探视预约：${videoTime}`
       });
+      this.setData({ showVisitPanel: false, roleIndex: 3 });
       wx.showToast({ title: '探视预约已提交', icon: 'success' });
       await this.loadMessages();
     } catch (error) {
@@ -411,6 +303,6 @@ Page({
     }
   },
   retryLoad() {
-    this.loadInitialData();
+    this.loadMessages();
   }
 });

@@ -2456,6 +2456,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     Map<String, Object> state = new LinkedHashMap<>();
     state.put("id", id);
     state.put("targetRole", targetRole);
+    state.put("direction", "FAMILY_TO_STAFF");
     state.put("msgType", msgType);
     state.put("content", content);
     state.put("time", time);
@@ -2491,9 +2492,14 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     ticket.setStatus("PENDING");
     ticket.setCreatedBy(familyUserId);
     oaSuggestionMapper.insert(ticket);
+    state.put("ticketId", ticket.getId());
+    state.put("status", "待处理");
+    upsertState(orgId, familyUserId, STATE_COMMUNICATION, String.valueOf(id), state);
 
     FamilyPortalModels.CommunicationMessageItem response = new FamilyPortalModels.CommunicationMessageItem();
     response.setId(id);
+    response.setTicketId(ticket.getId());
+    response.setDirection("FAMILY_TO_STAFF");
     response.setTargetRole(targetRole);
     response.setMsgType(msgType);
     response.setContent(content);
@@ -2503,7 +2509,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     response.setTranscript(transcript);
     response.setTime(time);
     response.setSender(sender);
-    response.setStatus("已发送");
+    response.setStatus("待处理");
 
     if ("voice".equalsIgnoreCase(msgType)) {
       notifyFamilySafe(orgId, familyUserId, null, "COMMUNICATION_VOICE_SENT", "normal",
@@ -5233,6 +5239,9 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
       JsonNode node = objectMapper.readTree(row.getValueJson());
       FamilyPortalModels.CommunicationMessageItem item = new FamilyPortalModels.CommunicationMessageItem();
       item.setId(node.path("id").asLong(row.getId() == null ? 0L : row.getId()));
+      Long ticketId = node.path("ticketId").isNumber() ? node.path("ticketId").asLong() : null;
+      item.setTicketId(ticketId);
+      item.setDirection(defaultText(node.path("direction").asText(""), "FAMILY_TO_STAFF"));
       item.setTargetRole(defaultText(node.path("targetRole").asText(""), "客服中心"));
       item.setMsgType(defaultText(node.path("msgType").asText(""), "text"));
       item.setContent(defaultText(node.path("content").asText(""), ""));
@@ -5242,11 +5251,32 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
       item.setTranscript(defaultText(node.path("transcript").asText(""), null));
       item.setTime(defaultText(node.path("time").asText(""), formatFriendlyDateTime(row.getUpdateTime())));
       item.setSender(defaultText(node.path("sender").asText(""), "家属"));
-      item.setStatus(defaultText(node.path("status").asText(""), "已发送"));
+      item.setStatus(resolveCommunicationTicketStatus(ticketId, defaultText(node.path("status").asText(""), "待处理")));
       return item;
     } catch (Exception ex) {
       return null;
     }
+  }
+
+  private String resolveCommunicationTicketStatus(Long ticketId, String fallback) {
+    if (ticketId == null || ticketId <= 0) {
+      return defaultText(fallback, "待处理");
+    }
+    OaSuggestion ticket = oaSuggestionMapper.selectById(ticketId);
+    if (ticket == null || Integer.valueOf(1).equals(ticket.getIsDeleted())) {
+      return defaultText(fallback, "待处理");
+    }
+    String status = defaultText(ticket.getStatus(), "").toUpperCase(Locale.ROOT);
+    if ("DONE".equals(status) || "COMPLETED".equals(status) || "RESOLVED".equals(status) || "ADOPTED".equals(status)) {
+      return "已处理";
+    }
+    if ("PROCESSING".equals(status) || "IN_PROGRESS".equals(status)) {
+      return "处理中";
+    }
+    if ("CLOSED".equals(status) || "REJECTED".equals(status)) {
+      return "已关闭";
+    }
+    return "待处理";
   }
 
   private FamilyPortalModels.VitalBadge buildVitalBadge(String name, String value, String status) {

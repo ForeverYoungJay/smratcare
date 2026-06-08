@@ -49,6 +49,10 @@ export function createSuggestion(data: Partial<OaSuggestion>) {
   return request.post<OaSuggestion>('/api/oa/suggestion', data)
 }
 
+export function updateSuggestionStatus(id: Id, status: string) {
+  return request.put<OaSuggestion>(`/api/oa/suggestion/${id}/status`, null, { params: { status } })
+}
+
 export function getNoticePage(params: any) {
   return fetchPage<OaNotice>('/api/oa/notice/page', params)
 }
