@@ -3,7 +3,7 @@
 
   <view class="chat-header">
     <view>
-      <view class="chat-title">{{activeRole}}</view>
+      <view class="chat-title">在线沟通</view>
       <view class="chat-subtitle">{{activeRoleDesc}}</view>
     </view>
     <view class="role-state">单独会话</view>
