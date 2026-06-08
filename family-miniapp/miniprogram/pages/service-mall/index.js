@@ -3,7 +3,7 @@ const {
   previewMallOrder,
   submitMallOrder,
   getMallOrders,
-  getFamilyBindings,
+  getHomeDashboard,
   resolveFileUrl
 } = require('../../services/family');
 
@@ -106,7 +106,8 @@ Page({
   async loadBindings() {
     this.setData({ loadingBindings: true });
     try {
-      const list = await getFamilyBindings();
+      const dashboard = await getHomeDashboard({ elderId: null });
+      const list = (dashboard && dashboard.elders) || [];
       const bindings = (list || []).map((item) => ({
         ...item,
         displayName: `${item.elderName || '老人'} · ${item.relation || '家属'}`

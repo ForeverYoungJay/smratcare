@@ -1,5 +1,5 @@
 const {
-  ensureCurrentElderId,
+  ensureAccessibleElderId,
   getBillSummary,
   getBillHistory,
   getPaymentGuard,
@@ -108,7 +108,7 @@ Page({
   async loadData() {
     this.setData({ loading: true, loadError: '' });
     try {
-      const elderId = await ensureCurrentElderId();
+      const elderId = await ensureAccessibleElderId();
       if (!elderId) {
         this.setData({
           loadError: '请先绑定并选择老人后再查看缴费信息',
@@ -191,7 +191,7 @@ Page({
     return null;
   },
   async doManualRecharge(amount) {
-    const elderId = await ensureCurrentElderId();
+    const elderId = await ensureAccessibleElderId();
     if (!elderId) {
       wx.showToast({ title: '请先绑定并选择老人', icon: 'none' });
       return;
@@ -251,7 +251,7 @@ Page({
     this.setData({ paying: true });
     wx.showLoading({ title: '创建支付单', mask: true });
     try {
-      const elderId = await ensureCurrentElderId();
+      const elderId = await ensureAccessibleElderId();
       if (!elderId) {
         throw new Error('请先绑定并选择老人');
       }
@@ -339,7 +339,7 @@ Page({
       }
     }
     try {
-      const elderId = await ensureCurrentElderId();
+      const elderId = await ensureAccessibleElderId();
       if (!elderId) {
         throw new Error('请先绑定并选择老人');
       }

@@ -58,6 +58,28 @@ async function ensureCurrentElderId(inputElderId) {
   return elderId || null;
 }
 
+async function ensureAccessibleElderId(inputElderId) {
+  const app = getApp();
+  const requested = toPositiveNumber(inputElderId || (app.globalData && app.globalData.selectedElderId));
+  const dashboard = await getHomeDashboard({ elderId: null });
+  const elders = Array.isArray(dashboard && dashboard.elders) ? dashboard.elders : [];
+  if (elders.length === 0) {
+    if (app.globalData) {
+      app.globalData.selectedElderId = null;
+    }
+    return null;
+  }
+  const matched = requested
+    ? elders.find((item) => toPositiveNumber(item.elderId) === requested)
+    : null;
+  const selected = matched || elders[0];
+  const elderId = toPositiveNumber(selected && selected.elderId);
+  if (app.globalData) {
+    app.globalData.selectedElderId = elderId || null;
+  }
+  return elderId || null;
+}
+
 function currentMonth() {
   const now = new Date();
   const month = now.getMonth() + 1;
@@ -851,6 +873,7 @@ module.exports = {
   bindElder,
   getMyElders,
   ensureCurrentElderId,
+  ensureAccessibleElderId,
   getHomeDashboard,
   getWeeklyBrief,
   getWeeklyBriefHistory,
