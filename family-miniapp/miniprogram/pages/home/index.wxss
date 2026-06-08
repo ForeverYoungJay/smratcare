@@ -44,11 +44,12 @@
 }
 
 .elder-swiper {
-  height: 456rpx;
+  height: 520rpx;
 }
 
 .elder-card {
-  height: 430rpx;
+  min-height: 494rpx;
+  height: auto;
   padding: 26rpx;
   overflow: hidden;
   background:
@@ -146,16 +147,19 @@
 .quick-actions {
   margin-top: 16rpx;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10rpx;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12rpx;
 }
 
 .quick-action {
-  height: 60rpx;
-  line-height: 60rpx;
+  width: 100%;
+  min-width: 0;
+  height: 66rpx;
+  line-height: 66rpx;
   padding: 0;
-  font-size: 22rpx;
+  font-size: 24rpx;
   border-radius: 12rpx;
+  overflow: visible;
 }
 
 .switch-strip {
