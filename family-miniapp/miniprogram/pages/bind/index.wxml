@@ -19,7 +19,7 @@
 
     <view class="field switch-field">
       <text class="label">设为主要联系人</text>
-      <switch checked="{{form.isPrimary === 1}}" bindchange="onPrimaryChange" color="#2c7a84" />
+      <switch checked="{{form.isPrimary === 1}}" bindchange="onPrimaryChange" color="#246b5f" />
     </view>
 
     <view class="field">

@@ -1,7 +1,7 @@
 .hero {
   padding: 24rpx;
   background: linear-gradient(140deg, rgba(25, 79, 94, 0.96), rgba(22, 124, 119, 0.96));
-  color: #f8fafc;
+  color: #f7faf8;
 }
 
 .hero-top {
@@ -101,7 +101,7 @@
   width: 14rpx;
   height: 14rpx;
   border-radius: 50%;
-  background: #2c7a84;
+  background: #246b5f;
   margin-top: 6rpx;
 }
 
@@ -126,12 +126,12 @@
 .timeline-title {
   font-size: 26rpx;
   font-weight: 700;
-  color: #1f2937;
+  color: #182420;
 }
 
 .timeline-time {
   font-size: 22rpx;
-  color: #64748b;
+  color: #71807a;
 }
 
 .timeline-desc {

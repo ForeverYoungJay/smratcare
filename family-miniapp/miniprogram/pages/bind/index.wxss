@@ -13,14 +13,14 @@
 .label {
   display: block;
   font-size: 24rpx;
-  color: #6b7280;
+  color: #71807a;
   margin-bottom: 10rpx;
 }
 
 .input,
 .picker,
 .textarea {
-  background: #f8fafc;
+  background: #f7faf8;
   border: 1rpx solid #dbe3ea;
   border-radius: 14rpx;
   padding: 20rpx;
@@ -28,7 +28,7 @@
 }
 
 .picker {
-  color: #1f2937;
+  color: #182420;
 }
 
 .textarea {
@@ -38,7 +38,7 @@
 .hint {
   margin-top: 8rpx;
   font-size: 22rpx;
-  color: #6b7280;
+  color: #71807a;
 }
 
 .switch-field {

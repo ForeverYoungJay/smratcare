@@ -41,15 +41,15 @@
   ],
   "window": {
     "navigationBarTitleText": "智养云家属端",
-    "navigationBarBackgroundColor": "#f7efe3",
+    "navigationBarBackgroundColor": "#e7f0eb",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#f6f7fb",
+    "backgroundColor": "#f4f7f5",
     "backgroundTextStyle": "light"
   },
   "tabBar": {
-    "color": "#6b7280",
-    "selectedColor": "#194f5e",
-    "backgroundColor": "#ffffff",
+    "color": "#7c8984",
+    "selectedColor": "#246b5f",
+    "backgroundColor": "#fbfdfc",
     "borderStyle": "black",
     "list": [
       {

@@ -14,7 +14,7 @@
         <view class="item-title">健康档案二次校验</view>
         <view class="item-desc">查看健康指标和趋势前要求验证</view>
       </view>
-      <switch checked="{{setting.verifyHealthData}}" data-field="verifyHealthData" bindchange="onSwitch" color="#2c7a84" />
+      <switch checked="{{setting.verifyHealthData}}" data-field="verifyHealthData" bindchange="onSwitch" color="#246b5f" />
     </view>
 
     <view class="item">
@@ -22,7 +22,7 @@
         <view class="item-title">就医记录二次校验</view>
         <view class="item-desc">门诊诊断与用药记录访问验证</view>
       </view>
-      <switch checked="{{setting.verifyMedicalRecords}}" data-field="verifyMedicalRecords" bindchange="onSwitch" color="#2c7a84" />
+      <switch checked="{{setting.verifyMedicalRecords}}" data-field="verifyMedicalRecords" bindchange="onSwitch" color="#246b5f" />
     </view>
 
     <view class="item">
@@ -30,7 +30,7 @@
         <view class="item-title">评估报告二次校验</view>
         <view class="item-desc">PDF 报告查看前二次确认</view>
       </view>
-      <switch checked="{{setting.verifyReports}}" data-field="verifyReports" bindchange="onSwitch" color="#2c7a84" />
+      <switch checked="{{setting.verifyReports}}" data-field="verifyReports" bindchange="onSwitch" color="#246b5f" />
     </view>
 
     <view class="item">
@@ -51,7 +51,7 @@
         <view class="item-title">敏感字段脱敏</view>
         <view class="item-desc">手机号、身份证号等默认隐藏</view>
       </view>
-      <switch checked="{{setting.maskSensitiveData}}" data-field="maskSensitiveData" bindchange="onSwitch" color="#2c7a84" />
+      <switch checked="{{setting.maskSensitiveData}}" data-field="maskSensitiveData" bindchange="onSwitch" color="#246b5f" />
     </view>
 
     <view class="scope-panel">

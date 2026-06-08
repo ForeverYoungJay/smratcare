@@ -1,32 +1,43 @@
 .card {
-  padding: 28rpx;
+  padding: 30rpx 28rpx;
 }
 
 .user-name {
-  font-size: 40rpx;
-  font-weight: 700;
-  color: #111827;
+  font-size: 42rpx;
+  line-height: 1.2;
+  font-weight: 900;
+  color: #16231f;
 }
 
 .user-sub {
   margin-top: 8rpx;
   font-size: 24rpx;
-  color: #6b7280;
+  color: #71807a;
+  line-height: 1.45;
 }
 
 .menu-list {
-  margin-top: 22rpx;
-  border-top: 1rpx solid #e5e7eb;
+  margin-top: 28rpx;
+  overflow: hidden;
+  border-radius: 16rpx;
+  border: 1rpx solid #edf2ef;
 }
 
 .menu-item {
+  min-height: 86rpx;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20rpx 0;
-  border-bottom: 1rpx solid #eef2f7;
+  padding: 0 18rpx;
+  border-bottom: 1rpx solid #edf2ef;
+  background: #ffffff;
   font-size: 27rpx;
-  color: #1f2937;
+  color: #182420;
+  font-weight: 800;
+}
+
+.menu-item:last-child {
+  border-bottom: none;
 }
 
 .menu-right {
@@ -36,20 +47,21 @@
 }
 
 .menu-badge {
-  min-width: 30rpx;
-  padding: 2rpx 8rpx;
+  min-width: 32rpx;
+  padding: 3rpx 8rpx;
   border-radius: 999rpx;
-  background: #dc2626;
-  color: #fff;
+  background: #e5484d;
+  color: #ffffff;
   font-size: 18rpx;
   line-height: 1.4;
   text-align: center;
 }
 
 .arrow {
-  color: #9ca3af;
+  color: #9aa6a1;
 }
 
 .action {
   margin-top: 24rpx;
+  width: 100%;
 }

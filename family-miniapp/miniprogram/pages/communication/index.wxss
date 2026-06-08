@@ -2,7 +2,7 @@
   min-height: 100vh;
   padding: 0 20rpx 132rpx;
   box-sizing: border-box;
-  background: #eef3f1;
+  background: #f4f7f5;
 }
 
 .runtime-tip {
@@ -24,19 +24,19 @@
   align-items: center;
   justify-content: space-between;
   padding: 22rpx 0 14rpx;
-  background: #eef3f1;
+  background: #f4f7f5;
 }
 
 .chat-title {
   font-size: 34rpx;
   font-weight: 800;
-  color: #17211f;
+  color: #16231f;
 }
 
 .chat-subtitle {
   margin-top: 4rpx;
   font-size: 22rpx;
-  color: #66756f;
+  color: #71807a;
 }
 
 .role-state {
@@ -44,7 +44,7 @@
   border-radius: 999rpx;
   background: #ffffff;
   border: 1rpx solid #d7e2dd;
-  color: #57706a;
+  color: #52615c;
   font-size: 21rpx;
   font-weight: 700;
 }
@@ -65,13 +65,13 @@
   box-sizing: border-box;
   border-radius: 18rpx;
   background: rgba(255, 255, 255, 0.72);
-  border: 1rpx solid #d9e5df;
+  border: 1rpx solid #d9e3df;
   color: #566b65;
 }
 
 .role-tab.active {
-  background: #1f7a69;
-  border-color: #1f7a69;
+  background: #246b5f;
+  border-color: #246b5f;
   color: #ffffff;
   box-shadow: 0 14rpx 28rpx rgba(31, 122, 105, 0.18);
 }
@@ -178,14 +178,14 @@
   justify-content: center;
   flex: 0 0 64rpx;
   background: #ffffff;
-  color: #1f6157;
+  color: #246b5f;
   font-size: 24rpx;
   font-weight: 800;
   box-shadow: 0 8rpx 20rpx rgba(46, 64, 58, 0.08);
 }
 
 .mine .avatar {
-  background: #1f7a69;
+  background: #246b5f;
   color: #fff;
 }
 
@@ -217,7 +217,7 @@
 
 .mine .bubble {
   border-radius: 22rpx 10rpx 22rpx 22rpx;
-  background: #95e27d;
+  background: #a9e596;
   box-shadow: none;
 }
 
@@ -230,7 +230,7 @@
 .message-status {
   margin-top: 6rpx;
   font-size: 19rpx;
-  color: #84918c;
+  color: #7a8983;
 }
 
 .mine .message-status {
@@ -251,7 +251,7 @@
   width: 26rpx;
   height: 26rpx;
   border-radius: 50%;
-  background: #1f7a69;
+  background: #246b5f;
   box-shadow: 0 0 0 8rpx rgba(31, 122, 105, 0.12);
 }
 
@@ -319,7 +319,7 @@
   height: 240rpx;
   border-radius: 16rpx;
   overflow: hidden;
-  background: #1f2d29;
+  background: #182420;
 }
 
 .chat-bottom {
@@ -335,7 +335,7 @@
   padding: 22rpx;
   border-radius: 24rpx 24rpx 18rpx 18rpx;
   background: #ffffff;
-  border: 1rpx solid #dce8e2;
+  border: 1rpx solid #d9e3df;
   box-shadow: 0 18rpx 54rpx rgba(31, 49, 43, 0.18);
 }
 
@@ -353,7 +353,7 @@
   flex: 1;
   margin: 0;
   padding: 0;
-  background: #f5faf7;
+  background: #f7faf8;
   border: 1rpx solid #dbe8e2;
   border-radius: 18rpx;
   height: 118rpx;
@@ -367,7 +367,7 @@
   line-height: 48rpx;
   margin: 18rpx auto 8rpx;
   border-radius: 14rpx;
-  background: #1f7a69;
+  background: #246b5f;
   color: #ffffff;
   font-size: 22rpx;
   font-weight: 800;
@@ -381,17 +381,17 @@
 }
 
 .visit-tool .tool-icon {
-  background: #e8f1ed;
-  color: #1f7a69;
+  background: #edf6f2;
+  color: #246b5f;
 }
 
 .visit-tool.active {
   background: #eef8f4;
-  border-color: #1f7a69;
+  border-color: #246b5f;
 }
 
 .visit-tool.active .tool-icon {
-  background: #1f7a69;
+  background: #246b5f;
   color: #ffffff;
 }
 
@@ -410,7 +410,7 @@
 .visit-panel-title {
   font-size: 27rpx;
   font-weight: 800;
-  color: #1f2d29;
+  color: #182420;
 }
 
 .visit-panel-subtitle {
@@ -448,7 +448,7 @@
   height: 72rpx;
   padding: 0 18rpx;
   border-radius: 16rpx;
-  background: #f8fafc;
+  background: #f7faf8;
   border: 1rpx solid #dbe5e1;
   font-size: 25rpx;
 }
@@ -487,7 +487,7 @@
   height: 76rpx;
   margin: 0 auto 18rpx;
   border-radius: 50%;
-  background: #1f7a69;
+  background: #246b5f;
   box-shadow: 0 0 0 18rpx rgba(31, 122, 105, 0.12);
 }
 
@@ -526,7 +526,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #1f2d29;
+  color: #182420;
 }
 
 .add-action {
@@ -554,7 +554,7 @@
 .chat-input {
   padding: 0 22rpx;
   font-size: 27rpx;
-  color: #17211f;
+  color: #16231f;
 }
 
 .hold-voice {
@@ -597,7 +597,7 @@
   position: relative;
   width: 24rpx;
   height: 32rpx;
-  border: 4rpx solid #1f2d29;
+  border: 4rpx solid #182420;
   border-radius: 14rpx;
   box-sizing: border-box;
 }
@@ -609,7 +609,7 @@
   bottom: -12rpx;
   width: 30rpx;
   height: 18rpx;
-  border: 4rpx solid #1f2d29;
+  border: 4rpx solid #182420;
   border-top: 0;
   border-radius: 0 0 18rpx 18rpx;
   transform: translateX(-50%);
@@ -624,7 +624,7 @@
   width: 4rpx;
   height: 10rpx;
   border-radius: 999rpx;
-  background: #1f2d29;
+  background: #182420;
   transform: translateX(-50%);
 }
 
@@ -632,7 +632,7 @@
   width: 36rpx;
   height: 26rpx;
   padding: 5rpx 4rpx;
-  border: 3rpx solid #1f2d29;
+  border: 3rpx solid #182420;
   border-radius: 5rpx;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -644,7 +644,7 @@
   display: block;
   height: 3rpx;
   border-radius: 999rpx;
-  background: #1f2d29;
+  background: #182420;
 }
 
 @keyframes pulse {

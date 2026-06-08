@@ -20,22 +20,22 @@
 
 .tag.urgent {
   background: #ffefef;
-  color: #b91c1c;
+  color: #b42318;
 }
 
 .tag.warning {
   background: #fff4e8;
-  color: #b45309;
+  color: #9a5b05;
 }
 
 .tag.normal {
-  background: #eef7f8;
-  color: #1f4f57;
+  background: #edf6f2;
+  color: #246b5f;
 }
 
 .time {
   font-size: 22rpx;
-  color: #6b7280;
+  color: #71807a;
   line-height: 1.5;
 }
 
@@ -43,7 +43,7 @@
   margin-top: 12rpx;
   font-size: 34rpx;
   font-weight: 700;
-  color: #111827;
+  color: #16231f;
   line-height: 1.45;
   word-break: break-word;
 }
@@ -52,7 +52,7 @@
 .content {
   margin-top: 10rpx;
   font-size: 24rpx;
-  color: #374151;
+  color: #34443f;
   line-height: 1.6;
   word-break: break-word;
   overflow-wrap: anywhere;
@@ -62,15 +62,15 @@
   margin-top: 20rpx;
   font-size: 26rpx;
   font-weight: 700;
-  color: #1f2937;
+  color: #182420;
 }
 
 .timeline-row {
   margin-top: 10rpx;
   font-size: 23rpx;
-  color: #4b5563;
+  color: #52615c;
   padding: 12rpx 14rpx;
-  background: #f8fafc;
+  background: #f7faf8;
   border-radius: 14rpx;
   line-height: 1.65;
   word-break: break-word;

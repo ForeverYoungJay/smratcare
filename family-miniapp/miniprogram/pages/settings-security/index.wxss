@@ -7,7 +7,7 @@
   margin-bottom: 8rpx;
   padding: 16rpx 18rpx;
   border-radius: 14rpx;
-  background: #f8fafc;
+  background: #f7faf8;
   border: 1rpx solid #dbe3ea;
 }
 
@@ -21,20 +21,20 @@
 
 .item-title {
   font-size: 26rpx;
-  color: #1f2937;
+  color: #182420;
 }
 
 .item-desc {
   margin-top: 6rpx;
   font-size: 22rpx;
-  color: #64748b;
+  color: #71807a;
   line-height: 1.5;
 }
 
 .scope-panel {
   margin-top: 18rpx;
   padding: 18rpx;
-  background: #f8fafc;
+  background: #f7faf8;
   border: 1rpx solid #d9e3ea;
   border-radius: 14rpx;
 }
@@ -46,7 +46,7 @@
   background: #ffffff;
   border: 1rpx solid #d6dfe8;
   font-size: 25rpx;
-  color: #1f2937;
+  color: #182420;
 }
 
 .password-panel {
@@ -54,7 +54,7 @@
   padding: 14rpx;
   border: 1rpx solid #d9e3ea;
   border-radius: 12rpx;
-  background: #f8fafc;
+  background: #f7faf8;
 }
 
 .password-btn {

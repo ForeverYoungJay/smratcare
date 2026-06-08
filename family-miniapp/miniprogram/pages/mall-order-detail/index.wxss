@@ -6,7 +6,7 @@
 .loading {
   text-align: center;
   font-size: 26rpx;
-  color: #6b7280;
+  color: #71807a;
 }
 
 .summary-grid {
@@ -27,12 +27,12 @@
 
 .k {
   font-size: 23rpx;
-  color: #6b7280;
+  color: #71807a;
 }
 
 .v {
   font-size: 23rpx;
-  color: #1f2937;
+  color: #182420;
   text-align: right;
 }
 
@@ -40,8 +40,8 @@
   margin-top: 10rpx;
   padding: 12rpx;
   border-radius: 10rpx;
-  background: #f8fafc;
-  border: 1rpx solid #e5edf2;
+  background: #f7faf8;
+  border: 1rpx solid #edf2ef;
 }
 
 .line-top {
@@ -58,13 +58,13 @@
 
 .amount {
   font-size: 24rpx;
-  color: #b45309;
+  color: #9a5b05;
 }
 
 .line-sub {
   margin-top: 6rpx;
   font-size: 22rpx;
-  color: #4b5563;
+  color: #52615c;
 }
 
 .risk-row {
@@ -85,7 +85,7 @@
   padding: 16rpx;
   border: 1rpx solid #dbe3ea;
   border-radius: 10rpx;
-  background: #f8fafc;
+  background: #f7faf8;
   font-size: 24rpx;
 }
 
@@ -116,5 +116,5 @@
   margin-top: 12rpx;
   text-align: center;
   font-size: 23rpx;
-  color: #6b7280;
+  color: #71807a;
 }

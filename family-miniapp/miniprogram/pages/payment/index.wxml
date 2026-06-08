@@ -40,7 +40,7 @@
 
     <view class="line switch-line">
       <text>自动扣费设置</text>
-      <switch checked="{{summary.autoPayEnabled}}" bindchange="onAutoPaySwitch" color="#2c7a84" />
+      <switch checked="{{summary.autoPayEnabled}}" bindchange="onAutoPaySwitch" color="#246b5f" />
     </view>
 
     <view class="line"><text>充值金额</text><input class="amount-input" type="digit" value="{{rechargeAmount}}" bindinput="onRechargeInput" /></view>
