@@ -32,3 +32,4 @@ export * from './marketing';
 export * from './fire';
 export * from './medicalCare';
 export * from './logistics';
+export * from './smartCare';

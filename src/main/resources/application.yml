@@ -40,7 +40,7 @@ mybatis-plus:
 
 security:
   jwt:
-    secret: "change-me-please-change-me-please-change-me"
+    secret: ${JWT_SECRET:smartcare-local-dev-jwt-secret-32-bytes}
     expiration-minutes: 120
     blacklist-enabled: true
 

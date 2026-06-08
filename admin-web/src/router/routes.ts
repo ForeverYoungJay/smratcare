@@ -2047,6 +2047,12 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '异常规则配置' }
           },
           {
+            path: 'smart-alerts',
+            name: 'MedicalCareSmartAlerts',
+            component: () => import('../views/medical/SmartDeviceAlerts.vue'),
+            meta: { title: '智慧设备告警' }
+          },
+          {
             path: 'ai-reports',
             name: 'MedicalCareAiReports',
             component: () => import('../views/medical/AiHealthReport.vue'),
