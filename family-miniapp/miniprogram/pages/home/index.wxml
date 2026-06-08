@@ -59,6 +59,7 @@
           <view class="quick-actions">
             <button class="primary-btn quick-action" data-path="/pages/communication/index" bindtap="goPage">在线沟通</button>
             <button class="ghost-btn quick-action" data-path="/pages/health/index" bindtap="goPage">健康档案</button>
+            <button class="ghost-btn quick-action" data-path="/pages/emergency-contacts/index" bindtap="goPage">紧急联系人</button>
             <button class="ghost-btn quick-action" data-path="/pages/communication/index?mode=video" bindtap="goPage">探视预约</button>
           </view>
         </view>

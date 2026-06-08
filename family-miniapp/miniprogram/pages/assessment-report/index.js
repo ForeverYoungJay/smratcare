@@ -13,11 +13,12 @@ Page({
     getApp().ensureLogin();
     await this.verifyAndLoad();
   },
-  async verifyAndLoad() {
+  async verifyAndLoad(force = false) {
     const granted = await ensureSensitiveAccess({
       scene: 'assessment-report-list',
       settingKey: 'verifyReports',
-      title: '评估报告访问验证'
+      title: '评估报告访问验证',
+      force
     });
     if (!granted) {
       this.setData({
@@ -65,6 +66,6 @@ Page({
     }
   },
   retryVerify() {
-    this.verifyAndLoad();
+    this.verifyAndLoad(true);
   }
 });

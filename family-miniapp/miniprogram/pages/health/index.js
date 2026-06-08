@@ -20,11 +20,12 @@ Page({
     getApp().ensureLogin();
     await this.verifyAndLoad();
   },
-  async verifyAndLoad() {
+  async verifyAndLoad(force = false) {
     const granted = await ensureSensitiveAccess({
       scene: 'health-data',
       settingKey: 'verifyHealthData',
-      title: '健康档案访问验证'
+      title: '健康档案访问验证',
+      force
     });
     if (!granted) {
       this.setData({
@@ -49,7 +50,7 @@ Page({
     this.loadData();
   },
   retryVerify() {
-    this.verifyAndLoad();
+    this.verifyAndLoad(true);
   },
   go(e) {
     wx.navigateTo({ url: e.currentTarget.dataset.path });

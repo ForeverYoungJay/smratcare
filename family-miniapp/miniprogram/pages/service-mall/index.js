@@ -3,7 +3,8 @@ const {
   previewMallOrder,
   submitMallOrder,
   getMallOrders,
-  getFamilyBindings
+  getFamilyBindings,
+  resolveFileUrl
 } = require('../../services/family');
 
 const ORDER_STATUS_TABS = [
@@ -207,6 +208,7 @@ Page({
           ...item,
           priceText: safeNumber(item.price, 0).toFixed(2),
           stockText: safeNumber(item.currentStock, 0),
+          imageUrl: resolveFileUrl(item.imageUrl || item.coverUrl || item.mainImageUrl || item.photoUrl || ''),
           canSubmit: String(item.stockStatus || '').toUpperCase() !== 'OUT'
         };
       });

@@ -33,12 +33,18 @@
 
     <block wx:for="{{products}}" wx:key="id">
       <view class="item">
-        <view class="row-top">
-          <text class="name">{{item.productName}}</text>
-          <text class="price">¥{{item.priceText}} / {{item.unit || '件'}}</text>
+        <view class="product-main">
+          <image wx:if="{{item.imageUrl}}" class="product-image" src="{{item.imageUrl}}" mode="aspectFill" />
+          <view wx:else class="product-image placeholder">额外购买</view>
+          <view class="product-info">
+            <view class="row-top">
+              <text class="name">{{item.productName}}</text>
+              <text class="price">¥{{item.priceText}} / {{item.unit || '件'}}</text>
+            </view>
+            <view class="meta">{{item.category}} · {{item.productCode}}</view>
+            <view class="stock stock-{{item.stockStatus}}">{{item.statusText}}（库存 {{item.stockText}}）</view>
+          </view>
         </view>
-        <view class="meta">{{item.category}} · {{item.productCode}}</view>
-        <view class="stock stock-{{item.stockStatus}}">{{item.statusText}}（库存 {{item.stockText}}）</view>
 
         <view class="qty-row">
           <text class="qty-label">数量</text>

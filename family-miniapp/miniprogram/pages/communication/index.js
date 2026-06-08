@@ -2,6 +2,7 @@ const {
   bookVideoVisit,
   getCommunicationMessages,
   getCommunicationTemplates,
+  resolveFileUrl,
   sendCommunicationMessage,
   uploadVoiceMessage
 } = require('../../services/family');
@@ -56,6 +57,8 @@ Page({
     voiceFileUrl: '',
     voiceFileName: '',
     voiceDurationSec: null,
+    recording: false,
+    playingId: '',
     messages: [],
     templates: [],
     filteredTemplates: [],
@@ -70,6 +73,38 @@ Page({
     const mode = query && query.mode ? String(query.mode).toLowerCase() : '';
     const idx = resolveTypeIndex(mode === 'video' ? 'video' : mode === 'voice' ? 'voice' : 'text');
     this.setData({ typeIndex: idx });
+    this.initRecorder();
+  },
+  onUnload() {
+    if (this.recorderManager && this.data.recording) {
+      this.recorderManager.stop();
+    }
+    if (this.audioContext) {
+      this.audioContext.destroy();
+      this.audioContext = null;
+    }
+  },
+  initRecorder() {
+    if (!wx.getRecorderManager) {
+      return;
+    }
+    this.recorderManager = wx.getRecorderManager();
+    this.recorderManager.onStop(async (res) => {
+      this.setData({ recording: false });
+      const tempFilePath = res && res.tempFilePath;
+      if (!tempFilePath) {
+        wx.showToast({ title: '录音文件生成失败', icon: 'none' });
+        return;
+      }
+      await this.uploadVoicePath(tempFilePath, {
+        name: '现场录音.m4a',
+        durationSec: res.duration ? Math.max(1, Math.round(res.duration / 1000)) : null
+      });
+    });
+    this.recorderManager.onError(() => {
+      this.setData({ recording: false });
+      wx.showToast({ title: '录音失败，请检查麦克风权限', icon: 'none' });
+    });
   },
   async onShow() {
     getApp().ensureLogin();
@@ -91,8 +126,10 @@ Page({
       const list = await getCommunicationMessages(1, 50);
       const messages = (list || []).map((item) => ({
         ...item,
+        idText: String(item.id || ''),
         msgTypeText: resolveTypeLabel(item.msgType || ''),
         isVoice: String(item.msgType || '').toLowerCase() === 'voice',
+        playableUrl: resolveFileUrl(item.mediaUrl || ''),
         voiceDurationText: item && item.mediaDurationSec ? `${item.mediaDurationSec}秒` : ''
       }));
       this.setData({ messages });
@@ -200,18 +237,90 @@ Page({
       if (!file || !file.path) {
         throw new Error('未获取到语音文件');
       }
-      const uploaded = await uploadVoiceMessage(file.path, { bizType: 'family-voice' });
-      this.setData({
-        voiceFileUrl: uploaded.fileUrl || '',
-        voiceFileName: uploaded.originalFileName || uploaded.fileName || '语音留言',
-        voiceDurationSec: file.time ? Number(file.time) : null
+      await this.uploadVoicePath(file.path, {
+        name: file.name || '语音留言',
+        durationSec: file.time ? Number(file.time) : null
       });
-      wx.showToast({ title: '语音文件上传成功', icon: 'none' });
     } catch (error) {
       wx.showToast({ title: error.message || '语音上传失败', icon: 'none' });
     } finally {
       this.setData({ uploadingVoice: false });
     }
+  },
+  async uploadVoicePath(filePath, options = {}) {
+    this.setData({ uploadingVoice: true });
+    try {
+      const uploaded = await uploadVoiceMessage(filePath, { bizType: 'family-voice' });
+      this.setData({
+        voiceFileUrl: uploaded.fileUrl || '',
+        voiceFileName: uploaded.originalFileName || uploaded.fileName || options.name || '语音留言',
+        voiceDurationSec: options.durationSec || null
+      });
+      wx.showToast({ title: '语音上传成功', icon: 'none' });
+    } finally {
+      this.setData({ uploadingVoice: false });
+    }
+  },
+  async startRecord() {
+    if (!this.recorderManager) {
+      wx.showToast({ title: '当前微信版本不支持录音', icon: 'none' });
+      return;
+    }
+    const authorized = await new Promise((resolve) => {
+      wx.authorize({
+        scope: 'scope.record',
+        success: () => resolve(true),
+        fail: () => resolve(false)
+      });
+    });
+    if (!authorized) {
+      wx.showToast({ title: '请先允许麦克风权限', icon: 'none' });
+      return;
+    }
+    this.setData({ recording: true });
+    this.recorderManager.start({
+      duration: 60000,
+      sampleRate: 16000,
+      numberOfChannels: 1,
+      encodeBitRate: 48000,
+      format: 'mp3'
+    });
+  },
+  stopRecord() {
+    if (!this.recorderManager || !this.data.recording) {
+      return;
+    }
+    this.recorderManager.stop();
+  },
+  playVoice(e) {
+    const id = String(e.currentTarget.dataset.id || '');
+    const url = e.currentTarget.dataset.url;
+    if (!url) {
+      wx.showToast({ title: '暂无可播放语音', icon: 'none' });
+      return;
+    }
+    if (this.audioContext) {
+      this.audioContext.stop();
+      this.audioContext.destroy();
+      this.audioContext = null;
+    }
+    const audio = wx.createInnerAudioContext();
+    this.audioContext = audio;
+    audio.src = url;
+    audio.onEnded(() => this.setData({ playingId: '' }));
+    audio.onStop(() => this.setData({ playingId: '' }));
+    audio.onError(() => {
+      this.setData({ playingId: '' });
+      wx.showToast({ title: '语音播放失败', icon: 'none' });
+    });
+    this.setData({ playingId: id });
+    audio.play();
+  },
+  stopVoice() {
+    if (this.audioContext) {
+      this.audioContext.stop();
+    }
+    this.setData({ playingId: '' });
   },
   clearVoiceFile() {
     this.setData({

@@ -2,6 +2,7 @@ const {
   getAffectionMoments,
   getFestivalTemplates,
   addAffectionMoment,
+  resolveFileUrl,
   uploadAffectionMedia
 } = require('../../services/family');
 
@@ -21,17 +22,19 @@ Page({
   },
   async loadData() {
     const [moments, templates] = await Promise.all([getAffectionMoments(), getFestivalTemplates()]);
-    this.setData({ moments: moments || [], templates: templates || [] });
+    this.setData({
+      moments: (moments || []).map((item) => ({
+        ...item,
+        resolvedMediaUrl: resolveFileUrl(item.mediaUrl || ''),
+        isImage: String(item.mediaType || '').toLowerCase() === 'image',
+        isVideo: String(item.mediaType || '').toLowerCase() === 'video',
+        isVoice: String(item.mediaType || item.type || '').toLowerCase() === 'voice'
+      })),
+      templates: templates || []
+    });
   },
   async sendVoice() {
-    await addAffectionMoment({
-      type: 'voice',
-      title: '语音留言',
-      desc: '“妈妈我想你了，周末来看你。”',
-      mediaType: 'voice'
-    });
-    wx.showToast({ title: '语音留言已发送', icon: 'none' });
-    this.loadData();
+    wx.navigateTo({ url: '/pages/communication/index?mode=voice' });
   },
   async sendGreeting(e) {
     const template = e.currentTarget.dataset.template;
@@ -107,5 +110,18 @@ Page({
     } finally {
       this.setData({ uploadingMedia: false });
     }
+  },
+  previewImage(e) {
+    const url = e.currentTarget.dataset.url;
+    if (!url) {
+      return;
+    }
+    const urls = (this.data.moments || [])
+      .filter((item) => item.isImage && item.resolvedMediaUrl)
+      .map((item) => item.resolvedMediaUrl);
+    wx.previewImage({
+      current: url,
+      urls: urls.length ? urls : [url]
+    });
   }
 });

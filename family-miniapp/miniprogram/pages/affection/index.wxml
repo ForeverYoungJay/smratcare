@@ -3,7 +3,7 @@
     <view class="section-title">亲情互动</view>
     <view class="section-subtitle">家庭照片、语音留言、节日祝福</view>
 
-    <button class="primary-btn action" bindtap="sendVoice">发送语音留言</button>
+    <button class="primary-btn action" bindtap="sendVoice">录制 / 发送语音留言</button>
 
     <view class="template-title">亲情相册上传</view>
     <view class="media-panel">
@@ -33,6 +33,25 @@
         <view class="time">{{item.time}} · {{item.type}}</view>
         <view class="desc">{{item.desc}}</view>
         <view class="desc" wx:if="{{item.mediaName}}">附件：{{item.mediaName}}</view>
+        <image
+          wx:if="{{item.isImage && item.resolvedMediaUrl}}"
+          class="moment-image"
+          src="{{item.resolvedMediaUrl}}"
+          mode="aspectFill"
+          data-url="{{item.resolvedMediaUrl}}"
+          bindtap="previewImage" />
+        <video
+          wx:if="{{item.isVideo && item.resolvedMediaUrl}}"
+          class="moment-video"
+          src="{{item.resolvedMediaUrl}}"
+          controls="{{true}}"
+          object-fit="cover" />
+        <audio
+          wx:if="{{item.isVoice && item.resolvedMediaUrl}}"
+          class="moment-audio"
+          src="{{item.resolvedMediaUrl}}"
+          name="{{item.mediaName || item.title}}"
+          controls="{{true}}" />
       </view>
     </block>
   </view>

@@ -1,4 +1,4 @@
-const { verifySecurityPassword } = require('../../services/family');
+const { getSecuritySettings, verifySecurityPassword } = require('../../services/family');
 
 Page({
   data: {
@@ -6,12 +6,32 @@ Page({
     title: '敏感信息访问验证',
     password: '',
     submitting: false,
-    verified: false
+    verified: false,
+    passwordLabel: '安全密码',
+    passwordHint: '请输入独立安全密码；如未设置，则输入登录密码。'
   },
   onLoad(query) {
     const title = decodeURIComponent(query.title || '敏感信息访问验证');
     const scene = decodeURIComponent(query.scene || 'default');
     this.setData({ title, scene });
+    this.loadPasswordHint();
+  },
+  async loadPasswordHint() {
+    try {
+      const settings = await getSecuritySettings();
+      const hasIndependentPassword = !!(settings && settings.hasIndependentPassword);
+      this.setData({
+        passwordLabel: hasIndependentPassword ? '独立安全密码' : '登录密码',
+        passwordHint: hasIndependentPassword
+          ? '请输入在“隐私与安全”中设置的独立安全密码。'
+          : '尚未设置独立安全密码，请输入当前账号登录密码。'
+      });
+    } catch (error) {
+      this.setData({
+        passwordLabel: '安全密码',
+        passwordHint: '请输入独立安全密码；如未设置，则输入登录密码。'
+      });
+    }
   },
   onUnload() {
     if (this.data.verified) {

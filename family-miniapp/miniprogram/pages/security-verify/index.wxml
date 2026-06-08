@@ -1,17 +1,18 @@
 <view class="container">
   <view class="surface card">
     <view class="section-title">{{title}}</view>
-    <view class="section-subtitle">为保护老人隐私，请再次输入登录密码。验证通过后 10 分钟内免重复验证。</view>
+    <view class="section-subtitle">为保护老人隐私，请再次输入{{passwordLabel}}。验证通过后 10 分钟内免重复验证。</view>
 
     <view class="code-box">
-      <view class="label">登录密码</view>
+      <view class="label">{{passwordLabel}}</view>
       <input
         class="code-input"
         type="password"
         maxlength="32"
-        placeholder="请输入登录密码"
+        placeholder="请输入{{passwordLabel}}"
         value="{{password}}"
         bindinput="onPasswordInput" />
+      <view class="hint">{{passwordHint}}</view>
     </view>
 
     <view class="action-row">

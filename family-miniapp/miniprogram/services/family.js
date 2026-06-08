@@ -35,6 +35,21 @@ function currentMonth() {
   return `${now.getFullYear()}-${month < 10 ? `0${month}` : month}`;
 }
 
+function resolveFileUrl(url) {
+  if (!url) {
+    return '';
+  }
+  if (/^https?:\/\//i.test(url)) {
+    return url;
+  }
+  const app = getApp();
+  const base = String((app && app.globalData && app.globalData.baseUrl) || '').replace(/\/$/, '');
+  if (!base) {
+    return url;
+  }
+  return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
 async function familyLogin(payload) {
   return request({
     url: '/api/auth/family/login',
@@ -790,6 +805,7 @@ module.exports = {
   verifyFamilySmsCode,
   registerFamily,
   resetFamilyPassword,
+  resolveFileUrl,
   getFamilyAuthBootstrap,
   bindElder,
   getMyElders,

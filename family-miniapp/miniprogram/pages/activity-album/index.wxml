@@ -3,7 +3,21 @@
     <view class="section-title">活动相册 / 视频</view>
     <block wx:for="{{list}}" wx:key="id">
       <view class="item">
-        <image wx:if="{{item.coverUrl}}" class="cover-image" src="{{item.coverUrl}}" mode="aspectFill" />
+        <video
+          wx:if="{{item.isVideo && item.resolvedMediaUrl}}"
+          class="cover-video"
+          src="{{item.resolvedMediaUrl}}"
+          controls="{{true}}"
+          enable-danmu="{{true}}"
+          danmu-btn="{{true}}"
+          object-fit="cover" />
+        <image
+          wx:elif="{{item.resolvedCoverUrl}}"
+          class="cover-image"
+          src="{{item.resolvedCoverUrl}}"
+          mode="aspectFill"
+          data-url="{{item.resolvedCoverUrl}}"
+          bindtap="previewPhoto" />
         <view wx:else class="cover">{{item.coverText}}</view>
         <view class="name">{{item.title}}</view>
         <view class="meta">{{item.elderName}} · {{item.date}} · {{item.mediaType}}</view>

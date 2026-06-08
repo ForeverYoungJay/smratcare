@@ -12,22 +12,14 @@ function countCapabilityAlerts(status) {
 function buildEntries(capabilityAlertCount = 0) {
   const count = Math.max(0, Number(capabilityAlertCount) || 0);
   return [
-    { title: '家属周报', sub: '一周总览', path: '/pages/weekly-brief/index' },
     { title: '预警中心', sub: '紧急提醒', path: '/pages/alert-center/index' },
-    { title: '待办中心', sub: '今日待处理', path: '/pages/todo-center/index' },
-    { title: '健康档案', sub: '趋势看板', path: '/pages/health/index' },
-    { title: '就医记录', sub: '门诊与医嘱', path: '/pages/medical-record/index' },
-    { title: '评估报告', sub: 'PDF下载', path: '/pages/assessment-report/index' },
-    { title: '在线缴费', sub: '账单与余额', path: '/pages/payment/index' },
-    { title: '支付保障', sub: '充值与异常', path: '/pages/payment-guard/index' },
-    { title: '服务增购', sub: '护理商城', path: '/pages/service-mall/index' },
+    { title: '健康资料', sub: '档案/就医/评估', path: '/pages/health/index' },
+    { title: '缴费充值', sub: '账单/余额/异常', path: '/pages/payment/index' },
+    { title: '额外购买', sub: '护理服务商城', path: '/pages/service-mall/index' },
     { title: '在线沟通', sub: '图文语音', path: '/pages/communication/index' },
-    { title: '护理日志', sub: '执行追踪', path: '/pages/care-log/index' },
-    { title: '活动相册', sub: '点赞互动', path: '/pages/activity-album/index' },
-    { title: '膳食日历', sub: '三餐详情', path: '/pages/diet-calendar/index' },
-    { title: '外出记录', sub: '安全轨迹', path: '/pages/outing-record/index' },
     { title: '紧急联系人', sub: '一键拨号', path: '/pages/emergency-contacts/index' },
-    { title: '亲情互动', sub: '照片语音', path: '/pages/affection/index' },
+    { title: '相册视频', sub: '活动/亲情互动', path: '/pages/activity-album/index' },
+    { title: '更多服务', sub: '周报/日程/护理', path: '/pages/services/index' },
     {
       title: '能力状态',
       sub: count > 0 ? `待处理 ${count} 项` : '链路巡检',

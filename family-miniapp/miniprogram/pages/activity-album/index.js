@@ -2,7 +2,8 @@ const {
   getActivityAlbums,
   toggleAlbumLike,
   getActivityAlbumComments,
-  addActivityAlbumComment
+  addActivityAlbumComment,
+  resolveFileUrl
 } = require('../../services/family');
 
 Page({
@@ -20,7 +21,32 @@ Page({
   },
   async loadData() {
     const list = await getActivityAlbums();
-    this.setData({ list: list || [] });
+    this.setData({
+      list: (list || []).map((item) => {
+        const mediaType = String(item.mediaType || '').toLowerCase();
+        const mediaUrl = item.mediaUrl || item.videoUrl || (mediaType === 'video' ? item.coverUrl : '');
+        return {
+          ...item,
+          resolvedCoverUrl: resolveFileUrl(item.coverUrl || ''),
+          resolvedMediaUrl: resolveFileUrl(mediaUrl || ''),
+          isVideo: mediaType === 'video',
+          isPhoto: mediaType === 'photo' || mediaType === 'image'
+        };
+      })
+    });
+  },
+  previewPhoto(e) {
+    const url = e.currentTarget.dataset.url;
+    if (!url) {
+      return;
+    }
+    const urls = (this.data.list || [])
+      .filter((item) => item.isPhoto && item.resolvedCoverUrl)
+      .map((item) => item.resolvedCoverUrl);
+    wx.previewImage({
+      current: url,
+      urls: urls.length ? urls : [url]
+    });
   },
   async like(e) {
     const id = Number(e.currentTarget.dataset.id);

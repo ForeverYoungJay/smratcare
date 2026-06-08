@@ -33,11 +33,15 @@ function wxLogin() {
 }
 
 function wxRequestPayment(params) {
+  const payPackage = params.payPackage || params.packageValue || params.package || '';
+  if (!params.timeStamp || !params.nonceStr || !payPackage || !params.paySign) {
+    return Promise.reject(new Error('微信支付参数不完整，请检查支付配置'));
+  }
   return new Promise((resolve, reject) => {
     wx.requestPayment({
       timeStamp: params.timeStamp,
       nonceStr: params.nonceStr,
-      package: params.payPackage,
+      package: payPackage,
       signType: params.signType || 'RSA',
       paySign: params.paySign,
       success: resolve,
@@ -236,6 +240,7 @@ Page({
       if (!prepay || !prepay.outTradeNo) {
         throw new Error('预下单失败');
       }
+      wx.hideLoading();
 
       try {
         await wxRequestPayment(prepay);

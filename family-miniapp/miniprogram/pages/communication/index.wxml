@@ -64,7 +64,9 @@
       </view>
       <view class="voice-empty" wx:else>尚未上传语音文件</view>
       <view class="action-row compact">
-        <button class="ghost-btn action-btn" loading="{{uploadingVoice}}" bindtap="chooseVoiceFile">选择语音</button>
+        <button class="ghost-btn action-btn" loading="{{recording}}" bindtap="startRecord" wx:if="{{!recording}}">直接录音</button>
+        <button class="ghost-btn action-btn danger" bindtap="stopRecord" wx:else>结束录音</button>
+        <button class="ghost-btn action-btn" loading="{{uploadingVoice}}" bindtap="chooseVoiceFile">选择语音文件</button>
         <button class="ghost-btn action-btn" wx:if="{{voiceFileUrl}}" bindtap="clearVoiceFile">清空文件</button>
       </view>
     </view>
@@ -116,7 +118,16 @@
             <text class="voice-name">{{msg.mediaName || '语音留言'}}</text>
             <text class="voice-duration" wx:if="{{msg.voiceDurationText}}">{{msg.voiceDurationText}}</text>
           </view>
-          <view class="voice-url">{{msg.mediaUrl ? '语音文件已上传，可在后台播放' : '语音文件待补充'}}</view>
+          <view class="voice-url">{{msg.mediaUrl ? '语音文件已上传，可直接播放' : '语音文件待补充'}}</view>
+          <view class="action-row compact" wx:if="{{msg.playableUrl}}">
+            <button
+              class="ghost-btn action-btn"
+              data-id="{{msg.idText}}"
+              data-url="{{msg.playableUrl}}"
+              bindtap="playVoice"
+              wx:if="{{playingId !== msg.idText}}">播放语音</button>
+            <button class="ghost-btn action-btn danger" bindtap="stopVoice" wx:else>停止播放</button>
+          </view>
           <view class="voice-transcript" wx:if="{{msg.transcript}}">备注：{{msg.transcript}}</view>
         </view>
         <view class="msg-content">{{msg.content}}</view>
