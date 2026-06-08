@@ -127,8 +127,7 @@
   </view>
 
   <view class="composer-bar">
-    <button class="icon-btn" bindtap="toggleVisitPanel">+</button>
-    <button class="mode-btn" bindtap="toggleVoiceMode">{{voiceMode ? '键盘' : '语音'}}</button>
+    <button class="icon-btn add-btn" aria-label="更多" bindtap="toggleVisitPanel">+</button>
     <button
       wx:if="{{voiceMode}}"
       class="hold-voice {{recording ? 'recording' : ''}}"
@@ -145,6 +144,15 @@
       value="{{content}}"
       bindinput="onContentInput"
       bindconfirm="sendText" />
+    <button
+      class="icon-btn voice-toggle"
+      aria-label="{{voiceMode ? '切换键盘' : '切换语音'}}"
+      bindtap="toggleVoiceMode">
+      <view wx:if="{{voiceMode}}" class="keyboard-glyph">
+        <text></text><text></text><text></text><text></text><text></text><text></text>
+      </view>
+      <view wx:else class="mic-glyph"></view>
+    </button>
     <button wx:if="{{!voiceMode}}" class="send-btn" loading="{{sending}}" disabled="{{!content}}" bindtap="sendText">发送</button>
   </view>
 </view>
