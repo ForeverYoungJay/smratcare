@@ -6,8 +6,13 @@ const {
   uploadVoiceMessage
 } = require('../../services/family');
 
-const ROLE_OPTIONS = ['照护团队', '责任护士', '责任护工', '生活管家', '客服中心'];
-const DRAFT_KEY = 'family_comm_chat_draft';
+const ROLE_OPTIONS = [
+  { value: '客服中心', label: '客服中心', desc: '咨询、投诉、通用问题' },
+  { value: '责任护士', label: '责任护士', desc: '用药、体征、健康问题' },
+  { value: '责任护工', label: '责任护工', desc: '起居、护理、日常照护' },
+  { value: '生活管家', label: '生活管家', desc: '探视、缴费、生活安排' }
+];
+const DRAFT_KEY_PREFIX = 'family_comm_chat_draft_';
 
 function nextDayVideoTime() {
   const now = new Date();
@@ -30,11 +35,18 @@ function isMineMessage(item = {}) {
   return direction !== 'STAFF_TO_FAMILY';
 }
 
+function draftKey(role) {
+  return `${DRAFT_KEY_PREFIX}${role || '客服中心'}`;
+}
+
 Page({
   data: {
     roleOptions: ROLE_OPTIONS,
     roleIndex: 0,
+    activeRole: ROLE_OPTIONS[0].value,
+    activeRoleDesc: ROLE_OPTIONS[0].desc,
     content: '',
+    allMessages: [],
     messages: [],
     loading: false,
     loadError: '',
@@ -49,8 +61,12 @@ Page({
   },
   onLoad(query) {
     const mode = query && query.mode ? String(query.mode).toLowerCase() : '';
+    const roleIndex = mode === 'video' ? 3 : 0;
+    const role = ROLE_OPTIONS[roleIndex] || ROLE_OPTIONS[0];
     this.setData({
-      roleIndex: mode === 'video' ? 3 : 0,
+      roleIndex,
+      activeRole: role.value,
+      activeRoleDesc: role.desc,
       showVisitPanel: mode === 'video'
     });
     this.initRecorder();
@@ -97,12 +113,14 @@ Page({
     this.setData({ loading: true, loadError: '' });
     try {
       const list = await getCommunicationMessages(1, 80);
-      const messages = (list || []).map((item) => {
+      const allMessages = (list || []).map((item) => {
         const msgType = String(item.msgType || 'text').toLowerCase();
+        const targetRole = item.targetRole || '客服中心';
         return {
           ...item,
+          targetRole,
           idText: String(item.id || ''),
-          avatarText: isMineMessage(item) ? '我' : String(item.targetRole || '照').slice(0, 1),
+          avatarText: isMineMessage(item) ? '我' : String(targetRole).slice(0, 1),
           msgType,
           msgTypeText: resolveTypeLabel(msgType),
           mine: isMineMessage(item),
@@ -115,8 +133,9 @@ Page({
         ...item,
         showTime: index === 0 || rows[index - 1].time !== item.time
       }));
-      this.setData({ messages });
-      return messages;
+      this.setData({ allMessages });
+      this.applyConversationMessages();
+      return allMessages;
     } catch (error) {
       this.setData({ loadError: error.message || '沟通信息加载失败，请稍后重试' });
       return [];
@@ -125,20 +144,45 @@ Page({
     }
   },
   onRoleChange(e) {
-    this.setData({ roleIndex: Number(e.detail.value || 0) });
+    this.selectRoleByIndex(Number(e.detail.value || 0));
+  },
+  selectRole(e) {
+    this.selectRoleByIndex(Number(e.currentTarget.dataset.index || 0));
+  },
+  selectRoleByIndex(index) {
+    const role = ROLE_OPTIONS[index] || ROLE_OPTIONS[0];
+    this.setData({
+      roleIndex: index,
+      activeRole: role.value,
+      activeRoleDesc: role.desc,
+      content: wx.getStorageSync(draftKey(role.value)) || '',
+      showVisitPanel: false
+    });
+    this.applyConversationMessages();
+  },
+  applyConversationMessages() {
+    const activeRole = this.data.activeRole || ROLE_OPTIONS[0].value;
+    const messages = (this.data.allMessages || []).filter((item) => {
+      const targetRole = item.targetRole || '客服中心';
+      return targetRole === activeRole;
+    }).map((item, index, rows) => ({
+      ...item,
+      showTime: index === 0 || rows[index - 1].time !== item.time
+    }));
+    this.setData({ messages });
   },
   onContentInput(e) {
     const content = e.detail.value;
     this.setData({ content });
     const trimmed = String(content || '').trim();
     if (trimmed) {
-      wx.setStorageSync(DRAFT_KEY, content);
+      wx.setStorageSync(draftKey(this.data.activeRole), content);
     } else {
-      wx.removeStorageSync(DRAFT_KEY);
+      wx.removeStorageSync(draftKey(this.data.activeRole));
     }
   },
   restoreDraft() {
-    const draft = wx.getStorageSync(DRAFT_KEY) || '';
+    const draft = wx.getStorageSync(draftKey(this.data.activeRole)) || '';
     if (draft) {
       this.setData({ content: draft });
     }
@@ -155,11 +199,11 @@ Page({
       msgType: 'text',
       content
     });
-    wx.removeStorageSync(DRAFT_KEY);
+    wx.removeStorageSync(draftKey(this.data.activeRole));
     this.setData({ content: '' });
   },
   async sendChatMessage(payload) {
-    const targetRole = this.data.roleOptions[this.data.roleIndex] || '照护团队';
+    const targetRole = this.data.activeRole || ROLE_OPTIONS[0].value;
     this.setData({ sending: true });
     try {
       await sendCommunicationMessage({
@@ -221,7 +265,7 @@ Page({
       const uploaded = await uploadVoiceMessage(filePath, { bizType: 'family-voice' });
       const durationSec = Number(options.durationSec || 0);
       await sendCommunicationMessage({
-        targetRole: this.data.roleOptions[this.data.roleIndex] || '照护团队',
+        targetRole: this.data.activeRole || ROLE_OPTIONS[0].value,
         msgType: 'voice',
         content: '语音留言',
         mediaUrl: uploaded.fileUrl || '',
@@ -264,7 +308,10 @@ Page({
     this.setData({ playingId: '' });
   },
   toggleVisitPanel() {
-    this.setData({ showVisitPanel: !this.data.showVisitPanel });
+    this.setData({
+      showVisitPanel: !this.data.showVisitPanel,
+      voiceMode: false
+    });
   },
   onTimeInput(e) {
     this.setData({ videoTime: e.detail.value });
@@ -293,7 +340,13 @@ Page({
         msgType: 'video',
         content: `已提交探视预约：${videoTime}`
       });
-      this.setData({ showVisitPanel: false, roleIndex: 3 });
+      const managerIndex = ROLE_OPTIONS.findIndex((item) => item.value === '生活管家');
+      this.setData({
+        showVisitPanel: false,
+        roleIndex: managerIndex,
+        activeRole: '生活管家',
+        activeRoleDesc: ROLE_OPTIONS[managerIndex].desc
+      });
       wx.showToast({ title: '探视预约已提交', icon: 'success' });
       await this.loadMessages();
     } catch (error) {

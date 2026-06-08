@@ -3,13 +3,23 @@
 
   <view class="chat-header">
     <view>
-      <view class="chat-title">在线沟通</view>
-      <view class="chat-subtitle">与机构照护团队实时留言</view>
+      <view class="chat-title">{{activeRole}}</view>
+      <view class="chat-subtitle">{{activeRoleDesc}}</view>
     </view>
-    <picker mode="selector" range="{{roleOptions}}" value="{{roleIndex}}" bindchange="onRoleChange">
-      <view class="role-pill">{{roleOptions[roleIndex]}}</view>
-    </picker>
+    <view class="role-state">单独会话</view>
   </view>
+
+  <scroll-view class="role-tabs" scroll-x show-scrollbar="{{false}}">
+    <block wx:for="{{roleOptions}}" wx:for-item="role" wx:for-index="index" wx:key="value">
+      <view
+        class="role-tab {{roleIndex === index ? 'active' : ''}}"
+        data-index="{{index}}"
+        bindtap="selectRole">
+        <text class="role-tab-title">{{role.label}}</text>
+        <text class="role-tab-desc">{{role.desc}}</text>
+      </view>
+    </block>
+  </scroll-view>
 
   <view class="error-card" wx:if="{{loadError}}">
     <view class="error-title">沟通暂时不可用</view>
@@ -26,7 +36,7 @@
     <view wx:if="{{loading}}" class="loading-text">正在同步沟通记录...</view>
     <view wx:if="{{!loading && messages.length === 0}}" class="empty-chat">
       <view class="empty-title">还没有沟通记录</view>
-      <view class="empty-text">直接输入文字，或按住说话给照护团队留言。</view>
+      <view class="empty-text">正在与{{activeRole}}沟通，文字和语音只进入这个会话。</view>
     </view>
 
     <block wx:for="{{messages}}" wx:for-item="msg" wx:key="id">
@@ -65,7 +75,13 @@
   </scroll-view>
 
   <view class="visit-panel" wx:if="{{showVisitPanel}}">
-    <view class="visit-panel-title">预约探视时间</view>
+    <view class="visit-panel-head">
+      <view>
+        <view class="visit-panel-title">预约探视时间</view>
+        <view class="visit-panel-subtitle">提交后会进入生活管家会话</view>
+      </view>
+      <button class="visit-close" bindtap="toggleVisitPanel">×</button>
+    </view>
     <view class="visit-panel-row">
       <input class="visit-input" value="{{videoTime}}" bindinput="onTimeInput" />
       <button class="primary-btn visit-submit" loading="{{sending}}" bindtap="submitVideoBooking">提交</button>
@@ -81,7 +97,7 @@
   </view>
 
   <view class="composer-bar">
-    <button class="icon-btn" bindtap="toggleVisitPanel">＋</button>
+    <button class="icon-btn" bindtap="toggleVisitPanel">+</button>
     <button class="mode-btn" bindtap="toggleVoiceMode">{{voiceMode ? '键盘' : '语音'}}</button>
     <button
       wx:if="{{voiceMode}}"
@@ -99,6 +115,6 @@
       value="{{content}}"
       bindinput="onContentInput"
       bindconfirm="sendText" />
-    <button class="send-btn" loading="{{sending}}" disabled="{{!content && !voiceMode}}" bindtap="sendText">发送</button>
+    <button wx:if="{{!voiceMode}}" class="send-btn" loading="{{sending}}" disabled="{{!content}}" bindtap="sendText">发送</button>
   </view>
 </view>
