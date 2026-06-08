@@ -34,7 +34,7 @@
 
 <script setup lang="ts">
 import type { ItemType } from 'ant-design-vue'
-import brandLogoUrl from '../../assets/login-bg.svg'
+import brandLogoUrl from '../../assets/guifeng-logo.png'
 
 defineProps<{
   collapsed: boolean

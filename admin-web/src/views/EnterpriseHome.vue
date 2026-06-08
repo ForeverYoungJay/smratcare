@@ -688,7 +688,7 @@ import { message } from 'ant-design-vue'
 import type { FormInstance } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { computed, onMounted, reactive, ref } from 'vue'
-import brandLogoUrl from '../assets/login-bg.svg'
+import brandLogoUrl from '../assets/guifeng-logo.png'
 import { enterpriseProfile, type EnterpriseProfile } from '../constants/enterpriseProfile'
 import { getRoles, getStaffInfo, getToken } from '../utils/auth'
 
