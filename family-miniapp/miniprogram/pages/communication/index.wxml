@@ -129,15 +129,15 @@
   </view>
 
   <view class="composer-bar">
-    <button class="icon-btn add-btn" aria-label="更多" bindtap="toggleVisitPanel">+</button>
-    <button
+    <view class="composer-action add-action" aria-label="更多" bindtap="toggleVisitPanel">+</view>
+    <view
       wx:if="{{voiceMode}}"
       class="hold-voice {{recording ? 'recording' : ''}}"
       bindtouchstart="startRecord"
       bindtouchend="stopRecord"
       bindtouchcancel="cancelRecord">
       {{recording ? '松开发送' : '按住说话'}}
-    </button>
+    </view>
     <input
       wx:else
       class="chat-input"
@@ -146,16 +146,18 @@
       value="{{content}}"
       bindinput="onContentInput"
       bindconfirm="sendText" />
-    <button
-      wx:if="{{voiceMode || !canSend}}"
-      class="icon-btn voice-toggle"
+    <view
+      wx:if="{{voiceMode}}"
+      class="composer-action voice-toggle"
       aria-label="{{voiceMode ? '切换键盘' : '切换语音'}}"
       bindtap="toggleVoiceMode">
-      <view wx:if="{{voiceMode}}" class="keyboard-glyph">
+      <view class="keyboard-glyph">
         <text></text><text></text><text></text><text></text><text></text><text></text>
       </view>
-      <view wx:else class="mic-glyph"></view>
-    </button>
-    <button wx:else class="send-btn" loading="{{sending}}" disabled="{{sending}}" bindtap="sendText">发送</button>
+    </view>
+    <view wx:elif="{{canSend}}" class="send-action {{sending ? 'sending' : ''}}" bindtap="sendText">发送</view>
+    <view wx:else class="composer-action voice-toggle" aria-label="切换语音" bindtap="toggleVoiceMode">
+      <view class="mic-glyph"></view>
+    </view>
   </view>
 </view>
