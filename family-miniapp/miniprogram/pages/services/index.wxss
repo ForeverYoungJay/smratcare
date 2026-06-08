@@ -19,14 +19,19 @@
 }
 
 .entry::before {
-  content: '';
+  content: attr(data-icon);
   position: absolute;
   left: 22rpx;
   top: 24rpx;
   width: 44rpx;
   height: 44rpx;
+  line-height: 44rpx;
   border-radius: 14rpx;
-  background: #dfeee8;
+  background: #246b5f;
+  color: #ffffff;
+  font-size: 23rpx;
+  font-weight: 900;
+  text-align: center;
 }
 
 .entry::after {
