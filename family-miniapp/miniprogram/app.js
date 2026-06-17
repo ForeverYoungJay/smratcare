@@ -15,7 +15,7 @@ App({
   globalData: {
     baseUrl: 'https://gfyy.org.cn',
     currentBaseUrl: 'https://gfyy.org.cn',
-    appName: '智养云家属端',
+    appName: '智养云',
     useMockFallback: false,
     localDevBypassLogin: false,
     localDevSession: {
@@ -23,6 +23,13 @@ App({
       familyUserId: 0,
       realName: '本地调试家属',
       phone: '13800138000'
+    },
+    localDevStaffSession: {
+      id: 1,
+      orgId: 1,
+      username: 'nursing_emp',
+      realName: '本地调试员工',
+      roles: ['NURSING_EMPLOYEE']
     },
     allowManualRechargeFallback: false,
     runtimeProfile: 'develop',
@@ -42,7 +49,9 @@ App({
       dataUsageSummary: '仅用于家属身份校验、老人照护信息展示、缴费充值、服务通知与安全审计。'
     },
     token: '',
+    userType: '',
     familyUser: null,
+    staffUser: null,
     selectedElderId: null,
     refreshHomeAfterBinding: false,
     pendingMessageFilter: '',
@@ -52,7 +61,13 @@ App({
   onLaunch() {
     this.initRuntimeConfig();
     this.globalData.token = getToken();
-    this.globalData.familyUser = getUser();
+    const storedUser = getUser();
+    this.globalData.userType = storedUser && storedUser.userType ? storedUser.userType : (storedUser ? 'family' : '');
+    if (this.globalData.userType === 'staff') {
+      this.globalData.staffUser = storedUser;
+    } else {
+      this.globalData.familyUser = storedUser;
+    }
     if (!this.globalData.token && this.canUseLocalDevBypass()) {
       this.enableLocalDevSession();
     }
@@ -184,6 +199,7 @@ App({
   enableLocalDevSession() {
     const dev = this.globalData.localDevSession || {};
     const user = {
+      userType: 'family',
       orgId: Number(dev.orgId) || 1,
       familyUserId: Number(dev.familyUserId) || 0,
       realName: dev.realName || '本地调试家属',
@@ -191,7 +207,21 @@ App({
     };
     const token = `LOCAL_DEV_TOKEN_${Date.now()}`;
     this.globalData.token = token;
+    this.globalData.userType = 'family';
     this.globalData.familyUser = user;
+    setAuth(token, user);
+  },
+  enableLocalDevStaffSession() {
+    const dev = this.globalData.localDevStaffSession || {};
+    const user = {
+      ...dev,
+      userType: 'staff'
+    };
+    const token = `LOCAL_DEV_STAFF_TOKEN_${Date.now()}`;
+    this.globalData.token = token;
+    this.globalData.userType = 'staff';
+    this.globalData.staffUser = user;
+    this.globalData.familyUser = null;
     setAuth(token, user);
   },
   ensureLogin() {
@@ -211,7 +241,9 @@ App({
   logout() {
     clearAuth();
     this.globalData.token = '';
+    this.globalData.userType = '';
     this.globalData.familyUser = null;
+    this.globalData.staffUser = null;
     this.globalData.selectedElderId = null;
     this.globalData.refreshHomeAfterBinding = false;
     this.globalData.pendingMessageFilter = '';

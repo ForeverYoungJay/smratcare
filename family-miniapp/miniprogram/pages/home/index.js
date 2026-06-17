@@ -60,7 +60,8 @@ Page({
       schedules: [],
       meal: { tags: [], breakfastText: '', lunchText: '', dinnerText: '' },
       notices: [],
-      focusEvents: []
+      focusEvents: [],
+      careTimeline: []
     },
     weeklyBrief: null,
     currentTime: '',
@@ -75,6 +76,10 @@ Page({
   },
   onShow() {
     getApp().ensureLogin();
+    if (getApp().globalData.userType === 'staff') {
+      wx.reLaunch({ url: '/pages/staff-home/index' });
+      return;
+    }
     const app = getApp();
     if (app.globalData.refreshHomeAfterBinding) {
       app.globalData.refreshHomeAfterBinding = false;
@@ -98,10 +103,12 @@ Page({
       const meal = raw.meal || {};
       const schedules = (raw.schedules || []).slice(0, 4);
       const notices = (raw.notices || []).slice(0, 3);
+      const careTimeline = (raw.careTimeline || []).slice(0, 6);
       const normalized = {
         ...raw,
         schedules,
         notices,
+        careTimeline,
         meal: {
           ...meal,
           breakfastText: (meal.breakfast || []).join('、'),
@@ -146,7 +153,8 @@ Page({
             schedules: [],
             meal: { tags: [], breakfastText: '', lunchText: '', dinnerText: '' },
             notices: [],
-            focusEvents: []
+            focusEvents: [],
+            careTimeline: []
           },
           weeklyBrief: null,
           loadError: ''

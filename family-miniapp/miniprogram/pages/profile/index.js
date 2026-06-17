@@ -19,6 +19,10 @@ Page({
   },
   onShow() {
     getApp().ensureLogin();
+    if (getApp().globalData.userType === 'staff') {
+      wx.navigateTo({ url: '/pages/staff-profile/index' });
+      return;
+    }
     this.loadData();
   },
   async loadData() {

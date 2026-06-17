@@ -1,0 +1,76 @@
+.search-row {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 22rpx;
+}
+
+.search-input {
+  flex: 1;
+  height: 72rpx;
+  padding: 0 18rpx;
+  border-radius: 14rpx;
+  border: 1rpx solid #d9e3df;
+  background: #ffffff;
+  color: #182420;
+  font-size: 24rpx;
+}
+
+.search-btn {
+  width: 140rpx;
+}
+
+.retry-btn {
+  margin-top: 20rpx;
+}
+
+.empty-card {
+  margin-top: 18rpx;
+  padding: 34rpx;
+}
+
+.contact-card {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  margin-top: 18rpx;
+  padding: 24rpx;
+}
+
+.avatar {
+  flex: none;
+  width: 78rpx;
+  height: 78rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(135deg, #246b5f, #1f5f8b);
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 900;
+  line-height: 78rpx;
+  text-align: center;
+}
+
+.contact-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.contact-name {
+  color: #182430;
+  font-size: 30rpx;
+  font-weight: 900;
+}
+
+.contact-meta {
+  margin-top: 8rpx;
+  color: #71807a;
+  font-size: 22rpx;
+  line-height: 1.45;
+}
+
+.call-btn {
+  flex: none;
+  width: 116rpx;
+  height: 62rpx;
+  line-height: 62rpx;
+  font-size: 23rpx;
+}

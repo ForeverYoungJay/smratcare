@@ -1,0 +1,68 @@
+.scan-card {
+  margin-top: 22rpx;
+  padding: 28rpx;
+  background: linear-gradient(135deg, rgba(36, 107, 95, 0.14), rgba(255, 255, 255, 0) 62%), #ffffff;
+}
+
+.scan-title {
+  color: #182430;
+  font-size: 32rpx;
+  font-weight: 900;
+}
+
+.scan-sub {
+  margin-top: 8rpx;
+  color: #73808c;
+  font-size: 23rpx;
+}
+
+.scan-btn {
+  width: 100%;
+  margin-top: 22rpx;
+}
+
+.scan-result,
+.retry-btn {
+  margin-top: 18rpx;
+}
+
+.scan-result {
+  color: #246b5f;
+  font-size: 24rpx;
+  font-weight: 850;
+}
+
+.point-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 20rpx 0;
+  border-top: 1rpx solid #edf1f5;
+}
+
+.point-row:first-of-type {
+  border-top: 0;
+}
+
+.point-title {
+  color: #182430;
+  font-size: 27rpx;
+  font-weight: 900;
+}
+
+.point-meta {
+  margin-top: 8rpx;
+  color: #73808c;
+  font-size: 23rpx;
+}
+
+.point-status {
+  color: #9a6400;
+  font-size: 23rpx;
+  font-weight: 900;
+}
+
+.point-status.done {
+  color: #247455;
+}

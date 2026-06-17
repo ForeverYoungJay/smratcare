@@ -1,0 +1,143 @@
+.type-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12rpx;
+  margin: 22rpx 0 18rpx;
+  padding: 8rpx;
+  border-radius: 18rpx;
+  background: #e8f1ed;
+}
+
+.type-tab {
+  height: 70rpx;
+  line-height: 70rpx;
+  border-radius: 14rpx;
+  color: #63736d;
+  font-size: 26rpx;
+  font-weight: 900;
+  text-align: center;
+}
+
+.type-tab.active {
+  background: #246b5f;
+  color: #ffffff;
+  box-shadow: 0 12rpx 24rpx rgba(36, 107, 95, 0.18);
+}
+
+.form-card,
+.panel {
+  padding: 26rpx;
+  margin-top: 18rpx;
+}
+
+.field {
+  margin-top: 22rpx;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14rpx;
+}
+
+.field-label {
+  margin-bottom: 10rpx;
+  color: #60716b;
+  font-size: 23rpx;
+  font-weight: 850;
+}
+
+.picker-line,
+.input-line,
+.reason-box {
+  width: 100%;
+  border-radius: 14rpx;
+  border: 1rpx solid #d9e3df;
+  background: #ffffff;
+  color: #182420;
+  font-size: 25rpx;
+}
+
+.picker-line,
+.input-line {
+  min-height: 74rpx;
+  line-height: 74rpx;
+  padding: 0 18rpx;
+}
+
+.reason-box {
+  min-height: 150rpx;
+  padding: 18rpx;
+  line-height: 1.55;
+}
+
+.policy-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 22rpx;
+  color: #4f605a;
+  font-size: 23rpx;
+  line-height: 1.5;
+}
+
+.submit-btn,
+.retry-btn {
+  margin-top: 22rpx;
+}
+
+.panel-head,
+.approval-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.approval-row {
+  padding: 22rpx 0;
+  border-top: 1rpx solid #edf1f5;
+}
+
+.approval-row:first-of-type {
+  border-top: 0;
+}
+
+.approval-title {
+  color: #182430;
+  font-size: 27rpx;
+  font-weight: 900;
+}
+
+.approval-meta,
+.approval-remark,
+.approval-create {
+  margin-top: 8rpx;
+  color: #71807a;
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+
+.approval-remark {
+  color: #465760;
+}
+
+.status-pill {
+  flex: none;
+  padding: 8rpx 14rpx;
+  border-radius: 999rpx;
+  background: #fff2d9;
+  color: #9a5b05;
+  font-size: 21rpx;
+  font-weight: 900;
+}
+
+.status-pill.success {
+  background: #e5f5ef;
+  color: #16704f;
+}
+
+.status-pill.danger {
+  background: #fde8e5;
+  color: #b42318;
+}

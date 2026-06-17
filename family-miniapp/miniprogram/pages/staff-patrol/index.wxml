@@ -1,0 +1,30 @@
+<view class="container">
+  <view class="section-title">巡检扫码</view>
+  <view class="section-subtitle">巡房、药房、餐车交接点扫码核验</view>
+
+  <view class="surface scan-card">
+    <view class="scan-title">现场扫码</view>
+    <view class="scan-sub">支持二维码、条码或点位编号</view>
+    <button class="primary-btn scan-btn" bindtap="scanCode">打开扫码</button>
+    <view class="scan-result" wx:if="{{scannedText}}">最近扫码：{{scannedText}}</view>
+  </view>
+
+  <view class="surface state-card" wx:if="{{loadError}}">
+    <view class="state-title">巡检点加载失败</view>
+    <view class="section-subtitle">{{loadError}}</view>
+    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-title">今日巡检点</view>
+    <block wx:for="{{points}}" wx:key="id">
+      <view class="point-row" data-id="{{item.id}}" bindtap="simulateScan">
+        <view>
+          <view class="point-title">{{item.name}}</view>
+          <view class="point-meta">{{item.location}} · {{item.id}}</view>
+        </view>
+        <text class="point-status {{item.status === '已扫码' ? 'done' : ''}}">{{item.status}}</text>
+      </view>
+    </block>
+  </view>
+</view>

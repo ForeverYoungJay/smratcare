@@ -1,0 +1,84 @@
+.workbench-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14rpx;
+  margin-top: 22rpx;
+}
+
+.workbench-card {
+  min-height: 116rpx;
+  padding: 22rpx;
+}
+
+.workbench-title {
+  color: #1d3b34;
+  font-size: 28rpx;
+  font-weight: 900;
+}
+
+.workbench-desc {
+  margin-top: 8rpx;
+  color: #74847f;
+  font-size: 22rpx;
+  line-height: 1.35;
+}
+
+.filter-scroll {
+  margin: 22rpx 0 8rpx;
+  white-space: nowrap;
+}
+
+.filter {
+  display: inline-flex;
+  align-items: center;
+  height: 58rpx;
+  margin-right: 12rpx;
+  padding: 0 22rpx;
+  border-radius: 999rpx;
+  background: #edf2ef;
+  color: #63716b;
+  font-size: 24rpx;
+  font-weight: 800;
+}
+
+.filter.active {
+  background: #1f5f8b;
+  color: #ffffff;
+}
+
+.task-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 18rpx;
+  padding: 20rpx 0;
+  border-top: 1rpx solid #edf1f5;
+}
+
+.task-row:first-of-type {
+  border-top: 0;
+}
+
+.task-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-title {
+  color: #182430;
+  font-size: 28rpx;
+  font-weight: 900;
+}
+
+.task-meta,
+.task-status {
+  margin-top: 8rpx;
+  color: #73808c;
+  font-size: 23rpx;
+}
+
+.task-action {
+  color: #1f5f8b;
+  font-size: 24rpx;
+  font-weight: 900;
+  white-space: nowrap;
+}

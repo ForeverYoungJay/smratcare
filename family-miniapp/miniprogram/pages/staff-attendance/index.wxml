@@ -1,0 +1,65 @@
+<view class="container">
+  <view class="section-title">我的考勤</view>
+  <view class="section-subtitle">查看本月出勤、异常和每日打卡记录</view>
+
+  <picker mode="date" fields="month" value="{{month || overview.month}}" bindchange="onMonthChange">
+    <view class="month-picker">月份：{{month || overview.month || '当前月'}}</view>
+  </picker>
+
+  <view class="surface state-card" wx:if="{{loading}}">
+    <view class="state-title">正在加载考勤</view>
+  </view>
+
+  <view class="surface state-card" wx:if="{{!loading && loadError}}">
+    <view class="state-title">加载失败</view>
+    <view class="section-subtitle">{{loadError}}</view>
+    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
+  </view>
+
+  <view wx:if="{{!loading && !loadError && overview}}">
+    <view class="surface today-card">
+      <view>
+        <view class="today-title">今日状态</view>
+        <view class="today-meta">应到 {{overview.expectedWorkStart || '-'}} · 应退 {{overview.expectedWorkEnd || '-'}}</view>
+      </view>
+      <text class="status">{{overview.todayStatusLabel || overview.todayStatus || '未打卡'}}</text>
+    </view>
+
+    <view class="summary-grid">
+      <view class="surface summary-card">
+        <text>出勤</text>
+        <strong>{{overview.onDutyDays || 0}}</strong>
+      </view>
+      <view class="surface summary-card">
+        <text>请假</text>
+        <strong>{{overview.leaveDays || 0}}</strong>
+      </view>
+      <view class="surface summary-card warning">
+        <text>迟到</text>
+        <strong>{{overview.lateCount || 0}}</strong>
+      </view>
+      <view class="surface summary-card danger">
+        <text>异常</text>
+        <strong>{{overview.abnormalCount || 0}}</strong>
+      </view>
+    </view>
+
+    <view class="surface panel">
+      <view class="panel-title">每日记录</view>
+      <block wx:for="{{overview.days}}" wx:key="date">
+        <view class="day-row">
+          <view class="day-date">
+            <text>{{item.date}}</text>
+            <text>{{item.weekLabel}}</text>
+          </view>
+          <view class="day-main">
+            <view class="day-time">上班 {{item.checkInTime || '-'}} · 下班 {{item.checkOutTime || '-'}}</view>
+            <view class="day-meta">{{item.scheduleTitles || '无排班任务'}}</view>
+            <view class="day-alert" wx:if="{{item.anomalyText}}">{{item.anomalyText}}</view>
+          </view>
+          <text class="day-status">{{item.status || 'NORMAL'}}</text>
+        </view>
+      </block>
+    </view>
+  </view>
+</view>

@@ -83,6 +83,26 @@
     </block>
   </view>
 
+  <view class="surface panel care-timeline-panel" wx:if="{{dashboard.careTimeline.length > 0}}">
+    <view class="panel-head">
+      <text class="panel-title">最近照护动态</text>
+      <text class="link" data-path="/pages/care-log/index" bindtap="goPage">护理记录</text>
+    </view>
+    <block wx:for="{{dashboard.careTimeline}}" wx:key="time">
+      <view class="care-timeline-item" data-path="{{item.linkPath}}" bindtap="goPage">
+        <view class="care-time">{{item.time}}</view>
+        <view class="care-main">
+          <view class="care-title-row">
+            <text class="care-category">{{item.category}}</text>
+            <text class="care-title">{{item.title}}</text>
+          </view>
+          <view class="care-content">{{item.content}}</view>
+        </view>
+        <text class="care-status">{{item.status}}</text>
+      </view>
+    </block>
+  </view>
+
   <view class="surface panel weekly-panel" wx:if="{{weeklyBrief}}">
     <view class="panel-head">
       <text class="panel-title">本周简报</text>

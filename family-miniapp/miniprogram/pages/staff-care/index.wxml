@@ -1,0 +1,19 @@
+<view class="container">
+  <view class="section-title">护理执行</view>
+  <view class="section-subtitle">扫码、拍照、补录体征和交接备注</view>
+  <view class="quick-actions">
+    <button class="ghost-btn quick-btn" bindtap="goCareExecution">护理执行</button>
+    <button class="ghost-btn quick-btn" bindtap="goVitals">体征补录</button>
+  </view>
+  <view class="surface panel">
+    <block wx:for="{{tasks}}" wx:key="id">
+      <view class="work-row" data-id="{{item.id}}" bindtap="openCare">
+        <view>
+          <view class="work-title">{{item.title}}</view>
+          <view class="work-meta">{{item.resident}} · {{item.room}} · {{item.time}}</view>
+        </view>
+        <text class="work-action">{{item.actionText}}</text>
+      </view>
+    </block>
+  </view>
+</view>

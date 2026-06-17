@@ -1,14 +1,18 @@
 <view class="container login-page">
   <view class="brand surface">
-    <view class="brand-title">智养云家属端</view>
-    <view class="brand-subtitle">连接照护现场，第一时间掌握长者状态</view>
+    <view class="brand-title">智养云</view>
+    <view class="brand-subtitle">{{identity === 'staff' ? '员工移动工作台' : '连接照护现场，第一时间掌握长者状态'}}</view>
     <view class="runtime-warning" wx:if="{{!runtimeReady}}">{{runtimeNotice}}</view>
     <view class="runtime-tip" wx:elif="{{runtimeNotice}}">{{runtimeNotice}}</view>
     <view class="org-line">
       <text>所属机构：{{orgName}}</text>
       <text wx:if="{{loadingBootstrap}}" class="org-loading">加载中...</text>
     </view>
-    <view class="mode-row">
+    <view class="identity-row">
+      <view class="identity {{identity === 'family' ? 'active' : ''}}" data-identity="family" bindtap="switchIdentity">家属</view>
+      <view class="identity {{identity === 'staff' ? 'active' : ''}}" data-identity="staff" bindtap="switchIdentity">员工</view>
+    </view>
+    <view class="mode-row" wx:if="{{identity === 'family'}}">
       <view class="mode {{mode === 'login' ? 'active' : ''}}" data-mode="login" bindtap="switchMode">密码登录</view>
       <view class="mode {{mode === 'register' ? 'active' : ''}}" data-mode="register" bindtap="switchMode">首次注册</view>
       <view class="mode {{mode === 'reset' ? 'active' : ''}}" data-mode="reset" bindtap="switchMode">找回密码</view>
@@ -16,6 +20,7 @@
   </view>
 
   <view class="form surface">
+    <view wx:if="{{identity === 'family'}}">
     <view class="field" wx:if="{{mode === 'register'}}">
       <text class="label">家属姓名</text>
       <input class="input" value="{{form.realName}}" bindinput="onNameInput" placeholder="请输入姓名（选填）" />
@@ -40,11 +45,24 @@
       <text class="label">{{mode === 'reset' ? '新密码' : '密码'}}</text>
       <input class="input" type="password" maxlength="32" value="{{form.password}}" bindinput="onPasswordInput" placeholder="请输入6-32位密码" />
     </view>
+    </view>
+
+    <view wx:if="{{identity === 'staff'}}">
+      <view class="field">
+        <text class="label">员工账号</text>
+        <input class="input" value="{{form.username}}" bindinput="onUsernameInput" placeholder="请输入员工账号" />
+      </view>
+      <view class="field">
+        <text class="label">员工密码</text>
+        <input class="input" type="password" maxlength="32" value="{{form.staffPassword}}" bindinput="onStaffPasswordInput" placeholder="请输入密码" />
+      </view>
+    </view>
 
     <button class="primary-btn login-btn" loading="{{loading}}" disabled="{{!runtimeReady}}" bindtap="onSubmit">
-      {{mode === 'login' ? '登录并进入首页' : (mode === 'register' ? '注册并登录' : '重置密码并登录')}}
+      {{identity === 'staff' ? '登录员工工作台' : (mode === 'login' ? '登录并进入首页' : (mode === 'register' ? '注册并登录' : '重置密码并登录'))}}
     </button>
-    <view class="tips" wx:if="{{mode !== 'login'}}">当前未接真实短信时，默认验证码为 1234。验证码有效期 5 分钟，连续输错将触发保护限制。</view>
+    <view class="tips" wx:if="{{identity === 'family' && mode !== 'login'}}">当前未接真实短信时，默认验证码为 1234。验证码有效期 5 分钟，连续输错将触发保护限制。</view>
+    <view class="tips" wx:if="{{identity === 'staff'}}">员工端用于护理执行、查房巡检、用药确认、维修和餐食配送。</view>
     <view class="agreement-box">
       <view class="agreement-title">登录即表示你已阅读并同意</view>
       <view class="agreement-text">《用户服务协议 {{complianceInfo.serviceAgreementVersion}}》与《隐私保护说明 {{complianceInfo.privacyPolicyVersion}}》</view>

@@ -1,0 +1,31 @@
+<view class="container">
+  <view class="surface card" wx:if="{{loadError}}">
+    <view class="user-name">员工信息暂时不可用</view>
+    <view class="user-sub">{{loadError}}</view>
+    <button class="ghost-btn action" bindtap="loadData">重新加载</button>
+  </view>
+
+  <view class="surface card" wx:if="{{profile}}">
+    <view class="user-name">{{profile.realName || profile.username}}</view>
+    <view class="user-sub">{{profile.department || profile.orgName}} · {{profile.shiftName || '今日班次'}}</view>
+    <view class="user-sub">{{profile.phone || '未维护手机号'}}</view>
+    <view class="role-row">
+      <block wx:for="{{profile.roles}}" wx:key="*this">
+        <text class="pill pill-normal">{{item}}</text>
+      </block>
+    </view>
+    <view class="quick-list">
+      <block wx:for="{{quickEntries}}" wx:key="route">
+        <view class="quick-row" data-path="{{item.route}}" bindtap="goPage">
+          <view>
+            <view class="quick-title">{{item.title}}</view>
+            <view class="quick-desc">{{item.desc}}</view>
+          </view>
+          <text class="quick-arrow">›</text>
+        </view>
+      </block>
+    </view>
+    <button class="ghost-btn action" bindtap="goHome">回员工工作台</button>
+    <button class="danger-btn action" bindtap="logout">退出登录</button>
+  </view>
+</view>

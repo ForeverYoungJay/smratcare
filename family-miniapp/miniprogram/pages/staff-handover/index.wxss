@@ -1,0 +1,54 @@
+.retry-btn,
+.submit-btn {
+  margin-top: 20rpx;
+}
+
+.handover-input {
+  width: 100%;
+  min-height: 190rpx;
+  box-sizing: border-box;
+  margin-top: 18rpx;
+  padding: 18rpx;
+  border-radius: 16rpx;
+  background: #f5f7fa;
+  color: #182430;
+  font-size: 25rpx;
+}
+
+.handover-row {
+  padding: 20rpx 0;
+  border-top: 1rpx solid #edf1f5;
+}
+
+.handover-row:first-of-type {
+  border-top: 0;
+}
+
+.handover-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.handover-title {
+  color: #182430;
+  font-size: 27rpx;
+  font-weight: 900;
+}
+
+.handover-time,
+.handover-owner {
+  color: #73808c;
+  font-size: 22rpx;
+}
+
+.handover-owner {
+  margin-top: 8rpx;
+}
+
+.handover-content {
+  margin-top: 12rpx;
+  color: #43515f;
+  font-size: 24rpx;
+  line-height: 1.55;
+}

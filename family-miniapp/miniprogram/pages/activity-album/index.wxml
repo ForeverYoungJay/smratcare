@@ -1,6 +1,19 @@
 <view class="container">
   <view class="surface card">
-    <view class="section-title">活动相册 / 视频</view>
+    <view class="section-title">相册 / 视频</view>
+    <view class="album-tabs">
+      <block wx:for="{{tabs}}" wx:key="key">
+        <view
+          class="album-tab {{activeScope === item.key ? 'active' : ''}}"
+          data-scope="{{item.key}}"
+          bindtap="switchScope">
+          {{item.title}}
+        </view>
+      </block>
+    </view>
+    <view class="empty" wx:if="{{list.length === 0}}">
+      {{activeScope === 'PERSONAL' ? '暂无个人相册' : '暂无集体活动相册'}}
+    </view>
     <block wx:for="{{list}}" wx:key="id">
       <view class="item">
         <video
@@ -20,7 +33,7 @@
           bindtap="previewPhoto" />
         <view wx:else class="cover">{{item.coverText}}</view>
         <view class="name">{{item.title}}</view>
-        <view class="meta">{{item.elderName}} · {{item.date}} · {{item.mediaType}}</view>
+        <view class="meta">{{item.elderName}} · {{item.date}} · {{item.scopeText}}</view>
         <view class="desc">{{item.description}}</view>
         <view class="actions">
           <button class="ghost-btn small" data-id="{{item.id}}" bindtap="like">{{item.liked ? '取消赞' : '点赞'}} {{item.likes}}</button>

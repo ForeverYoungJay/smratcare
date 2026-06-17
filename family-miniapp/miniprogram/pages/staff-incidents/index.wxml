@@ -1,0 +1,63 @@
+<view class="container">
+  <view class="section-title">异常记录</view>
+  <view class="section-subtitle">查看本人上报的异常事件、证据和处理状态</view>
+
+  <view class="filter-row">
+    <block wx:for="{{statusFilters}}" wx:key="value">
+      <view class="filter {{activeStatus === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="switchStatus">{{item.label}}</view>
+    </block>
+  </view>
+
+  <view class="filter-row compact">
+    <block wx:for="{{levelFilters}}" wx:key="value">
+      <view class="filter level {{activeLevel === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="switchLevel">{{item.label}}</view>
+    </block>
+  </view>
+
+  <button class="ghost-btn report-btn" bindtap="goReport">新增异常上报</button>
+
+  <view class="surface state-card" wx:if="{{loading}}">
+    <view class="state-title">正在加载异常记录</view>
+  </view>
+
+  <view class="surface state-card" wx:if="{{!loading && loadError}}">
+    <view class="state-title">加载失败</view>
+    <view class="section-subtitle">{{loadError}}</view>
+    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
+  </view>
+
+  <view class="surface empty-card" wx:if="{{!loading && !loadError && incidents.length === 0}}">
+    <view class="state-title">暂无异常记录</view>
+    <view class="section-subtitle">发生跌倒、用药、设备、餐食等异常后，可在这里追踪处理状态。</view>
+  </view>
+
+  <view wx:if="{{!loading && !loadError && incidents.length}}">
+    <block wx:for="{{incidents}}" wx:key="id">
+      <view class="surface incident-card">
+        <view class="incident-head">
+          <view>
+            <view class="incident-title">{{item.incidentType || '异常事件'}}</view>
+            <view class="incident-meta">{{item.incidentTime}} · {{item.resident || '对象未记录'}}</view>
+          </view>
+          <text class="level-pill">{{item.level || '一般'}}</text>
+        </view>
+        <view class="tag-row">
+          <text>{{item.status || 'OPEN'}}</text>
+          <text>{{item.location || '位置未记录'}}</text>
+        </view>
+        <view class="incident-line">{{item.description}}</view>
+        <view class="incident-line muted" wx:if="{{item.actionTaken}}">处理：{{item.actionTaken}}</view>
+        <view class="incident-line muted" wx:if="{{item.scanText}}">扫码：{{item.scanText}}</view>
+        <view class="voice-chip" wx:if="{{item.voiceUrl}}">
+          <text>语音证据</text>
+          <text>{{item.voiceDurationSec || 0}} 秒</text>
+        </view>
+        <view class="photo-row" wx:if="{{item.photos && item.photos.length}}">
+          <block wx:for="{{item.photos}}" wx:key="*this" wx:for-item="photo">
+            <image class="photo" mode="aspectFill" src="{{photo}}" data-urls="{{item.photos}}" data-current="{{photo}}" bindtap="previewPhoto" />
+          </block>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>

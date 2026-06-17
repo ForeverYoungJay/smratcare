@@ -1,0 +1,68 @@
+<view class="container">
+  <view class="section-title">建议反馈</view>
+  <view class="section-subtitle">把一线护理、查房、用药、后勤和餐食配送中的真实问题沉淀下来，便于主管闭环优化</view>
+
+  <view class="surface form-card">
+    <view class="panel-title">提交一线建议</view>
+    <view class="field">
+      <view class="field-label">建议类型</view>
+      <picker mode="selector" range="{{categoryOptions}}" value="{{categoryIndex}}" bindchange="onCategoryChange">
+        <view class="picker-line">{{categoryOptions[categoryIndex]}}</view>
+      </picker>
+    </view>
+    <view class="field">
+      <view class="field-label">提交人</view>
+      <input class="input-line" value="{{proposerName}}" data-field="proposerName" bindinput="onInput" placeholder="填写姓名" />
+    </view>
+    <view class="field">
+      <view class="field-label">联系方式</view>
+      <input class="input-line" value="{{contact}}" data-field="contact" bindinput="onInput" placeholder="便于主管回访，可选" />
+    </view>
+    <view class="field">
+      <view class="field-label">建议内容</view>
+      <textarea class="textarea-line" value="{{content}}" data-field="content" bindinput="onInput" maxlength="1000" placeholder="例如：巡检扫码后希望能直接带出老人风险标签，减少重复录入" />
+      <view class="field-hint">{{content.length}} / 1000</view>
+    </view>
+    <button class="primary-btn submit-btn" loading="{{submitting}}" bindtap="submitSuggestion">提交建议</button>
+  </view>
+
+  <view class="filter-row">
+    <block wx:for="{{statusFilters}}" wx:key="value">
+      <view class="filter {{activeStatus === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="switchStatus">{{item.label}}</view>
+    </block>
+  </view>
+
+  <view class="surface state-card" wx:if="{{loading}}">
+    <view class="state-title">正在加载建议记录</view>
+  </view>
+
+  <view class="surface state-card" wx:if="{{!loading && loadError}}">
+    <view class="state-title">建议记录加载失败</view>
+    <view class="section-subtitle">{{loadError}}</view>
+    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
+  </view>
+
+  <view class="surface empty-card" wx:if="{{!loading && !loadError && suggestions.length === 0}}">
+    <view class="state-title">暂无建议记录</view>
+    <view class="section-subtitle">提交后可在这里查看处理状态。</view>
+  </view>
+
+  <view wx:if="{{!loading && !loadError && suggestions.length}}">
+    <block wx:for="{{suggestions}}" wx:key="id">
+      <view class="surface suggestion-card">
+        <view class="suggestion-head">
+          <view>
+            <view class="suggestion-title">{{item.categoryText}}</view>
+            <view class="suggestion-meta">{{item.proposerName || '当前员工'}} · {{item.createText || '刚刚'}}</view>
+          </view>
+          <text class="status-pill status-{{item.status}}">{{item.statusText}}</text>
+        </view>
+        <view class="suggestion-content">{{item.contentText}}</view>
+        <view class="reply-box" wx:if="{{item.reply}}">
+          <view class="reply-label">处理反馈</view>
+          <view class="reply-content">{{item.reply}}</view>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>

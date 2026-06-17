@@ -268,6 +268,7 @@ const activityAlbums = [
     title: '音乐疗愈上午场',
     date: '2026-03-08 10:10',
     elderName: '李正国',
+    albumScope: 'PERSONAL',
     description: '参与节奏互动与合唱环节，状态积极。',
     mediaType: 'photo',
     coverText: '活动照片 3 张',
@@ -279,7 +280,8 @@ const activityAlbums = [
     id: 1002,
     title: '生日会彩排',
     date: '2026-03-08 14:00',
-    elderName: '王秀兰',
+    elderName: '全体长者',
+    albumScope: 'GROUP',
     description: '与同伴一起练习生日歌，互动良好。',
     mediaType: 'video',
     coverText: '短视频 01:12',
@@ -705,6 +707,32 @@ function getHomeDashboard() {
       '今日 15:00 家属可预约视频探视',
       '周桂芬复查后将更新医嘱结果',
       '王秀兰晚间护理新增血压复测'
+    ],
+    careTimeline: [
+      {
+        time: '03-08 10:30',
+        category: '健康',
+        title: '血压复测',
+        content: '138/88mmHg，轻度偏高，护理团队继续观察。',
+        status: '需关注',
+        linkPath: '/pages/health/index'
+      },
+      {
+        time: '03-08 09:20',
+        category: '护理',
+        title: '晨间护理',
+        content: '完成洗漱、翻身和皮肤观察，老人精神状态良好。',
+        status: '已完成',
+        linkPath: '/pages/care-log/index'
+      },
+      {
+        time: '03-07 15:40',
+        category: '相册',
+        title: '康复活动照片',
+        content: '新增 6 张活动照片，家属可查看互动记录。',
+        status: '已发布',
+        linkPath: '/pages/activity-album/index'
+      }
     ]
   };
 }
@@ -824,7 +852,11 @@ function getCareLogs() {
   return clone(careLogs);
 }
 
-function getActivityAlbums() {
+function getActivityAlbums(scope) {
+  const normalizedScope = String(scope || '').toUpperCase();
+  if (normalizedScope === 'PERSONAL' || normalizedScope === 'GROUP') {
+    return clone(activityAlbums.filter((item) => item.albumScope === normalizedScope));
+  }
   return clone(activityAlbums);
 }
 
@@ -868,6 +900,34 @@ function addActivityAlbumComment(albumId, content) {
 
 function getOutingRecords() {
   return clone(outingRecords);
+}
+
+function submitOutingApplication(payload = {}) {
+  const item = {
+    id: Date.now(),
+    elderName: payload.elderName || '周桂芬',
+    startTime: payload.outingDate || '',
+    reason: payload.reason || '家属外出申请',
+    companion: payload.companion || '家属陪同',
+    destination: payload.destination || '院外活动',
+    returnTime: payload.expectedReturnTime || '待返院',
+    status: '待审批',
+    applicationStatus: 'APPLIED',
+    canCancel: true,
+    canResubmit: false
+  };
+  outingRecords.unshift(item);
+  return clone(item);
+}
+
+function cancelOutingApplication(id) {
+  const item = outingRecords.find((entry) => String(entry.id) === String(id));
+  if (!item) return null;
+  item.status = '已取消';
+  item.applicationStatus = 'CANCELLED';
+  item.canCancel = false;
+  item.canResubmit = true;
+  return clone(item);
 }
 
 function getEmergencyContacts() {
@@ -1885,6 +1945,8 @@ module.exports = {
   getActivityAlbumComments,
   addActivityAlbumComment,
   getOutingRecords,
+  submitOutingApplication,
+  cancelOutingApplication,
   getEmergencyContacts,
   getBillSummary,
   getPaymentGuard,

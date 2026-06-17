@@ -1,0 +1,34 @@
+<view class="container">
+  <view class="section-title">医护工作</view>
+  <view class="section-subtitle">查房、用药确认和异常巡检闭环</view>
+  <view class="quick-actions">
+    <button class="ghost-btn quick-btn" bindtap="goMedication">用药确认</button>
+    <button class="ghost-btn quick-btn" bindtap="goInspection">巡检复核</button>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-title">用药确认</view>
+    <block wx:for="{{medicationTasks}}" wx:key="id">
+      <view class="work-row" data-id="{{item.id}}" bindtap="openMedication">
+        <view>
+          <view class="work-title">{{item.title}}</view>
+          <view class="work-meta">{{item.resident}} · {{item.room}} · {{item.time}}</view>
+        </view>
+        <text class="work-action">{{item.actionText}}</text>
+      </view>
+    </block>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-title">异常巡检</view>
+    <block wx:for="{{inspectionTasks}}" wx:key="id">
+      <view class="work-row" data-id="{{item.id}}" bindtap="openInspection">
+        <view>
+          <view class="work-title">{{item.title}}</view>
+          <view class="work-meta">{{item.resident}} · {{item.room}} · {{item.time}}</view>
+        </view>
+        <text class="work-action">{{item.actionText}}</text>
+      </view>
+    </block>
+  </view>
+</view>

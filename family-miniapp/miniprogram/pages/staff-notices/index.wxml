@@ -1,0 +1,50 @@
+<view class="container">
+  <view class="section-title">通知公告</view>
+  <view class="section-subtitle">查看院内制度通知、培训安排和运营公告</view>
+
+  <view class="search-row">
+    <input class="search-input" value="{{keyword}}" placeholder="搜索公告标题或内容" bindinput="onKeywordInput" confirm-type="search" bindconfirm="searchNotices" />
+    <button class="ghost-btn search-btn" bindtap="searchNotices">搜索</button>
+  </view>
+
+  <view class="surface state-card" wx:if="{{loading}}">
+    <view class="state-title">正在加载通知公告</view>
+  </view>
+
+  <view class="surface state-card" wx:if="{{!loading && loadError}}">
+    <view class="state-title">通知公告加载失败</view>
+    <view class="section-subtitle">{{loadError}}</view>
+    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
+  </view>
+
+  <view class="surface empty-card" wx:if="{{!loading && !loadError && notices.length === 0}}">
+    <view class="state-title">暂无公告</view>
+    <view class="section-subtitle">当前没有已发布的通知公告。</view>
+  </view>
+
+  <view wx:if="{{!loading && !loadError && notices.length}}">
+    <block wx:for="{{notices}}" wx:key="id">
+      <view class="surface notice-card" data-id="{{item.id}}" bindtap="openNotice">
+        <view class="notice-head">
+          <view>
+            <view class="notice-title">{{item.title}}</view>
+            <view class="notice-meta">{{item.publisherName || '机构公告'}} · {{item.publishText || '未设置时间'}}</view>
+          </view>
+          <text class="status-pill">已发布</text>
+        </view>
+        <view class="notice-preview">{{item.preview}}</view>
+      </view>
+    </block>
+  </view>
+
+  <view class="detail-mask" wx:if="{{activeNotice}}" catchtap="closeDetail">
+    <view class="surface detail-panel" catchtap="noop">
+      <view class="detail-title">{{activeNotice.title}}</view>
+      <view class="detail-meta">{{activeNotice.publisherName || '机构公告'}} · {{activeNotice.publishText}}</view>
+      <scroll-view scroll-y class="detail-content">
+        <text>{{activeNotice.content}}</text>
+      </scroll-view>
+      <button class="primary-btn close-btn" bindtap="closeDetail">我知道了</button>
+    </view>
+  </view>
+</view>

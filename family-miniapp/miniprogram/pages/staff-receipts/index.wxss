@@ -1,0 +1,102 @@
+.filter-row {
+  display: flex;
+  gap: 12rpx;
+  overflow-x: auto;
+  margin: 22rpx 0;
+  padding-bottom: 4rpx;
+}
+
+.filter {
+  flex: 0 0 auto;
+  padding: 14rpx 22rpx;
+  border-radius: 999rpx;
+  background: #edf2f0;
+  color: #62716b;
+  font-size: 24rpx;
+  font-weight: 850;
+}
+
+.filter.active {
+  background: #246b5f;
+  color: #ffffff;
+}
+
+.retry-btn {
+  margin-top: 20rpx;
+}
+
+.empty-card {
+  padding: 34rpx;
+}
+
+.receipt-card {
+  margin-top: 18rpx;
+  padding: 26rpx;
+}
+
+.receipt-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.receipt-title {
+  color: #182430;
+  font-size: 30rpx;
+  font-weight: 900;
+}
+
+.receipt-meta {
+  margin-top: 8rpx;
+  color: #73808c;
+  font-size: 22rpx;
+}
+
+.snapshot-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 16rpx;
+}
+
+.snapshot-row text {
+  padding: 8rpx 12rpx;
+  border-radius: 999rpx;
+  background: #f1f5f4;
+  color: #60706b;
+  font-size: 21rpx;
+  font-weight: 800;
+}
+
+.receipt-line {
+  margin-top: 14rpx;
+  color: #465563;
+  font-size: 24rpx;
+  line-height: 1.55;
+}
+
+.voice-chip {
+  display: inline-flex;
+  gap: 12rpx;
+  margin-top: 14rpx;
+  padding: 10rpx 16rpx;
+  border-radius: 999rpx;
+  background: #eef6ff;
+  color: #255a91;
+  font-size: 22rpx;
+  font-weight: 850;
+}
+
+.photo-row {
+  display: flex;
+  gap: 10rpx;
+  flex-wrap: wrap;
+  margin-top: 16rpx;
+}
+
+.photo {
+  width: 150rpx;
+  height: 150rpx;
+  border-radius: 16rpx;
+  background: #eef2f5;
+}

@@ -1,0 +1,30 @@
+<view class="container">
+  <view class="section-title">班次交接</view>
+  <view class="section-subtitle">接班重点、风险提醒和现场补充</view>
+
+  <view class="surface state-card" wx:if="{{loadError}}">
+    <view class="state-title">交接记录加载失败</view>
+    <view class="section-subtitle">{{loadError}}</view>
+    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-title">新增交接</view>
+    <textarea class="handover-input" value="{{note}}" placeholder="填写需要下一班关注的老人、房间、异常和处理状态" bindinput="onNoteInput" />
+    <button class="primary-btn submit-btn" loading="{{submitting}}" bindtap="submitNote">提交交接</button>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-title">交接记录</view>
+    <block wx:for="{{handovers}}" wx:key="id">
+      <view class="handover-row">
+        <view class="handover-head">
+          <text class="handover-title">{{item.title}}</text>
+          <text class="handover-time">{{item.time}}</text>
+        </view>
+        <view class="handover-owner">{{item.owner}}</view>
+        <view class="handover-content">{{item.content}}</view>
+      </view>
+    </block>
+  </view>
+</view>

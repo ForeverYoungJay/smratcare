@@ -1,0 +1,49 @@
+<view class="container" wx:if="{{task}}">
+  <view class="surface detail-card">
+    <view class="detail-title">{{task.title}}</view>
+    <view class="detail-meta">{{task.time}} · {{task.status}}</view>
+    <view class="info-line"><text>对象</text><text>{{task.resident}}</text></view>
+    <view class="info-line"><text>位置</text><text>{{task.room}}</text></view>
+    <view class="info-line"><text>优先级</text><text>{{task.priority}}</text></view>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-title">现场回执</view>
+    <view class="check-list" wx:if="{{task.checklist && task.checklist.length}}">
+      <block wx:for="{{task.checklist}}" wx:key="*this">
+        <view class="check-item {{checkedMap[item] ? 'checked' : ''}}" data-key="{{item}}" bindtap="toggleCheck">
+          <text class="check-dot">{{checkedMap[item] ? '✓' : ''}}</text>
+          <text>{{item}}</text>
+        </view>
+      </block>
+    </view>
+    <view class="tool-row">
+      <button class="tool-btn" bindtap="scanCode">扫码核验</button>
+      <button class="tool-btn" bindtap="choosePhoto">拍照留痕</button>
+    </view>
+    <view class="voice-panel">
+      <button class="voice-btn {{recording ? 'recording' : ''}}" bindtouchstart="startRecord" bindtouchend="stopRecord" bindtouchcancel="stopRecord">
+        {{recording ? '松开发送语音' : '按住录入语音说明'}}
+      </button>
+      <view class="voice-chip" wx:if="{{voice}}">
+        <text>已录入现场语音 {{voice.durationText}}</text>
+        <text class="voice-clear" bindtap="clearVoice">重录</text>
+      </view>
+    </view>
+    <view class="scan-text" wx:if="{{scanText}}">扫码结果：{{scanText}}</view>
+    <view class="photo-grid" wx:if="{{photos.length}}">
+      <block wx:for="{{photos}}" wx:key="*this">
+        <image class="photo" mode="aspectFill" src="{{item}}" />
+      </block>
+    </view>
+    <textarea class="remark" value="{{remark}}" placeholder="填写执行结果、异常说明或交接备注" bindinput="onRemarkInput" />
+    <button class="primary-btn submit-btn" loading="{{submitting}}" bindtap="submitDone">{{task.actionText}}</button>
+  </view>
+  <view class="record-mask" wx:if="{{recording}}">
+    <view class="record-card">
+      <view class="record-mic"></view>
+      <view class="record-title">正在录音</view>
+      <view class="record-text">松开后保存为现场语音证据</view>
+    </view>
+  </view>
+</view>

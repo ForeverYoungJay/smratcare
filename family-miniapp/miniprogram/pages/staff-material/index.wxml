@@ -1,0 +1,79 @@
+<view class="container">
+  <view class="section-title">物资申领</view>
+  <view class="section-subtitle">护理耗材、餐饮物资、维修备件和保洁补给，移动端提交后进入 OA 物资审批流</view>
+
+  <view class="surface form-card">
+    <view class="panel-title">新增申领</view>
+    <view class="field">
+      <view class="field-label">物资类别</view>
+      <picker mode="selector" range="{{categoryOptions}}" range-key="label" value="{{categoryIndex}}" bindchange="onCategoryChange">
+        <view class="picker-line">{{categoryOptions[categoryIndex].label}}</view>
+      </picker>
+    </view>
+    <view class="field">
+      <view class="field-label">物资名称</view>
+      <input class="input-line" value="{{materialName}}" data-field="materialName" bindinput="onInput" placeholder="例如 护理垫、手消、维修螺丝包" />
+    </view>
+    <view class="field">
+      <view class="field-label">申领数量</view>
+      <input class="input-line" value="{{quantity}}" data-field="quantity" bindinput="onInput" placeholder="例如 2 包 / 10 个 / 1 箱" />
+    </view>
+    <view class="field-grid">
+      <view class="field">
+        <view class="field-label">使用区域</view>
+        <input class="input-line" value="{{useArea}}" data-field="useArea" bindinput="onInput" placeholder="例如 3F 护理区" />
+      </view>
+      <view class="field">
+        <view class="field-label">期望到位</view>
+        <picker mode="date" value="{{expectedDate}}" bindchange="onExpectedDateChange">
+          <view class="picker-line">{{expectedDate}}</view>
+        </picker>
+      </view>
+    </view>
+    <view class="field">
+      <view class="field-label">紧急程度</view>
+      <picker mode="selector" range="{{urgencyOptions}}" range-key="label" value="{{urgencyIndex}}" bindchange="onUrgencyChange">
+        <view class="picker-line">{{urgencyOptions[urgencyIndex].label}}</view>
+      </picker>
+    </view>
+    <view class="field">
+      <view class="field-label">申领原因</view>
+      <textarea class="textarea-line" value="{{reason}}" data-field="reason" bindinput="onInput" maxlength="500" placeholder="说明现场库存、使用对象、是否影响护理/送餐/维修执行" />
+    </view>
+    <button class="primary-btn submit-btn" loading="{{submitting}}" bindtap="submitMaterial">提交申领</button>
+  </view>
+
+  <view class="surface state-card" wx:if="{{loading}}">
+    <view class="state-title">正在加载申领记录</view>
+  </view>
+
+  <view class="surface state-card" wx:if="{{!loading && loadError}}">
+    <view class="state-title">申领记录加载失败</view>
+    <view class="section-subtitle">{{loadError}}</view>
+    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
+  </view>
+
+  <view class="surface empty-card" wx:if="{{!loading && !loadError && approvals.length === 0}}">
+    <view class="state-title">暂无申领记录</view>
+    <view class="section-subtitle">提交后可在这里查看审批状态。</view>
+  </view>
+
+  <view wx:if="{{!loading && !loadError && approvals.length}}">
+    <block wx:for="{{approvals}}" wx:key="id">
+      <view class="surface material-card">
+        <view class="material-head">
+          <view>
+            <view class="material-title">{{item.materialLine}}</view>
+            <view class="material-meta">{{item.form.materialCategoryText || '物资'}} · {{item.form.useArea || '区域未填'}} · {{item.createText}}</view>
+          </view>
+          <text class="status-pill {{item.status === 'APPROVED' ? 'success' : item.status === 'REJECTED' ? 'danger' : ''}}">{{item.statusText}}</text>
+        </view>
+        <view class="tag-row">
+          <text>{{item.form.urgencyText || '普通'}}</text>
+          <text>期望 {{item.form.expectedDate || '-'}}</text>
+        </view>
+        <view class="material-reason">{{item.remark || '无申领原因'}}</view>
+      </view>
+    </block>
+  </view>
+</view>

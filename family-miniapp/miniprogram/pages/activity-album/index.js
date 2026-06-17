@@ -8,6 +8,11 @@ const {
 
 Page({
   data: {
+    tabs: [
+      { key: 'PERSONAL', title: '个人相册' },
+      { key: 'GROUP', title: '集体活动相册' }
+    ],
+    activeScope: 'PERSONAL',
     list: [],
     activeAlbumId: null,
     comments: [],
@@ -20,7 +25,7 @@ Page({
     await this.loadData();
   },
   async loadData() {
-    const list = await getActivityAlbums();
+    const list = await getActivityAlbums(1, 20, { scope: this.data.activeScope });
     this.setData({
       list: (list || []).map((item) => {
         const mediaType = String(item.mediaType || '').toLowerCase();
@@ -29,11 +34,26 @@ Page({
           ...item,
           resolvedCoverUrl: resolveFileUrl(item.coverUrl || ''),
           resolvedMediaUrl: resolveFileUrl(mediaUrl || ''),
+          scopeText: item.albumScope === 'PERSONAL' ? '个人相册' : '集体活动',
           isVideo: mediaType === 'video',
           isPhoto: mediaType === 'photo' || mediaType === 'image'
         };
       })
     });
+  },
+  async switchScope(e) {
+    const scope = e.currentTarget.dataset.scope;
+    if (!scope || scope === this.data.activeScope) {
+      return;
+    }
+    this.setData({
+      activeScope: scope,
+      activeAlbumId: null,
+      comments: [],
+      commentInput: '',
+      list: []
+    });
+    await this.loadData();
   },
   previewPhoto(e) {
     const url = e.currentTarget.dataset.url;

@@ -1,0 +1,97 @@
+<view class="container">
+  <view class="section-title">工作日报</view>
+  <view class="section-subtitle">记录当班完成事项、风险问题和下一班计划，沉淀一线复盘</view>
+
+  <view class="summary-grid">
+    <view class="surface summary-card">
+      <text>全部</text>
+      <strong>{{summary.totalCount || 0}}</strong>
+    </view>
+    <view class="surface summary-card success">
+      <text>已提交</text>
+      <strong>{{summary.submittedCount || 0}}</strong>
+    </view>
+    <view class="surface summary-card warning">
+      <text>草稿</text>
+      <strong>{{summary.draftCount || 0}}</strong>
+    </view>
+    <view class="surface summary-card">
+      <text>今日</text>
+      <strong>{{summary.todaySubmittedCount || 0}}</strong>
+    </view>
+  </view>
+
+  <view class="surface form-card">
+    <view class="panel-title">填写今日日报</view>
+    <view class="field">
+      <view class="field-label">日报日期</view>
+      <picker mode="date" value="{{reportDate}}" bindchange="onDateChange">
+        <view class="picker-line">{{reportDate}}</view>
+      </picker>
+    </view>
+    <view class="field">
+      <view class="field-label">标题</view>
+      <input class="input-line" value="{{title}}" data-field="title" bindinput="onInput" placeholder="例如：早班护理日报" />
+    </view>
+    <view class="field">
+      <view class="field-label">工作摘要</view>
+      <textarea class="textarea-line" value="{{contentSummary}}" data-field="contentSummary" bindinput="onInput" placeholder="概括本班重点、老人状态和协同事项" />
+    </view>
+    <view class="field">
+      <view class="field-label">已完成工作</view>
+      <textarea class="textarea-line" value="{{completedWork}}" data-field="completedWork" bindinput="onInput" placeholder="填写护理执行、用药确认、巡检、后勤处理等完成情况" />
+    </view>
+    <view class="field">
+      <view class="field-label">风险问题</view>
+      <textarea class="textarea-line small" value="{{riskIssue}}" data-field="riskIssue" bindinput="onInput" placeholder="记录跌倒风险、用药异常、设备隐患等" />
+    </view>
+    <view class="field">
+      <view class="field-label">下一步计划</view>
+      <textarea class="textarea-line small" value="{{nextPlan}}" data-field="nextPlan" bindinput="onInput" placeholder="写给下一班或主管需要继续跟进的事项" />
+    </view>
+    <view class="button-row">
+      <button class="ghost-btn half-btn" loading="{{submitting}}" bindtap="saveDraft">保存草稿</button>
+      <button class="primary-btn half-btn" loading="{{submitting}}" bindtap="submitNow">提交日报</button>
+    </view>
+  </view>
+
+  <view class="filter-row">
+    <block wx:for="{{statusFilters}}" wx:key="value">
+      <view class="filter {{activeStatus === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="switchStatus">{{item.label}}</view>
+    </block>
+  </view>
+
+  <view class="surface state-card" wx:if="{{loading}}">
+    <view class="state-title">正在加载工作日报</view>
+  </view>
+
+  <view class="surface state-card" wx:if="{{!loading && loadError}}">
+    <view class="state-title">日报加载失败</view>
+    <view class="section-subtitle">{{loadError}}</view>
+    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
+  </view>
+
+  <view class="surface empty-card" wx:if="{{!loading && !loadError && reports.length === 0}}">
+    <view class="state-title">暂无日报</view>
+    <view class="section-subtitle">提交后可在这里查看本人历史日报。</view>
+  </view>
+
+  <view wx:if="{{!loading && !loadError && reports.length}}">
+    <block wx:for="{{reports}}" wx:key="id">
+      <view class="surface report-card">
+        <view class="report-head">
+          <view>
+            <view class="report-title">{{item.title}}</view>
+            <view class="report-meta">{{item.reportDate}} · {{item.reporterName || '当前员工'}}</view>
+          </view>
+          <text class="status-pill {{item.status === 'SUBMITTED' ? 'done' : ''}}">{{item.statusText}}</text>
+        </view>
+        <view class="report-line">摘要：{{item.contentSummary || '-'}}</view>
+        <view class="report-line">完成：{{item.completedWork || '-'}}</view>
+        <view class="report-line muted" wx:if="{{item.riskIssue}}">风险：{{item.riskIssue}}</view>
+        <view class="report-line muted" wx:if="{{item.nextPlan}}">计划：{{item.nextPlan}}</view>
+        <button class="primary-btn submit-draft" wx:if="{{item.status === 'DRAFT'}}" data-id="{{item.id}}" loading="{{operatingId === item.id}}" bindtap="submitDraft">提交草稿</button>
+      </view>
+    </block>
+  </view>
+</view>

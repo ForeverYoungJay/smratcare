@@ -1,0 +1,104 @@
+<view class="container">
+  <view class="section-title">维修处理</view>
+  <view class="section-subtitle">到场确认、故障处理、用料记录、拍照验收和后续跟进，形成后勤维修闭环</view>
+
+  <view class="surface state-card" wx:if="{{loading}}">
+    <view class="state-title">正在加载维修工单</view>
+  </view>
+
+  <view class="surface state-card" wx:if="{{!loading && loadError}}">
+    <view class="state-title">维修工单加载失败</view>
+    <view class="section-subtitle">{{loadError}}</view>
+    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
+  </view>
+
+  <view class="surface empty-card" wx:if="{{!loading && !loadError && tasks.length === 0}}">
+    <view class="state-title">暂无维修工单</view>
+    <view class="section-subtitle">设备、设施和环境维修任务派发后会出现在这里。</view>
+  </view>
+
+  <view wx:if="{{!loading && !loadError && tasks.length}}">
+    <view class="surface task-card">
+      <view class="panel-title">待处理工单</view>
+      <block wx:for="{{tasks}}" wx:key="id">
+        <view class="repair-row {{activeTaskId === item.id ? 'active' : ''}}" data-id="{{item.id}}" bindtap="selectTask">
+          <view>
+            <view class="repair-title">{{item.title}}</view>
+            <view class="repair-meta">{{item.metaText}}</view>
+          </view>
+          <text class="repair-status">{{item.priority}}</text>
+        </view>
+      </block>
+    </view>
+
+    <view class="surface form-card" wx:if="{{activeTask}}">
+      <view class="form-head">
+        <view>
+          <view class="panel-title">处理回执</view>
+          <view class="form-subtitle">{{activeTask.title}} · {{activeTask.room}}</view>
+        </view>
+        <text class="task-time">{{activeTask.time}}</text>
+      </view>
+
+      <view class="check-grid">
+        <view class="check-item {{arrived ? 'checked' : ''}}" data-field="arrived" bindtap="toggleCheck">
+          <text class="check-dot">{{arrived ? '✓' : ''}}</text>
+          <text>已到场并确认位置</text>
+        </view>
+        <view class="check-item {{repaired ? 'checked' : ''}}" data-field="repaired" bindtap="toggleCheck">
+          <text class="check-dot">{{repaired ? '✓' : ''}}</text>
+          <text>已完成维修处理</text>
+        </view>
+        <view class="check-item {{accepted ? 'checked' : ''}}" data-field="accepted" bindtap="toggleCheck">
+          <text class="check-dot">{{accepted ? '✓' : ''}}</text>
+          <text>现场验收通过</text>
+        </view>
+      </view>
+
+      <view class="tool-row">
+        <button class="tool-btn" bindtap="scanCode">扫码定位</button>
+        <button class="tool-btn" bindtap="choosePhoto">拍照验收</button>
+      </view>
+      <view class="scan-text" wx:if="{{scanText}}">扫码结果：{{scanText}}</view>
+      <view class="photo-grid" wx:if="{{photos.length}}">
+        <block wx:for="{{photos}}" wx:key="*this">
+          <image class="photo" mode="aspectFill" src="{{item}}" />
+        </block>
+      </view>
+
+      <view class="field-grid">
+        <view class="field">
+          <view class="field-label">故障类型</view>
+          <picker mode="selector" range="{{faultOptions}}" value="{{faultIndex}}" bindchange="onFaultChange">
+            <view class="picker-line">{{faultOptions[faultIndex]}}</view>
+          </picker>
+        </view>
+        <view class="field">
+          <view class="field-label">处理结果</view>
+          <picker mode="selector" range="{{resultOptions}}" value="{{resultIndex}}" bindchange="onResultChange">
+            <view class="picker-line">{{resultOptions[resultIndex]}}</view>
+          </picker>
+        </view>
+      </view>
+      <view class="field">
+        <view class="field-label">处理耗时</view>
+        <picker mode="selector" range="{{durationOptions}}" value="{{durationIndex}}" bindchange="onDurationChange">
+          <view class="picker-line">{{durationOptions[durationIndex]}}</view>
+        </picker>
+      </view>
+      <view class="field">
+        <view class="field-label">使用物料</view>
+        <input class="input-line" value="{{materials}}" data-field="materials" bindinput="onInput" placeholder="例如 膨胀螺丝 2 个、扶手垫片 1 套" />
+      </view>
+      <view class="field">
+        <view class="field-label">处理说明</view>
+        <textarea class="textarea-line" value="{{remark}}" data-field="remark" bindinput="onInput" maxlength="500" placeholder="说明故障原因、处理过程和验收情况" />
+      </view>
+      <view class="field">
+        <view class="field-label">后续跟进</view>
+        <textarea class="textarea-line small" value="{{followUp}}" data-field="followUp" bindinput="onInput" maxlength="300" placeholder="如需二次维修、采购备件或通知主管，请写在这里" />
+      </view>
+      <button class="primary-btn submit-btn" loading="{{submitting}}" bindtap="submitRepair">提交维修回执</button>
+    </view>
+  </view>
+</view>

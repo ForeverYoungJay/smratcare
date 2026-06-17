@@ -1,0 +1,35 @@
+<view class="container">
+  <view class="section-title">后勤执行</view>
+  <view class="section-subtitle">维修派单、到场处理、餐食配送和签收回执</view>
+  <view class="quick-actions">
+    <button class="ghost-btn quick-btn" bindtap="goMaterial">物资申领 / 补给</button>
+    <button class="ghost-btn quick-btn" bindtap="goRepairs">维修处理 / 验收</button>
+    <button class="ghost-btn quick-btn" bindtap="goMeals">送餐签收 / 反馈</button>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-title">维修工单</view>
+    <block wx:for="{{maintenanceTasks}}" wx:key="id">
+      <view class="work-row" bindtap="goRepairs">
+        <view>
+          <view class="work-title">{{item.title}}</view>
+          <view class="work-meta">{{item.room}} · {{item.time}} · {{item.status}}</view>
+        </view>
+        <text class="work-action">{{item.actionText}}</text>
+      </view>
+    </block>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-title">餐食配送</view>
+    <block wx:for="{{mealTasks}}" wx:key="id">
+      <view class="work-row" bindtap="goMeals">
+        <view>
+          <view class="work-title">{{item.title}}</view>
+          <view class="work-meta">{{item.resident}} · {{item.room}} · {{item.time}}</view>
+        </view>
+        <text class="work-action">{{item.actionText}}</text>
+      </view>
+    </block>
+  </view>
+</view>

@@ -1,6 +1,9 @@
-# SmartCare 微信家属端小程序
+# SmartCare 微信一体小程序
 
-本目录是独立于 `admin-web` 的微信小程序工程，面向养老机构家属端。
+本目录是独立于 `admin-web` 的微信小程序工程，同时承载家属端和员工端。
+
+- 家属登录后进入原家属首页，查看长者动态、健康、缴费、沟通和服务。
+- 员工登录后进入员工工作台，处理护理执行、查房巡检、用药确认、维修和餐食配送。
 
 ## 一、已完成能力（完整版）
 
@@ -78,6 +81,40 @@
 - 沟通提效增强：按沟通对象+类型自动恢复草稿、内容字数计数
 - 评估能力增强：家属端可触发 AI 中医体质/心血管评估生成并回看 PDF
 
+### 7) 员工端工作台
+- 登录页支持“家属 / 员工”身份切换
+- 员工账号密码登录复用后台员工登录接口
+- 员工工作台：现场压力指数、任务分组、马上要处理
+- 员工首页作战视图：首屏聚合在岗状态、今日班次、待办数、超时待办、开放异常和最高优先级任务
+- 员工待办：护理、用药、巡检、后勤、送餐筛选，并聚合护理/医护/维修/送餐专用工作台入口
+- 待办智能跳转：按任务模块自动进入护理执行、用药确认、巡检复核、维修处理或送餐签收专用闭环页
+- 任务详情：现场回执、备注和完成动作
+- 任务详情增强：检查项、扫码核验、拍照留痕、语音证据和现场备注
+- 护理执行：护理任务列表
+- 护理执行闭环：床号/姓名核对、护理项目、皮肤状态、精神状态、风险观察、耗材使用、交接提示和拍照留痕
+- 体征补录：现场采集血压、体温、心率、血氧、血糖等数据并自动标记异常
+- 医护工作：用药确认和异常巡检
+- 医护闭环：用药三查七对、给药结果、不良反应记录；巡检到房查验、复测体征、风险等级和处理措施
+- 后勤执行：维修工单和餐食配送
+- 物资申领：护理耗材、餐饮物资、维修备件和保洁补给移动端申请，进入 OA 物资审批流
+- 维修处理：到场确认、扫码定位、故障类型、处理结果、用料、耗时和拍照验收
+- 送餐签收：餐别/姓名核对、禁忌标签确认、签收、餐量反馈、扫码和拍照留痕
+- 我的排班：查看近期班次、时间和责任区域，并支持上班/下班、午休、外出移动打卡
+- 我的考勤：查看本月出勤、请假、迟到、异常和每日打卡记录
+- 请假调班：移动端发起请假/调班审批，进入后台 OA 审批流
+- 我的待办：聚合 OA 提醒、审批待办、换班确认和值班通知
+- 通讯录：搜索员工、查看角色/部门/工号并一键拨号
+- 工作日报：填写当班摘要、完成事项、风险问题和下一班计划
+- 通知公告：阅读院内制度通知、培训安排和运营公告
+- 建议反馈：提交流程、物资、餐食、排班等一线优化建议并追踪处理状态
+- 班次交接：查看重点事项并提交移动端交接补充
+- 异常上报：跌倒、用药、设备、餐食等异常统一上报
+- 异常上报增强：扫码定位、拍照上传、语音说明和现场说明一起留痕
+- 异常记录：按处理状态和紧急程度查看本人上报事件
+- 巡检扫码：巡房、药房、餐车和消防巡检点扫码核验
+- 执行记录：按任务模块查看本人提交的回执、扫码、检查项、照片和语音证据
+- 员工我的：员工资料、岗位角色和退出登录
+
 ## 二、工程结构
 
 - `project.config.json`：微信开发者工具项目配置
@@ -85,7 +122,9 @@
 - `miniprogram/utils/request.js`：统一请求（含 GET 参数/超时处理）
 - `miniprogram/utils/auth.js`：登录态缓存
 - `miniprogram/services/family.js`：家属端统一服务层
+- `miniprogram/services/staff.js`：员工端统一服务层
 - `miniprogram/mocks/family-app.js`：完整 mock 数据中心
+- `miniprogram/mocks/staff-app.js`：员工端 mock 数据中心
 - `miniprogram/pages/*`：业务页面
 
 ## 三、接口策略（真实 API + Mock 兜底）
@@ -97,6 +136,49 @@
 - `POST /api/auth/family/register`
 - `POST /api/auth/family/password/reset`
 - `POST /api/auth/family/login`
+- `POST /api/auth/login`（员工账号密码登录）
+- `GET /api/auth/me`（员工信息）
+- `GET /api/operations/staff-mobile`（员工移动端任务概览）
+- `GET /api/operations/staff-mobile/tasks?module=`（员工待办）
+- `GET /api/operations/staff-mobile/tasks/{id}`（员工任务详情）
+- `POST /api/operations/staff-mobile/tasks/{id}/complete`（员工任务完成回执）
+- `POST /api/operations/staff-mobile/tasks/{id}/complete`（护理执行复用员工任务回执，保存护理项目、皮肤/精神状态、风险观察、耗材、交接提示、检查项、扫码和照片）
+- `POST /api/operations/staff-mobile/tasks/{id}/complete`（医护闭环复用员工任务回执，保存用药结果/给药方式/不良反应，或巡检结论/风险等级/体征摘要/处理措施）
+- `POST /api/operations/staff-mobile/tasks/{id}/complete`（维修处理复用员工任务回执，保存故障类型、处理结果、用料、耗时、检查项、扫码和照片）
+- `POST /api/operations/staff-mobile/tasks/{id}/complete`（送餐签收复用员工任务回执，保存餐量、签收人、检查项、扫码和照片）
+- `GET /api/operations/staff-mobile/receipts?module=`（员工执行记录）
+- `GET /api/health/data/page`（员工查看近期体征补录记录）
+- `POST /api/health/data`（员工现场补录健康体征数据）
+- `GET /api/operations/staff-mobile/schedule`（员工排班）
+- `GET /api/attendance/overview`（员工今日考勤状态）
+- `GET /api/attendance/overview?month=`（员工月度考勤概览）
+- `POST /api/attendance/punch?action=`（员工移动端打卡）
+- `GET /api/oa/approval/page`（员工本人审批记录）
+- `POST /api/oa/approval`（员工请假/调班审批申请）
+- `POST /api/oa/approval`（员工物资申领，`approvalType=MATERIAL_APPLY`）
+- `GET /api/oa/todo/summary?mineOnly=true`（员工待办统计）
+- `GET /api/oa/todo/page?mineOnly=true`（员工待办列表）
+- `PUT /api/oa/todo/{id}/done`（员工完成普通待办）
+- `GET /api/admin/staff/options`（员工通讯录搜索）
+- `GET /api/oa/report/summary?mineOnly=true&reportType=DAY`（员工日报统计）
+- `GET /api/oa/report/page?mineOnly=true&reportType=DAY`（员工日报列表）
+- `POST /api/oa/report`（员工保存/提交日报）
+- `PUT /api/oa/report/{id}/submit`（员工提交日报草稿）
+- `GET /api/oa/notice/page?status=PUBLISHED`（员工通知公告列表）
+- `GET /api/oa/notice/{id}`（员工通知公告详情）
+- `GET /api/oa/suggestion/page`（员工建议反馈记录）
+- `POST /api/oa/suggestion`（员工提交一线建议）
+- `GET /api/operations/staff-mobile/handovers`（交接记录）
+- `POST /api/operations/staff-mobile/handovers`（提交交接）
+- `GET /api/operations/staff-mobile/patrol-points`（巡检点）
+- `POST /api/operations/staff-mobile/patrol-scan`（巡检扫码回执）
+- `POST /api/operations/staff-mobile/incidents`（异常上报）
+- `GET /api/operations/staff-mobile/incidents?status=&level=`（异常记录）
+
+员工端留痕表：
+- `operations_staff_handover`：班次交接记录
+- `operations_staff_patrol_scan`：巡检扫码记录
+- `operations_staff_task_receipt`：任务执行回执，含任务快照、检查项、扫码、备注、照片 URL 和语音证据 URL
 
 家属端聚合接口（本次补齐）：
 - `GET /api/family/dashboard/home`
@@ -180,6 +262,7 @@
 - 沟通消息 `POST /api/family/communication/messages` 已支持语音附件字段：
   `mediaUrl/mediaName/mediaDurationSec/transcript`。
 - 短信验证码与语音上传链路默认强依赖真实后端接口，不再自动降级到 mock，避免绕过安全校验。
+- 员工端当前真实接口优先；任务和异常照片/语音会先上传为文件 URL，再随回执/事件提交。任务回执会保存任务标题、服务对象、位置、检查项、扫码、照片 URL 和语音证据 URL，异常上报会保存位置、扫码、照片 URL 和语音说明，员工可回看本人异常记录，交接和巡检扫码也已落库留痕。员工体征补录复用健康数据接口，支持血压、心率、体温、血氧、血糖、体重等现场采集并自动标记异常；员工物资申领复用 OA `MATERIAL_APPLY` 审批链路，避免现场人员绕过仓库出库权限；员工建议反馈复用 OA 建议接口，便于把一线优化意见纳入后台处理闭环。本地开发环境保留 mock 兜底，方便没有后端或没有测试数据时继续演示。
 
 ## 四、运行方式
 

@@ -316,10 +316,11 @@ async function getCareLogs(options = {}) {
   );
 }
 
-async function getActivityAlbums(pageNo = 1, pageSize = 20) {
+async function getActivityAlbums(pageNo = 1, pageSize = 20, options = {}) {
+  const scope = options.scope || options.albumScope;
   return withFallback(
-    async () => request({ url: '/api/family/activity-albums', data: { pageNo, pageSize } }),
-    () => mock.getActivityAlbums()
+    async () => request({ url: '/api/family/activity-albums', data: { pageNo, pageSize, scope } }),
+    () => mock.getActivityAlbums(scope)
   );
 }
 
@@ -353,6 +354,29 @@ async function getOutingRecords(options = {}) {
   return withFallback(
     async () => request({ url: '/api/family/outing-records', data: { elderId } }),
     () => mock.getOutingRecords()
+  );
+}
+
+async function submitOutingApplication(payload = {}) {
+  const elderId = resolveCurrentElderId(payload.elderId);
+  const data = { ...payload, elderId };
+  return withFallback(
+    async () => request({
+      url: '/api/family/outing-applications',
+      method: 'POST',
+      data
+    }),
+    () => mock.submitOutingApplication(data)
+  );
+}
+
+async function cancelOutingApplication(id) {
+  return withFallback(
+    async () => request({
+      url: `/api/family/outing-applications/${id}/cancel`,
+      method: 'POST'
+    }),
+    () => mock.cancelOutingApplication(id)
   );
 }
 
@@ -897,6 +921,8 @@ module.exports = {
   getActivityAlbumComments,
   addActivityAlbumComment,
   getOutingRecords,
+  submitOutingApplication,
+  cancelOutingApplication,
   getEmergencyContacts,
   getBillSummary,
   getPaymentGuard,

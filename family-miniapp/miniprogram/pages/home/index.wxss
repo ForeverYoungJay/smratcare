@@ -213,7 +213,8 @@
 }
 
 .focus-panel,
-.weekly-panel {
+.weekly-panel,
+.care-timeline-panel {
   box-shadow: none;
 }
 
@@ -225,6 +226,72 @@
   color: #8a5508;
   font-size: 24rpx;
   line-height: 1.45;
+}
+
+.care-timeline-item {
+  display: grid;
+  grid-template-columns: 108rpx minmax(0, 1fr) auto;
+  gap: 14rpx;
+  align-items: flex-start;
+  padding: 18rpx 0;
+  border-top: 1rpx solid #edf2ef;
+}
+
+.care-timeline-item:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.care-time {
+  color: #71807a;
+  font-size: 21rpx;
+  line-height: 1.35;
+}
+
+.care-main {
+  min-width: 0;
+}
+
+.care-title-row {
+  display: flex;
+  gap: 10rpx;
+  align-items: center;
+  min-width: 0;
+}
+
+.care-category {
+  flex: 0 0 auto;
+  padding: 4rpx 10rpx;
+  border-radius: 999rpx;
+  background: #edf6f2;
+  color: #246b5f;
+  font-size: 20rpx;
+  font-weight: 800;
+}
+
+.care-title {
+  flex: 1;
+  min-width: 0;
+  color: #17231f;
+  font-size: 25rpx;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.care-content {
+  margin-top: 8rpx;
+  color: #586862;
+  font-size: 22rpx;
+  line-height: 1.45;
+}
+
+.care-status {
+  color: #246b5f;
+  font-size: 21rpx;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .weekly-range {

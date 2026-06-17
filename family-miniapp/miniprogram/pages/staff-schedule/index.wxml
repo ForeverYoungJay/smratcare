@@ -1,0 +1,45 @@
+<view class="container">
+  <view class="section-title">我的排班</view>
+  <view class="section-subtitle">查看班次、责任区域和移动端打卡状态</view>
+
+  <view class="surface state-card" wx:if="{{loading}}">
+    <view class="state-title">正在加载排班</view>
+  </view>
+
+  <view class="surface state-card" wx:if="{{!loading && loadError}}">
+    <view class="state-title">排班加载失败</view>
+    <view class="section-subtitle">{{loadError}}</view>
+    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
+  </view>
+
+  <view class="surface attendance-card" wx:if="{{!loading && !loadError && attendance}}">
+    <view class="attendance-head">
+      <view>
+        <view class="attendance-title">今日考勤</view>
+        <view class="attendance-meta">应到 {{attendance.expectedWorkStart || '-'}} · 应退 {{attendance.expectedWorkEnd || '-'}}</view>
+      </view>
+      <text class="status">{{attendance.todayStatusLabel || attendance.status || '未打卡'}}</text>
+    </view>
+    <view class="attendance-meta detail" wx:if="{{attendance.checkInTime || attendance.checkOutTime}}">
+      上班 {{attendance.checkInTime || '-'}} · 下班 {{attendance.checkOutTime || '-'}}
+    </view>
+    <view class="punch-grid">
+      <block wx:for="{{punchActions}}" wx:key="action">
+        <button class="punch-btn" loading="{{punching}}" data-action="{{item.action}}" bindtap="punch">{{item.label}}</button>
+      </block>
+    </view>
+  </view>
+
+  <view class="surface panel" wx:if="{{!loading && !loadError}}">
+    <block wx:for="{{schedule}}" wx:key="date">
+      <view class="schedule-row">
+        <view class="date-chip">{{item.date}}</view>
+        <view class="schedule-main">
+          <view class="schedule-title">{{item.shift}} · {{item.time}}</view>
+          <view class="schedule-meta">{{item.area}}</view>
+        </view>
+        <text class="status">{{item.status}}</text>
+      </view>
+    </block>
+  </view>
+</view>

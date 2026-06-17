@@ -1,0 +1,161 @@
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12rpx;
+  margin-top: 22rpx;
+}
+
+.summary-card {
+  padding: 20rpx 12rpx;
+  text-align: center;
+}
+
+.summary-card text,
+.summary-card strong {
+  display: block;
+}
+
+.summary-card text {
+  color: #73808c;
+  font-size: 22rpx;
+  font-weight: 800;
+}
+
+.summary-card strong {
+  margin-top: 8rpx;
+  color: #246b5f;
+  font-size: 38rpx;
+  font-weight: 900;
+}
+
+.summary-card.warning strong {
+  color: #9a6400;
+}
+
+.summary-card.danger strong {
+  color: #bd2e1f;
+}
+
+.search-row {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 18rpx;
+}
+
+.search-input {
+  flex: 1;
+  height: 72rpx;
+  padding: 0 18rpx;
+  border-radius: 14rpx;
+  border: 1rpx solid #d9e3df;
+  background: #ffffff;
+  color: #182420;
+  font-size: 24rpx;
+}
+
+.search-btn {
+  width: 140rpx;
+}
+
+.filter-row {
+  display: flex;
+  gap: 12rpx;
+  overflow-x: auto;
+  margin: 20rpx 0 0;
+  padding-bottom: 4rpx;
+}
+
+.filter-row.compact {
+  margin-top: 12rpx;
+}
+
+.filter {
+  flex: 0 0 auto;
+  padding: 14rpx 22rpx;
+  border-radius: 999rpx;
+  background: #edf2f0;
+  color: #62716b;
+  font-size: 24rpx;
+  font-weight: 850;
+}
+
+.filter.source {
+  background: #f4f0e7;
+  color: #7a5a12;
+}
+
+.filter.active {
+  background: #246b5f;
+  color: #ffffff;
+}
+
+.retry-btn {
+  margin-top: 20rpx;
+}
+
+.empty-card {
+  margin-top: 18rpx;
+  padding: 34rpx;
+}
+
+.todo-card {
+  margin-top: 18rpx;
+  padding: 26rpx;
+}
+
+.todo-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.todo-title {
+  color: #182430;
+  font-size: 30rpx;
+  font-weight: 900;
+}
+
+.todo-meta,
+.todo-foot {
+  margin-top: 8rpx;
+  color: #73808c;
+  font-size: 22rpx;
+}
+
+.status-pill {
+  flex: none;
+  height: 46rpx;
+  padding: 0 16rpx;
+  border-radius: 999rpx;
+  background: #fff2d9;
+  color: #9a5b05;
+  font-size: 21rpx;
+  font-weight: 900;
+  line-height: 46rpx;
+}
+
+.status-pill.done {
+  background: #e5f5ef;
+  color: #16704f;
+}
+
+.todo-content {
+  margin-top: 16rpx;
+  color: #465563;
+  font-size: 24rpx;
+  line-height: 1.55;
+}
+
+.todo-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14rpx;
+}
+
+.action-row {
+  margin-top: 20rpx;
+}
+
+.action-btn {
+  width: 100%;
+}

@@ -1,0 +1,90 @@
+<view class="container">
+  <view class="section-title">送餐签收</view>
+  <view class="section-subtitle">餐别核对、禁忌确认、扫码/拍照留痕和餐量反馈，一线送餐闭环在这里完成</view>
+
+  <view class="surface state-card" wx:if="{{loading}}">
+    <view class="state-title">正在加载送餐任务</view>
+  </view>
+
+  <view class="surface state-card" wx:if="{{!loading && loadError}}">
+    <view class="state-title">送餐任务加载失败</view>
+    <view class="section-subtitle">{{loadError}}</view>
+    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
+  </view>
+
+  <view class="surface empty-card" wx:if="{{!loading && !loadError && tasks.length === 0}}">
+    <view class="state-title">暂无送餐任务</view>
+    <view class="section-subtitle">午餐、晚餐或特殊餐生成后会出现在这里。</view>
+  </view>
+
+  <view wx:if="{{!loading && !loadError && tasks.length}}">
+    <view class="surface task-card">
+      <view class="panel-title">待配送餐食</view>
+      <block wx:for="{{tasks}}" wx:key="id">
+        <view class="meal-row {{activeTaskId === item.id ? 'active' : ''}}" data-id="{{item.id}}" bindtap="selectTask">
+          <view>
+            <view class="meal-title">{{item.title}}</view>
+            <view class="meal-meta">{{item.metaText}}</view>
+          </view>
+          <text class="meal-status">{{item.status}}</text>
+        </view>
+      </block>
+    </view>
+
+    <view class="surface form-card" wx:if="{{activeTask}}">
+      <view class="form-head">
+        <view>
+          <view class="panel-title">签收回执</view>
+          <view class="form-subtitle">{{activeTask.title}} · {{activeTask.room}}</view>
+        </view>
+        <text class="task-time">{{activeTask.time}}</text>
+      </view>
+
+      <view class="check-grid">
+        <view class="check-item {{mealChecked ? 'checked' : ''}}" data-field="mealChecked" bindtap="toggleCheck">
+          <text class="check-dot">{{mealChecked ? '✓' : ''}}</text>
+          <text>核对餐别和姓名</text>
+        </view>
+        <view class="check-item {{tabooChecked ? 'checked' : ''}}" data-field="tabooChecked" bindtap="toggleCheck">
+          <text class="check-dot">{{tabooChecked ? '✓' : ''}}</text>
+          <text>核对禁忌标签</text>
+        </view>
+        <view class="check-item {{signed ? 'checked' : ''}}" data-field="signed" bindtap="toggleCheck">
+          <text class="check-dot">{{signed ? '✓' : ''}}</text>
+          <text>送达并完成签收</text>
+        </view>
+      </view>
+
+      <view class="tool-row">
+        <button class="tool-btn" bindtap="scanCode">扫码核验</button>
+        <button class="tool-btn" bindtap="choosePhoto">拍照留痕</button>
+      </view>
+      <view class="scan-text" wx:if="{{scanText}}">扫码结果：{{scanText}}</view>
+      <view class="photo-grid" wx:if="{{photos.length}}">
+        <block wx:for="{{photos}}" wx:key="*this">
+          <image class="photo" mode="aspectFill" src="{{item}}" />
+        </block>
+      </view>
+
+      <view class="field">
+        <view class="field-label">餐量反馈</view>
+        <picker mode="selector" range="{{intakeOptions}}" value="{{intakeIndex}}" bindchange="onIntakeChange">
+          <view class="picker-line">{{intakeOptions[intakeIndex]}}</view>
+        </picker>
+      </view>
+      <view class="field">
+        <view class="field-label">签收人</view>
+        <input class="input-line" value="{{signerName}}" data-field="signerName" bindinput="onInput" placeholder="老人本人 / 护理员代签 / 家属" />
+      </view>
+      <view class="field">
+        <view class="field-label">餐食备注</view>
+        <textarea class="textarea-line" value="{{remark}}" data-field="remark" bindinput="onInput" maxlength="500" placeholder="例如 糖尿病软食已送达，餐温正常" />
+      </view>
+      <view class="field">
+        <view class="field-label">异常说明</view>
+        <textarea class="textarea-line small" value="{{exceptionText}}" data-field="exceptionText" bindinput="onInput" maxlength="300" placeholder="拒食、呛咳、禁忌不符等情况填写在这里" />
+      </view>
+      <button class="primary-btn submit-btn" loading="{{submitting}}" bindtap="submitMeal">提交送餐签收</button>
+    </view>
+  </view>
+</view>

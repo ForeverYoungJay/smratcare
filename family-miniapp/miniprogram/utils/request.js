@@ -19,7 +19,9 @@ function handleAuthFailure(app, message) {
   clearAuth();
   if (app && app.globalData) {
     app.globalData.token = '';
+    app.globalData.userType = '';
     app.globalData.familyUser = null;
+    app.globalData.staffUser = null;
     app.globalData.selectedElderId = null;
   }
   const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];

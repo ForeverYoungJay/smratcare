@@ -1,0 +1,93 @@
+<view class="container">
+  <view class="section-title">体征补录</view>
+  <view class="section-subtitle">现场采集血压、体温、心率、血氧、血糖等数据，异常自动标记并进入健康数据台账</view>
+
+  <view class="surface form-card">
+    <view class="panel-title">新增体征记录</view>
+    <view class="field">
+      <view class="field-label">老人姓名</view>
+      <input class="input-line" value="{{elderName}}" data-field="elderName" bindinput="onInput" placeholder="例如 王桂兰" />
+    </view>
+    <view class="field">
+      <view class="field-label">体征类型</view>
+      <picker mode="selector" range="{{dataTypeOptions}}" range-key="label" value="{{dataTypeIndex}}" bindchange="onTypeChange">
+        <view class="picker-line">{{dataTypeOptions[dataTypeIndex].label}}</view>
+      </picker>
+    </view>
+    <view class="field">
+      <view class="field-label">采集数值</view>
+      <view class="value-row">
+        <input class="input-line value-input" value="{{dataValue}}" data-field="dataValue" bindinput="onInput" placeholder="{{placeholder}}" />
+        <text class="unit-label">{{unit || '-'}}</text>
+      </view>
+    </view>
+    <view class="time-grid">
+      <view class="field">
+        <view class="field-label">采集日期</view>
+        <picker mode="date" value="{{measuredDate}}" bindchange="onDateChange">
+          <view class="picker-line">{{measuredDate}}</view>
+        </picker>
+      </view>
+      <view class="field">
+        <view class="field-label">采集时间</view>
+        <picker mode="time" value="{{measuredTime}}" bindchange="onTimeChange">
+          <view class="picker-line">{{measuredTime}}</view>
+        </picker>
+      </view>
+    </view>
+    <view class="field">
+      <view class="field-label">现场备注</view>
+      <textarea class="textarea-line" value="{{remark}}" data-field="remark" bindinput="onInput" maxlength="1000" placeholder="例如：餐后复测、夜间巡检、已同步医生等" />
+    </view>
+    <view class="abnormal-row" bindtap="toggleAbnormal">
+      <view>
+        <view class="abnormal-title">异常标记</view>
+        <view class="abnormal-sub">系统会根据常见阈值自动判断，现场也可手动切换</view>
+      </view>
+      <text class="status-pill {{abnormalFlag ? 'danger' : 'done'}}">{{abnormalFlag ? '异常' : '正常'}}</text>
+    </view>
+    <button class="primary-btn submit-btn" loading="{{submitting}}" bindtap="submitRecord">提交体征</button>
+  </view>
+
+  <view class="search-row">
+    <input class="search-input" value="{{keyword}}" data-field="keyword" bindinput="onInput" placeholder="按老人姓名搜索记录" confirm-type="search" bindconfirm="searchRecords" />
+    <button class="ghost-btn search-btn" bindtap="searchRecords">搜索</button>
+  </view>
+
+  <view class="filter-row">
+    <block wx:for="{{statusFilters}}" wx:key="value">
+      <view class="filter {{activeAbnormal === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="switchAbnormal">{{item.label}}</view>
+    </block>
+  </view>
+
+  <view class="surface state-card" wx:if="{{loading}}">
+    <view class="state-title">正在加载体征记录</view>
+  </view>
+
+  <view class="surface state-card" wx:if="{{!loading && loadError}}">
+    <view class="state-title">体征记录加载失败</view>
+    <view class="section-subtitle">{{loadError}}</view>
+    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
+  </view>
+
+  <view class="surface empty-card" wx:if="{{!loading && !loadError && records.length === 0}}">
+    <view class="state-title">暂无体征记录</view>
+    <view class="section-subtitle">提交后可在这里查看最近补录数据。</view>
+  </view>
+
+  <view wx:if="{{!loading && !loadError && records.length}}">
+    <block wx:for="{{records}}" wx:key="id">
+      <view class="surface vital-card">
+        <view class="vital-head">
+          <view>
+            <view class="vital-title">{{item.elderName || '未命名老人'}} · {{item.typeLabel}}</view>
+            <view class="vital-meta">{{item.measuredText || '未设置时间'}} · {{item.source || 'staff-mobile'}}</view>
+          </view>
+          <text class="status-pill {{item.statusClass}}">{{item.statusText}}</text>
+        </view>
+        <view class="vital-value">{{item.dataValue}} <text>{{item.unit}}</text></view>
+        <view class="vital-remark" wx:if="{{item.remark}}">{{item.remark}}</view>
+      </view>
+    </block>
+  </view>
+</view>

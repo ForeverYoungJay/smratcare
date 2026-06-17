@@ -1,0 +1,65 @@
+.card {
+  padding: 32rpx;
+}
+
+.user-name {
+  color: #16231f;
+  font-size: 38rpx;
+  font-weight: 900;
+}
+
+.user-sub {
+  margin-top: 10rpx;
+  color: #71807a;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
+.role-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 22rpx;
+}
+
+.quick-list {
+  margin-top: 26rpx;
+  border-radius: 20rpx;
+  overflow: hidden;
+  background: #f6f8fa;
+}
+
+.quick-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+  padding: 20rpx;
+  border-top: 1rpx solid #edf1f5;
+}
+
+.quick-row:first-child {
+  border-top: 0;
+}
+
+.quick-title {
+  color: #182430;
+  font-size: 26rpx;
+  font-weight: 900;
+}
+
+.quick-desc {
+  margin-top: 6rpx;
+  color: #73808c;
+  font-size: 22rpx;
+}
+
+.quick-arrow {
+  color: #9aa7b3;
+  font-size: 38rpx;
+}
+
+.action {
+  width: 100%;
+  margin-top: 22rpx;
+}

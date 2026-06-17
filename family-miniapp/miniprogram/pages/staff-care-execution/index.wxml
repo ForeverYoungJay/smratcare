@@ -1,0 +1,112 @@
+<view class="container">
+  <view class="section-title">护理执行</view>
+  <view class="section-subtitle">床号核对、护理项目、皮肤/精神状态、风险观察、耗材和交接提示一并留痕</view>
+
+  <view class="surface state-card" wx:if="{{loading}}">
+    <view class="state-title">正在加载护理任务</view>
+  </view>
+
+  <view class="surface state-card" wx:if="{{!loading && loadError}}">
+    <view class="state-title">护理任务加载失败</view>
+    <view class="section-subtitle">{{loadError}}</view>
+    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
+  </view>
+
+  <view class="surface empty-card" wx:if="{{!loading && !loadError && tasks.length === 0}}">
+    <view class="state-title">暂无护理任务</view>
+    <view class="section-subtitle">护理计划生成或派发后会出现在这里。</view>
+  </view>
+
+  <view wx:if="{{!loading && !loadError && tasks.length}}">
+    <view class="surface task-card">
+      <view class="panel-title">待执行护理</view>
+      <block wx:for="{{tasks}}" wx:key="id">
+        <view class="care-row {{activeTaskId === item.id ? 'active' : ''}}" data-id="{{item.id}}" bindtap="selectTask">
+          <view>
+            <view class="care-title">{{item.title}}</view>
+            <view class="care-meta">{{item.metaText}}</view>
+          </view>
+          <text class="care-status">{{item.status}}</text>
+        </view>
+      </block>
+    </view>
+
+    <view class="surface form-card" wx:if="{{activeTask}}">
+      <view class="form-head">
+        <view>
+          <view class="panel-title">护理回执</view>
+          <view class="form-subtitle">{{activeTask.title}} · {{activeTask.room}}</view>
+        </view>
+        <text class="task-time">{{activeTask.time}}</text>
+      </view>
+
+      <view class="check-grid">
+        <view class="check-item {{identityChecked ? 'checked' : ''}}" data-field="identityChecked" bindtap="toggleCheck">
+          <text class="check-dot">{{identityChecked ? '✓' : ''}}</text>
+          <text>核对床号和姓名</text>
+        </view>
+        <view class="check-item {{careDone ? 'checked' : ''}}" data-field="careDone" bindtap="toggleCheck">
+          <text class="check-dot">{{careDone ? '✓' : ''}}</text>
+          <text>护理项目已完成</text>
+        </view>
+        <view class="check-item {{riskChecked ? 'checked' : ''}}" data-field="riskChecked" bindtap="toggleCheck">
+          <text class="check-dot">{{riskChecked ? '✓' : ''}}</text>
+          <text>完成风险观察</text>
+        </view>
+      </view>
+
+      <view class="tool-row">
+        <button class="tool-btn" bindtap="scanCode">扫码核验</button>
+        <button class="tool-btn" bindtap="choosePhoto">拍照留痕</button>
+      </view>
+      <view class="scan-text" wx:if="{{scanText}}">扫码结果：{{scanText}}</view>
+      <view class="photo-grid" wx:if="{{photos.length}}">
+        <block wx:for="{{photos}}" wx:key="*this">
+          <image class="photo" mode="aspectFill" src="{{item}}" />
+        </block>
+      </view>
+
+      <view class="field-grid">
+        <view class="field">
+          <view class="field-label">护理项目</view>
+          <picker mode="selector" range="{{careItemOptions}}" value="{{careItemIndex}}" bindchange="onCareItemChange">
+            <view class="picker-line">{{careItemOptions[careItemIndex]}}</view>
+          </picker>
+        </view>
+        <view class="field">
+          <view class="field-label">风险观察</view>
+          <picker mode="selector" range="{{riskOptions}}" value="{{riskIndex}}" bindchange="onRiskChange">
+            <view class="picker-line">{{riskOptions[riskIndex]}}</view>
+          </picker>
+        </view>
+      </view>
+      <view class="field-grid">
+        <view class="field">
+          <view class="field-label">皮肤状态</view>
+          <picker mode="selector" range="{{skinStatusOptions}}" value="{{skinStatusIndex}}" bindchange="onSkinStatusChange">
+            <view class="picker-line">{{skinStatusOptions[skinStatusIndex]}}</view>
+          </picker>
+        </view>
+        <view class="field">
+          <view class="field-label">精神状态</view>
+          <picker mode="selector" range="{{mentalStatusOptions}}" value="{{mentalStatusIndex}}" bindchange="onMentalStatusChange">
+            <view class="picker-line">{{mentalStatusOptions[mentalStatusIndex]}}</view>
+          </picker>
+        </view>
+      </view>
+      <view class="field">
+        <view class="field-label">耗材使用</view>
+        <input class="input-line" value="{{materials}}" data-field="materials" bindinput="onInput" placeholder="例如 护理垫 1 片、湿巾 2 张，可选" />
+      </view>
+      <view class="field">
+        <view class="field-label">护理结果</view>
+        <textarea class="textarea-line" value="{{remark}}" data-field="remark" bindinput="onInput" maxlength="500" placeholder="记录护理完成情况、老人配合度和现场观察" />
+      </view>
+      <view class="field">
+        <view class="field-label">交接提示</view>
+        <textarea class="textarea-line small" value="{{handoverNote}}" data-field="handoverNote" bindinput="onInput" maxlength="300" placeholder="需要下一班关注的风险、皮肤状态、情绪或家属沟通事项" />
+      </view>
+      <button class="primary-btn submit-btn" loading="{{submitting}}" bindtap="submitCare">提交护理回执</button>
+    </view>
+  </view>
+</view>

@@ -6,6 +6,7 @@ const {
   getFamilyAuthBootstrap,
   bindWechatNotifyOpenId
 } = require('../../services/family');
+const { staffLogin } = require('../../services/staff');
 const { setAuth } = require('../../utils/auth');
 
 const MODE_LOGIN = 'login';
@@ -29,6 +30,7 @@ Page({
     clientPlatform: 'unknown',
     currentBaseUrl: '',
     mode: MODE_LOGIN,
+    identity: 'family',
     orgId: 1,
     orgName: '默认机构',
     supportInfo: {},
@@ -37,7 +39,9 @@ Page({
       phone: '',
       verifyCode: '',
       password: '',
-      realName: ''
+      realName: '',
+      username: '',
+      staffPassword: ''
     }
   },
   timer: null,
@@ -67,7 +71,7 @@ Page({
       return;
     }
     if (app.globalData.token) {
-      wx.reLaunch({ url: '/pages/home/index' });
+      wx.reLaunch({ url: app.globalData.userType === 'staff' ? '/pages/staff-home/index' : '/pages/home/index' });
       return;
     }
     if (app.globalData.localDevBypassLogin && app.isLocalDevEnvironment()) {
@@ -137,6 +141,22 @@ Page({
       'form.password': ''
     });
   },
+  switchIdentity(e) {
+    const identity = e.currentTarget.dataset.identity || 'family';
+    if (identity === this.data.identity) {
+      return;
+    }
+    this.clearTimer();
+    this.setData({
+      identity,
+      mode: MODE_LOGIN,
+      countdown: 0,
+      debugCodeHint: '',
+      'form.verifyCode': '',
+      'form.password': '',
+      'form.staffPassword': ''
+    });
+  },
   onPhoneInput(e) {
     this.setData({ 'form.phone': e.detail.value });
   },
@@ -145,6 +165,12 @@ Page({
   },
   onPasswordInput(e) {
     this.setData({ 'form.password': e.detail.value });
+  },
+  onUsernameInput(e) {
+    this.setData({ 'form.username': e.detail.value });
+  },
+  onStaffPasswordInput(e) {
+    this.setData({ 'form.staffPassword': e.detail.value });
   },
   onNameInput(e) {
     this.setData({ 'form.realName': e.detail.value });
@@ -189,6 +215,10 @@ Page({
       return;
     }
     if (this.data.loading) {
+      return;
+    }
+    if (this.data.identity === 'staff') {
+      await this.submitStaffLogin();
       return;
     }
     const phone = trimText(this.data.form.phone);
@@ -247,18 +277,55 @@ Page({
 
       const app = getApp();
       app.globalData.token = loginResp.token;
+      app.globalData.userType = 'family';
       app.globalData.familyUser = {
+        userType: 'family',
         familyUserId: loginResp.familyUserId,
         orgId: loginResp.orgId || orgId,
         realName: loginResp.realName,
         phone: loginResp.phone
       };
+      app.globalData.staffUser = null;
       app.globalData.selectedElderId = null;
       setAuth(loginResp.token, app.globalData.familyUser);
       this.bindWechatNotifyOpenId();
       wx.reLaunch({ url: '/pages/home/index' });
     } catch (error) {
       wx.showToast({ title: error.message || '操作失败，请稍后重试', icon: 'none' });
+    } finally {
+      this.setData({ loading: false });
+    }
+  },
+  async submitStaffLogin() {
+    const username = trimText(this.data.form.username);
+    const password = trimText(this.data.form.staffPassword);
+    if (!username || !password) {
+      wx.showToast({ title: '请输入员工账号和密码', icon: 'none' });
+      return;
+    }
+    this.setData({ loading: true });
+    try {
+      const loginResp = await staffLogin({ username, password });
+      const token = loginResp && loginResp.token;
+      if (!token) {
+        throw new Error('登录响应缺少 token');
+      }
+      const app = getApp();
+      const staffUser = {
+        ...(loginResp.staffInfo || {}),
+        userType: 'staff',
+        username,
+        roles: loginResp.roles || []
+      };
+      app.globalData.token = token;
+      app.globalData.userType = 'staff';
+      app.globalData.staffUser = staffUser;
+      app.globalData.familyUser = null;
+      app.globalData.selectedElderId = null;
+      setAuth(token, staffUser);
+      wx.reLaunch({ url: '/pages/staff-home/index' });
+    } catch (error) {
+      wx.showToast({ title: error.message || '员工登录失败', icon: 'none' });
     } finally {
       this.setData({ loading: false });
     }

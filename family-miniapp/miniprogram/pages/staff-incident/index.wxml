@@ -1,0 +1,55 @@
+<view class="container">
+  <view class="section-title">异常事件上报</view>
+  <view class="section-subtitle">跌倒、用药、设备、餐食等异常统一留痕</view>
+
+  <view class="surface panel form-panel">
+    <view class="field-label">事件类型</view>
+    <picker range="{{incidentTypes}}" bindchange="onTypeChange">
+      <view class="picker-value">{{incidentType}}</view>
+    </picker>
+
+    <view class="field-label">紧急程度</view>
+    <picker range="{{levels}}" bindchange="onLevelChange">
+      <view class="picker-value level-{{level}}">{{level}}</view>
+    </picker>
+
+    <view class="field-label">关联老人</view>
+    <input class="input" value="{{resident}}" placeholder="如：王桂兰，可选" data-field="resident" bindinput="onFieldInput" />
+
+    <view class="field-label">位置</view>
+    <input class="input" value="{{room}}" placeholder="如：3F-302-1" data-field="room" bindinput="onFieldInput" />
+
+    <view class="field-label">异常说明</view>
+    <textarea class="textarea" value="{{description}}" placeholder="描述现场情况、已采取措施、是否需要升级处理" data-field="description" bindinput="onFieldInput" />
+
+    <view class="tool-row">
+      <button class="tool-btn" bindtap="scanCode">扫码定位</button>
+      <button class="tool-btn" bindtap="choosePhoto">拍照留痕</button>
+    </view>
+    <view class="voice-panel">
+      <button class="voice-btn {{recording ? 'recording' : ''}}" bindtouchstart="startRecord" bindtouchend="stopRecord" bindtouchcancel="stopRecord">
+        {{recording ? '松开保存语音' : '按住录入语音说明'}}
+      </button>
+      <view class="voice-chip" wx:if="{{voice}}">
+        <text>已录入异常语音 {{voice.durationText}}</text>
+        <text class="voice-clear" bindtap="clearVoice">重录</text>
+      </view>
+    </view>
+    <view class="scan-text" wx:if="{{scanText}}">扫码结果：{{scanText}}</view>
+    <view class="photo-grid" wx:if="{{photos.length}}">
+      <block wx:for="{{photos}}" wx:key="*this">
+        <image class="photo" mode="aspectFill" src="{{item}}" />
+      </block>
+    </view>
+
+    <button class="primary-btn submit-btn" loading="{{submitting}}" bindtap="submitForm">提交上报</button>
+  </view>
+
+  <view class="record-mask" wx:if="{{recording}}">
+    <view class="record-card">
+      <view class="record-mic"></view>
+      <view class="record-title">正在录音</view>
+      <view class="record-text">松开后保存为异常语音证据</view>
+    </view>
+  </view>
+</view>

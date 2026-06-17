@@ -1,0 +1,56 @@
+<view class="container">
+  <view class="section-title">执行记录</view>
+  <view class="section-subtitle">查看本人提交的任务回执、扫码、照片和语音留痕</view>
+
+  <view class="filter-row">
+    <block wx:for="{{filters}}" wx:key="value">
+      <view class="filter {{active === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="switchFilter">{{item.label}}</view>
+    </block>
+  </view>
+
+  <view class="surface state-card" wx:if="{{loading}}">
+    <view class="state-title">正在加载执行记录</view>
+  </view>
+
+  <view class="surface state-card" wx:if="{{!loading && loadError}}">
+    <view class="state-title">加载失败</view>
+    <view class="section-subtitle">{{loadError}}</view>
+    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
+  </view>
+
+  <view class="surface empty-card" wx:if="{{!loading && !loadError && receipts.length === 0}}">
+    <view class="state-title">暂无执行记录</view>
+    <view class="section-subtitle">完成护理、用药、巡检、后勤或送餐任务后会出现在这里。</view>
+  </view>
+
+  <view wx:if="{{!loading && !loadError && receipts.length}}">
+    <block wx:for="{{receipts}}" wx:key="id">
+      <view class="surface receipt-card">
+        <view class="receipt-head">
+          <view>
+            <view class="receipt-title">{{item.taskTitle || item.moduleText || item.module || '现场任务'}}</view>
+            <view class="receipt-meta">{{item.moduleText || item.module || '任务'}} · {{item.receiptTime}}</view>
+          </view>
+          <text class="pill pill-normal">{{item.status || 'DONE'}}</text>
+        </view>
+        <view class="snapshot-row">
+          <text>{{item.resident || '对象未记录'}}</text>
+          <text>{{item.room || '位置未记录'}}</text>
+          <text>{{item.taskId}}</text>
+        </view>
+        <view class="receipt-line" wx:if="{{item.remark}}">备注：{{item.remark}}</view>
+        <view class="receipt-line" wx:if="{{item.scanText}}">扫码：{{item.scanText}}</view>
+        <view class="receipt-line" wx:if="{{item.checkedItems}}">检查项：{{item.checkedItems}}</view>
+        <view class="voice-chip" wx:if="{{item.voiceUrl}}">
+          <text>语音证据</text>
+          <text>{{item.voiceDurationSec || 0}} 秒</text>
+        </view>
+        <view class="photo-row" wx:if="{{item.photos && item.photos.length}}">
+          <block wx:for="{{item.photos}}" wx:key="*this" wx:for-item="photo">
+            <image class="photo" mode="aspectFill" src="{{photo}}" data-urls="{{item.photos}}" data-current="{{photo}}" bindtap="previewPhoto" />
+          </block>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>

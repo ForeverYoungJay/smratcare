@@ -1,0 +1,96 @@
+.retry-btn {
+  margin-top: 20rpx;
+}
+
+.attendance-card {
+  margin: 22rpx 0;
+  padding: 26rpx;
+  background: linear-gradient(135deg, rgba(36, 107, 95, 0.13), rgba(255, 255, 255, 0) 58%), #ffffff;
+}
+
+.attendance-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.attendance-title {
+  color: #182430;
+  font-size: 32rpx;
+  font-weight: 900;
+}
+
+.attendance-meta {
+  margin-top: 8rpx;
+  color: #73808c;
+  font-size: 23rpx;
+}
+
+.attendance-meta.detail {
+  margin-top: 16rpx;
+  color: #465563;
+}
+
+.punch-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12rpx;
+  margin-top: 20rpx;
+}
+
+.punch-btn {
+  height: 74rpx;
+  border-radius: 18rpx;
+  background: #edf5f2;
+  color: #1f5f4c;
+  font-size: 24rpx;
+  font-weight: 850;
+  line-height: 74rpx;
+}
+
+.schedule-row {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  padding: 22rpx 0;
+  border-top: 1rpx solid #edf1f5;
+}
+
+.schedule-row:first-child {
+  border-top: 0;
+}
+
+.date-chip {
+  width: 86rpx;
+  height: 86rpx;
+  border-radius: 24rpx;
+  background: #eaf4ef;
+  color: #246b5f;
+  font-size: 25rpx;
+  font-weight: 900;
+  line-height: 86rpx;
+  text-align: center;
+}
+
+.schedule-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.schedule-title {
+  color: #182430;
+  font-size: 28rpx;
+  font-weight: 900;
+}
+
+.schedule-meta {
+  margin-top: 8rpx;
+  color: #73808c;
+  font-size: 23rpx;
+}
+
+.status {
+  color: #1f5f8b;
+  font-size: 23rpx;
+  font-weight: 850;
+}

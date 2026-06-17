@@ -1,0 +1,146 @@
+<view class="container">
+  <view class="section-title">{{config.title}}</view>
+  <view class="section-subtitle">{{config.subtitle}}</view>
+
+  <view class="mode-tabs">
+    <view class="mode-tab {{mode === 'MEDICATION' ? 'active' : ''}}" data-mode="MEDICATION" bindtap="switchMode">用药确认</view>
+    <view class="mode-tab {{mode === 'INSPECTION' ? 'active' : ''}}" data-mode="INSPECTION" bindtap="switchMode">巡检复核</view>
+  </view>
+
+  <view class="surface state-card" wx:if="{{loading}}">
+    <view class="state-title">正在加载{{config.moduleText}}任务</view>
+  </view>
+
+  <view class="surface state-card" wx:if="{{!loading && loadError}}">
+    <view class="state-title">任务加载失败</view>
+    <view class="section-subtitle">{{loadError}}</view>
+    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
+  </view>
+
+  <view class="surface empty-card" wx:if="{{!loading && !loadError && tasks.length === 0}}">
+    <view class="state-title">{{config.emptyText}}</view>
+    <view class="section-subtitle">任务生成后会出现在这里。</view>
+  </view>
+
+  <view wx:if="{{!loading && !loadError && tasks.length}}">
+    <view class="surface task-card">
+      <view class="panel-title">{{config.moduleText}}任务</view>
+      <block wx:for="{{tasks}}" wx:key="id">
+        <view class="clinical-row {{activeTaskId === item.id ? 'active' : ''}}" data-id="{{item.id}}" bindtap="selectTask">
+          <view>
+            <view class="clinical-title">{{item.title}}</view>
+            <view class="clinical-meta">{{item.metaText}}</view>
+          </view>
+          <text class="clinical-status">{{item.status}}</text>
+        </view>
+      </block>
+    </view>
+
+    <view class="surface form-card" wx:if="{{activeTask}}">
+      <view class="form-head">
+        <view>
+          <view class="panel-title">现场回执</view>
+          <view class="form-subtitle">{{activeTask.title}} · {{activeTask.room}}</view>
+        </view>
+        <text class="task-time">{{activeTask.time}}</text>
+      </view>
+
+      <view wx:if="{{mode === 'MEDICATION'}}">
+        <view class="check-grid">
+          <view class="check-item {{identityChecked ? 'checked' : ''}}" data-field="identityChecked" bindtap="toggleCheck">
+            <text class="check-dot">{{identityChecked ? '✓' : ''}}</text>
+            <text>核对老人身份</text>
+          </view>
+          <view class="check-item {{drugChecked ? 'checked' : ''}}" data-field="drugChecked" bindtap="toggleCheck">
+            <text class="check-dot">{{drugChecked ? '✓' : ''}}</text>
+            <text>核对药品和剂量</text>
+          </view>
+          <view class="check-item {{administered ? 'checked' : ''}}" data-field="administered" bindtap="toggleCheck">
+            <text class="check-dot">{{administered ? '✓' : ''}}</text>
+            <text>确认给药结果</text>
+          </view>
+        </view>
+      </view>
+
+      <view wx:if="{{mode === 'INSPECTION'}}">
+        <view class="check-grid">
+          <view class="check-item {{visited ? 'checked' : ''}}" data-field="visited" bindtap="toggleCheck">
+            <text class="check-dot">{{visited ? '✓' : ''}}</text>
+            <text>已到房查验</text>
+          </view>
+          <view class="check-item {{vitalsChecked ? 'checked' : ''}}" data-field="vitalsChecked" bindtap="toggleCheck">
+            <text class="check-dot">{{vitalsChecked ? '✓' : ''}}</text>
+            <text>已复测生命体征</text>
+          </view>
+          <view class="check-item {{synced ? 'checked' : ''}}" data-field="synced" bindtap="toggleCheck">
+            <text class="check-dot">{{synced ? '✓' : ''}}</text>
+            <text>已同步医生或主管</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="tool-row">
+        <button class="tool-btn" bindtap="scanCode">扫码核验</button>
+        <button class="tool-btn" bindtap="choosePhoto">拍照留痕</button>
+      </view>
+      <view class="scan-text" wx:if="{{scanText}}">扫码结果：{{scanText}}</view>
+      <view class="photo-grid" wx:if="{{photos.length}}">
+        <block wx:for="{{photos}}" wx:key="*this">
+          <image class="photo" mode="aspectFill" src="{{item}}" />
+        </block>
+      </view>
+
+      <view wx:if="{{mode === 'MEDICATION'}}">
+        <view class="field-grid">
+          <view class="field">
+            <view class="field-label">给药结果</view>
+            <picker mode="selector" range="{{medicationResultOptions}}" value="{{medicationResultIndex}}" bindchange="onMedicationResultChange">
+              <view class="picker-line">{{medicationResultOptions[medicationResultIndex]}}</view>
+            </picker>
+          </view>
+          <view class="field">
+            <view class="field-label">给药方式</view>
+            <picker mode="selector" range="{{medicationMethodOptions}}" value="{{medicationMethodIndex}}" bindchange="onMedicationMethodChange">
+              <view class="picker-line">{{medicationMethodOptions[medicationMethodIndex]}}</view>
+            </picker>
+          </view>
+        </view>
+        <view class="field">
+          <view class="field-label">不良反应 / 异常</view>
+          <textarea class="textarea-line small" value="{{adverseText}}" data-field="adverseText" bindinput="onInput" maxlength="300" placeholder="如拒服、呛咳、皮疹、需医生复核等" />
+        </view>
+      </view>
+
+      <view wx:if="{{mode === 'INSPECTION'}}">
+        <view class="field-grid">
+          <view class="field">
+            <view class="field-label">巡检结论</view>
+            <picker mode="selector" range="{{inspectionResultOptions}}" value="{{inspectionResultIndex}}" bindchange="onInspectionResultChange">
+              <view class="picker-line">{{inspectionResultOptions[inspectionResultIndex]}}</view>
+            </picker>
+          </view>
+          <view class="field">
+            <view class="field-label">风险等级</view>
+            <picker mode="selector" range="{{riskLevelOptions}}" value="{{riskLevelIndex}}" bindchange="onRiskLevelChange">
+              <view class="picker-line">{{riskLevelOptions[riskLevelIndex]}}</view>
+            </picker>
+          </view>
+        </view>
+        <view class="field">
+          <view class="field-label">体征摘要</view>
+          <input class="input-line" value="{{vitalsSummary}}" data-field="vitalsSummary" bindinput="onInput" placeholder="例如 BP 138/88，T 37.6，SpO2 96%" />
+        </view>
+        <view class="field">
+          <view class="field-label">处理措施</view>
+          <textarea class="textarea-line" value="{{actionTaken}}" data-field="actionTaken" bindinput="onInput" maxlength="500" placeholder="记录复测、安抚、通知医生、调整巡视频次等" />
+        </view>
+      </view>
+
+      <view class="field">
+        <view class="field-label">补充备注</view>
+        <textarea class="textarea-line small" value="{{remark}}" data-field="remark" bindinput="onInput" maxlength="500" placeholder="填写需要交接给下一班或主管的说明" />
+      </view>
+      <button class="primary-btn submit-btn" loading="{{submitting}}" bindtap="submitClinical">提交{{config.moduleText}}回执</button>
+    </view>
+  </view>
+</view>
