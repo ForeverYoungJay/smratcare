@@ -28,6 +28,19 @@ async function staffLogin(payload) {
   });
 }
 
+function isAuthRequiredError(error) {
+  return error && (error.code === 'AUTH_REQUIRED' || error.businessCode === 401 || error.businessCode === 403);
+}
+
+async function safeStaffCall(realCall, fallbackValue) {
+  try {
+    return await realCall();
+  } catch (error) {
+    if (isAuthRequiredError(error)) throw error;
+    return typeof fallbackValue === 'function' ? fallbackValue() : fallbackValue;
+  }
+}
+
 async function getStaffProfile() {
   return withFallback(
     async () => {
@@ -45,26 +58,40 @@ async function getStaffProfile() {
 async function getStaffDashboard() {
   return withFallback(
     async () => {
-      const mobile = await request({ url: '/api/operations/staff-mobile' });
-      const profile = await getStaffProfile();
-      const tasks = await getTaskList();
+      const mockDashboard = mock.getStaffDashboard();
+      const app = getApp();
+      const cachedStaff = (app && app.globalData && app.globalData.staffUser) || {};
+      const mobile = await safeStaffCall(
+        async () => request({ url: '/api/operations/staff-mobile' }),
+        {}
+      );
+      const profile = await safeStaffCall(
+        async () => getStaffProfile(),
+        cachedStaff.realName || cachedStaff.username ? cachedStaff : mock.getStaffProfile()
+      );
+      const tasks = await safeStaffCall(
+        async () => getTaskList(),
+        mock.getTaskList()
+      );
+      const metrics = Array.isArray(mobile.metrics) ? mobile.metrics : [];
+      const actions = Array.isArray(mobile.actions) ? mobile.actions : [];
       return {
-        generatedAt: mobile.generatedAt,
+        generatedAt: mobile.generatedAt || mockDashboard.generatedAt || '',
         staffName: profile.realName || profile.username || '员工',
-        shiftName: profile.shiftName || '今日班次',
+        shiftName: profile.shiftName || mockDashboard.shiftName || '今日班次',
         roleText: (profile.roles || []).join(' / ') || '员工',
-        mobileIndex: mobile.mobileIndex || 0,
-        mobileLevel: mobile.mobileLevel || 'LOW',
-        notices: (mobile.actions || []).slice(0, 3).map((item) => item.title),
-        taskGroups: (mobile.metrics || []).map((item) => ({
+        mobileIndex: mobile.mobileIndex || mockDashboard.mobileIndex || 0,
+        mobileLevel: mobile.mobileLevel || mockDashboard.mobileLevel || 'LOW',
+        notices: actions.length ? actions.slice(0, 3).map((item) => item.title) : mockDashboard.notices,
+        taskGroups: metrics.length ? metrics.map((item) => ({
           key: item.key,
           title: item.label,
           count: Number(String(item.value || '0').split('/')[0]) || 0,
           tone: item.tone || 'normal',
           route: routeForMetric(item.key)
-        })),
-        quickEntries: mock.getStaffDashboard().quickEntries,
-        tasks: tasks.slice(0, 4).map(normalizeStaffTask)
+        })) : mockDashboard.taskGroups,
+        quickEntries: mockDashboard.quickEntries,
+        tasks: (tasks || []).slice(0, 4).map(normalizeStaffTask)
       };
     },
     () => mock.getStaffDashboard()
