@@ -578,7 +578,30 @@
             <li><span>联系邮箱：</span>{{ profile.contact.email }}</li>
             <li><span>机构地址：</span>{{ profile.contact.address }}</li>
             <li><span>参观时段：</span>{{ profile.contact.visitingTime }}</li>
+            <li><span>微信小程序：</span>{{ profile.contact.miniProgram }}</li>
+            <li><span>微信公众号：</span>{{ profile.contact.officialAccount }}</li>
+            <li><span>视频号：</span>{{ profile.contact.videoAccount }}</li>
           </ul>
+          <div class="wechat-contact-grid">
+            <div class="wechat-contact-card">
+              <div class="wechat-qr-placeholder">小程序码</div>
+              <span>微信小程序</span>
+              <strong>{{ profile.contact.miniProgram }}</strong>
+              <small>家属可预约参观、查看服务与提交咨询</small>
+            </div>
+            <div class="wechat-contact-card">
+              <div class="wechat-qr-placeholder">公众号码</div>
+              <span>微信公众号</span>
+              <strong>{{ profile.contact.officialAccount }}</strong>
+              <small>关注机构动态、服务公告与健康科普</small>
+            </div>
+            <div class="wechat-contact-card">
+              <div class="wechat-qr-placeholder">视频号码</div>
+              <span>视频号</span>
+              <strong>{{ profile.contact.videoAccount }}</strong>
+              <small>查看院区环境、长者活动与服务现场短视频</small>
+            </div>
+          </div>
           <div class="contact-actions">
             <a-button type="primary" @click="openConsultModal">预约参观</a-button>
             <a-button @click="openAppointment">电话咨询</a-button>
@@ -1028,6 +1051,7 @@ const heroTrustSignals = computed(() => ([
   '7×24 小时连续照护',
   `${profile.compliance.qualifications.length} 项证照公示`,
   '收费区间公开透明',
+  '小程序 / 公众号 / 视频号可咨询',
   `参观时段 ${profile.contact.visitingTime || '请电话确认'}`
 ]))
 
@@ -2566,6 +2590,59 @@ function scrollTo(id: string) {
   width: 90px;
 }
 
+.wechat-contact-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 18px 0 24px;
+}
+
+.wechat-contact-card {
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: #f1f7f4;
+  border: 1px solid #dbe8e2;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.wechat-qr-placeholder {
+  width: 92px;
+  height: 92px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  border: 1px solid #cfe0d8;
+  background:
+    linear-gradient(90deg, rgba(33, 112, 95, 0.18) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(33, 112, 95, 0.18) 1px, transparent 1px),
+    #ffffff;
+  background-size: 10px 10px;
+  color: #21705f;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.wechat-contact-card span {
+  color: #5c6f69;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.wechat-contact-card strong {
+  color: #21705f;
+  font-size: 18px;
+}
+
+.wechat-contact-card small {
+  color: #5c6f69;
+  line-height: 1.6;
+}
+
 .appointment-strip {
   padding: 48px 0;
   background: linear-gradient(135deg, #185c4e, #2e8a72);
@@ -2820,6 +2897,10 @@ function scrollTo(id: string) {
   }
 
   .hero-panel-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .wechat-contact-grid {
     grid-template-columns: 1fr;
   }
 

@@ -92,6 +92,9 @@ export interface EnterpriseProfile {
     email: string
     address: string
     visitingTime: string
+    miniProgram: string
+    officialAccount: string
+    videoAccount: string
   }
   legal: {
     icp?: string
@@ -325,7 +328,10 @@ export const enterpriseProfile: EnterpriseProfile = {
     hotlineTip: '工作日 08:00-18:00',
     email: 'service@gfyy.org.cn',
     address: '江西省上饶市弋阳县龟峰大道88号',
-    visitingTime: '周一至周日 08:00-18:00'
+    visitingTime: '周一至周日 08:00-18:00',
+    miniProgram: '弋阳龟峰颐养中心',
+    officialAccount: '弋阳龟峰颐养中心',
+    videoAccount: '弋阳龟峰颐养中心'
   },
   legal: {
     icp: '赣ICP备2026001888号-1',
