@@ -96,7 +96,7 @@
               <strong>{{ item.source }}</strong>
               <span>{{ item.leadCount }} · 签约率 {{ item.contractRate }}</span>
             </button>
-            <a-empty v-if="!data.channels.length" :image="null" description="暂无渠道数据" />
+            <a-empty v-if="!data.channels.length" description="暂无渠道数据" />
           </div>
         </a-card>
       </a-col>

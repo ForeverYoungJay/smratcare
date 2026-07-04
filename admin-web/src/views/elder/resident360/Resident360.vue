@@ -77,7 +77,7 @@
             <a-tag>{{ item.levelCode || '未分级' }}</a-tag>
             <span>{{ item.resultSummary || item.suggestion || '暂无摘要' }}</span>
           </div>
-          <a-empty v-if="!(careProfile.latestAssessments || []).length" :image="null" description="暂无评估记录" />
+          <a-empty v-if="!(careProfile.latestAssessments || []).length" description="暂无评估记录" />
         </a-col>
         <a-col :xs="24" :lg="10">
           <div class="care-profile__section-title">等级调整轨迹</div>
@@ -85,7 +85,7 @@
             <span>{{ item.createTime || '-' }}</span>
             <span>{{ item.beforeValue || '未评定' }} → {{ item.afterValue || '未评定' }}</span>
           </div>
-          <a-empty v-if="!(careProfile.changeLogs || []).length" :image="null" description="暂无调整记录" />
+          <a-empty v-if="!(careProfile.changeLogs || []).length" description="暂无调整记录" />
         </a-col>
       </a-row>
     </a-card>

@@ -207,7 +207,7 @@
               </div>
             </div>
           </div>
-          <a-empty v-else :image="null" description="当前筛选条件下暂无楼栋/楼层分布数据" />
+          <a-empty v-else description="当前筛选条件下暂无楼栋/楼层分布数据" />
         </div>
       </a-spin>
     </a-card>

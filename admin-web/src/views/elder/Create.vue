@@ -170,7 +170,7 @@
               </a-col>
             </a-row>
           </div>
-          <a-empty v-if="!familyDraftRows.length" :image="null" description="暂无家属信息，可直接新增录入" />
+          <a-empty v-if="!familyDraftRows.length" description="暂无家属信息，可直接新增录入" />
         </div>
         <a-form-item label="楼栋" name="buildingId">
           <a-select v-model:value="assetSelect.buildingId" allow-clear placeholder="选择楼栋" :disabled="form.status !== 1">

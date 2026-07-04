@@ -3,7 +3,9 @@ import type { RouteRecordRaw } from 'vue-router'
 /**
  * 历史兼容路由（纯重定向）
  *
- * 这些一级模块已合并进 logistics/*，仅保留旧 URL 的自动跳转以免收藏/外链失效。
+ * 收纳两类旧 URL 的自动跳转，避免收藏/外链失效：
+ *   1. 已合并进 logistics/* 的旧一级模块（bed / material / store / inventory）
+ *   2. 长者模块内被迁移到新页面的旧路径（elder/admission 等）
  * 全部 hidden，不出现在菜单里。新功能请勿加到这里——加到 routes.ts 的正式模块。
  *
  * 使用：在 routes.ts 的根布局 children 中 `...legacyModuleRedirects` 展开。
@@ -175,5 +177,60 @@ export const legacyModuleRedirects: RouteRecordRaw[] = [
         meta: { title: '盘点记录' }
       }
     ]
+  },
+  // 长者模块历史兼容跳转（旧路径 → 新页面）
+  {
+    path: 'elder/admission-assessment',
+    name: 'ElderAdmissionAssessment',
+    redirect: '/elder/assessment/ability/admission',
+    meta: { title: '入住评估', hidden: true }
+  },
+  {
+    path: 'elder/discharge-settlement',
+    name: 'ElderDischargeSettlement',
+    redirect: '/elder/status-change/discharge-settlement',
+    meta: { hidden: true }
+  },
+  {
+    path: 'elder/admission',
+    name: 'ElderAdmission',
+    redirect: '/elder/admission-processing',
+    meta: { hidden: true }
+  },
+  {
+    path: 'elder/outing',
+    name: 'ElderOuting',
+    redirect: '/elder/status-change/outing',
+    meta: { hidden: true }
+  },
+  {
+    path: 'elder/visit-register',
+    name: 'ElderVisitRegister',
+    redirect: '/elder/status-change/visit-register',
+    meta: { hidden: true }
+  },
+  {
+    path: 'elder/discharge-apply',
+    name: 'ElderDischargeApply',
+    redirect: '/elder/status-change/discharge-apply',
+    meta: { hidden: true }
+  },
+  {
+    path: 'elder/trial-stay',
+    name: 'ElderTrialStay',
+    redirect: '/elder/status-change/trial-stay',
+    meta: { hidden: true }
+  },
+  {
+    path: 'elder/medical-outing',
+    name: 'ElderMedicalOutingRegister',
+    redirect: '/elder/status-change/medical-outing',
+    meta: { hidden: true }
+  },
+  {
+    path: 'elder/death-register',
+    name: 'ElderDeathRegister',
+    redirect: '/elder/status-change/death-register',
+    meta: { hidden: true }
   }
 ]

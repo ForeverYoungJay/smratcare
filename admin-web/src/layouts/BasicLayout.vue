@@ -2227,12 +2227,15 @@ function onOpenChange(keys: string[]) {
   persistOpenKeys(keys)
   const addedKey = keys.find((key) => !previousKeys.includes(key))
   if (!addedKey) return
-  const isTopLevel = filteredMenu.value.some((item) => item.key === addedKey)
-  if (!isTopLevel) return
-  const targetPath = resolveMenuPathByKey(addedKey, filteredMenu.value)
-  if (!targetPath) return
-  if (normalizeTabKey(route.path) === normalizeTabKey(targetPath)) return
-  router.push(targetPath)
+  // 展开一级模块或其目录时，自动打开该模块的业务导航（Hub）
+  const addedPath =
+    resolveMenuPathByKey(addedKey, filteredMenu.value) ||
+    (typeof addedKey === 'string' && addedKey.startsWith('/') ? addedKey : '')
+  const moduleSeg = addedPath.split('/').filter(Boolean)[0]
+  if (!moduleSeg) return
+  const moduleHub = `/${moduleSeg}`
+  if (normalizeTabKey(route.path) === normalizeTabKey(moduleHub)) return
+  router.push(moduleHub)
 }
 
 function onMenuClick(info: any) {

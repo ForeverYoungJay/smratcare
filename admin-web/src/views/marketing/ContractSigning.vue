@@ -301,7 +301,7 @@
                     <span>身份证 {{ item.idCardNo || '-' }}</span>
                   </div>
                 </div>
-                <a-empty v-if="!familyDraftRows.length" :image="null" description="暂无家属信息" />
+                <a-empty v-if="!familyDraftRows.length" description="暂无家属信息" />
               </div>
               <div class="readonly-disease-block">
                 <span class="readonly-label">基础疾病</span>
@@ -551,7 +551,7 @@
                     </a-col>
                   </a-row>
                 </div>
-                <a-empty v-if="!familyDraftRows.length" :image="null" description="暂无家属信息，可直接新增录入" />
+                <a-empty v-if="!familyDraftRows.length" description="暂无家属信息，可直接新增录入" />
               </div>
             </div>
 
