@@ -53,6 +53,10 @@ export function updateSuggestionStatus(id: Id, status: string) {
   return request.put<OaSuggestion>(`/api/oa/suggestion/${id}/status`, null, { params: { status } })
 }
 
+export function handleSuggestion(id: Id, data: { status?: string; reply?: string }) {
+  return request.put<OaSuggestion>(`/api/oa/suggestion/${id}/handle`, data)
+}
+
 export function getNoticePage(params: any) {
   return fetchPage<OaNotice>('/api/oa/notice/page', params)
 }

@@ -1,5 +1,12 @@
 <template>
   <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
+    <template #extra>
+      <a-space wrap>
+        <a-button @click="exportCsvData">导出CSV</a-button>
+        <a-button v-if="!isStorageMode" type="primary" @click="openCreate">新增商品</a-button>
+        <a-button v-else type="primary" @click="goToCommerceProduct">去商城维护</a-button>
+      </a-space>
+    </template>
     <template #stats>
       <div class="product-overview-grid">
         <div class="overview-card">
@@ -95,11 +102,6 @@
             <a-tag color="purple">低库存 {{ lowStockCount }} 条</a-tag>
           </a-space>
         </div>
-        <div class="toolbar-actions">
-          <a-button v-if="!isStorageMode" type="primary" @click="openCreate">新增商品</a-button>
-          <a-button v-else type="primary" @click="goToCommerceProduct">去商城维护</a-button>
-          <a-button @click="exportCsvData">导出CSV</a-button>
-        </div>
       </div>
 
       <div class="table-frame">
@@ -108,7 +110,7 @@
           class="product-vxe-table"
           border
           stripe
-          show-overflow
+          show-overflow="title"
           height="520"
           :loading="loading"
           :data="rows"
@@ -164,12 +166,12 @@
           </vxe-column>
           <vxe-column :title="isStorageMode ? '联动操作' : '操作'" :width="isStorageMode ? 280 : 220" fixed="right">
             <template #default="{ row }">
-              <a-space>
-                <a v-if="!isStorageMode" @click="openEdit(row)">编辑</a>
-                <a v-if="!isStorageMode" @click="toggleStatus(row)">{{ row.status === 1 ? '下架' : '上架' }}</a>
-                <a v-if="isStorageMode" @click="goToStockQuery">查看库存</a>
-                <a v-if="isStorageMode" @click="goToCommerceProduct">商品维护</a>
-              </a-space>
+              <div class="row-action-links">
+                <a-button v-if="!isStorageMode" type="link" size="small" @click="openEdit(row)">编辑</a-button>
+                <a-button v-if="!isStorageMode" type="link" size="small" @click="toggleStatus(row)">{{ row.status === 1 ? '下架' : '上架' }}</a-button>
+                <a-button v-if="isStorageMode" type="link" size="small" @click="goToStockQuery">查看库存</a-button>
+                <a-button v-if="isStorageMode" type="link" size="small" @click="goToCommerceProduct">商品维护</a-button>
+              </div>
             </template>
           </vxe-column>
         </vxe-table>
@@ -577,24 +579,24 @@ onMounted(() => {
   gap: 6px;
   padding: 14px 16px;
   border-radius: 16px;
-  border: 1px solid #dce9f2;
+  border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.86);
 }
 
 .overview-card span,
 .table-head span,
 .product-name-cell span {
-  color: #6d8aa3;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .overview-card strong {
-  color: #173854;
+  color: var(--ink);
   font-size: 24px;
 }
 
 .overview-card small {
-  color: #7a97b0;
+  color: var(--muted-2);
 }
 
 .product-workspace {
@@ -602,7 +604,6 @@ onMounted(() => {
 }
 
 .table-actions,
-.toolbar-actions,
 .table-head,
 .product-name-cell,
 .pager-row {
@@ -617,11 +618,6 @@ onMounted(() => {
   margin-bottom: 14px;
 }
 
-.toolbar-actions {
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 .table-head {
   justify-content: space-between;
   gap: 12px;
@@ -631,7 +627,7 @@ onMounted(() => {
 
 .table-head strong,
 .product-name-cell strong {
-  color: #173854;
+  color: var(--ink);
 }
 
 .table-head strong {
@@ -640,7 +636,7 @@ onMounted(() => {
 }
 
 .table-frame {
-  border: 1px solid #e4edf4;
+  border: 1px solid var(--border);
   border-radius: 18px;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.95);

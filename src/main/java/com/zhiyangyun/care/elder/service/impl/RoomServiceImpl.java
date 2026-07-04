@@ -18,6 +18,7 @@ import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.elder.model.RoomRequest;
 import com.zhiyangyun.care.elder.model.RoomResponse;
 import com.zhiyangyun.care.elder.model.RoomSortRequest;
+import com.zhiyangyun.care.elder.service.ElderOccupancyReadService;
 import com.zhiyangyun.care.elder.service.RoomService;
 import com.zhiyangyun.care.elder.util.QrCodeUtil;
 import java.time.LocalDateTime;
@@ -41,18 +42,21 @@ public class RoomServiceImpl implements RoomService {
   private final BuildingMapper buildingMapper;
   private final FloorMapper floorMapper;
   private final BaseDataItemMapper baseDataItemMapper;
+  private final ElderOccupancyReadService elderOccupancyReadService;
 
   public RoomServiceImpl(
       RoomMapper roomMapper,
       BedMapper bedMapper,
       BuildingMapper buildingMapper,
       FloorMapper floorMapper,
-      BaseDataItemMapper baseDataItemMapper) {
+      BaseDataItemMapper baseDataItemMapper,
+      ElderOccupancyReadService elderOccupancyReadService) {
     this.roomMapper = roomMapper;
     this.bedMapper = bedMapper;
     this.buildingMapper = buildingMapper;
     this.floorMapper = floorMapper;
     this.baseDataItemMapper = baseDataItemMapper;
+    this.elderOccupancyReadService = elderOccupancyReadService;
   }
 
   @Override
@@ -195,8 +199,7 @@ public class RoomServiceImpl implements RoomService {
         .eq(Bed::getIsDeleted, 0)
         .eq(Bed::getTenantId, room.getTenantId())
         .eq(Bed::getRoomId, room.getId()));
-    boolean hasOccupiedBed = beds.stream().anyMatch(bed ->
-        bed.getElderId() != null || Integer.valueOf(2).equals(bed.getStatus()));
+    boolean hasOccupiedBed = !elderOccupancyReadService.buildOccupiedBedMapByElderId(null, beds).isEmpty();
     if (hasOccupiedBed) {
       throw new IllegalArgumentException("当前房间下存在已入住床位，请先办理退床或换床");
     }

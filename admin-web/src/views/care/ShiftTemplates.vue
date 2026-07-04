@@ -37,11 +37,11 @@
             </a-space>
           </template>
           <template v-else-if="column.key === 'actions'">
-            <a-space>
-              <a @click="openApply(record)">实施</a>
-              <a @click="openModal(record)">编辑</a>
-              <a class="danger-text" @click="removeScheme(record)">删除</a>
-            </a-space>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="openApply(record)">实施</a-button>
+              <a-button type="link" size="small" @click="openModal(record)">编辑</a-button>
+              <a-button type="link" size="small" danger @click="removeScheme(record)">删除</a-button>
+            </div>
           </template>
         </template>
       </a-table>

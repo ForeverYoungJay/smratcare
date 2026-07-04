@@ -17,11 +17,14 @@ import com.zhiyangyun.care.crm.model.report.MarketingDataQualityResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingFollowupReportResponse;
 import com.zhiyangyun.care.crm.service.CrmTraceService;
 import com.zhiyangyun.care.crm.service.impl.MarketingReportServiceImpl;
+import com.zhiyangyun.care.elder.entity.Bed;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
+import com.zhiyangyun.care.elder.service.ElderOccupancyReadService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,6 +47,9 @@ class MarketingReportServiceTest {
   private BedMapper bedMapper;
 
   @Mock
+  private ElderOccupancyReadService elderOccupancyReadService;
+
+  @Mock
   private CrmMarketingPlanMapper crmMarketingPlanMapper;
 
   @Mock
@@ -58,6 +64,7 @@ class MarketingReportServiceTest {
         callbackPlanMapper,
         crmContractMapper,
         bedMapper,
+        elderOccupancyReadService,
         crmMarketingPlanMapper,
         crmTraceService);
   }
@@ -187,5 +194,33 @@ class MarketingReportServiceTest {
     assertEquals(2L, response.getMissingSourceCount());
     assertEquals(5L, response.getMissingNextFollowDateCount());
     assertEquals(1L, response.getNonStandardSourceCount());
+  }
+
+  @Test
+  void workbenchSummary_should_not_count_relation_occupied_bed_as_sellable_empty() {
+    when(crmLeadMapper.selectList(any())).thenReturn(List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+    when(crmLeadMapper.selectCount(any())).thenReturn(0L);
+    when(callbackPlanMapper.selectList(any())).thenReturn(List.of(), List.of());
+    when(crmContractMapper.selectList(any())).thenReturn(List.of(), List.of());
+    when(crmMarketingPlanMapper.selectList(any())).thenReturn(List.of());
+
+    Bed relationOccupiedBed = new Bed();
+    relationOccupiedBed.setId(101L);
+    relationOccupiedBed.setIsDeleted(0);
+    relationOccupiedBed.setStatus(1);
+    relationOccupiedBed.setBedType("普通床");
+
+    Bed emptyBed = new Bed();
+    emptyBed.setId(102L);
+    emptyBed.setIsDeleted(0);
+    emptyBed.setStatus(1);
+    emptyBed.setBedType("普通床");
+
+    when(bedMapper.selectList(any())).thenReturn(List.of(relationOccupiedBed, emptyBed));
+    when(elderOccupancyReadService.buildOccupiedBedMapByElderId(any(), any()))
+        .thenReturn(Map.of(201L, relationOccupiedBed));
+
+    var response = service.workbenchSummary(1L, "2026-02-01", "2026-02-28");
+    assertEquals(1L, response.getBedSales().getEmptyCount());
   }
 }

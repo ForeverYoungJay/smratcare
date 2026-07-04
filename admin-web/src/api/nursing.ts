@@ -63,6 +63,10 @@ export function getShiftHandoverPage(params: any) {
   return fetchPage<ShiftHandoverItem>('/api/nursing/handovers/page', params)
 }
 
+export function getShiftHandover(id: number) {
+  return request.get<ShiftHandoverItem>(`/api/nursing/handovers/${id}`)
+}
+
 export function createShiftHandover(data: Partial<ShiftHandoverItem>) {
   return request.post<ShiftHandoverItem>('/api/nursing/handovers', data)
 }

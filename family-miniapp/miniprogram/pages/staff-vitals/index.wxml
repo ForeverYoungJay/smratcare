@@ -4,6 +4,15 @@
 
   <view class="surface form-card">
     <view class="panel-title">新增体征记录</view>
+    <view class="state-card inline-state success-state" wx:if="{{submitSuccess}}">
+      <view class="state-title">体征补录已提交</view>
+      <view class="section-subtitle">{{submitSuccess}}</view>
+      <view class="section-subtitle" wx:if="{{lastRecordSummary}}">最近一次：{{lastRecordSummary}}</view>
+    </view>
+    <view class="state-card inline-state error-state" wx:if="{{submitError}}">
+      <view class="state-title">体征补录失败</view>
+      <view class="section-subtitle">{{submitError}}</view>
+    </view>
     <view class="field">
       <view class="field-label">老人姓名</view>
       <input class="input-line" value="{{elderName}}" data-field="elderName" bindinput="onInput" placeholder="例如 王桂兰" />

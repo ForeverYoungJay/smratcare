@@ -1,11 +1,15 @@
 .card { padding: 24rpx; }
 .day-block { margin-top: 14rpx; }
-.day { font-size: 26rpx; color: #246b5f; font-weight: 700; }
-.row { margin-top: 10rpx; display: flex; gap: 12rpx; background: #f7faf8; border-radius: 10rpx; padding: 12rpx; }
-.time { width: 84rpx; font-size: 22rpx; color: #71807a; }
+.day { font-size: 26rpx; color: #21705F; font-weight: 700; }
+.row { margin-top: 10rpx; display: flex; gap: 12rpx; background: #FAFAF7; border-radius: 10rpx; padding: 12rpx; }
+.time { width: 84rpx; font-size: 22rpx; color: #5C6F69; }
 .main { flex: 1; }
-.project { display: block; font-size: 25rpx; color: #16231f; font-weight: 600; }
-.staff { display: block; margin-top: 4rpx; font-size: 22rpx; color: #71807a; }
+.project { display: block; font-size: 25rpx; color: #22332E; font-weight: 600; }
+.staff { display: block; margin-top: 4rpx; font-size: 22rpx; color: #5C6F69; }
 .note { display: block; margin-top: 4rpx; font-size: 22rpx; color: #34443f; }
 .photo-row { margin-top: 8rpx; display: flex; gap: 8rpx; flex-wrap: wrap; }
 .photo { width: 140rpx; height: 100rpx; border-radius: 8rpx; background: #dbeafe; }
+.list-empty { padding: 30rpx 0; text-align: center; font-size: 23rpx; color: #7C8984; }
+.error-box { padding: 30rpx 0; text-align: center; }
+.error-text { font-size: 23rpx; color: #B4553B; line-height: 1.6; }
+.retry-btn { margin-top: 14rpx; display: inline-block; height: 60rpx; line-height: 60rpx; font-size: 23rpx; padding: 0 30rpx; }

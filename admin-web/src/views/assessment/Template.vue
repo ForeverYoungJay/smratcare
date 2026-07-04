@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="量表模板" subTitle="评估量表与评分规则配置">
+    <template #extra>
+      <a-button type="primary" @click="openForm()">新增模板</a-button>
+    </template>
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="关键字">
@@ -26,19 +29,16 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <div class="table-actions">
-        <a-button type="primary" @click="openForm()">新增模板</a-button>
-      </div>
       <a-table :data-source="rows" :columns="columns" :loading="loading" :pagination="false" row-key="id">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
             <a-tag :color="record.status === 1 ? 'green' : 'default'">{{ record.status === 1 ? '启用' : '停用' }}</a-tag>
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-space>
-              <a-button type="link" @click="openForm(record)">编辑</a-button>
-              <a-button type="link" danger @click="remove(record.id)">删除</a-button>
-            </a-space>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="openForm(record)">编辑</a-button>
+              <a-button type="link" size="small" danger @click="remove(record.id)">删除</a-button>
+            </div>
           </template>
         </template>
       </a-table>
@@ -98,7 +98,7 @@
             <a-upload :before-upload="beforeTemplateUpload" :show-upload-list="false" accept=".json,.txt">
               <a-button>上传模板JSON</a-button>
             </a-upload>
-            <span style="color: rgba(0, 0, 0, 0.45);">可导入 templateCode/templateName/assessmentType/scoreRulesJson/levelRulesJson</span>
+            <span style="color: var(--muted); font-size: 12px;">可导入 templateCode/templateName/assessmentType/scoreRulesJson/levelRulesJson</span>
           </a-space>
         </a-form-item>
         <a-form-item label="评分规则JSON" name="scoreRulesJson">

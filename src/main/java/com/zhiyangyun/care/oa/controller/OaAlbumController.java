@@ -42,6 +42,8 @@ public class OaAlbumController {
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) String category,
       @RequestParam(required = false) String folderName,
+      @RequestParam(required = false) String albumScope,
+      @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) String status) {
     Long orgId = AuthContext.getOrgId();
     var wrapper = Wrappers.lambdaQuery(OaAlbum.class)
@@ -49,6 +51,8 @@ public class OaAlbumController {
         .eq(orgId != null, OaAlbum::getOrgId, orgId)
         .eq(category != null && !category.isBlank(), OaAlbum::getCategory, category)
         .like(folderName != null && !folderName.isBlank(), OaAlbum::getFolderName, folderName)
+        .eq(albumScope != null && !albumScope.isBlank(), OaAlbum::getAlbumScope, normalizeAlbumScope(albumScope))
+        .eq(elderId != null && elderId > 0, OaAlbum::getElderId, elderId)
         .eq(status != null && !status.isBlank(), OaAlbum::getStatus, status);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(OaAlbum::getTitle, keyword)
@@ -91,6 +95,8 @@ public class OaAlbumController {
     album.setTitle(request.getTitle());
     album.setCategory(request.getCategory() == null ? null : request.getCategory().trim());
     album.setFolderName(request.getFolderName() == null ? null : request.getFolderName().trim());
+    album.setAlbumScope(normalizeAlbumScope(request.getAlbumScope()));
+    album.setElderId("PERSONAL".equals(album.getAlbumScope()) ? request.getElderId() : null);
     album.setCoverUrl(request.getCoverUrl());
     album.setPhotosJson(request.getPhotosJson());
     album.setPhotoCount(resolvePhotoCount(request.getPhotoCount(), request.getPhotosJson()));
@@ -111,6 +117,8 @@ public class OaAlbumController {
     album.setTitle(request.getTitle());
     album.setCategory(request.getCategory() == null ? null : request.getCategory().trim());
     album.setFolderName(request.getFolderName() == null ? null : request.getFolderName().trim());
+    album.setAlbumScope(normalizeAlbumScope(request.getAlbumScope()));
+    album.setElderId("PERSONAL".equals(album.getAlbumScope()) ? request.getElderId() : null);
     album.setCoverUrl(request.getCoverUrl());
     album.setPhotosJson(request.getPhotosJson());
     album.setPhotoCount(resolvePhotoCount(
@@ -140,6 +148,11 @@ public class OaAlbumController {
         .eq(OaAlbum::getIsDeleted, 0)
         .eq(orgId != null, OaAlbum::getOrgId, orgId)
         .last("LIMIT 1"));
+  }
+
+  private String normalizeAlbumScope(String scope) {
+    String value = scope == null ? "" : scope.trim().toUpperCase();
+    return "PERSONAL".equals(value) ? "PERSONAL" : "GROUP";
   }
 
   private int resolvePhotoCount(Integer incomingCount, String photosJson) {

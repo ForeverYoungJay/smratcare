@@ -7,6 +7,17 @@
 - 前端：Vue 3、Vite、TypeScript、Pinia、Vue Router、Ant Design Vue
 - 部署：Docker / Docker Compose
 
+## 运行时要求
+- Node.js：`18+`（推荐 `20`，见 `.nvmrc`）
+- Java：`17+`（见 `.java-version`）
+- Maven：`3.9+`
+- Docker：支持 `docker compose`
+
+快速检查：
+```bash
+./scripts/check_runtime_requirements.sh
+```
+
 ## 仓库结构
 - `src/main/java`：后端业务代码
 - `src/main/resources/db/migration`：MySQL Flyway 迁移脚本（后端数据库演进基准）
@@ -21,6 +32,11 @@
 首次使用先准备环境变量（可直接使用默认值）：
 ```bash
 cp .env.example .env
+```
+
+生产部署请改用：
+```bash
+cp .env.prod.example .env
 ```
 
 启动服务：
@@ -88,6 +104,11 @@ Flyway 版本冲突检查：
 项目一键静态自检（Flyway 版本冲突 + 前端导航路由）：
 ```bash
 ./scripts/project_self_check.sh
+```
+
+项目运行时要求检查：
+```bash
+./scripts/check_runtime_requirements.sh
 ```
 
 RBAC 权限模型审计（旧权限表达式回归检查）：
@@ -219,6 +240,7 @@ OpenAPI：
 - 企业首页内容治理：`docs/ENTERPRISE_HOME_CONTENT_GOVERNANCE.md`
 - 家属旧接口下线计划：`docs/FAMILY_LEGACY_API_SUNSET_PLAN.md`
 - 家属支付/OSS 配置说明：`docs/FAMILY_PAYMENT_OSS_WECHAT_CONFIG.md`
+- 员工移动端补齐方案：`docs/STAFF_MOBILE_APP_PLAN.md`
 
 ## 备注
 - 上传文件默认映射目录：`output/uploads`（容器内 `/app/uploads`）
@@ -237,7 +259,10 @@ OpenAPI：
 - 家属评估增强：`/api/family/assessment-reports/generate-ai` 可生成 AI 中医体质/心血管评估
 - 家属支付增强：`/api/family/payment/auto-pay` 首次开启需 `authorizeConfirmed=true`，并由定时任务执行余额自动结算
 - 家属提效增强：`/api/family/messages/read-all`（消息一键已读） + `/api/family/dashboard/weekly-brief/history`（周报历史）
+- 小程序 `mock fallback / 本地免登录 / 人工充值回退` 仅允许 `develop + localhost/devtools` 使用，正式环境应保持关闭
 - 家属预警增强：`/api/family/messages/summary`（未读分层/类型统计/紧急摘要）
+- 微信小程序已合并家属端与员工端：`family-miniapp` 登录页支持家属/员工身份切换，员工入口为 `/pages/staff-home/index`
+- 员工移动端能力概览：`/api/operations/staff-mobile`（员工移动场景汇总） + `/stats/operations/staff-mobile`（运营视图）
 - 家属消息筛选增强：`/api/family/messages/page` 支持 `level/type/unreadOnly` 过滤参数
 - 家属待办闭环增强：`/api/family/todo-center/action`（DONE/SNOOZE/UNDO）+ 小程序待办中心操作按钮
 - 管理端家属绑定已迁移：`/api/admin/family/relations/bind`（替代旧 `/api/family/bindElder` 的后台使用场景）

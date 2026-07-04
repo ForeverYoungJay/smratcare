@@ -2,7 +2,7 @@
   <PageContainer title="行政中心" subTitle="按职责进入协同办公、活动文化和员工服务，不再把个人入口混在业务域里。">
     <section class="center-hero card-elevated">
       <div class="hero-main">
-        <div class="hero-kicker">Administrative Domain</div>
+        <div class="hero-kicker">行政事务</div>
         <h2>行政管理只保留业务能力，不再承担个人工作台。</h2>
         <p>审批、通知、任务、文档、知识、活动和员工服务都按职责分区。个人待办、我的信息、我的考勤已移到工作台。</p>
         <a-space wrap>

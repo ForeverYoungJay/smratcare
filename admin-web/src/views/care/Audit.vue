@@ -31,7 +31,9 @@
         </vxe-column>
         <vxe-column title="操作" width="140" fixed="right">
           <template #default="{ row }">
-            <a @click="openDetail(row)">查看</a>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="openDetail(row)">查看</a-button>
+            </div>
           </template>
         </vxe-column>
       </vxe-table>

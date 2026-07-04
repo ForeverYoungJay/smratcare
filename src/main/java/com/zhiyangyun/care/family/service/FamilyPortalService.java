@@ -36,7 +36,8 @@ public interface FamilyPortalService {
 
   List<FamilyPortalModels.CareLogDay> listCareLogs(Long orgId, Long familyUserId, Long elderId);
 
-  List<FamilyPortalModels.ActivityAlbumItem> listActivityAlbums(Long orgId, Long familyUserId, int pageNo, int pageSize);
+  List<FamilyPortalModels.ActivityAlbumItem> listActivityAlbums(Long orgId, Long familyUserId, int pageNo, int pageSize,
+      String scope);
 
   FamilyPortalModels.ActivityAlbumItem toggleAlbumLike(Long orgId, Long familyUserId, Long albumId);
 
@@ -46,6 +47,11 @@ public interface FamilyPortalService {
       FamilyPortalModels.ActivityAlbumCommentCreateRequest request);
 
   List<FamilyPortalModels.OutingRecordItem> listOutingRecords(Long orgId, Long familyUserId, Long elderId);
+
+  FamilyPortalModels.OutingRecordItem createOutingApplication(Long orgId, Long familyUserId,
+      FamilyPortalModels.OutingApplicationRequest request);
+
+  FamilyPortalModels.OutingRecordItem cancelOutingApplication(Long orgId, Long familyUserId, Long applicationId);
 
   List<FamilyPortalModels.EmergencyContactItem> listEmergencyContacts(Long orgId, Long familyUserId);
 
@@ -63,6 +69,9 @@ public interface FamilyPortalService {
 
   FamilyPortalModels.WechatNotifyBindResponse bindWechatNotifyOpenId(Long orgId, Long familyUserId,
       FamilyPortalModels.WechatNotifyBindRequest request);
+
+  List<FamilyPortalModels.NotifyLogItem> listNotifyLogs(Long orgId, Long familyUserId,
+      int pageNo, int pageSize, String status);
 
   List<FamilyPortalModels.RechargeOrderItem> listRechargeOrders(Long orgId, Long familyUserId, Long elderId,
       int pageNo, int pageSize);

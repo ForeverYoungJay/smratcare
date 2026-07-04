@@ -60,10 +60,10 @@
           >
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'actions'">
-                <a-space>
-                  <a @click="toStock(record)">查看库存</a>
-                  <a @click="toPurchase(record)">发起采购</a>
-                </a-space>
+                <div class="row-action-links">
+                  <a-button type="link" size="small" @click="toStock(record)">查看库存</a-button>
+                  <a-button type="link" size="small" @click="toPurchase(record)">发起采购</a-button>
+                </div>
               </template>
             </template>
           </a-table>
@@ -492,14 +492,14 @@ function itemTypeLabel(value?: string) {
 }
 .attach-title {
   font-size: 12px;
-  color: #595959;
+  color: var(--muted);
 }
 .attach-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 4px 8px;
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--border-soft);
   border-radius: 6px;
 }
 .attach-item-main {
@@ -509,6 +509,6 @@ function itemTypeLabel(value?: string) {
 }
 .attach-time {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--muted-2);
 }
 </style>

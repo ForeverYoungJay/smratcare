@@ -164,6 +164,6 @@ onMounted(async () => {
 <style scoped>
 .permission-summary {
   margin-top: 10px;
-  color: rgba(0, 0, 0, 0.65);
+  color: var(--muted);
 }
 </style>

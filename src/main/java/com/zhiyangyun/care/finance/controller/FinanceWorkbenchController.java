@@ -19,17 +19,16 @@ import com.zhiyangyun.care.bill.mapper.BillMonthlyMapper;
 import com.zhiyangyun.care.crm.entity.CrmContract;
 import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.elder.entity.Bed;
-import com.zhiyangyun.care.elder.entity.ElderBedRelation;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.entity.Room;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
-import com.zhiyangyun.care.elder.mapper.ElderBedRelationMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.elder.model.BedReleaseResult;
 import com.zhiyangyun.care.elder.model.ElderDepartureType;
 import com.zhiyangyun.care.elder.model.ElderLifecycleStatus;
 import com.zhiyangyun.care.elder.service.ElderLifecycleStateService;
+import com.zhiyangyun.care.elder.service.ElderOccupancyReadService;
 import com.zhiyangyun.care.elder.service.ElderOccupancyService;
 import com.zhiyangyun.care.finance.entity.AdmissionFeeAudit;
 import com.zhiyangyun.care.finance.entity.ConsumptionRecord;
@@ -143,9 +142,9 @@ public class FinanceWorkbenchController {
   private final ReconciliationDailyMapper reconciliationDailyMapper;
   private final CrmContractMapper crmContractMapper;
   private final BedMapper bedMapper;
-  private final ElderBedRelationMapper elderBedRelationMapper;
   private final RoomMapper roomMapper;
   private final ElderMapper elderMapper;
+  private final ElderOccupancyReadService elderOccupancyReadService;
   private final OaApprovalMapper oaApprovalMapper;
   private final AuditLogMapper auditLogMapper;
   private final AuditLogService auditLogService;
@@ -173,9 +172,9 @@ public class FinanceWorkbenchController {
       ReconciliationDailyMapper reconciliationDailyMapper,
       CrmContractMapper crmContractMapper,
       BedMapper bedMapper,
-      ElderBedRelationMapper elderBedRelationMapper,
       RoomMapper roomMapper,
       ElderMapper elderMapper,
+      ElderOccupancyReadService elderOccupancyReadService,
       OaApprovalMapper oaApprovalMapper,
       AuditLogMapper auditLogMapper,
       AuditLogService auditLogService,
@@ -197,9 +196,9 @@ public class FinanceWorkbenchController {
     this.reconciliationDailyMapper = reconciliationDailyMapper;
     this.crmContractMapper = crmContractMapper;
     this.bedMapper = bedMapper;
-    this.elderBedRelationMapper = elderBedRelationMapper;
     this.roomMapper = roomMapper;
     this.elderMapper = elderMapper;
+    this.elderOccupancyReadService = elderOccupancyReadService;
     this.oaApprovalMapper = oaApprovalMapper;
     this.auditLogMapper = auditLogMapper;
     this.auditLogService = auditLogService;
@@ -999,7 +998,7 @@ public class FinanceWorkbenchController {
             .eq(orgId != null, Room::getOrgId, orgId));
     Map<Long, Room> roomMap = rooms.stream()
         .collect(Collectors.toMap(Room::getId, Function.identity(), (a, b) -> a));
-    Map<Long, Bed> elderBedMap = buildOccupiedBedMapByElderId(orgId, beds);
+    Map<Long, Bed> elderBedMap = elderOccupancyReadService.buildOccupiedBedMapByElderId(orgId, beds);
     Map<Long, BigDecimal> roomIncomeMap = new HashMap<>();
     for (BillMonthly billMonthly : bills) {
       Bed bed = elderBedMap.get(billMonthly.getElderId());
@@ -1135,7 +1134,7 @@ public class FinanceWorkbenchController {
             .eq(Bed::getIsDeleted, 0)
             .eq(orgId != null, Bed::getOrgId, orgId)
             .in(Bed::getRoomId, roomIds));
-    Map<Long, Bed> occupiedBedMap = buildOccupiedBedMapByElderId(orgId, beds);
+    Map<Long, Bed> occupiedBedMap = elderOccupancyReadService.buildOccupiedBedMapByElderId(orgId, beds);
     List<Long> elderIds = occupiedBedMap.keySet().stream()
         .filter(Objects::nonNull)
         .distinct()
@@ -2153,7 +2152,7 @@ public class FinanceWorkbenchController {
     Map<Long, Room> roomMap = rooms.stream()
         .collect(Collectors.toMap(Room::getId, Function.identity(), (a, b) -> a));
 
-    Map<Long, Bed> elderBedMap = buildOccupiedBedMapByElderId(orgId, beds);
+    Map<Long, Bed> elderBedMap = elderOccupancyReadService.buildOccupiedBedMapByElderId(orgId, beds);
 
     Map<Long, BigDecimal> roomIncomeMap = new HashMap<>();
     for (BillMonthly bill : thisMonthBills) {
@@ -3009,7 +3008,7 @@ public class FinanceWorkbenchController {
                 .in(ElderProfile::getId, elderIds))
             .stream()
             .collect(Collectors.toMap(ElderProfile::getId, Function.identity(), (a, b) -> a));
-    Map<Long, Bed> occupiedBedMap = loadOccupiedBedMapByElderId(orgId, elderIds);
+    Map<Long, Bed> occupiedBedMap = elderOccupancyReadService.loadOccupiedBedMapByElderIds(orgId, elderIds);
 
     for (DischargeSettlement settlement : settlements) {
       ElderProfile elder = settlement.getElderId() == null ? null : elderMap.get(settlement.getElderId());
@@ -4379,112 +4378,18 @@ public class FinanceWorkbenchController {
     return Integer.valueOf(3).equals(elder.getStatus());
   }
 
-  private Map<Long, Bed> buildOccupiedBedMapByElderId(Long orgId, List<Bed> beds) {
-    if (beds == null || beds.isEmpty()) {
-      return Map.of();
-    }
-    Map<Long, Bed> bedById = beds.stream()
-        .filter(item -> item.getId() != null)
-        .collect(Collectors.toMap(Bed::getId, Function.identity(), (a, b) -> a));
-    if (bedById.isEmpty()) {
-      return Map.of();
-    }
-    List<Long> bedIds = new ArrayList<>(bedById.keySet());
-    List<ElderBedRelation> activeRelations = elderBedRelationMapper.selectList(
-        Wrappers.lambdaQuery(ElderBedRelation.class)
-            .eq(ElderBedRelation::getIsDeleted, 0)
-            .eq(orgId != null, ElderBedRelation::getOrgId, orgId)
-            .eq(ElderBedRelation::getActiveFlag, 1)
-            .in(ElderBedRelation::getBedId, bedIds));
-    Map<Long, Bed> occupiedBedMap = new LinkedHashMap<>();
-    Set<Long> relationBedIds = new HashSet<>();
-    for (ElderBedRelation relation : activeRelations) {
-      if (relation.getElderId() == null || relation.getBedId() == null) {
-        continue;
-      }
-      Bed bed = bedById.get(relation.getBedId());
-      if (bed == null) {
-        continue;
-      }
-      relationBedIds.add(relation.getBedId());
-      occupiedBedMap.putIfAbsent(relation.getElderId(), bed);
-    }
-    for (Bed bed : beds) {
-      if (bed.getId() == null || relationBedIds.contains(bed.getId()) || bed.getElderId() == null) {
-        continue;
-      }
-      occupiedBedMap.putIfAbsent(bed.getElderId(), bed);
-    }
-    return occupiedBedMap;
-  }
-
   private Map<Long, Integer> countOccupiedBedsByRoom(Long orgId, List<Bed> beds) {
     if (beds == null || beds.isEmpty()) {
       return Map.of();
     }
     Map<Long, Integer> roomOccupied = new HashMap<>();
-    for (Bed bed : buildOccupiedBedMapByElderId(orgId, beds).values()) {
+    for (Bed bed : elderOccupancyReadService.buildOccupiedBedMapByElderId(orgId, beds).values()) {
       if (bed.getRoomId() == null) {
         continue;
       }
       roomOccupied.merge(bed.getRoomId(), 1, Integer::sum);
     }
     return roomOccupied;
-  }
-
-  private Map<Long, Bed> loadOccupiedBedMapByElderId(Long orgId, List<Long> elderIds) {
-    if (elderIds == null || elderIds.isEmpty()) {
-      return Map.of();
-    }
-    List<ElderBedRelation> activeRelations = elderBedRelationMapper.selectList(
-        Wrappers.lambdaQuery(ElderBedRelation.class)
-            .eq(ElderBedRelation::getIsDeleted, 0)
-            .eq(orgId != null, ElderBedRelation::getOrgId, orgId)
-            .eq(ElderBedRelation::getActiveFlag, 1)
-            .in(ElderBedRelation::getElderId, elderIds));
-    Map<Long, Bed> occupiedBedMap = new LinkedHashMap<>();
-    List<Long> relationBedIds = activeRelations.stream()
-        .map(ElderBedRelation::getBedId)
-        .filter(Objects::nonNull)
-        .distinct()
-        .toList();
-    if (!relationBedIds.isEmpty()) {
-      Map<Long, Bed> bedMap = bedMapper.selectList(
-              Wrappers.lambdaQuery(Bed.class)
-                  .eq(Bed::getIsDeleted, 0)
-                  .eq(orgId != null, Bed::getOrgId, orgId)
-                  .in(Bed::getId, relationBedIds))
-          .stream()
-          .filter(item -> item.getId() != null)
-          .collect(Collectors.toMap(Bed::getId, Function.identity(), (a, b) -> a));
-      for (ElderBedRelation relation : activeRelations) {
-        if (relation.getElderId() == null || relation.getBedId() == null) {
-          continue;
-        }
-        Bed bed = bedMap.get(relation.getBedId());
-        if (bed != null) {
-          occupiedBedMap.putIfAbsent(relation.getElderId(), bed);
-        }
-      }
-    }
-    List<Long> fallbackElderIds = elderIds.stream()
-        .filter(Objects::nonNull)
-        .filter(id -> !occupiedBedMap.containsKey(id))
-        .toList();
-    if (fallbackElderIds.isEmpty()) {
-      return occupiedBedMap;
-    }
-    bedMapper.selectList(
-            Wrappers.lambdaQuery(Bed.class)
-                .eq(Bed::getIsDeleted, 0)
-                .eq(orgId != null, Bed::getOrgId, orgId)
-                .in(Bed::getElderId, fallbackElderIds))
-        .forEach(item -> {
-          if (item.getElderId() != null) {
-            occupiedBedMap.putIfAbsent(item.getElderId(), item);
-          }
-        });
-    return occupiedBedMap;
   }
 
   private ResponseEntity<byte[]> csvResponse(String filenamePrefix, List<String> headers, List<List<String>> rows) {

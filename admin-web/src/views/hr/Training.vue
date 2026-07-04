@@ -814,7 +814,7 @@ watch(
 
 <style scoped>
 .selection-tip {
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--muted);
   font-size: 12px;
 }
 

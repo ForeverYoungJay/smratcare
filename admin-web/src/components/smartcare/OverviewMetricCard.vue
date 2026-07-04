@@ -57,10 +57,10 @@ function handleClick() {
   gap: 18px;
   width: 100%;
   padding: 18px;
-  border: 1px solid rgba(214, 225, 233, 0.92);
+  border: 1px solid var(--border-strong);
   border-radius: 20px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 251, 253, 0.96));
-  box-shadow: var(--shadow-xs);
+  background: linear-gradient(180deg, #ffffff, rgba(246, 251, 253, 0.96));
+  box-shadow: var(--shadow-sm);
   text-align: left;
 }
 
@@ -90,7 +90,7 @@ function handleClick() {
 }
 
 .overview-metric-card--brand {
-  background: linear-gradient(135deg, rgba(19, 108, 181, 0.12), rgba(30, 138, 143, 0.08), rgba(255, 255, 255, 0.96));
+  background: linear-gradient(135deg, rgba(33, 112, 95, 0.1), rgba(46, 138, 114, 0.06), rgba(255, 255, 255, 0.96));
 }
 
 .overview-metric-card--warning {

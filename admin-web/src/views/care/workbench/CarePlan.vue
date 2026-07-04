@@ -124,6 +124,6 @@ onMounted(() => {
 <style scoped>
 .meta-line {
   line-height: 2;
-  color: #334155;
+  color: var(--ink-soft);
 }
 </style>

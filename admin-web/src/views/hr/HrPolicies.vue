@@ -219,12 +219,12 @@ onMounted(fetchData)
 
 <style scoped>
 :deep(.hr-row-warning) {
-  background: #fffbe6 !important;
+  background: rgba(var(--warning-rgb), 0.12) !important;
 }
 
 .upload-hint {
   margin-top: 8px;
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--muted);
   font-size: 12px;
 }
 </style>

@@ -115,6 +115,33 @@ public class VisitServiceImpl implements VisitService {
   }
 
   @Override
+  public List<VisitBookingResponse> listBookings(Long orgId, Long elderId, Integer status, LocalDate fromDate, LocalDate toDate) {
+    LocalDate safeFrom = fromDate == null ? LocalDate.now() : fromDate;
+    LocalDate safeTo = toDate == null ? safeFrom.plusDays(7) : toDate;
+    if (safeTo.isBefore(safeFrom)) {
+      throw new IllegalArgumentException("结束日期不能早于开始日期");
+    }
+    List<VisitBooking> bookings = bookingMapper.selectList(
+        Wrappers.lambdaQuery(VisitBooking.class)
+            .eq(VisitBooking::getOrgId, orgId)
+            .eq(VisitBooking::getIsDeleted, 0)
+            .eq(elderId != null, VisitBooking::getElderId, elderId)
+            .eq(status != null, VisitBooking::getStatus, status)
+            .ge(VisitBooking::getVisitDate, safeFrom)
+            .le(VisitBooking::getVisitDate, safeTo)
+            .orderByAsc(VisitBooking::getVisitTime));
+
+    List<VisitBookingResponse> responses = new ArrayList<>();
+    for (VisitBooking booking : bookings) {
+      ElderProfile elder = elderMapper.selectById(booking.getElderId());
+      FamilyUser familyUser = familyUserMapper.selectById(booking.getFamilyUserId());
+      ElderFamily relation = resolveFamilyRelation(orgId, booking.getElderId(), booking.getFamilyUserId());
+      responses.add(toResponse(booking, elder, familyUser, relation));
+    }
+    return responses;
+  }
+
+  @Override
   public List<VisitBookingResponse> listByFamily(Long orgId, Long familyUserId) {
     List<VisitBooking> bookings = bookingMapper.selectList(
         Wrappers.lambdaQuery(VisitBooking.class)

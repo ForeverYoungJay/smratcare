@@ -6,6 +6,7 @@ import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.model.CareTaskAssignRequest;
 import com.zhiyangyun.care.model.CareTaskBatchAssignRequest;
 import com.zhiyangyun.care.model.CareTaskCreateRequest;
+import com.zhiyangyun.care.model.CareTaskExceptionResolveRequest;
 import com.zhiyangyun.care.model.CareTaskExecuteLogItem;
 import com.zhiyangyun.care.model.CareTaskReviewRequest;
 import com.zhiyangyun.care.model.CareTaskSummaryResponse;
@@ -150,6 +151,20 @@ public class CareTaskController {
         AuthContext.getStaffId(),
         AuthContext.getUsername(),
         reviewTime);
+    return Result.ok(null);
+  }
+
+  @PostMapping("/exception/resolve")
+  public Result<Void> resolveException(@Valid @RequestBody CareTaskExceptionResolveRequest request) {
+    careTaskService.resolveException(
+        AuthContext.getOrgId(),
+        request.getTaskDailyId(),
+        request.getStaffId(),
+        request.getScore(),
+        request.getResolution(),
+        AuthContext.getStaffId(),
+        AuthContext.getUsername(),
+        LocalDateTime.now());
     return Result.ok(null);
   }
 

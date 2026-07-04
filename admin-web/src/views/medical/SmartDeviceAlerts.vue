@@ -22,6 +22,7 @@
         <a-space>
           <a-button @click="openDeviceModal()">新增设备</a-button>
           <a-button @click="openEventModal()">上报事件</a-button>
+          <a-button :loading="refreshingDerived" @click="refreshDerivedAlerts">刷新趋势预警</a-button>
           <a-button type="primary" :loading="loading" @click="fetchAll">刷新</a-button>
         </a-space>
       </template>
@@ -34,6 +35,7 @@
         <a-col :xs="12" :lg="4"><a-card><a-statistic title="离线设备" :value="summary.offlineDeviceCount" /></a-card></a-col>
         <a-col :xs="12" :lg="4"><a-card><a-statistic title="未闭环告警" :value="summary.openAlertCount" /></a-card></a-col>
         <a-col :xs="12" :lg="4"><a-card><a-statistic title="紧急告警" :value="summary.criticalAlertCount" /></a-card></a-col>
+        <a-col :xs="12" :lg="4"><a-card><a-statistic title="趋势预警" :value="summary.derivedHealthAlertCount" /></a-card></a-col>
         <a-col :xs="12" :lg="4"><a-card><a-statistic title="今日事件" :value="summary.todayEventCount" /></a-card></a-col>
       </a-row>
 
@@ -57,10 +59,10 @@
                   <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
                 </template>
                 <template v-else-if="column.key === 'action'">
-                  <a-space>
-                    <a-button size="small" :disabled="record.status !== 'OPEN'" @click="ackAlert(record)">确认</a-button>
-                    <a-button size="small" type="primary" :disabled="record.status === 'RESOLVED'" @click="openResolveModal(record)">处置</a-button>
-                  </a-space>
+                  <div class="row-action-links">
+                    <a-button type="link" size="small" :disabled="record.status !== 'OPEN'" @click="ackAlert(record)">确认</a-button>
+                    <a-button type="link" size="small" :disabled="record.status === 'RESOLVED'" @click="openResolveModal(record)">处置</a-button>
+                  </div>
                 </template>
               </template>
             </a-table>
@@ -84,7 +86,9 @@
                   <a-switch :checked="Number(record.enabled) === 1" size="small" @change="(checked) => toggleDevice(record, checked as boolean)" />
                 </template>
                 <template v-else-if="column.key === 'action'">
-                  <a-button type="link" size="small" @click="openDeviceModal(record)">编辑</a-button>
+                  <div class="row-action-links">
+                    <a-button type="link" size="small" @click="openDeviceModal(record)">编辑</a-button>
+                  </div>
                 </template>
               </template>
             </a-table>
@@ -145,6 +149,7 @@ import {
   getSmartAlertSummary,
   getSmartDevicePage,
   reportSmartDeviceEvent,
+  refreshDerivedSmartAlerts,
   resolveSmartAlert,
   setSmartDeviceEnabled,
   updateSmartDevice
@@ -153,6 +158,7 @@ import type { PageResult, SmartAlert, SmartAlertSummary, SmartDevice } from '../
 
 const loading = ref(false)
 const saving = ref(false)
+const refreshingDerived = ref(false)
 const errorMessage = ref('')
 const alerts = ref<SmartAlert[]>([])
 const devices = ref<SmartDevice[]>([])
@@ -162,6 +168,8 @@ const summary = reactive<SmartAlertSummary>({
   offlineDeviceCount: 0,
   openAlertCount: 0,
   criticalAlertCount: 0,
+  derivedHealthAlertCount: 0,
+  derivedHealthGeneratedCount: 0,
   todayEventCount: 0,
   levelStats: []
 })
@@ -337,6 +345,18 @@ async function ackAlert(record: SmartAlert) {
   await acknowledgeSmartAlert(record.id)
   message.success('告警已确认')
   fetchAll()
+}
+
+async function refreshDerivedAlerts() {
+  refreshingDerived.value = true
+  try {
+    const data = await refreshDerivedSmartAlerts()
+    Object.assign(summary, data || {})
+    message.success(`趋势预警已刷新，本次更新 ${data?.derivedHealthGeneratedCount || 0} 条`)
+    fetchAll()
+  } finally {
+    refreshingDerived.value = false
+  }
 }
 
 async function submitResolve() {

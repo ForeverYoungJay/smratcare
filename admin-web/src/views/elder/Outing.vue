@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="外出登记" subTitle="老人外出与返院登记">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新增外出</a-button>
+    </template>
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="老人">
@@ -18,8 +21,10 @@
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="query.status" allow-clear style="width: 140px" placeholder="请选择状态">
+            <a-select-option value="APPLIED">待审批</a-select-option>
             <a-select-option value="OUT">外出中</a-select-option>
             <a-select-option value="RETURNED">已返院</a-select-option>
+            <a-select-option value="CANCELLED">已取消</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="计划外出时间">
@@ -33,7 +38,6 @@
           <a-space>
             <a-button type="primary" @click="fetchData">搜索</a-button>
             <a-button @click="reset">清空</a-button>
-            <a-button type="primary" @click="openCreate">新增外出</a-button>
           </a-space>
         </a-form-item>
       </a-form>
@@ -42,6 +46,7 @@
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <a-space style="margin-bottom: 12px" wrap>
         <a-tag color="blue">已选 {{ selectedRowKeys.length }} 条</a-tag>
+        <a-button :disabled="selectedRowKeys.length !== 1" @click="approveSelected">批准外出申请</a-button>
         <a-button :disabled="selectedRowKeys.length !== 1" @click="markReturnSelected">返院登记</a-button>
         <a-button danger :disabled="selectedRowKeys.length === 0" @click="deleteSelected">删除</a-button>
       </a-space>
@@ -56,8 +61,8 @@
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'status'">
-              <a-tag :color="record.status === 'RETURNED' ? 'green' : 'orange'">
-                {{ record.status === 'RETURNED' ? '已返院' : '外出中' }}
+              <a-tag :color="statusMeta(record.status).color">
+                {{ statusMeta(record.status).text }}
               </a-tag>
             </template>
             <template v-else-if="column.key === 'leaveNoteImageUrl'">
@@ -137,8 +142,8 @@ import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
 import { uploadElderFile } from '../../api/elder'
 import { useElderOptions } from '../../composables/useElderOptions'
-import { createOuting, deleteOuting, getOutingPage, returnOuting } from '../../api/elderResidence'
-import type { Id, OutingCreateRequest, OutingItem, PageResult } from '../../types'
+import { approveOuting, createOuting, deleteOuting, getOutingPage, returnOuting } from '../../api/elderResidence'
+import type { Id, OutingCreateRequest, OutingItem, OutingStatus, PageResult } from '../../types'
 import { normalizeResidentId } from '../../utils/id'
 
 const loading = ref(false)
@@ -161,7 +166,7 @@ const rowSelection = computed(() => ({
 
 const query = reactive({
   elderId: undefined as Id | undefined,
-  status: undefined as string | undefined,
+  status: undefined as OutingStatus | undefined,
   planTimeRange: undefined as [string, string] | undefined,
   pageNo: 1,
   pageSize: 10
@@ -191,6 +196,17 @@ const columns = [
   { title: '请假条', dataIndex: 'leaveNoteImageUrl', key: 'leaveNoteImageUrl', width: 120 },
   { title: '状态', key: 'status', width: 100 }
 ]
+
+const statusTextMap: Record<string, { text: string; color: string }> = {
+  APPLIED: { text: '待审批', color: 'gold' },
+  OUT: { text: '外出中', color: 'orange' },
+  RETURNED: { text: '已返院', color: 'green' },
+  CANCELLED: { text: '已取消', color: 'default' }
+}
+
+function statusMeta(status?: string) {
+  return statusTextMap[status || ''] || { text: status || '未知', color: 'default' }
+}
 
 async function fetchData() {
   loading.value = true
@@ -263,8 +279,24 @@ async function submitCreate() {
 }
 
 async function markReturn(record: OutingItem) {
+  if (record.status !== 'OUT') {
+    message.warning('仅外出中的记录可登记返院')
+    return
+  }
   await returnOuting(record.id, {})
   message.success('返院登记成功')
+  fetchData()
+}
+
+async function approveSelected() {
+  const record = getSelectedRecord()
+  if (!record) return
+  if (record.status !== 'APPLIED') {
+    message.warning('仅待审批申请可批准')
+    return
+  }
+  await approveOuting(record.id)
+  message.success('外出申请已批准')
   fetchData()
 }
 
@@ -316,6 +348,10 @@ onMounted(async () => {
   if (elderId) {
     ensureSelectedElder(elderId)
     query.elderId = elderId
+  }
+  const routeStatus = route.query.status
+  if (typeof routeStatus === 'string' && ['APPLIED', 'OUT', 'RETURNED', 'CANCELLED'].includes(routeStatus)) {
+    query.status = routeStatus as OutingStatus
   }
   await fetchData()
 })

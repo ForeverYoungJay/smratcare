@@ -62,6 +62,22 @@ function toMoney(value) {
   return Number(num.toFixed(2));
 }
 
+function canUseMockFallback() {
+  const app = getApp();
+  return !!(app
+    && app.globalData
+    && app.globalData.useMockFallback
+    && typeof app.isLocalDevEnvironment === 'function'
+    && app.isLocalDevEnvironment());
+}
+
+function canUseManualRechargeFallback() {
+  const app = getApp();
+  return !!(app
+    && typeof app.canUseManualRechargeFallback === 'function'
+    && app.canUseManualRechargeFallback());
+}
+
 function matchOrderFilter(order, filterKey) {
   const status = (order && order.status) || '';
   if (filterKey === 'pending') {
@@ -94,25 +110,54 @@ Page({
     previewBalance: '0.00',
     paying: false,
     allowManualFallback: false,
+    partialWarning: '',
     runtimeNotice: ''
+  },
+  onLoad(query) {
+    const amount = Number(decodeURIComponent((query && query.amount) || ''));
+    if (Number.isFinite(amount) && amount > 0) {
+      const amountText = String(amount);
+      this.setData({
+        rechargeAmount: amountText,
+        selectedPreset: PRESET_AMOUNTS.includes(amountText) ? amountText : ''
+      });
+    }
   },
   async onShow() {
     getApp().ensureLogin();
     this.setData({
-      allowManualFallback: !!getApp().globalData.allowManualRechargeFallback,
+      allowManualFallback: canUseManualRechargeFallback(),
       runtimeNotice: getApp().globalData.runtimeNotice || ''
     });
     await this.loadData();
   },
   async loadData() {
-    this.setData({ loading: true, loadError: '' });
+    this.setData({ loading: true, loadError: '', partialWarning: '' });
     try {
-      const [summary, history, rechargeOrders, guard] = await Promise.all([
+      const results = await Promise.allSettled([
         getBillSummary({ elderId: null }),
         getBillHistory({ elderId: null }),
         getRechargeOrders({ elderId: null, pageNo: 1, pageSize: 10 }),
         getPaymentGuard({ elderId: null })
       ]);
+      const [summaryResult, historyResult, rechargeOrdersResult, guardResult] = results;
+      if (summaryResult.status !== 'fulfilled') {
+        throw summaryResult.reason;
+      }
+      const warnings = [];
+      if (historyResult.status !== 'fulfilled' && !canUseMockFallback()) {
+        warnings.push('历史账单');
+      }
+      if (rechargeOrdersResult.status !== 'fulfilled' && !canUseMockFallback()) {
+        warnings.push('充值订单');
+      }
+      if (guardResult.status !== 'fulfilled' && !canUseMockFallback()) {
+        warnings.push('支付保障');
+      }
+      const summary = summaryResult.value;
+      const history = historyResult.status === 'fulfilled' ? historyResult.value : [];
+      const rechargeOrders = rechargeOrdersResult.status === 'fulfilled' ? rechargeOrdersResult.value : [];
+      const guard = guardResult.status === 'fulfilled' ? guardResult.value : null;
       const orderList = rechargeOrders || [];
       const abnormalOrders = orderList.filter((item) => item && item.status !== 'PAID');
       const filteredOrders = orderList.filter((item) => matchOrderFilter(item, this.data.orderFilter));
@@ -126,7 +171,8 @@ Page({
         abnormalOrders,
         filteredOrders,
         selectedPreset,
-        previewBalance: previewBalance.toFixed(2)
+        previewBalance: previewBalance.toFixed(2),
+        partialWarning: warnings.length ? `以下信息暂未同步成功：${warnings.join('、')}。可稍后下拉刷新重试。` : ''
       });
     } catch (error) {
       this.setData({
@@ -231,6 +277,7 @@ Page({
     }
     this.setData({ paying: true });
     wx.showLoading({ title: '创建支付单', mask: true });
+    let outTradeNo = '';
     try {
       const loginCode = await wxLogin();
       const prepay = await createWechatRechargePrepay(amount, {
@@ -241,13 +288,14 @@ Page({
       if (!prepay || !prepay.outTradeNo) {
         throw new Error('预下单失败');
       }
+      outTradeNo = prepay.outTradeNo;
       wx.hideLoading();
 
       try {
         await wxRequestPayment(prepay);
       } catch (payError) {
         if (payError && payError.errMsg && payError.errMsg.includes('cancel')) {
-          wx.showToast({ title: '已取消支付', icon: 'none' });
+          this.promptPendingOrder(outTradeNo);
           return;
         }
         throw payError;
@@ -257,19 +305,68 @@ Page({
       if (paidOrder) {
         wx.showToast({ title: `充值成功 ¥${amount}`, icon: 'success' });
       } else {
-        wx.showToast({ title: '支付处理中，请稍后刷新', icon: 'none' });
+        this.promptProcessingOrder(outTradeNo);
       }
     } catch (error) {
       if (this.data.allowManualFallback) {
         await this.doManualRecharge(amount);
       } else {
-        wx.showToast({ title: error.message || '支付发起失败，请稍后重试', icon: 'none' });
+        this.promptRechargeFailure(error, outTradeNo);
       }
     } finally {
       wx.hideLoading();
       this.setData({ paying: false });
       await this.loadData();
     }
+  },
+  promptPendingOrder(outTradeNo) {
+    wx.showModal({
+      title: '支付未完成',
+      content: '本次支付已取消，订单已保留为待支付状态。你可以在订单详情中查看状态或重新发起充值。',
+      confirmText: '查看订单',
+      cancelText: '知道了',
+      success: (res) => {
+        if (res.confirm && outTradeNo) {
+          this.openOrderDetail(outTradeNo);
+        }
+      }
+    });
+  },
+  promptProcessingOrder(outTradeNo) {
+    wx.showModal({
+      title: '支付确认中',
+      content: '微信支付已提交，系统暂未确认到账。到账通常有延迟，可在订单详情中刷新查看最新状态。',
+      confirmText: '查看订单',
+      cancelText: '稍后再看',
+      success: (res) => {
+        if (res.confirm && outTradeNo) {
+          this.openOrderDetail(outTradeNo);
+        }
+      }
+    });
+  },
+  promptRechargeFailure(error, outTradeNo) {
+    const message = (error && error.message) || '支付发起失败，请稍后重试';
+    if (!outTradeNo) {
+      wx.showToast({ title: message, icon: 'none' });
+      return;
+    }
+    wx.showModal({
+      title: '支付未成功',
+      content: `${message}。订单已记录，可在订单详情查看原因并重新发起充值。`,
+      confirmText: '查看订单',
+      cancelText: '知道了',
+      success: (res) => {
+        if (res.confirm) {
+          this.openOrderDetail(outTradeNo);
+        }
+      }
+    });
+  },
+  openOrderDetail(outTradeNo) {
+    wx.navigateTo({
+      url: `/pages/recharge-order/index?outTradeNo=${encodeURIComponent(outTradeNo)}`
+    });
   },
   toOrderDetail(e) {
     const outTradeNo = e.currentTarget.dataset.tradeNo;

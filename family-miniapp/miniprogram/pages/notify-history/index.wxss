@@ -1,0 +1,19 @@
+.card { padding: 24rpx; }
+.filter-row { margin-top: 12rpx; display: flex; gap: 12rpx; flex-wrap: wrap; }
+.filter-item { padding: 8rpx 22rpx; border-radius: 999rpx; background: #EFF3EF; color: #5C6F69; font-size: 23rpx; }
+.filter-item.active { background: #21705F; color: #FFFFFF; font-weight: 600; }
+.list-empty { margin-top: 22rpx; text-align: center; font-size: 23rpx; color: #7C8984; line-height: 1.6; }
+.error-box { margin-top: 22rpx; text-align: center; }
+.error-text { font-size: 23rpx; color: #B4553B; line-height: 1.6; }
+.retry-btn { margin-top: 14rpx; display: inline-block; height: 60rpx; line-height: 60rpx; font-size: 23rpx; padding: 0 30rpx; }
+.log-item { margin-top: 16rpx; padding: 16rpx; border-radius: 12rpx; background: #FAFAF7; }
+.log-head { display: flex; justify-content: space-between; align-items: center; }
+.log-type { font-size: 21rpx; color: #21705F; background: #E8F3EF; padding: 4rpx 12rpx; border-radius: 999rpx; }
+.log-status { font-size: 21rpx; }
+.status-SUCCESS { color: #21705F; }
+.status-FAILED { color: #B4553B; }
+.status-PENDING, .status-SKIPPED { color: #8A7A3B; }
+.log-title { margin-top: 10rpx; font-size: 26rpx; color: #22332E; font-weight: 600; }
+.log-content { margin-top: 6rpx; font-size: 23rpx; color: #34443F; line-height: 1.5; }
+.log-error { margin-top: 6rpx; font-size: 21rpx; color: #B4553B; }
+.log-time { margin-top: 8rpx; font-size: 21rpx; color: #7C8984; }

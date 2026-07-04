@@ -35,8 +35,8 @@
 }
 
 .count-card {
-  background: #f7faf8;
-  border: 1rpx solid #edf2ef;
+  background: #FAFAF7;
+  border: 1rpx solid #E4E7E0;
   border-radius: 18rpx;
   padding: 16rpx 18rpx;
   min-width: 0;
@@ -45,7 +45,7 @@
 .count-card .num {
   display: block;
   font-size: 34rpx;
-  color: #182420;
+  color: #22332E;
   font-weight: 700;
 }
 
@@ -53,7 +53,7 @@
   display: block;
   margin-top: 4rpx;
   font-size: 21rpx;
-  color: #71807a;
+  color: #5C6F69;
 }
 
 .count-card.urgent {
@@ -67,7 +67,7 @@
 }
 
 .count-card.normal {
-  background: #edf6f2;
+  background: #E8F3EF;
   border-color: #cde1e4;
 }
 
@@ -85,13 +85,13 @@
 
 .panel-title {
   font-size: 28rpx;
-  color: #182420;
+  color: #22332E;
   font-weight: 700;
 }
 
 .link {
   font-size: 22rpx;
-  color: #246b5f;
+  color: #21705F;
 }
 
 .type-row {
@@ -103,7 +103,7 @@
   flex-wrap: wrap;
   font-size: 23rpx;
   color: #34443f;
-  background: #f7faf8;
+  background: #FAFAF7;
   border-radius: 14rpx;
   padding: 14rpx 16rpx;
 }
@@ -115,7 +115,7 @@
 }
 
 .type-count {
-  color: #71807a;
+  color: #5C6F69;
   line-height: 1.5;
   word-break: break-word;
 }
@@ -146,29 +146,29 @@
 
 .tag.lv-urgent {
   background: #ffefef;
-  color: #b42318;
+  color: #C9504B;
 }
 
 .tag.lv-warning {
   background: #fff4e8;
-  color: #9a5b05;
+  color: #B27221;
 }
 
 .tag.lv-normal {
-  background: #edf6f2;
-  color: #246b5f;
+  background: #E8F3EF;
+  color: #21705F;
 }
 
 .urgent-time {
   font-size: 22rpx;
-  color: #71807a;
+  color: #5C6F69;
   line-height: 1.5;
 }
 
 .urgent-title {
   margin-top: 8rpx;
   font-size: 27rpx;
-  color: #16231f;
+  color: #22332E;
   font-weight: 700;
   line-height: 1.45;
   word-break: break-word;
@@ -194,7 +194,7 @@
 
 .elder {
   font-size: 22rpx;
-  color: #71807a;
+  color: #5C6F69;
   min-width: 0;
   word-break: break-word;
 }

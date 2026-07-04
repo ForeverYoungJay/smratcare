@@ -1,7 +1,13 @@
 <template>
-  <PageContainer title="来访登记" subTitle="访客预约与到访登记">
+  <PageContainer title="探访预约管理" subTitle="家属预约、门岗到访、取消留痕与凭条打印">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新增来访</a-button>
+    </template>
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
+        <a-form-item label="预约日期">
+          <a-range-picker v-model:value="query.dateRange" value-format="YYYY-MM-DD" style="width: 260px" />
+        </a-form-item>
         <a-form-item label="老人姓名">
           <a-select
             v-model:value="query.elderId"
@@ -20,13 +26,13 @@
           <a-select v-model:value="query.status" allow-clear style="width: 160px" placeholder="请选择来访状态">
             <a-select-option :value="0">待登记</a-select-option>
             <a-select-option :value="1">已登记</a-select-option>
+            <a-select-option :value="2">已取消</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item>
           <a-space>
             <a-button type="primary" :loading="loading" @click="fetchData">搜索</a-button>
             <a-button @click="reset">清空</a-button>
-            <a-button type="primary" @click="openCreate">新增来访</a-button>
           </a-space>
         </a-form-item>
       </a-form>
@@ -36,9 +42,9 @@
       <a-space style="margin-bottom: 12px" wrap>
         <a-tag color="blue">已选 {{ selectedRowKeys.length }} 条</a-tag>
         <a-button :disabled="selectedRowKeys.length !== 1" @click="checkinSelected">登记到访</a-button>
-        <a-button :disabled="selectedRowKeys.length !== 1" @click="printSelectedTicket">打印词条</a-button>
+        <a-button :disabled="selectedRowKeys.length !== 1" @click="printSelectedTicket">打印凭条</a-button>
         <a-button :disabled="selectedRowKeys.length !== 1" @click="openEditSelected">编辑</a-button>
-        <a-button danger :disabled="selectedRowKeys.length === 0" @click="deleteSelected">删除</a-button>
+        <a-button danger :disabled="selectedRowKeys.length === 0" @click="deleteSelected">取消预约</a-button>
       </a-space>
       <StatefulBlock :loading="loading" :error="errorMessage" :empty="!rows.length" empty-text="暂无来访记录" @retry="fetchData">
         <a-table
@@ -51,9 +57,7 @@
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'status'">
-              <a-tag :color="record.status === 1 ? 'green' : 'orange'">
-                {{ record.status === 1 ? '已登记' : '待登记' }}
-              </a-tag>
+              <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
             </template>
           </template>
         </a-table>
@@ -123,7 +127,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
 import { getFamilyRelations } from '../../api/family'
 import { useElderOptions } from '../../composables/useElderOptions'
-import { guardBookVisit, guardCheckin, guardDeleteVisit, guardGetPrintTicket, guardTodayVisits, guardUpdateVisit } from '../../api/visit'
+import { guardBookVisit, guardCheckin, guardDeleteVisit, guardGetPrintTicket, guardUpdateVisit, guardVisits } from '../../api/visit'
 import type { FamilyRelationItem, Id, VisitBookRequest, VisitBookingItem } from '../../types'
 import { normalizeResidentId } from '../../utils/id'
 
@@ -152,6 +156,7 @@ const rowSelection = computed(() => ({
   }
 }))
 const query = reactive({
+  dateRange: [dayjs().format('YYYY-MM-DD'), dayjs().format('YYYY-MM-DD')] as string[],
   elderId: undefined as Id | undefined,
   status: undefined as number | undefined
 })
@@ -181,6 +186,8 @@ const columns = [
   { title: '居住楼层', dataIndex: 'floorNo', key: 'floorNo', width: 120 },
   { title: '房号', dataIndex: 'roomNo', key: 'roomNo', width: 120 },
   { title: '来访时间', dataIndex: 'visitTime', key: 'visitTime', width: 180 },
+  { title: '预约时段', dataIndex: 'visitTimeSlot', key: 'visitTimeSlot', width: 120 },
+  { title: '预约码', dataIndex: 'visitCode', key: 'visitCode', width: 140 },
   { title: '访客人数', dataIndex: 'visitorCount', key: 'visitorCount', width: 100 },
   { title: '车牌', dataIndex: 'carPlate', key: 'carPlate', width: 120 },
   { title: '状态', key: 'status', width: 100 }
@@ -241,10 +248,14 @@ async function fetchData() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const source = await guardTodayVisits()
+    const [fromDate, toDate] = query.dateRange || []
+    const source = await guardVisits({
+      elderId: query.elderId,
+      status: query.status,
+      fromDate,
+      toDate
+    })
     rows.value = source
-      .filter((item) => (query.elderId ? item.elderId === query.elderId : true))
-      .filter((item) => (query.status !== undefined ? item.status === query.status : true))
       .map((item) => ({
         ...item,
         elderName: item.elderName || resolveElderName(item.elderId),
@@ -252,7 +263,7 @@ async function fetchData() {
         visitorPhone: item.visitorPhone || '',
         visitorRelation: item.visitorRelation || ''
       }))
-    selectedRowKeys.value = selectedRowKeys.value.filter((id) => rows.value.some((item) => item.id === id))
+    selectedRowKeys.value = selectedRowKeys.value.filter((id) => rows.value.some((item) => String(item.id) === String(id)))
   } catch (error: any) {
     errorMessage.value = error?.message || '加载来访记录失败'
   } finally {
@@ -261,12 +272,17 @@ async function fetchData() {
 }
 
 function reset() {
+  query.dateRange = [dayjs().format('YYYY-MM-DD'), dayjs().format('YYYY-MM-DD')]
   query.elderId = undefined
   query.status = undefined
   fetchData()
 }
 
 async function checkin(record: VisitBookingItem) {
+  if (record.status === 2) {
+    message.warning('已取消的预约不能登记到访')
+    return
+  }
   await guardCheckin({ bookingId: record.id })
   message.success('来访登记成功')
   fetchData()
@@ -274,13 +290,29 @@ async function checkin(record: VisitBookingItem) {
 
 async function checkinSelected() {
   if (selectedRowKeys.value.length !== 1) return
-  const record = rows.value.find((item) => item.id === selectedRowKeys.value[0])
+  const record = rows.value.find((item) => String(item.id) === String(selectedRowKeys.value[0]))
   if (!record) return
   if (record.status === 1) {
     message.warning('该记录已登记')
     return
   }
+  if (record.status === 2) {
+    message.warning('该记录已取消')
+    return
+  }
   await checkin(record)
+}
+
+function statusText(status?: number) {
+  if (status === 1) return '已登记'
+  if (status === 2) return '已取消'
+  return '待登记'
+}
+
+function statusColor(status?: number) {
+  if (status === 1) return 'green'
+  if (status === 2) return 'default'
+  return 'orange'
 }
 
 function buildPrintableTicket(record: {
@@ -299,7 +331,7 @@ function buildPrintableTicket(record: {
   generatedAt?: string
 }) {
   const lines = [
-    `词条编号：${record.ticketNo || '-'}`,
+    `凭条编号：${record.ticketNo || '-'}`,
     `老人：${record.elderName || '-'}`,
     `来访人：${record.visitorName || record.familyName || '-'}`,
     `关系：${record.visitorRelation || '-'}`,
@@ -337,7 +369,7 @@ function printVisitTicket(record: {
   popup.document.write(`
     <html>
       <head>
-        <title>来访登记词条</title>
+        <title>来访登记凭条</title>
         <style>
           body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; padding: 20px; }
           .ticket { border: 1px dashed #333; padding: 16px; line-height: 1.8; font-size: 14px; }
@@ -346,7 +378,7 @@ function printVisitTicket(record: {
       </head>
       <body>
         <div class="ticket">
-          <div class="title">来访登记词条</div>
+          <div class="title">来访登记凭条</div>
           ${buildPrintableTicket(record)}
         </div>
       </body>
@@ -359,7 +391,7 @@ function printVisitTicket(record: {
 
 async function printSelectedTicket() {
   if (selectedRowKeys.value.length !== 1) return
-  const record = rows.value.find((item) => item.id === selectedRowKeys.value[0])
+  const record = rows.value.find((item) => String(item.id) === String(selectedRowKeys.value[0]))
   if (!record) return
   try {
     const ticket = await guardGetPrintTicket(record.id)
@@ -379,7 +411,7 @@ async function printSelectedTicket() {
       generatedAt: ticket.generatedAt
     })
   } catch (error: any) {
-    message.error(error?.message || '生成打印词条失败')
+    message.error(error?.message || '生成打印凭条失败')
   }
 }
 
@@ -401,10 +433,14 @@ function openCreate() {
 
 async function openEditSelected() {
   if (selectedRowKeys.value.length !== 1) return
-  const record = rows.value.find((item) => item.id === selectedRowKeys.value[0])
+  const record = rows.value.find((item) => String(item.id) === String(selectedRowKeys.value[0]))
   if (!record) return
   if (record.status === 1) {
     message.warning('已登记到访记录不可编辑')
+    return
+  }
+  if (record.status === 2) {
+    message.warning('已取消预约不可编辑')
     return
   }
   ensureSelectedElder(record.elderId, record.elderName)
@@ -416,7 +452,7 @@ async function openEditSelected() {
   form.visitorPhone = record.visitorPhone || ''
   form.visitorRelation = record.visitorRelation || ''
   form.visitTime = record.visitTime
-  form.visitTimeSlot = ''
+  form.visitTimeSlot = record.visitTimeSlot || ''
   form.visitorCount = record.visitorCount || 1
   form.carPlate = record.carPlate || ''
   form.remark = record.remark || ''
@@ -463,14 +499,23 @@ async function submitEdit() {
 
 function deleteSelected() {
   if (!selectedRowKeys.value.length) return
+  const selectedRows = rows.value.filter((item) => selectedRowKeys.value.some((id) => String(id) === String(item.id)))
+  if (selectedRows.some((item) => item.status === 1)) {
+    message.warning('已登记到访记录不可取消')
+    return
+  }
+  if (selectedRows.some((item) => item.status === 2)) {
+    message.warning('已取消预约无需重复取消')
+    return
+  }
   Modal.confirm({
-    title: '确认删除来访预约？',
-    content: `将删除 ${selectedRowKeys.value.length} 条预约（已登记记录不可删除）`,
-    okText: '确认删除',
+    title: '确认取消来访预约？',
+    content: `将取消 ${selectedRows.length} 条预约，并保留取消状态用于后续追踪。`,
+    okText: '确认取消',
     okType: 'danger',
     async onOk() {
-      await Promise.all(selectedRowKeys.value.map((id) => guardDeleteVisit(id)))
-      message.success('删除成功')
+      await Promise.all(selectedRows.map((item) => guardDeleteVisit(item.id)))
+      message.success('预约已取消')
       selectedRowKeys.value = []
       await fetchData()
     }

@@ -4,12 +4,17 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.elder.entity.ElderProfile;
+import com.zhiyangyun.care.elder.entity.FamilyUser;
+import com.zhiyangyun.care.elder.mapper.ElderMapper;
+import com.zhiyangyun.care.elder.mapper.FamilyUserMapper;
 import com.zhiyangyun.care.family.entity.FamilyNotifyLog;
 import com.zhiyangyun.care.family.entity.FamilyRechargeOrder;
 import com.zhiyangyun.care.family.entity.FamilySmsCodeLog;
 import com.zhiyangyun.care.family.mapper.FamilyNotifyLogMapper;
 import com.zhiyangyun.care.family.mapper.FamilyRechargeOrderMapper;
 import com.zhiyangyun.care.family.mapper.FamilySmsCodeLogMapper;
+import java.math.RoundingMode;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -35,13 +40,19 @@ public class FamilyOpsController {
   private final FamilySmsCodeLogMapper familySmsCodeLogMapper;
   private final FamilyNotifyLogMapper familyNotifyLogMapper;
   private final FamilyRechargeOrderMapper familyRechargeOrderMapper;
+  private final ElderMapper elderMapper;
+  private final FamilyUserMapper familyUserMapper;
 
   public FamilyOpsController(FamilySmsCodeLogMapper familySmsCodeLogMapper,
       FamilyNotifyLogMapper familyNotifyLogMapper,
-      FamilyRechargeOrderMapper familyRechargeOrderMapper) {
+      FamilyRechargeOrderMapper familyRechargeOrderMapper,
+      ElderMapper elderMapper,
+      FamilyUserMapper familyUserMapper) {
     this.familySmsCodeLogMapper = familySmsCodeLogMapper;
     this.familyNotifyLogMapper = familyNotifyLogMapper;
     this.familyRechargeOrderMapper = familyRechargeOrderMapper;
+    this.elderMapper = elderMapper;
+    this.familyUserMapper = familyUserMapper;
   }
 
   @PreAuthorize("hasAnyRole('FINANCE_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
@@ -72,6 +83,98 @@ public class FamilyOpsController {
     response.setRecharge(recharge);
     response.setTopErrors(topErrors);
     response.setSuggestions(buildSuggestions(sms, notify, recharge));
+    return Result.ok(response);
+  }
+
+  @PreAuthorize("hasAnyRole('FINANCE_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @GetMapping("/recharge-ledger")
+  public Result<RechargeLedgerResponse> rechargeLedger(
+      @RequestParam(defaultValue = "1") Integer pageNo,
+      @RequestParam(defaultValue = "20") Integer pageSize,
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String channel,
+      @RequestParam(required = false) String keyword) {
+    Long orgId = AuthContext.getOrgId();
+    String normalizedStatus = normalizeOptional(status);
+    String normalizedChannel = normalizeOptional(channel);
+    String normalizedKeyword = normalizeOptional(keyword);
+
+    List<Long> elderIds = null;
+    List<Long> familyUserIds = null;
+    if (normalizedKeyword != null) {
+      elderIds = elderMapper.selectList(Wrappers.lambdaQuery(ElderProfile.class)
+              .eq(orgId != null, ElderProfile::getOrgId, orgId)
+              .eq(ElderProfile::getIsDeleted, 0)
+              .like(ElderProfile::getFullName, normalizedKeyword))
+          .stream()
+          .map(ElderProfile::getId)
+          .distinct()
+          .toList();
+      familyUserIds = familyUserMapper.selectList(Wrappers.lambdaQuery(FamilyUser.class)
+              .eq(orgId != null, FamilyUser::getOrgId, orgId)
+              .eq(FamilyUser::getIsDeleted, 0)
+              .and(wrapper -> wrapper
+                  .like(FamilyUser::getRealName, normalizedKeyword)
+                  .or()
+                  .like(FamilyUser::getPhone, normalizedKeyword)))
+          .stream()
+          .map(FamilyUser::getId)
+          .distinct()
+          .toList();
+    }
+
+    LambdaQueryWrapper<FamilyRechargeOrder> baseQuery = buildRechargeLedgerQuery(
+        orgId,
+        normalizedStatus,
+        normalizedChannel,
+        normalizedKeyword,
+        elderIds,
+        familyUserIds);
+    List<FamilyRechargeOrder> filteredOrders = familyRechargeOrderMapper.selectList(
+        baseQuery.orderByDesc(FamilyRechargeOrder::getCreateTime));
+    int safePageNo = Math.max(pageNo == null ? 1 : pageNo, 1);
+    int safePageSize = Math.max(pageSize == null ? 20 : pageSize, 1);
+    int fromIndex = Math.min((safePageNo - 1) * safePageSize, filteredOrders.size());
+    int toIndex = Math.min(fromIndex + safePageSize, filteredOrders.size());
+    List<FamilyRechargeOrder> pageOrders = filteredOrders.subList(fromIndex, toIndex);
+
+    List<Long> pageElderIds = pageOrders.stream().map(FamilyRechargeOrder::getElderId).filter(id -> id != null).distinct().toList();
+    List<Long> pageFamilyIds = pageOrders.stream().map(FamilyRechargeOrder::getFamilyUserId).filter(id -> id != null).distinct().toList();
+    Map<Long, ElderProfile> elderMap = pageElderIds.isEmpty()
+        ? Map.of()
+        : elderMapper.selectList(Wrappers.lambdaQuery(ElderProfile.class)
+                .eq(orgId != null, ElderProfile::getOrgId, orgId)
+                .eq(ElderProfile::getIsDeleted, 0)
+                .in(ElderProfile::getId, pageElderIds))
+            .stream()
+            .collect(java.util.stream.Collectors.toMap(ElderProfile::getId, elder -> elder, (a, b) -> a));
+    Map<Long, FamilyUser> familyMap = pageFamilyIds.isEmpty()
+        ? Map.of()
+        : familyUserMapper.selectList(Wrappers.lambdaQuery(FamilyUser.class)
+                .eq(orgId != null, FamilyUser::getOrgId, orgId)
+                .eq(FamilyUser::getIsDeleted, 0)
+                .in(FamilyUser::getId, pageFamilyIds))
+            .stream()
+            .collect(java.util.stream.Collectors.toMap(FamilyUser::getId, user -> user, (a, b) -> a));
+
+    RechargeLedgerSummary summary = new RechargeLedgerSummary();
+    summary.setTotalCount(filteredOrders.size());
+    summary.setPendingCount(countRechargeByStatuses(filteredOrders, "INIT", "PREPAY_CREATED"));
+    summary.setPaidCount(countRechargeByStatuses(filteredOrders, "PAID"));
+    summary.setAbnormalCount(countRechargeByStatuses(filteredOrders, "FAILED", "CLOSED"));
+    summary.setAutoPayEnabledCount((int) filteredOrders.stream()
+        .filter(item -> containsAnyText(item.getRemark(), "自动扣费", "AUTO_PAY", "自动代扣"))
+        .count());
+    summary.setTotalAmount(sumRechargeAmount(filteredOrders));
+    summary.setPaidAmount(sumRechargeAmount(filteredOrders, "PAID"));
+    summary.setAbnormalAmount(sumRechargeAmount(filteredOrders, "FAILED", "CLOSED"));
+
+    RechargeLedgerResponse response = new RechargeLedgerResponse();
+    response.setPageNo(safePageNo);
+    response.setPageSize(safePageSize);
+    response.setTotal(filteredOrders.size());
+    response.setSummary(summary);
+    response.setList(pageOrders.stream().map(order -> toRechargeLedgerItem(order, elderMap, familyMap)).toList());
     return Result.ok(response);
   }
 
@@ -296,6 +399,116 @@ public class FamilyOpsController {
     return text.trim();
   }
 
+  private String defaultText(String text, String fallback) {
+    return normalizeText(text, fallback);
+  }
+
+  private String normalizeOptional(String text) {
+    if (text == null || text.isBlank()) {
+      return null;
+    }
+    return text.trim();
+  }
+
+  private LambdaQueryWrapper<FamilyRechargeOrder> buildRechargeLedgerQuery(
+      Long orgId,
+      String normalizedStatus,
+      String normalizedChannel,
+      String normalizedKeyword,
+      List<Long> elderIds,
+      List<Long> familyUserIds) {
+    LambdaQueryWrapper<FamilyRechargeOrder> query = Wrappers.lambdaQuery(FamilyRechargeOrder.class)
+        .eq(FamilyRechargeOrder::getIsDeleted, 0)
+        .eq(orgId != null, FamilyRechargeOrder::getOrgId, orgId)
+        .eq(normalizedStatus != null, FamilyRechargeOrder::getStatus, normalizedStatus)
+        .eq(normalizedChannel != null, FamilyRechargeOrder::getChannel, normalizedChannel);
+    if (normalizedKeyword != null) {
+      boolean hasElders = elderIds != null && !elderIds.isEmpty();
+      boolean hasFamilies = familyUserIds != null && !familyUserIds.isEmpty();
+      query.and(wrapper -> {
+        wrapper.like(FamilyRechargeOrder::getOutTradeNo, normalizedKeyword)
+            .or()
+            .like(FamilyRechargeOrder::getRemark, normalizedKeyword);
+        if (hasElders) {
+          wrapper.or().in(FamilyRechargeOrder::getElderId, elderIds);
+        }
+        if (hasFamilies) {
+          wrapper.or().in(FamilyRechargeOrder::getFamilyUserId, familyUserIds);
+        }
+      });
+    }
+    return query;
+  }
+
+  private boolean containsAnyText(String text, String... needles) {
+    if (text == null || text.isBlank() || needles == null || needles.length == 0) {
+      return false;
+    }
+    String normalized = text.toUpperCase(Locale.ROOT);
+    for (String needle : needles) {
+      if (needle != null && !needle.isBlank() && normalized.contains(needle.toUpperCase(Locale.ROOT))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private int countRechargeByStatuses(List<FamilyRechargeOrder> orders, String... statuses) {
+    if (orders == null || orders.isEmpty() || statuses == null || statuses.length == 0) {
+      return 0;
+    }
+    List<String> statusList = java.util.Arrays.stream(statuses).map(this::normalizeStatus).toList();
+    return (int) orders.stream()
+        .filter(item -> statusList.contains(normalizeStatus(item.getStatus())))
+        .count();
+  }
+
+  private BigDecimal sumRechargeAmount(List<FamilyRechargeOrder> orders, String... statuses) {
+    if (orders == null || orders.isEmpty()) {
+      return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    }
+    List<String> statusList = statuses == null || statuses.length == 0
+        ? List.of()
+        : java.util.Arrays.stream(statuses).map(this::normalizeStatus).toList();
+    return orders.stream()
+        .filter(item -> statusList.isEmpty() || statusList.contains(normalizeStatus(item.getStatus())))
+        .map(item -> item.getAmount() == null ? BigDecimal.ZERO : item.getAmount())
+        .reduce(BigDecimal.ZERO, BigDecimal::add)
+        .setScale(2, RoundingMode.HALF_UP);
+  }
+
+  private RechargeLedgerItem toRechargeLedgerItem(
+      FamilyRechargeOrder order,
+      Map<Long, ElderProfile> elderMap,
+      Map<Long, FamilyUser> familyMap) {
+    RechargeLedgerItem item = new RechargeLedgerItem();
+    item.setId(order.getId());
+    item.setOutTradeNo(order.getOutTradeNo());
+    item.setFamilyUserId(order.getFamilyUserId());
+    item.setFamilyName(defaultText(familyMap.get(order.getFamilyUserId()) == null ? null : familyMap.get(order.getFamilyUserId()).getRealName(), "未命名家属"));
+    item.setFamilyPhone(familyMap.get(order.getFamilyUserId()) == null ? null : familyMap.get(order.getFamilyUserId()).getPhone());
+    item.setElderId(order.getElderId());
+    item.setElderName(defaultText(elderMap.get(order.getElderId()) == null ? null : elderMap.get(order.getElderId()).getFullName(), "未绑定老人"));
+    item.setAmount(order.getAmount() == null ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP) : order.getAmount().setScale(2, RoundingMode.HALF_UP));
+    item.setChannel(defaultText(order.getChannel(), "WECHAT_JSAPI"));
+    item.setStatus(normalizeStatus(order.getStatus()));
+    item.setStatusText(rechargeStatusText(order.getStatus()));
+    item.setRemark(normalizeText(order.getRemark(), ""));
+    item.setCreateTime(order.getCreateTime() == null ? null : order.getCreateTime().format(DATETIME_FMT));
+    item.setPaidTime(order.getPaidAt() == null ? null : order.getPaidAt().format(DATETIME_FMT));
+    item.setWxTransactionId(order.getWxTransactionId());
+    return item;
+  }
+
+  private String rechargeStatusText(String status) {
+    String normalized = normalizeStatus(status);
+    if ("PAID".equals(normalized)) return "已支付";
+    if ("PREPAY_CREATED".equals(normalized)) return "待支付";
+    if ("CLOSED".equals(normalized)) return "已关闭";
+    if ("FAILED".equals(normalized)) return "支付失败";
+    return "待创建";
+  }
+
   @Data
   public static class FamilyOpsHealthResponse {
     private String checkedAt;
@@ -346,5 +559,45 @@ public class FamilyOpsController {
     private String source;
     private String reason;
     private int count;
+  }
+
+  @Data
+  public static class RechargeLedgerResponse {
+    private int pageNo;
+    private int pageSize;
+    private int total;
+    private RechargeLedgerSummary summary = new RechargeLedgerSummary();
+    private List<RechargeLedgerItem> list = new ArrayList<>();
+  }
+
+  @Data
+  public static class RechargeLedgerSummary {
+    private int totalCount;
+    private int pendingCount;
+    private int paidCount;
+    private int abnormalCount;
+    private int autoPayEnabledCount;
+    private BigDecimal totalAmount = BigDecimal.ZERO;
+    private BigDecimal paidAmount = BigDecimal.ZERO;
+    private BigDecimal abnormalAmount = BigDecimal.ZERO;
+  }
+
+  @Data
+  public static class RechargeLedgerItem {
+    private Long id;
+    private String outTradeNo;
+    private Long familyUserId;
+    private String familyName;
+    private String familyPhone;
+    private Long elderId;
+    private String elderName;
+    private BigDecimal amount;
+    private String channel;
+    private String status;
+    private String statusText;
+    private String remark;
+    private String createTime;
+    private String paidTime;
+    private String wxTransactionId;
   }
 }

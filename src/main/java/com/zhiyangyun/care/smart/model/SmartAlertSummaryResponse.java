@@ -11,6 +11,8 @@ public class SmartAlertSummaryResponse {
   private Long offlineDeviceCount = 0L;
   private Long openAlertCount = 0L;
   private Long criticalAlertCount = 0L;
+  private Long derivedHealthAlertCount = 0L;
+  private Long derivedHealthGeneratedCount = 0L;
   private Long todayEventCount = 0L;
   private List<LevelCount> levelStats = new ArrayList<>();
 

@@ -24,6 +24,7 @@ import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeApplyMapper;
 import com.zhiyangyun.care.elder.model.lifecycle.ResidenceLifecycleConstants;
 import com.zhiyangyun.care.elder.service.ElderLifecycleStateService;
+import com.zhiyangyun.care.elder.service.ElderOccupancyReadService;
 import com.zhiyangyun.care.elder.service.ElderOccupancyService;
 import com.zhiyangyun.care.finance.entity.AdmissionFeeAudit;
 import com.zhiyangyun.care.finance.entity.ConsumptionRecord;
@@ -88,6 +89,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
   private final FinanceRefundVoucherMapper financeRefundVoucherMapper;
   private final ElderDischargeApplyMapper elderDischargeApplyMapper;
   private final ElderLifecycleStateService elderLifecycleStateService;
+  private final ElderOccupancyReadService elderOccupancyReadService;
   private final ElderOccupancyService elderOccupancyService;
   private final ElderAccountService elderAccountService;
   private final FinanceService financeService;
@@ -109,6 +111,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
       FinanceRefundVoucherMapper financeRefundVoucherMapper,
       ElderDischargeApplyMapper elderDischargeApplyMapper,
       ElderLifecycleStateService elderLifecycleStateService,
+      ElderOccupancyReadService elderOccupancyReadService,
       ElderOccupancyService elderOccupancyService,
       ElderAccountService elderAccountService,
       FinanceService financeService) {
@@ -128,6 +131,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     this.financeRefundVoucherMapper = financeRefundVoucherMapper;
     this.elderDischargeApplyMapper = elderDischargeApplyMapper;
     this.elderLifecycleStateService = elderLifecycleStateService;
+    this.elderOccupancyReadService = elderOccupancyReadService;
     this.elderOccupancyService = elderOccupancyService;
     this.elderAccountService = elderAccountService;
     this.financeService = financeService;
@@ -833,26 +837,21 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     }
     String normalizedRoomNo = normalizeOptionalText(roomNo);
     if (hasText(normalizedRoomNo)) {
-      List<Bed> beds = bedMapper.selectList(
-          Wrappers.lambdaQuery(Bed.class)
-              .eq(Bed::getIsDeleted, 0)
-              .eq(orgId != null, Bed::getOrgId, orgId)
-              .in(Bed::getElderId, normalized));
-      long uniqueElderCount = beds.stream()
-          .map(Bed::getElderId)
-          .filter(Objects::nonNull)
-          .distinct()
-          .count();
-      if (uniqueElderCount != normalized.size()) {
+      Map<Long, Bed> occupiedBedMap = elderOccupancyReadService.loadOccupiedBedMapByElderIds(orgId, normalized);
+      if (occupiedBedMap.size() != normalized.size()) {
         throw new IllegalStateException("所选老人存在未入住床位数据，请刷新后重试");
       }
-      List<Long> roomIds = beds.stream().map(Bed::getRoomId).filter(Objects::nonNull).distinct().toList();
+      List<Long> roomIds = occupiedBedMap.values().stream()
+          .map(Bed::getRoomId)
+          .filter(Objects::nonNull)
+          .distinct()
+          .toList();
       var roomMap = roomIds.isEmpty()
           ? java.util.Map.<Long, String>of()
           : roomMapperByIds(roomIds);
-      List<Long> invalidElderIds = beds.stream()
-          .filter(bed -> !normalizedRoomNo.equals(roomMap.getOrDefault(bed.getRoomId(), "")))
-          .map(Bed::getElderId)
+      List<Long> invalidElderIds = occupiedBedMap.entrySet().stream()
+          .filter(entry -> !normalizedRoomNo.equals(roomMap.getOrDefault(entry.getValue().getRoomId(), "")))
+          .map(Map.Entry::getKey)
           .filter(Objects::nonNull)
           .distinct()
           .toList();

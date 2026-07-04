@@ -1,5 +1,23 @@
 <template>
   <PageContainer title="机构月运营详情" subTitle="先看经营结论，再做横向比较和下钻明细">
+    <template #extra>
+      <a-space>
+        <a-button type="primary" @click="loadData">刷新</a-button>
+        <a-button @click="exportCsvReport">导出报表</a-button>
+        <a-dropdown>
+          <a-button>更多 ▾</a-button>
+          <template #overlay>
+            <a-menu>
+              <a-menu-item @click="openColumnSetting">列设置</a-menu-item>
+              <a-menu-item @click="printCurrent">打印当前列</a-menu-item>
+              <a-menu-item @click="printSpecificOrg">打印指定机构</a-menu-item>
+              <a-menu-divider />
+              <a-menu-item @click="reset">重置</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+      </a-space>
+    </template>
     <template #meta>
       <a-space wrap size="small">
         <span class="soft-pill">月份范围：{{ periodLabel }}</span>
@@ -43,16 +61,6 @@
         <a-form-item label="打印备注">
           <a-input v-model:value="query.printRemark" allow-clear placeholder="例如：运营周会版" style="width: 200px" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="loadData">刷新</a-button>
-            <a-button @click="exportCsvReport">导出报表</a-button>
-            <a-button @click="openColumnSetting">列设置</a-button>
-            <a-button @click="printCurrent">打印当前列</a-button>
-            <a-button @click="printSpecificOrg">打印指定机构</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
       </a-form>
     </section>
 
@@ -92,7 +100,7 @@
       <div class="story-panel">
         <div class="story-head">
           <div>
-            <div class="story-kicker">Summary</div>
+            <div class="story-kicker">概要</div>
             <h3>机构营收对比</h3>
           </div>
         </div>
@@ -110,7 +118,7 @@
       <div class="story-panel">
         <div class="story-head">
           <div>
-            <div class="story-kicker">Pressure</div>
+            <div class="story-kicker">经营压力</div>
             <h3>容量压力机构</h3>
           </div>
         </div>
@@ -130,7 +138,7 @@
     <section class="story-panel story-panel--chart">
       <div class="story-head">
         <div>
-          <div class="story-kicker">Trend</div>
+          <div class="story-kicker">趋势</div>
           <h3>机构月运营趋势</h3>
         </div>
       </div>
@@ -140,11 +148,11 @@
     <section class="story-panel story-panel--table">
       <div class="story-head">
         <div>
-          <div class="story-kicker">Detail</div>
+          <div class="story-kicker">明细</div>
           <h3>机构月运营明细</h3>
         </div>
       </div>
-      <vxe-table border stripe show-overflow :data="displayRows" height="320">
+      <vxe-table border stripe show-overflow="title" :data="displayRows" height="320">
         <vxe-column field="orgName" title="机构" min-width="140" />
         <vxe-column field="month" title="月份" width="120" />
         <vxe-column field="admissions" title="入住" width="100" />
@@ -498,28 +506,28 @@ onMounted(loadData)
 .headline-stat {
   padding: 14px 16px;
   border-radius: 16px;
-  border: 1px solid rgba(208, 223, 234, 0.88);
+  border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.78);
 }
 
 .headline-stat span {
   display: block;
   font-size: 12px;
-  color: #6f8ba2;
+  color: var(--muted);
 }
 
 .headline-stat strong {
   display: block;
   margin-top: 8px;
   font-size: 22px;
-  color: #173854;
+  color: var(--ink);
 }
 
 .stats-toolbar-shell,
 .story-panel {
   padding: 16px 18px;
   border-radius: 20px;
-  border: 1px solid rgba(208, 223, 234, 0.88);
+  border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.82);
 }
 
@@ -548,13 +556,13 @@ onMounted(loadData)
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #7290a8;
+  color: var(--muted);
 }
 
 .story-head h3 {
   margin: 4px 0 0;
   font-size: 18px;
-  color: #173854;
+  color: var(--ink);
 }
 
 .compare-list {
@@ -575,19 +583,19 @@ onMounted(loadData)
 
 .compare-name {
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ink);
 }
 
 .compare-meta {
   margin-top: 4px;
   font-size: 12px;
-  color: rgba(15, 23, 42, 0.62);
+  color: var(--muted);
 }
 
 .compare-value {
   font-size: 18px;
   font-weight: 700;
-  color: #111827;
+  color: var(--ink);
 }
 
 @media (max-width: 992px) {

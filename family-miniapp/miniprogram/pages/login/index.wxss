@@ -1,125 +1,142 @@
+/* ===== 登录页 · 品牌感 · 温暖大按钮 ===== */
+
 .login-page {
   min-height: 100vh;
   padding-top: 54rpx;
 }
 
+/* ---- 品牌卡（品牌渐变） ---- */
 .brand {
-  padding: 36rpx;
-  margin-bottom: 22rpx;
-  background:
-    linear-gradient(135deg, rgba(36, 107, 95, 0.13), rgba(255, 255, 255, 0) 54%),
-    #ffffff;
+  padding: 44rpx 36rpx 36rpx;
+  margin-bottom: 24rpx;
+  border: none;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, #21705F, #2E8A72);
+  box-shadow: 0 10rpx 28rpx rgba(33, 112, 95, 0.28);
 }
 
 .brand-title {
-  font-size: 48rpx;
+  font-size: 56rpx;
   line-height: 1.18;
   font-weight: 900;
-  color: #16231f;
+  color: #ffffff;
+  letter-spacing: 2rpx;
 }
 
 .brand-subtitle {
   margin-top: 14rpx;
-  font-size: 26rpx;
-  color: #52615c;
+  font-size: 28rpx;
+  color: rgba(255, 255, 255, 0.88);
   line-height: 1.55;
 }
 
-.runtime-warning,
-.runtime-tip {
-  margin-top: 18rpx;
-  padding: 14rpx 16rpx;
+.brand .runtime-warning,
+.brand .runtime-tip {
+  margin: 18rpx 0 0;
+  padding: 14rpx 18rpx;
   border-radius: 14rpx;
-  font-size: 22rpx;
+  font-size: 23rpx;
   line-height: 1.6;
 }
 
-.runtime-warning {
-  background: #fff4f2;
-  color: #b42318;
-  border: 1rpx solid #f0c2bd;
+.brand .runtime-warning {
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--danger);
+  border: none;
+}
+
+.brand .runtime-tip {
+  background: rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.92);
+  border: none;
 }
 
 .org-line {
-  margin-top: 16rpx;
-  font-size: 22rpx;
-  color: #71807a;
+  margin-top: 18rpx;
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.78);
 }
 
 .org-loading {
   margin-left: 10rpx;
-  color: #246b5f;
+  color: rgba(255, 255, 255, 0.92);
 }
 
-.mode-row {
-  margin-top: 24rpx;
-  display: flex;
-  background: #edf2ef;
-  border-radius: 999rpx;
-  padding: 6rpx;
-}
-
+/* ---- 身份 / 模式切换 ---- */
 .identity-row {
-  margin-top: 24rpx;
+  margin-top: 26rpx;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10rpx;
+  gap: 12rpx;
 }
 
 .identity {
-  height: 64rpx;
-  line-height: 64rpx;
+  height: 76rpx;
+  line-height: 76rpx;
   border-radius: 999rpx;
-  background: #edf2ef;
-  color: #71807a;
-  font-size: 25rpx;
-  font-weight: 900;
+  background: rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 28rpx;
+  font-weight: 800;
   text-align: center;
 }
 
 .identity.active {
-  background: #246b5f;
-  color: #ffffff;
+  background: #ffffff;
+  color: var(--brand-deep);
+  font-weight: 900;
+  box-shadow: 0 6rpx 16rpx rgba(24, 92, 78, 0.25);
+}
+
+.mode-row {
+  margin-top: 18rpx;
+  display: flex;
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 999rpx;
+  padding: 6rpx;
 }
 
 .mode {
   flex: 1;
   text-align: center;
-  padding: 11rpx 8rpx;
-  font-size: 23rpx;
-  color: #71807a;
+  padding: 14rpx 8rpx;
+  font-size: 25rpx;
+  color: rgba(255, 255, 255, 0.85);
   border-radius: 999rpx;
 }
 
 .mode.active {
-  background: #246b5f;
-  color: #ffffff;
+  background: #ffffff;
+  color: var(--brand-deep);
   font-weight: 900;
 }
 
+/* ---- 表单 ---- */
 .form {
-  padding: 30rpx;
+  padding: 34rpx 30rpx;
+  border-radius: var(--radius-lg);
 }
 
 .field {
-  margin-bottom: 22rpx;
+  margin-bottom: 26rpx;
 }
 
 .label {
   display: block;
-  margin-bottom: 10rpx;
-  font-size: 23rpx;
-  color: #71807a;
+  margin-bottom: 12rpx;
+  font-size: 26rpx;
+  color: var(--muted);
   font-weight: 700;
 }
 
 .input {
-  height: 78rpx;
-  padding: 0 18rpx;
-  border-radius: 14rpx;
-  background: #f7faf8;
-  border: 1rpx solid #d9e3df;
-  font-size: 28rpx;
+  height: 88rpx;
+  padding: 0 22rpx;
+  border-radius: var(--radius-ctl);
+  background: #FAFBF9;
+  border: 1rpx solid #D7DED8;
+  font-size: 30rpx;
+  color: var(--ink);
 }
 
 .code-row {
@@ -133,40 +150,44 @@
 }
 
 .code-btn {
-  width: 210rpx;
-  height: 78rpx;
-  line-height: 78rpx;
-  font-size: 24rpx;
+  width: 220rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  font-size: 25rpx;
 }
 
 .login-btn {
-  margin-top: 8rpx;
+  margin-top: 12rpx;
   width: 100%;
+  height: 92rpx;
+  line-height: 92rpx;
+  font-size: 32rpx;
+  border-radius: 16rpx;
 }
 
 .tips {
-  margin-top: 14rpx;
-  color: #71807a;
-  font-size: 22rpx;
-  line-height: 1.55;
+  margin-top: 16rpx;
+  color: var(--muted);
+  font-size: 24rpx;
+  line-height: 1.6;
 }
 
 .agreement-box {
-  margin-top: 24rpx;
-  padding: 18rpx;
+  margin-top: 26rpx;
+  padding: 20rpx 22rpx;
   border-radius: 16rpx;
-  background: #f7faf8;
+  background: var(--brand-soft);
 }
 
 .agreement-title {
-  font-size: 24rpx;
-  font-weight: 900;
-  color: #182420;
+  font-size: 25rpx;
+  font-weight: 800;
+  color: var(--brand-deep);
 }
 
 .agreement-text {
   margin-top: 8rpx;
-  font-size: 21rpx;
+  font-size: 22rpx;
   line-height: 1.6;
-  color: #71807a;
+  color: var(--muted);
 }

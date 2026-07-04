@@ -26,7 +26,7 @@
       <vxe-table
         border
         stripe
-        show-overflow
+        show-overflow="title"
         height="520"
         :loading="loading"
         :data="rows"
@@ -42,10 +42,10 @@
         </vxe-column>
         <vxe-column title="操作" width="200" fixed="right">
           <template #default="{ row }">
-            <a-space>
-              <a @click="openEdit(row)">编辑</a>
-              <a @click="toggleStatus(row)">{{ row.status === 1 ? '停用' : '启用' }}</a>
-            </a-space>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="openEdit(row)">编辑</a-button>
+              <a-button type="link" size="small" @click="toggleStatus(row)">{{ row.status === 1 ? '停用' : '启用' }}</a-button>
+            </div>
           </template>
         </vxe-column>
       </vxe-table>

@@ -18,7 +18,7 @@
         </a-row>
         <a-alert v-if="summary.warningMessage" style="margin-top: 12px;" type="warning" show-icon :message="summary.warningMessage" />
         <a-card style="margin-top: 12px;" size="small" :bordered="false" title="摘要明细">
-          <vxe-table border stripe show-overflow :data="summary.topItems || []" height="220">
+          <vxe-table border stripe show-overflow="title" :data="summary.topItems || []" height="220">
             <vxe-column field="label" title="维度" min-width="180" />
             <vxe-column field="count" title="数量" width="120" />
             <vxe-column field="amount" title="金额（元）" width="160" />

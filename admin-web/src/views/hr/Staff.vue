@@ -33,11 +33,11 @@
         <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑档案</a-button>
         <a-button :disabled="!selectedSingleRecord" @click="viewSelected">查看</a-button>
         <a-button :disabled="!selectedSingleRecord" @click="openEffectivePermissionPanel()">生效页面权限</a-button>
-        <a-button :disabled="!canTerminateSingle" @click="terminateSelected">离职</a-button>
         <a-button :disabled="!canReinstateSingle" @click="reinstateSelected">复职</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" @click="batchTerminate">批量离职</a-button>
         <a-button :disabled="selectedRowKeys.length === 0" @click="batchReinstate">批量复职</a-button>
         <a-button @click="printBirthdayLedger">打印生日台账</a-button>
+        <a-button danger :disabled="!canTerminateSingle" @click="terminateSelected">离职</a-button>
+        <a-button danger :disabled="selectedRowKeys.length === 0" @click="batchTerminate">批量离职</a-button>
         <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
       </template>
     </SearchForm>
@@ -1044,12 +1044,12 @@ maybeAutoOpenProfile()
 
 <style scoped>
 .selection-tip {
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--muted);
   font-size: 12px;
 }
 
 .summary-label {
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -1061,7 +1061,7 @@ maybeAutoOpenProfile()
 }
 
 .summary-warning {
-  color: #cf1322;
+  color: var(--danger);
 }
 
 .summary-card {
@@ -1071,7 +1071,7 @@ maybeAutoOpenProfile()
 .form-rule-tip {
   margin-top: 6px;
   font-size: 12px;
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--muted);
 }
 
 .permission-panel__label {
@@ -1082,7 +1082,7 @@ maybeAutoOpenProfile()
 }
 
 .permission-panel__empty {
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--muted);
   font-size: 12px;
 }
 </style>

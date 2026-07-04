@@ -5,8 +5,14 @@
   <view class="surface scan-card">
     <view class="scan-title">现场扫码</view>
     <view class="scan-sub">支持二维码、条码或点位编号</view>
-    <button class="primary-btn scan-btn" bindtap="scanCode">打开扫码</button>
+    <button class="primary-btn scan-btn" loading="{{submitting}}" bindtap="scanCode">打开扫码</button>
     <view class="scan-result" wx:if="{{scannedText}}">最近扫码：{{scannedText}}</view>
+    <view class="section-subtitle success-text" wx:if="{{submitSuccess}}">{{submitSuccess}}</view>
+    <view class="section-subtitle error-text" wx:if="{{submitError}}">{{submitError}}</view>
+  </view>
+
+  <view class="surface state-card" wx:if="{{loading}}">
+    <view class="state-title">正在加载巡检点</view>
   </view>
 
   <view class="surface state-card" wx:if="{{loadError}}">
@@ -15,8 +21,9 @@
     <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
   </view>
 
-  <view class="surface panel">
+  <view class="surface panel" wx:if="{{!loading && !loadError}}">
     <view class="panel-title">今日巡检点</view>
+    <view class="section-subtitle" wx:if="{{!points.length}}">当前没有待巡检点位</view>
     <block wx:for="{{points}}" wx:key="id">
       <view class="point-row" data-id="{{item.id}}" bindtap="simulateScan">
         <view>

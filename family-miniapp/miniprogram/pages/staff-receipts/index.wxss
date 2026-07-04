@@ -17,7 +17,7 @@
 }
 
 .filter.active {
-  background: #246b5f;
+  background: #21705F;
   color: #ffffff;
 }
 
@@ -41,7 +41,7 @@
 }
 
 .receipt-title {
-  color: #182430;
+  color: #22332E;
   font-size: 30rpx;
   font-weight: 900;
 }
@@ -82,7 +82,7 @@
   padding: 10rpx 16rpx;
   border-radius: 999rpx;
   background: #eef6ff;
-  color: #255a91;
+  color: #3D7FA6;
   font-size: 22rpx;
   font-weight: 850;
 }
@@ -99,4 +99,11 @@
   height: 150rpx;
   border-radius: 16rpx;
   background: #eef2f5;
+}
+
+.list-footer {
+  padding: 24rpx 0;
+  text-align: center;
+  color: #9aa7a1;
+  font-size: 23rpx;
 }

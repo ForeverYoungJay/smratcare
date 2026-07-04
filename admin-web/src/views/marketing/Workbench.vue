@@ -26,7 +26,7 @@
       <a-card class="card-elevated dashboard-control" :bordered="false">
         <div class="dashboard-control-bar">
           <div class="dashboard-control-copy">
-            <span class="section-kicker">Marketing Operations</span>
+            <span class="section-kicker">今日销售重点</span>
             <strong>销售运营工作台</strong>
             <span>围绕漏斗、风险、床位、合同和回访，把当下最该处理的销售动作集中到一屏。</span>
           </div>
@@ -86,7 +86,7 @@
         <a-card class="card-elevated risk-panel" :bordered="false">
           <div class="panel-head">
             <div>
-              <span class="section-kicker">Risk</span>
+              <span class="section-kicker">风险</span>
               <strong>风险预警</strong>
             </div>
             <span class="panel-link" @click="goReport('followup')">查看明细</span>
@@ -113,7 +113,7 @@
         <a-card class="card-elevated quick-panel" :bordered="false">
           <div class="panel-head">
             <div>
-              <span class="section-kicker">Actions</span>
+              <span class="section-kicker">快捷操作</span>
               <strong>快捷操作</strong>
             </div>
             <span class="panel-link" @click="goPlan({ status: 'PENDING_APPROVAL' })">查看方案审批</span>
@@ -146,7 +146,7 @@
         <a-card class="card-elevated bed-overview-card" :bordered="false">
           <div class="panel-head">
             <div>
-              <span class="section-kicker">Bed & Reservation</span>
+              <span class="section-kicker">床位与预定</span>
               <strong>床位与预定概况</strong>
             </div>
             <span class="panel-link" @click="goReservation('panorama')">进入床态看板</span>
@@ -168,7 +168,7 @@
         <a-card class="card-elevated operations-card" :bordered="false">
           <div class="panel-head panel-head--stack">
             <div>
-              <span class="section-kicker">Task Desk</span>
+              <span class="section-kicker">任务台</span>
               <strong>运营任务台</strong>
               <small>把今天最需要推进的营销动作收在一起，优先级从高到低处理。</small>
             </div>
@@ -210,7 +210,7 @@
           <a-card class="card-elevated rail-card" :bordered="false">
             <div class="panel-head">
               <div>
-                <span class="section-kicker">Reminder</span>
+                <span class="section-kicker">提醒</span>
                 <strong>跟进任务提醒</strong>
               </div>
               <span class="panel-link" @click="goFollowup('today')">查看全部</span>
@@ -227,7 +227,7 @@
           <a-card class="card-elevated rail-card" :bordered="false">
             <div class="panel-head">
               <div>
-                <span class="section-kicker">Channel</span>
+                <span class="section-kicker">渠道</span>
                 <strong>渠道表现</strong>
               </div>
               <span class="panel-link" @click="goReport('channel-rank')">查看全部</span>
@@ -247,7 +247,7 @@
           <a-card class="card-elevated rail-card" :bordered="false">
             <div class="panel-head">
               <div>
-                <span class="section-kicker">Campaign</span>
+                <span class="section-kicker">营销活动</span>
                 <strong>营销方案进度</strong>
               </div>
               <span class="panel-link" @click="goPlan({ status: 'PUBLISHED' })">查看全部</span>
@@ -267,7 +267,7 @@
           <a-card class="card-elevated rail-card" :bordered="false">
             <div class="panel-head">
               <div>
-                <span class="section-kicker">Snapshot</span>
+                <span class="section-kicker">快照</span>
                 <strong>经营快照</strong>
               </div>
               <span class="panel-link" @click="goSnapshots">更多</span>
@@ -502,7 +502,7 @@ const bedOverviewOption = computed(() => ({
       style: {
         text: `总床位\n${bedOverviewItems.value.reduce((sum, item) => sum + Number(item.value || 0), 0)}`,
         textAlign: 'center',
-        fill: '#173854',
+        fill: '#22332e',
         fontSize: 15,
         fontWeight: 700
       }
@@ -849,49 +849,49 @@ onUnmounted(() => {
   min-height: 112px;
   padding: 18px;
   border-radius: 22px;
-  border: 1px solid rgba(216, 229, 239, 0.92);
+  border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 14px 32px rgba(17, 60, 93, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .overview-tile span {
-  color: #648097;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .overview-tile strong {
-  color: #12314d;
+  color: var(--ink);
   font-size: 30px;
   line-height: 1;
 }
 
 .overview-tile small {
-  color: #7f96aa;
+  color: var(--muted-2);
   font-size: 12px;
   line-height: 1.55;
 }
 
 .overview-tile--primary {
-  background: linear-gradient(180deg, rgba(68, 163, 255, 0.11) 0%, rgba(255, 255, 255, 0.98) 100%);
+  background: linear-gradient(180deg, rgba(var(--info-rgb), 0.11) 0%, rgba(255, 255, 255, 0.98) 100%);
 }
 
 .overview-tile--warning {
-  background: linear-gradient(180deg, rgba(255, 176, 77, 0.14) 0%, rgba(255, 255, 255, 0.98) 100%);
+  background: linear-gradient(180deg, rgba(var(--warning-rgb), 0.14) 0%, rgba(255, 255, 255, 0.98) 100%);
 }
 
 .overview-tile--success {
-  background: linear-gradient(180deg, rgba(103, 197, 152, 0.12) 0%, rgba(255, 255, 255, 0.98) 100%);
+  background: linear-gradient(180deg, rgba(var(--success-rgb), 0.12) 0%, rgba(255, 255, 255, 0.98) 100%);
 }
 
 .overview-tile--danger {
-  background: linear-gradient(180deg, rgba(255, 108, 116, 0.12) 0%, rgba(255, 255, 255, 0.98) 100%);
+  background: linear-gradient(180deg, rgba(var(--danger-rgb), 0.12) 0%, rgba(255, 255, 255, 0.98) 100%);
 }
 
 .dashboard-control {
-  border: 1px solid rgba(210, 225, 235, 0.92);
+  border: 1px solid var(--border);
   background:
-    radial-gradient(circle at top right, rgba(68, 163, 255, 0.12), transparent 24%),
-    radial-gradient(circle at left bottom, rgba(103, 197, 152, 0.12), transparent 28%),
+    radial-gradient(circle at top right, rgba(var(--info-rgb), 0.12), transparent 24%),
+    radial-gradient(circle at left bottom, rgba(var(--success-rgb), 0.12), transparent 28%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(247, 251, 253, 0.98) 100%);
 }
 
@@ -908,20 +908,20 @@ onUnmounted(() => {
 }
 
 .section-kicker {
-  color: #7a95ac;
+  color: var(--muted-2);
   font-size: 11px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
 .dashboard-control-copy strong {
-  color: #133854;
+  color: var(--ink);
   font-size: 34px;
   line-height: 1.08;
 }
 
 .dashboard-control-copy span:last-child {
-  color: #5d7890;
+  color: var(--muted);
   font-size: 14px;
   line-height: 1.7;
 }
@@ -938,7 +938,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #5f7b92;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -962,20 +962,20 @@ onUnmounted(() => {
 
 .panel-head strong {
   display: block;
-  color: #173854;
+  color: var(--ink);
   font-size: 16px;
 }
 
 .panel-head small {
   display: block;
   margin-top: 6px;
-  color: #7b94a9;
+  color: var(--muted-2);
   font-size: 12px;
   line-height: 1.5;
 }
 
 .panel-link {
-  color: #1f8bc4;
+  color: var(--primary);
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
@@ -1001,7 +1001,7 @@ onUnmounted(() => {
   display: grid;
   gap: 4px;
   padding-bottom: 10px;
-  border-bottom: 1px solid rgba(224, 233, 239, 0.9);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .hero-stage-item:last-child {
@@ -1010,18 +1010,18 @@ onUnmounted(() => {
 }
 
 .hero-stage-item span {
-  color: #5a748b;
+  color: var(--muted);
   font-size: 13px;
 }
 
 .hero-stage-item strong {
-  color: #1774b2;
+  color: var(--primary);
   font-size: 32px;
   line-height: 1;
 }
 
 .hero-stage-item small {
-  color: #8a9caf;
+  color: var(--muted-2);
   font-size: 12px;
 }
 
@@ -1052,19 +1052,19 @@ onUnmounted(() => {
   width: 100%;
   padding: 16px;
   border-radius: 18px;
-  border: 1px solid rgba(226, 233, 239, 0.95);
+  border: 1px solid var(--border);
   background: #fff;
   text-align: left;
 }
 
 .risk-item--danger {
-  border-color: rgba(255, 143, 130, 0.65);
-  background: linear-gradient(180deg, rgba(255, 245, 243, 0.98) 0%, rgba(255, 255, 255, 0.98) 100%);
+  border-color: rgba(var(--danger-rgb), 0.4);
+  background: linear-gradient(180deg, rgba(var(--danger-rgb), 0.06) 0%, rgba(255, 255, 255, 0.98) 100%);
 }
 
 .risk-item--warning {
-  border-color: rgba(255, 188, 92, 0.72);
-  background: linear-gradient(180deg, rgba(255, 250, 240, 0.98) 0%, rgba(255, 255, 255, 0.98) 100%);
+  border-color: rgba(var(--warning-rgb), 0.45);
+  background: linear-gradient(180deg, rgba(var(--warning-rgb), 0.08) 0%, rgba(255, 255, 255, 0.98) 100%);
 }
 
 .risk-icon {
@@ -1074,7 +1074,7 @@ onUnmounted(() => {
   width: 36px;
   height: 36px;
   border-radius: 12px;
-  background: linear-gradient(180deg, #ff8a3d 0%, #ff5d5d 100%);
+  background: linear-gradient(180deg, var(--warning) 0%, var(--danger) 100%);
   color: #fff;
   font-weight: 700;
   font-size: 18px;
@@ -1086,18 +1086,18 @@ onUnmounted(() => {
 }
 
 .risk-copy strong {
-  color: #173854;
+  color: var(--ink);
   font-size: 14px;
 }
 
 .risk-copy small {
-  color: #70869a;
+  color: var(--muted);
   font-size: 12px;
   line-height: 1.5;
 }
 
 .risk-action {
-  color: #1f8bc4;
+  color: var(--primary);
   font-size: 12px;
 }
 
@@ -1112,9 +1112,9 @@ onUnmounted(() => {
   min-height: 102px;
   padding: 14px 10px;
   border-radius: 18px;
-  border: 1px solid rgba(224, 233, 239, 0.95);
+  border: 1px solid var(--border);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(247, 250, 252, 0.99) 100%);
-  color: #294256;
+  color: var(--ink-soft);
   font-size: 13px;
 }
 
@@ -1176,9 +1176,9 @@ onUnmounted(() => {
   min-height: 116px;
   padding: 18px;
   border-radius: 22px;
-  border: 1px solid rgba(218, 229, 236, 0.95);
+  border: 1px solid var(--border);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(247, 250, 252, 0.99) 100%);
-  box-shadow: 0 14px 32px rgba(17, 60, 93, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .signal-copy {
@@ -1187,18 +1187,18 @@ onUnmounted(() => {
 }
 
 .signal-copy span {
-  color: #658298;
+  color: var(--muted);
   font-size: 13px;
 }
 
 .signal-copy strong {
-  color: #173854;
+  color: var(--ink);
   font-size: 38px;
   line-height: 1;
 }
 
 .signal-copy small {
-  color: #8a9eb0;
+  color: var(--muted-2);
   font-size: 12px;
 }
 
@@ -1225,8 +1225,8 @@ onUnmounted(() => {
 
 .signal-badge--orange,
 .signal-badge--amber {
-  background: rgba(255, 176, 77, 0.16);
-  color: #dc8d25;
+  background: rgba(var(--warning-rgb), 0.16);
+  color: var(--warning);
 }
 
 .signal-badge--indigo {
@@ -1264,7 +1264,7 @@ onUnmounted(() => {
   grid-template-columns: 10px 1fr auto;
   gap: 10px;
   align-items: center;
-  color: #617b91;
+  color: var(--muted);
   font-size: 13px;
 }
 
@@ -1275,7 +1275,7 @@ onUnmounted(() => {
 }
 
 .bed-legend-item strong {
-  color: #173854;
+  color: var(--ink);
 }
 
 .operations-grid {
@@ -1303,15 +1303,15 @@ onUnmounted(() => {
   min-height: 38px;
   padding: 0 14px;
   border-radius: 999px;
-  border: 1px solid rgba(220, 229, 236, 0.95);
+  border: 1px solid var(--border);
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.98) 0%, rgba(255, 255, 255, 0.98) 100%);
-  color: #466178;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .task-table {
   margin-top: 8px;
-  border: 1px solid rgba(223, 232, 238, 0.94);
+  border: 1px solid var(--border);
   border-radius: 20px;
   overflow: hidden;
 }
@@ -1326,16 +1326,16 @@ onUnmounted(() => {
 }
 
 .task-table-head {
-  color: #648097;
+  color: var(--muted);
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  background: #f7fafc;
+  background: var(--surface-3);
 }
 
 .task-row {
-  border-top: 1px solid rgba(228, 235, 240, 0.92);
+  border-top: 1px solid var(--border-soft);
 }
 
 .task-main {
@@ -1344,14 +1344,14 @@ onUnmounted(() => {
 }
 
 .task-main strong {
-  color: #173854;
+  color: var(--ink);
   font-size: 14px;
 }
 
 .task-main small,
 .task-stage,
 .task-metric {
-  color: #72889d;
+  color: var(--muted);
   font-size: 12px;
   line-height: 1.55;
 }
@@ -1368,14 +1368,14 @@ onUnmounted(() => {
 }
 
 .task-priority--danger {
-  background: rgba(255, 108, 116, 0.14);
-  color: #d04b52;
+  background: rgba(var(--danger-rgb), 0.14);
+  color: var(--danger);
 }
 
 .task-priority--warning,
 .task-priority--orange {
-  background: rgba(255, 176, 77, 0.16);
-  color: #d98b23;
+  background: rgba(var(--warning-rgb), 0.16);
+  color: var(--warning);
 }
 
 .task-priority--cyan {
@@ -1408,12 +1408,12 @@ onUnmounted(() => {
   grid-template-columns: 10px 1fr auto;
   gap: 10px;
   align-items: center;
-  color: #617b91;
+  color: var(--muted);
   font-size: 13px;
 }
 
 .reminder-item strong {
-  color: #173854;
+  color: var(--ink);
 }
 
 .reminder-dot {
@@ -1427,15 +1427,15 @@ onUnmounted(() => {
 }
 
 .reminder-dot--orange {
-  background: #ffb04d;
+  background: var(--warning);
 }
 
 .reminder-dot--red {
-  background: #ff6c74;
+  background: var(--danger);
 }
 
 .reminder-dot--green {
-  background: #67c598;
+  background: var(--success);
 }
 
 .progress-list {
@@ -1456,17 +1456,17 @@ onUnmounted(() => {
 }
 
 .progress-copy strong {
-  color: #173854;
+  color: var(--ink);
   font-size: 13px;
 }
 
 .progress-copy small {
-  color: #8298ab;
+  color: var(--muted-2);
   font-size: 12px;
 }
 
 .progress-value {
-  color: #5f7b92;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -1476,16 +1476,16 @@ onUnmounted(() => {
   padding: 12px 14px;
   border-radius: 16px;
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.98) 0%, rgba(255, 255, 255, 0.98) 100%);
-  border: 1px solid rgba(223, 232, 238, 0.94);
+  border: 1px solid var(--border);
 }
 
 .snapshot-item strong {
-  color: #173854;
+  color: var(--ink);
   font-size: 13px;
 }
 
 .snapshot-item small {
-  color: #8298ab;
+  color: var(--muted-2);
   font-size: 12px;
 }
 

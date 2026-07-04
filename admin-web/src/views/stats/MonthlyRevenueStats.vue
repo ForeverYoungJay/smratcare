@@ -1,5 +1,13 @@
 <template>
   <PageContainer title="月运营收入统计" subTitle="按月份查看运营收入">
+    <template #extra>
+      <a-space wrap>
+        <a-button @click="exportTrend">导出趋势</a-button>
+        <a-button @click="printReport">打印报告</a-button>
+        <a-button @click="reset">重置</a-button>
+        <a-button type="primary" @click="loadData">刷新</a-button>
+      </a-space>
+    </template>
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline">
         <a-form-item label="起始月份">
@@ -13,14 +21,6 @@
         </a-form-item>
         <a-form-item label="打印备注">
           <a-input v-model:value="query.printRemark" allow-clear placeholder="例如：财务复核版" style="width: 200px" />
-        </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="loadData">刷新</a-button>
-            <a-button @click="exportTrend">导出趋势</a-button>
-            <a-button @click="printReport">打印报告</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
         </a-form-item>
       </a-form>
     </a-card>
@@ -81,14 +81,14 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="收入明细">
-      <vxe-table border stripe show-overflow :data="stats.monthlyRevenue || []" height="320">
+      <vxe-table border stripe show-overflow="title" :data="stats.monthlyRevenue || []" height="320">
         <vxe-column field="month" title="月份" width="140" />
         <vxe-column field="amount" title="收入金额" width="180" />
       </vxe-table>
     </a-card>
 
     <a-modal v-model:open="metricOpen" :title="metricTitle" @ok="metricOpen = false" cancel-text="关闭" ok-text="确定" width="680">
-      <vxe-table border stripe show-overflow :data="metricRows" height="360">
+      <vxe-table border stripe show-overflow="title" :data="metricRows" height="360">
         <vxe-column field="month" title="月份" width="160" />
         <vxe-column field="amount" title="收入金额" width="180" />
         <vxe-column field="tag" title="标签" min-width="180" />

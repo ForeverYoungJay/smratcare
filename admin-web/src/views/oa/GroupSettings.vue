@@ -15,11 +15,11 @@
         <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
         <a-button :disabled="!selectedSingleRecord || !canEnableSelected" @click="enableSelected">启用</a-button>
         <a-button :disabled="!selectedSingleRecord || !canDisableSelected" @click="disableSelected">停用</a-button>
-        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
         <a-button :disabled="selectedEnableIds.length === 0" @click="batchEnable">批量启用</a-button>
         <a-button :disabled="selectedDisableIds.length === 0" @click="batchDisable">批量停用</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
         <a-button @click="downloadExport">导出CSV</a-button>
+        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
         <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，批量启停只对状态不同项生效</span>
       </template>
     </SearchForm>
@@ -289,7 +289,7 @@ fetchData()
 
 <style scoped>
 .selection-tip {
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--muted);
   font-size: 12px;
 }
 </style>

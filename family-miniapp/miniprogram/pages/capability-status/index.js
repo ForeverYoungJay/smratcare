@@ -67,7 +67,8 @@ Page({
   data: {
     loading: false,
     status: null,
-    items: []
+    items: [],
+    loadError: ''
   },
   async onShow() {
     getApp().ensureLogin();
@@ -77,7 +78,7 @@ Page({
     await this.loadData(true);
   },
   async loadData(fromPullDown = false) {
-    this.setData({ loading: true });
+    this.setData({ loading: true, loadError: '' });
     try {
       const status = await getCapabilityStatus();
       const alertCount = countAlerts(status && status.items ? status.items : []);
@@ -87,7 +88,11 @@ Page({
         items: normalizeItems(status && status.items ? status.items : [])
       });
     } catch (error) {
-      wx.showToast({ title: error.message || '加载失败', icon: 'none' });
+      this.setData({
+        status: null,
+        items: [],
+        loadError: error.message || '能力状态加载失败，请稍后重试'
+      });
     } finally {
       this.setData({ loading: false });
       if (fromPullDown) {

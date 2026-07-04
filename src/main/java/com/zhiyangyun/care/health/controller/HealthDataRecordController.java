@@ -46,6 +46,7 @@ public class HealthDataRecordController {
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) String dataType,
+      @RequestParam(required = false) String source,
       @RequestParam(required = false) Integer abnormalFlag,
       @RequestParam(required = false) String measuredFrom,
       @RequestParam(required = false) String measuredTo,
@@ -54,6 +55,7 @@ public class HealthDataRecordController {
         AuthContext.getOrgId(),
         elderId,
         dataType,
+        source,
         abnormalFlag,
         measuredFrom,
         measuredTo,
@@ -66,6 +68,7 @@ public class HealthDataRecordController {
   public Result<HealthDataSummaryResponse> summary(
       @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) String dataType,
+      @RequestParam(required = false) String source,
       @RequestParam(required = false) Integer abnormalFlag,
       @RequestParam(required = false) String measuredFrom,
       @RequestParam(required = false) String measuredTo,
@@ -73,16 +76,16 @@ public class HealthDataRecordController {
     Long orgId = AuthContext.getOrgId();
     LocalDateTime from = parseDateTime(measuredFrom);
     LocalDateTime to = parseDateTime(measuredTo);
-    var wrapper = buildQuery(orgId, elderId, dataType, abnormalFlag, measuredFrom, measuredTo, keyword);
+    var wrapper = buildQuery(orgId, elderId, dataType, source, abnormalFlag, measuredFrom, measuredTo, keyword);
     long totalCount = mapper.selectCount(wrapper);
 
     long abnormalCount = 0L;
     if (totalCount > 0) {
-      abnormalCount = mapper.selectCount(buildQuery(orgId, elderId, dataType, 1, measuredFrom, measuredTo, keyword));
+      abnormalCount = mapper.selectCount(buildQuery(orgId, elderId, dataType, source, 1, measuredFrom, measuredTo, keyword));
     }
     long normalCount = Math.max(totalCount - abnormalCount, 0L);
 
-    var latestWrapper = buildQuery(orgId, elderId, dataType, abnormalFlag, measuredFrom, measuredTo, keyword)
+    var latestWrapper = buildQuery(orgId, elderId, dataType, source, abnormalFlag, measuredFrom, measuredTo, keyword)
         .orderByDesc(HealthDataRecord::getMeasuredAt)
         .last("limit 1");
     HealthDataRecord latestRecord = mapper.selectOne(latestWrapper);
@@ -93,6 +96,7 @@ public class HealthDataRecordController {
         .eq(orgId != null, "org_id", orgId)
         .eq(elderId != null, "elder_id", elderId)
         .eq(dataType != null && !dataType.isBlank(), "data_type", dataType)
+        .like(source != null && !source.isBlank(), "source", source)
         .eq(abnormalFlag != null && (abnormalFlag == 0 || abnormalFlag == 1), "abnormal_flag", abnormalFlag)
         .ge(from != null, "measured_at", from)
         .le(to != null, "measured_at", to)
@@ -181,6 +185,7 @@ public class HealthDataRecordController {
       Long orgId,
       Long elderId,
       String dataType,
+      String source,
       Integer abnormalFlag,
       String measuredFrom,
       String measuredTo,
@@ -192,6 +197,7 @@ public class HealthDataRecordController {
         .eq(orgId != null, HealthDataRecord::getOrgId, orgId)
         .eq(elderId != null, HealthDataRecord::getElderId, elderId)
         .eq(dataType != null && !dataType.isBlank(), HealthDataRecord::getDataType, dataType)
+        .like(source != null && !source.isBlank(), HealthDataRecord::getSource, source)
         .eq(abnormalFlag != null && (abnormalFlag == 0 || abnormalFlag == 1), HealthDataRecord::getAbnormalFlag, abnormalFlag)
         .ge(from != null, HealthDataRecord::getMeasuredAt, from)
         .le(to != null, HealthDataRecord::getMeasuredAt, to);

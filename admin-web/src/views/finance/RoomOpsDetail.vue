@@ -28,7 +28,7 @@
     </a-row>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <vxe-table border stripe show-overflow :loading="loading" :data="detail?.rows || []" height="560">
+      <vxe-table border stripe show-overflow="title" :loading="loading" :data="detail?.rows || []" height="560">
         <vxe-column field="building" title="楼栋" width="120" />
         <vxe-column field="floorNo" title="楼层" width="120" />
         <vxe-column field="roomNo" title="房间" width="120" />

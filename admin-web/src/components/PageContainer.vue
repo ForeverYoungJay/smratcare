@@ -50,12 +50,10 @@ const kicker = props.kicker
 .page-head {
   position: relative;
   padding: 22px 24px;
-  border: 1px solid rgba(206, 220, 231, 0.9);
-  border-radius: 26px;
-  background:
-    radial-gradient(circle at top right, rgba(120, 211, 237, 0.12), transparent 30%),
-    linear-gradient(180deg, rgba(252, 254, 255, 0.98), rgba(244, 249, 252, 0.96));
-  box-shadow: 0 18px 42px rgba(16, 68, 103, 0.08);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: var(--shadow-xs);
   overflow: hidden;
 }
 
@@ -63,15 +61,14 @@ const kicker = props.kicker
   position: absolute;
   inset: 0 auto 0 0;
   width: 4px;
-  background: linear-gradient(180deg, #3cc7d8 0%, #1f7dbd 100%);
+  background: linear-gradient(180deg, #2e8a72 0%, #21705f 100%);
   border-radius: 999px;
 }
 
 .page-head--showcase {
   background:
-    radial-gradient(320px 220px at 100% 0%, rgba(87, 215, 255, 0.15), transparent 68%),
-    radial-gradient(240px 180px at 0% 100%, rgba(121, 177, 255, 0.12), transparent 72%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.99) 0%, rgba(246, 251, 253, 0.97) 52%, rgba(239, 248, 252, 0.95) 100%);
+    radial-gradient(320px 220px at 100% 0%, rgba(33, 112, 95, 0.08), transparent 68%),
+    linear-gradient(135deg, #ffffff 0%, #fbfcf9 60%, #f4f8f4 100%);
 }
 
 .page-head--showcase::before,
@@ -86,7 +83,7 @@ const kicker = props.kicker
   inset: auto auto -80px -60px;
   width: 240px;
   height: 240px;
-  background: radial-gradient(circle, rgba(87, 215, 255, 0.14) 0%, rgba(87, 215, 255, 0) 70%);
+  background: radial-gradient(circle, rgba(46, 138, 114, 0.1) 0%, rgba(46, 138, 114, 0) 70%);
 }
 
 .page-head--showcase::after {
@@ -94,7 +91,7 @@ const kicker = props.kicker
   right: -50px;
   width: 240px;
   height: 240px;
-  background: radial-gradient(circle, rgba(121, 177, 255, 0.16) 0%, rgba(121, 177, 255, 0) 70%);
+  background: radial-gradient(circle, rgba(229, 138, 58, 0.1) 0%, rgba(229, 138, 58, 0) 70%);
 }
 
 .page-head-glow {
@@ -104,7 +101,7 @@ const kicker = props.kicker
   width: 280px;
   height: 280px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(19, 108, 181, 0.16) 0%, rgba(19, 108, 181, 0) 72%);
+  background: radial-gradient(circle, rgba(33, 112, 95, 0.12) 0%, rgba(33, 112, 95, 0) 72%);
   pointer-events: none;
 }
 
@@ -141,26 +138,26 @@ const kicker = props.kicker
   min-height: 28px;
   padding: 0 12px;
   border-radius: 999px;
-  background: rgba(29, 125, 189, 0.08);
-  color: #23658f;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
   font-size: 12px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   font-weight: 700;
 }
 
 .page-title {
   margin: 0;
-  font-size: 28px;
+  font-size: 26px;
   line-height: 1.12;
   letter-spacing: 0.01em;
-  color: #12314d;
+  color: var(--ink);
 }
 
 .page-subtitle {
   margin: 0;
   max-width: 760px;
   font-size: 14px;
-  color: #5e7890;
+  color: var(--muted);
   line-height: 1.7;
 }
 
@@ -180,7 +177,7 @@ const kicker = props.kicker
 .page-head-extra :deep(.ant-btn),
 .page-head-extra :deep(.ant-select-selector),
 .page-head-extra :deep(.ant-input-affix-wrapper) {
-  border-radius: 12px;
+  border-radius: 10px;
 }
 
 .page-head-foot {
@@ -192,7 +189,7 @@ const kicker = props.kicker
   flex-wrap: wrap;
   margin-top: 18px;
   padding-top: 16px;
-  border-top: 1px solid rgba(208, 221, 231, 0.76);
+  border-top: 1px solid var(--border-soft);
 }
 
 .page-head-meta {
@@ -218,13 +215,11 @@ const kicker = props.kicker
 }
 
 .page-shell--workspace .page-head {
-  background:
-    radial-gradient(circle at top right, rgba(87, 215, 255, 0.09), transparent 28%),
-    linear-gradient(180deg, rgba(250, 253, 255, 0.98), rgba(243, 248, 252, 0.95));
+  background: #ffffff;
 }
 
 .page-shell--workspace .page-head-accent {
-  background: linear-gradient(180deg, #5dc0c8 0%, #317fb4 100%);
+  background: linear-gradient(180deg, #2e8a72 0%, #21705f 100%);
 }
 
 .page-shell--showcase .page-title {
@@ -237,8 +232,8 @@ const kicker = props.kicker
 }
 
 .page-shell--workspace .page-kicker-chip {
-  background: rgba(54, 151, 193, 0.08);
-  color: #3b7392;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
 }
 
 .page-head-meta :deep(.ant-tag),

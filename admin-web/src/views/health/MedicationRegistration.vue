@@ -33,6 +33,62 @@
       </a-space>
     </a-card>
 
+    <a-card :bordered="false" class="summary-row medication-task-panel">
+      <template #title>
+        <a-space wrap>
+          <span>今日用药任务</span>
+          <a-tag color="orange">{{ pendingMedicationTaskCount }} 待发药</a-tag>
+          <a-tag color="red">{{ missedMedicationTaskCount }} 漏服/拒服</a-tag>
+        </a-space>
+      </template>
+      <template #extra>
+        <a-space>
+          <a-button size="small" :loading="taskLoading" @click="fetchMedicationTasks">刷新</a-button>
+          <a-button size="small" type="primary" :loading="taskLoading" @click="generateTodayTasks">生成今日任务</a-button>
+        </a-space>
+      </template>
+      <DataTable
+        rowKey="id"
+        size="small"
+        :columns="taskColumns"
+        :data-source="medicationTasks"
+        :loading="taskLoading"
+        :pagination="false"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'plannedTime'">
+            {{ formatDateTime(record.plannedTime) }}
+          </template>
+          <template v-else-if="column.key === 'status'">
+            <a-tag :color="taskStatusMeta(record.status).color">{{ taskStatusMeta(record.status).text }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <div class="row-action-links">
+              <a-button
+                type="link"
+                size="small"
+                :disabled="record.status === 'DONE'"
+                :loading="taskActionLoading === record.id"
+                @click="completeTask(record)"
+              >
+                确认发药
+              </a-button>
+              <a-button
+                type="link"
+                size="small"
+                danger
+                :disabled="record.status === 'DONE' || record.status === 'MISSED'"
+                :loading="taskActionLoading === record.id"
+                @click="missTask(record)"
+              >
+                标记漏服
+              </a-button>
+            </div>
+          </template>
+        </template>
+      </DataTable>
+    </a-card>
+
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
@@ -69,12 +125,12 @@
           {{ formatDateTime(record.registerTime) }}
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="openEdit(record)">编辑</a-button>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
             <a-popconfirm title="确认删除该记录吗？" ok-text="确认" cancel-text="取消" @confirm="remove(record)">
-              <a-button type="link" danger>删除</a-button>
+              <a-button type="link" size="small" danger>删除</a-button>
             </a-popconfirm>
-          </a-space>
+          </div>
         </template>
       </template>
     </DataTable>
@@ -132,17 +188,24 @@ import {
   getHealthMedicationRegistrationSummary,
   createHealthMedicationRegistration,
   updateHealthMedicationRegistration,
-  deleteHealthMedicationRegistration
+  deleteHealthMedicationRegistration,
+  getHealthMedicationTaskPage,
+  generateTodayHealthMedicationTasks,
+  completeHealthMedicationTask,
+  markHealthMedicationTaskMissed
 } from '../../api/health'
 import { useUserStore } from '../../stores/user'
-import type { HealthMedicationRegistration, HealthMedicationRegistrationSummary, Id, PageResult } from '../../types'
+import type { HealthMedicationRegistration, HealthMedicationRegistrationSummary, HealthMedicationTask, Id, PageResult } from '../../types'
 
 const loading = ref(false)
+const taskLoading = ref(false)
+const taskActionLoading = ref<Id | undefined>()
 const exporting = ref(false)
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const rows = ref<HealthMedicationRegistration[]>([])
+const medicationTasks = ref<HealthMedicationTask[]>([])
 const query = reactive({
   keyword: '',
   drugName: '',
@@ -172,6 +235,21 @@ const columns = [
   { title: '操作', key: 'action', width: 120 }
 ]
 
+const taskColumns = [
+  { title: '老人', dataIndex: 'elderName', key: 'elderName', width: 120 },
+  { title: '药品', dataIndex: 'drugName', key: 'drugName', width: 150 },
+  { title: '计划时间', dataIndex: 'plannedTime', key: 'plannedTime', width: 180 },
+  { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
+  { title: '备注', dataIndex: 'remark', key: 'remark' },
+  { title: '操作', key: 'action', width: 180 }
+]
+
+const taskStatusMap: Record<string, { text: string; color: string }> = {
+  PENDING: { text: '待发药', color: 'orange' },
+  DONE: { text: '已发药', color: 'green' },
+  MISSED: { text: '漏服/拒服', color: 'red' }
+}
+
 const editOpen = ref(false)
 const saving = ref(false)
 const { elderOptions, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
@@ -198,6 +276,8 @@ const residentContext = computed(() => {
     name: residentName || ''
   }
 })
+const pendingMedicationTaskCount = computed(() => medicationTasks.value.filter((item) => item.status === 'PENDING').length)
+const missedMedicationTaskCount = computed(() => medicationTasks.value.filter((item) => item.status === 'MISSED').length)
 
 async function fetchData() {
   loading.value = true
@@ -227,6 +307,64 @@ async function fetchData() {
     summary.nurseStats = []
   } finally {
     loading.value = false
+  }
+}
+
+async function fetchMedicationTasks() {
+  taskLoading.value = true
+  try {
+    const res = await getHealthMedicationTaskPage(buildMedicationTaskParams()) as PageResult<HealthMedicationTask>
+    medicationTasks.value = res.list || []
+  } catch (error) {
+    message.error(resolveHealthError(error, '加载今日用药任务失败'))
+    medicationTasks.value = []
+  } finally {
+    taskLoading.value = false
+  }
+}
+
+async function generateTodayTasks() {
+  taskLoading.value = true
+  try {
+    await generateTodayHealthMedicationTasks()
+    message.success('今日用药任务已生成')
+    await fetchMedicationTasks()
+  } catch (error) {
+    message.error(resolveHealthError(error, '生成今日任务失败'))
+  } finally {
+    taskLoading.value = false
+  }
+}
+
+async function completeTask(record: HealthMedicationTask) {
+  taskActionLoading.value = record.id
+  try {
+    await completeHealthMedicationTask(record.id, {
+      nurseName: currentNurseName.value || '未填写',
+      remark: '管理端任务确认'
+    })
+    message.success('已确认发药')
+    await Promise.all([fetchData(), fetchMedicationTasks()])
+  } catch (error) {
+    message.error(resolveHealthError(error, '确认发药失败'))
+  } finally {
+    taskActionLoading.value = undefined
+  }
+}
+
+async function missTask(record: HealthMedicationTask) {
+  taskActionLoading.value = record.id
+  try {
+    await markHealthMedicationTaskMissed(record.id, {
+      nurseName: currentNurseName.value || '未填写',
+      remark: '漏服/拒服，已记录'
+    })
+    message.success('已标记漏服')
+    await Promise.all([fetchData(), fetchMedicationTasks()])
+  } catch (error) {
+    message.error(resolveHealthError(error, '标记漏服失败'))
+  } finally {
+    taskActionLoading.value = undefined
   }
 }
 
@@ -337,7 +475,7 @@ async function submit() {
     }
     message.success('保存成功')
     editOpen.value = false
-    fetchData()
+    await Promise.all([fetchData(), fetchMedicationTasks()])
   } catch (error) {
     message.error(resolveHealthError(error, '保存失败'))
   } finally {
@@ -349,7 +487,7 @@ async function remove(record: HealthMedicationRegistration) {
   try {
     await deleteHealthMedicationRegistration(record.id)
     message.success('删除成功')
-    fetchData()
+    await Promise.all([fetchData(), fetchMedicationTasks()])
   } catch (error) {
     message.error(resolveHealthError(error, '删除失败'))
   }
@@ -394,8 +532,22 @@ function buildQueryParams() {
   return params
 }
 
+function buildMedicationTaskParams() {
+  const residentId = normalizeResidentId(route.query as Record<string, unknown>)
+  return {
+    elderId: residentId || undefined,
+    taskDate: dayjs().format('YYYY-MM-DD'),
+    pageNo: 1,
+    pageSize: 8
+  }
+}
+
 function formatDateTime(value?: string) {
   return value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'
+}
+
+function taskStatusMeta(status?: string) {
+  return taskStatusMap[status || ''] || { text: status || '未知', color: 'default' }
 }
 
 function resolveRowClassName(record: HealthMedicationRegistration) {
@@ -441,6 +593,7 @@ async function loadExportRecords() {
 }
 
 fetchData()
+fetchMedicationTasks()
 searchElders('')
 syncMedicalAlertRules().catch(() => {})
 
@@ -450,6 +603,7 @@ watch(
     query.pageNo = 1
     pagination.current = 1
     fetchData()
+    fetchMedicationTasks()
   }
 )
 </script>
@@ -459,9 +613,9 @@ watch(
   margin-bottom: 12px;
 }
 :deep(.health-row-warning > td) {
-  background: #fff7e6 !important;
+  background: rgba(var(--warning-rgb), 0.12) !important;
 }
 .context-card {
-  background: #f0f9ff;
+  background: var(--primary-soft);
 }
 </style>

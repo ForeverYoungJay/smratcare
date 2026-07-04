@@ -35,7 +35,7 @@
         <div class="calendar-main">
           <div class="calendar-toolbar">
             <div class="calendar-toolbar-copy">
-              <div class="calendar-eyebrow">My Schedule Workspace</div>
+              <div class="calendar-eyebrow">我的日程</div>
               <div class="calendar-title-tip">按我的工作节奏查看个人、部门、日常和协同安排，今天优先、风险优先、待完成优先。</div>
               <a-space size="small" wrap class="calendar-insights">
                 <a-tag v-for="item in calendarInsights" :key="item.label" :color="item.color">{{ item.label }} {{ item.value }}</a-tag>
@@ -469,7 +469,7 @@ const form = reactive({
   calendarType: 'WORK' as CalendarType,
   urgency: 'NORMAL' as UrgencyType,
   planCategory: '基础办公',
-  eventColor: '#1677ff',
+  eventColor: '#3d7fa6',
   collaboratorDeptIds: [] as string[],
   collaboratorIds: [] as string[],
   recurring: false,
@@ -579,7 +579,7 @@ type DayAgendaItem = OaTask & {
 const calendarBuckets = computed(() => {
   const defs = [
     { type: 'PERSONAL' as const, label: '个人', color: '#52c41a' },
-    { type: 'WORK' as const, label: '部门工作', color: '#1677ff' },
+    { type: 'WORK' as const, label: '部门工作', color: '#3d7fa6' },
     { type: 'DAILY' as const, label: '日常计划', color: '#fa8c16' },
     { type: 'COLLAB' as const, label: '协同日历', color: '#722ed1' }
   ]
@@ -591,7 +591,7 @@ const calendarBuckets = computed(() => {
 
 const calendarLegendCards = computed(() => ([
   { type: 'PERSONAL', label: '个人计划', color: '#22c55e', count: calendarBuckets.value.find((item) => item.type === 'PERSONAL')?.count || 0, desc: '与当前员工本人直接相关的个人安排、请假与自用提醒。' },
-  { type: 'WORK', label: '部门工作', color: '#2563eb', count: calendarBuckets.value.find((item) => item.type === 'WORK')?.count || 0, desc: '工作推进类事项，强调执行节奏和完成状态。' },
+  { type: 'WORK', label: '部门工作', color: '#3d7fa6', count: calendarBuckets.value.find((item) => item.type === 'WORK')?.count || 0, desc: '工作推进类事项，强调执行节奏和完成状态。' },
   { type: 'DAILY', label: '日常计划', color: '#f59e0b', count: calendarBuckets.value.find((item) => item.type === 'DAILY')?.count || 0, desc: '固定例行事务、节日节点和生日提醒，作为每日节奏底板。' },
   { type: 'COLLAB', label: '协同日历', color: '#8b5cf6', count: calendarBuckets.value.find((item) => item.type === 'COLLAB')?.count || 0, desc: '跨部门或跨成员协同时段，突出同步、对齐和会面安排。' }
 ]))
@@ -878,7 +878,7 @@ function resolveCalendarTypeColor(calendarType: CalendarType, urgency: UrgencyTy
   if (calendarType === 'PERSONAL') return '#52c41a'
   if (calendarType === 'DAILY') return '#fa8c16'
   if (calendarType === 'COLLAB') return '#722ed1'
-  return '#1677ff'
+  return '#3d7fa6'
 }
 
 function resolveTaskColor(task: OaTask) {
@@ -1644,12 +1644,12 @@ useLiveSyncRefresh({
   gap: 16px;
   margin-bottom: 16px;
   padding: 18px 20px;
-  border: 1px solid rgba(191, 219, 254, 0.72);
+  border: 1px solid rgba(var(--primary-rgb), 0.18);
   border-radius: 22px;
   background: linear-gradient(135deg, rgba(250, 252, 255, 0.9) 0%, rgba(239, 246, 255, 0.94) 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.82),
-    0 10px 24px rgba(59, 130, 246, 0.08);
+    0 10px 24px rgba(var(--primary-rgb), 0.08);
 }
 
 .calendar-toolbar-copy {
@@ -1663,11 +1663,11 @@ useLiveSyncRefresh({
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: #7c93aa;
+  color: var(--muted-2);
 }
 
 .calendar-title-tip {
-  color: #31475f;
+  color: var(--ink-soft);
   font-size: 14px;
   line-height: 1.6;
   font-weight: 500;
@@ -1691,7 +1691,7 @@ useLiveSyncRefresh({
 
 .calendar-scope-pill {
   padding: 12px 14px;
-  border: 1px solid rgba(214, 226, 236, 0.92);
+  border: 1px solid var(--border-soft);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.86);
   text-align: left;
@@ -1704,14 +1704,14 @@ useLiveSyncRefresh({
 .calendar-side-empty strong,
 .calendar-side-agenda-item strong {
   display: block;
-  color: #0f172a;
+  color: var(--ink);
 }
 
 .calendar-scope-pill span,
 .calendar-side-head p,
 .calendar-side-empty p,
 .calendar-side-agenda-item span {
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
   line-height: 1.6;
 }
@@ -1719,12 +1719,12 @@ useLiveSyncRefresh({
 .calendar-scope-pill:hover,
 .calendar-side-agenda-item:hover {
   transform: translateY(-1px);
-  border-color: rgba(147, 197, 253, 0.96);
-  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.08);
+  border-color: rgba(var(--primary-rgb), 0.5);
+  box-shadow: 0 14px 28px rgba(var(--primary-rgb), 0.08);
 }
 
 .calendar-scope-pill--active {
-  border-color: rgba(37, 99, 235, 0.94);
+  border-color: rgba(var(--primary-rgb), 0.5);
   background: linear-gradient(180deg, rgba(239, 246, 255, 0.98) 0%, rgba(255, 255, 255, 0.92) 100%);
 }
 
@@ -1740,7 +1740,7 @@ useLiveSyncRefresh({
 .calendar-legend-card {
   padding: 14px 16px;
   border-radius: 18px;
-  border: 1px solid rgba(226, 232, 240, 0.88);
+  border: 1px solid var(--border-soft);
   background: rgba(255, 255, 255, 0.82);
 }
 
@@ -1762,7 +1762,7 @@ useLiveSyncRefresh({
 
 .calendar-legend-card p {
   margin: 8px 0 0;
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
   line-height: 1.6;
 }
@@ -1774,13 +1774,13 @@ useLiveSyncRefresh({
 }
 
 .calendar-legend-head strong {
-  color: #0f172a;
+  color: var(--ink);
   font-size: 14px;
 }
 
 .calendar-legend-head small {
   margin-left: auto;
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -1804,7 +1804,7 @@ useLiveSyncRefresh({
   position: relative;
   z-index: 1;
   padding: 12px;
-  border: 1px solid rgba(226, 232, 240, 0.9);
+  border: 1px solid var(--border-soft);
   border-radius: 24px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.98) 100%);
@@ -1815,7 +1815,7 @@ useLiveSyncRefresh({
 
 .calendar-side-card {
   padding: 16px;
-  border: 1px solid rgba(226, 232, 240, 0.88);
+  border: 1px solid var(--border-soft);
   border-radius: 22px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(247, 250, 252, 0.95) 100%);
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
@@ -1843,19 +1843,19 @@ useLiveSyncRefresh({
   padding: 12px 14px;
   border-radius: 16px;
   background: rgba(248, 250, 252, 0.94);
-  border: 1px solid rgba(226, 232, 240, 0.92);
+  border: 1px solid var(--border-soft);
 }
 
 .calendar-side-metric span {
   display: block;
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .calendar-side-metric strong {
   display: block;
   margin-top: 6px;
-  color: #0f172a;
+  color: var(--ink);
   font-size: 22px;
 }
 
@@ -1874,7 +1874,7 @@ useLiveSyncRefresh({
 .calendar-side-agenda-item {
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid rgba(226, 232, 240, 0.92);
+  border: 1px solid var(--border-soft);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.92);
   display: flex;
@@ -1889,7 +1889,7 @@ useLiveSyncRefresh({
   margin-top: 14px;
   padding: 20px 16px;
   border-radius: 18px;
-  border: 1px dashed rgba(191, 219, 254, 0.92);
+  border: 1px dashed rgba(var(--primary-rgb), 0.32);
   background: rgba(248, 250, 252, 0.8);
 }
 
@@ -1900,7 +1900,7 @@ useLiveSyncRefresh({
 .drawer-actions {
   margin-bottom: 14px;
   padding: 14px 16px;
-  border: 1px solid rgba(226, 232, 240, 0.88);
+  border: 1px solid var(--border-soft);
   border-radius: 18px;
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.92) 0%, rgba(255, 255, 255, 0.96) 100%);
 }
@@ -1915,32 +1915,32 @@ useLiveSyncRefresh({
 .day-overview-metric {
   padding: 12px 14px;
   border-radius: 16px;
-  border: 1px solid rgba(226, 232, 240, 0.84);
+  border: 1px solid var(--border-soft);
   background: rgba(255, 255, 255, 0.88);
 }
 
 .day-overview-metric span {
   display: block;
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .day-overview-metric strong {
   display: block;
   margin-top: 6px;
-  color: #0f172a;
+  color: var(--ink);
   font-size: 22px;
 }
 
 .repeat-card {
   margin-bottom: 12px;
   border-radius: 18px;
-  border: 1px solid rgba(219, 234, 254, 0.9);
+  border: 1px solid rgba(var(--primary-rgb), 0.22);
   background: linear-gradient(180deg, rgba(248, 251, 255, 0.94) 0%, rgba(255, 255, 255, 0.96) 100%);
 }
 
 .repeat-tip {
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
   line-height: 32px;
 }
@@ -1948,7 +1948,7 @@ useLiveSyncRefresh({
 .agenda-list :deep(.ant-list-item) {
   margin-bottom: 10px;
   padding: 14px 16px;
-  border: 1px solid rgba(226, 232, 240, 0.84);
+  border: 1px solid var(--border-soft);
   border-radius: 18px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.92) 100%);
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
@@ -1956,8 +1956,8 @@ useLiveSyncRefresh({
 
 .agenda-list :deep(.ant-list-item:hover) {
   transform: translateY(-1px);
-  border-color: rgba(147, 197, 253, 0.96);
-  box-shadow: 0 14px 30px rgba(59, 130, 246, 0.08);
+  border-color: rgba(var(--primary-rgb), 0.5);
+  box-shadow: 0 14px 30px rgba(var(--primary-rgb), 0.08);
 }
 
 .timeline-shell {
@@ -1984,13 +1984,13 @@ useLiveSyncRefresh({
 }
 
 .timeline-time strong {
-  color: #0f172a;
+  color: var(--ink);
   font-size: 14px;
 }
 
 .timeline-time span {
   margin-top: 4px;
-  color: #94a3b8;
+  color: var(--muted-2);
   font-size: 11px;
 }
 
@@ -2021,7 +2021,7 @@ useLiveSyncRefresh({
 .timeline-card {
   padding: 16px 18px;
   border-radius: 20px;
-  border: 1px solid rgba(226, 232, 240, 0.88);
+  border: 1px solid var(--border-soft);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.94) 100%);
 }
 
@@ -2039,7 +2039,7 @@ useLiveSyncRefresh({
 }
 
 .timeline-card-title strong {
-  color: #0f172a;
+  color: var(--ink);
   font-size: 15px;
 }
 
@@ -2055,7 +2055,7 @@ useLiveSyncRefresh({
 
 .timeline-summary {
   margin: 10px 0 0;
-  color: #475569;
+  color: var(--ink-soft);
   font-size: 13px;
   line-height: 1.6;
 }
@@ -2065,7 +2065,7 @@ useLiveSyncRefresh({
   flex-wrap: wrap;
   gap: 8px 14px;
   margin-top: 10px;
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -2113,7 +2113,7 @@ useLiveSyncRefresh({
 .calendar-empty-state {
   padding: 34px 20px;
   border-radius: 24px;
-  border: 1px dashed rgba(191, 219, 254, 0.92);
+  border: 1px dashed rgba(var(--primary-rgb), 0.32);
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.92) 0%, rgba(255, 255, 255, 0.96) 100%);
   text-align: center;
 }
@@ -2127,21 +2127,21 @@ useLiveSyncRefresh({
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #2563eb;
+  color: var(--primary);
   font-size: 28px;
   font-weight: 300;
 }
 
 .calendar-empty-state strong {
   display: block;
-  color: #0f172a;
+  color: var(--ink);
   font-size: 16px;
 }
 
 .calendar-empty-state p {
   max-width: 360px;
   margin: 10px auto 0;
-  color: #64748b;
+  color: var(--muted);
   line-height: 1.7;
 }
 
@@ -2150,61 +2150,61 @@ useLiveSyncRefresh({
 }
 
 .agenda-title-done {
-  color: #64748b;
+  color: var(--muted);
   text-decoration: line-through;
 }
 
 .readonly-tip {
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .calendar-surface :deep(.fc) {
-  --fc-border-color: rgba(226, 232, 240, 0.95);
+  --fc-border-color: var(--border-soft);
   --fc-page-bg-color: transparent;
   --fc-neutral-bg-color: #f8fafc;
   --fc-event-border-color: transparent;
-  --fc-today-bg-color: rgba(219, 234, 254, 0.36);
+  --fc-today-bg-color: rgba(var(--primary-rgb), 0.14);
 }
 
 .calendar-surface :deep(.fc .fc-toolbar.fc-header-toolbar) {
   margin-bottom: 14px;
   padding: 12px 14px;
-  border: 1px solid rgba(191, 219, 254, 0.72);
+  border: 1px solid rgba(var(--primary-rgb), 0.18);
   border-radius: 18px;
   background: linear-gradient(180deg, rgba(249, 251, 255, 0.96) 0%, rgba(241, 245, 249, 0.96) 100%);
 }
 
 .calendar-surface :deep(.fc .fc-button) {
   border-radius: 999px;
-  border: 1px solid rgba(191, 219, 254, 0.96);
+  border: 1px solid rgba(var(--primary-rgb), 0.24);
   background: rgba(255, 255, 255, 0.98);
-  color: #1e3a8a;
+  color: var(--primary-strong);
   box-shadow: none;
   transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease;
 }
 
 .calendar-surface :deep(.fc .fc-button:hover) {
-  background: #eff6ff;
-  border-color: #93c5fd;
+  background: var(--primary-soft);
+  border-color: rgba(var(--primary-rgb), 0.5);
   transform: translateY(-1px);
 }
 
 .calendar-surface :deep(.fc .fc-button-primary:not(:disabled).fc-button-active),
 .calendar-surface :deep(.fc .fc-button-primary:not(:disabled):active) {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-  border-color: #2563eb;
+  background: linear-gradient(135deg, #3d7fa6 0%, #33698a 100%);
+  border-color: #3d7fa6;
   color: #fff;
 }
 
 .calendar-surface :deep(.fc .fc-col-header-cell-cushion) {
-  color: #334155;
+  color: var(--ink-soft);
   font-weight: 600;
   letter-spacing: 0.03em;
 }
 
 .calendar-surface :deep(.fc .fc-daygrid-day-number) {
-  color: #64748b;
+  color: var(--muted);
   font-weight: 600;
 }
 
@@ -2226,7 +2226,7 @@ useLiveSyncRefresh({
   padding: 2px 7px;
   border-radius: 999px;
   background: rgba(248, 250, 252, 0.92);
-  color: #94a3b8;
+  color: var(--muted-2);
   font-size: 11px;
 }
 
@@ -2243,8 +2243,8 @@ useLiveSyncRefresh({
   padding: 2px 8px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.92);
-  color: #475569;
-  font-size: 10px;
+  color: var(--ink-soft);
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
 }
@@ -2279,7 +2279,7 @@ useLiveSyncRefresh({
 }
 
 .calendar-surface :deep(.fc .fc-daygrid-day.fc-day-today) {
-  background: rgba(219, 234, 254, 0.56);
+  background: rgba(var(--primary-rgb), 0.14);
 }
 
 .calendar-surface :deep(.fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number) {
@@ -2289,7 +2289,7 @@ useLiveSyncRefresh({
   min-width: 28px;
   height: 28px;
   border-radius: 999px;
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  background: linear-gradient(135deg, #3d7fa6 0%, #33698a 100%);
   color: #fff;
 }
 
@@ -2325,7 +2325,7 @@ useLiveSyncRefresh({
 }
 
 .calendar-surface :deep(.calendar-event-work) {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+  background: linear-gradient(135deg, #3d7fa6, #33698a) !important;
 }
 
 .calendar-surface :deep(.calendar-event-daily) {
@@ -2356,21 +2356,21 @@ useLiveSyncRefresh({
 
 .calendar-surface :deep(.ant-tag-checkable) {
   padding: 7px 12px;
-  border: 1px solid rgba(203, 213, 225, 0.9);
+  border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.82);
   transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
 }
 
 .calendar-surface :deep(.ant-tag-checkable:hover) {
   transform: translateY(-1px);
-  border-color: rgba(147, 197, 253, 0.96);
+  border-color: rgba(var(--primary-rgb), 0.5);
   background: rgba(255, 255, 255, 0.96);
 }
 
 .calendar-surface :deep(.ant-tag-checkable-checked) {
-  border-color: rgba(37, 99, 235, 0.92);
-  background: rgba(219, 234, 254, 0.86);
-  color: #1d4ed8;
+  border-color: rgba(var(--primary-rgb), 0.5);
+  background: var(--primary-soft);
+  color: var(--primary-strong);
 }
 
 .calendar-editor-modal :deep(.ant-modal-content) {
@@ -2390,7 +2390,7 @@ useLiveSyncRefresh({
 .calendar-editor-modal :deep(.ant-modal-title) {
   font-size: 18px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ink);
 }
 
 .calendar-editor-modal :deep(.ant-modal-body) {
@@ -2402,7 +2402,7 @@ useLiveSyncRefresh({
 }
 
 .calendar-editor-modal :deep(.ant-form-item-label > label) {
-  color: #334155;
+  color: var(--ink-soft);
   font-weight: 600;
 }
 

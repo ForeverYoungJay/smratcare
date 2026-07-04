@@ -89,15 +89,15 @@
       <div style="margin-top: 16px;">
         <a-space>
           <a-button v-if="detail?.status !== 9" type="primary" @click="openPay">登记收款</a-button>
-          <a-button v-if="detail?.status !== 9" danger @click="markInvalid">无效账单</a-button>
           <a-button @click="goConsumption">消费明细</a-button>
           <a-button @click="refresh">刷新</a-button>
+          <a-button v-if="detail?.status !== 9" danger @click="markInvalid">无效账单</a-button>
         </a-space>
       </div>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="费用构成">
-      <vxe-table border stripe show-overflow :data="detail?.items || []" height="260">
+      <vxe-table border stripe show-overflow="title" :data="detail?.items || []" height="260">
         <vxe-column field="itemType" title="类型" width="140" />
         <vxe-column field="itemName" title="项目" min-width="160" />
         <vxe-column field="amount" title="金额" width="120" />
@@ -109,7 +109,7 @@
       <vxe-table
         border
         stripe
-        show-overflow
+        show-overflow="title"
         :data="detail?.storeOrders || []"
         height="260"
         @toggle-row-expand="onToggleOrderExpand"
@@ -119,7 +119,7 @@
             <a-spin :spinning="orderLoading[row.id]">
               <div v-if="orderDetailMap[row.id]">
                 <div class="expand-title">订单明细</div>
-                <vxe-table border stripe show-overflow :data="orderDetailMap[row.id].items || []" height="180">
+                <vxe-table border stripe show-overflow="title" :data="orderDetailMap[row.id].items || []" height="180">
                   <vxe-column field="productName" title="商品" min-width="160" />
                   <vxe-column field="quantity" title="数量" width="80" />
                   <vxe-column field="unitPrice" title="单价" width="100" />
@@ -135,7 +135,7 @@
                 <a-empty v-else description="暂无风控命中" />
 
                 <div class="expand-title" style="margin-top: 12px;">FIFO 批次扣减</div>
-                <vxe-table border stripe show-overflow :data="orderDetailMap[row.id].fifoLogs || []" height="160">
+                <vxe-table border stripe show-overflow="title" :data="orderDetailMap[row.id].fifoLogs || []" height="160">
                   <vxe-column field="batchNo" title="批次号" min-width="140" />
                   <vxe-column field="quantity" title="数量" width="80" />
                   <vxe-column field="expireDate" title="有效期" width="140" />
@@ -169,7 +169,7 @@
           <a-button @click="exportPayments">导出支付记录</a-button>
         </a-space>
       </div>
-      <vxe-table border stripe show-overflow :data="detail?.payments || []" height="220">
+      <vxe-table border stripe show-overflow="title" :data="detail?.payments || []" height="220">
         <vxe-column field="amount" title="金额" width="120" />
         <vxe-column field="payMethod" title="方式" width="140">
           <template #default="{ row }">
@@ -181,7 +181,9 @@
         <vxe-column field="remark" title="备注" min-width="200" />
         <vxe-column title="操作" width="120" fixed="right">
           <template #default="{ row }">
-            <a-button v-if="detail?.status !== 9" type="link" @click="openEditPayment(row)">修改</a-button>
+            <div class="row-action-links">
+              <a-button v-if="detail?.status !== 9" type="link" size="small" @click="openEditPayment(row)">修改</a-button>
+            </div>
           </template>
         </vxe-column>
       </vxe-table>

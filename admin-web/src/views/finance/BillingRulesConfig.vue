@@ -56,7 +56,7 @@
     <input ref="importInputRef" type="file" accept=".csv,text/csv" style="display: none" @change="onImportFileChange" />
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <vxe-table ref="tableRef" border stripe show-overflow :loading="loading" :data="filteredRows" height="560">
+      <vxe-table ref="tableRef" border stripe show-overflow="title" :loading="loading" :data="filteredRows" height="560">
         <vxe-column type="checkbox" width="50" />
         <vxe-column field="configKey" title="配置键" min-width="280" />
         <vxe-column field="configValue" title="配置值" width="150" />
@@ -69,9 +69,9 @@
         <vxe-column field="remark" title="备注" min-width="220" />
         <vxe-column title="操作" width="160" fixed="right">
           <template #default="{ row }">
-            <a-space>
-              <a-button type="link" @click="openEdit(row)">编辑</a-button>
-            </a-space>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="openEdit(row)">编辑</a-button>
+            </div>
           </template>
         </vxe-column>
       </vxe-table>

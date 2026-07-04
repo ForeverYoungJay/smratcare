@@ -111,7 +111,7 @@
           class="inventory-vxe-table"
           border
           stripe
-          show-overflow
+          show-overflow="title"
           height="520"
           :loading="loading"
           :data="rows"
@@ -518,24 +518,24 @@ onMounted(async () => {
   gap: 6px;
   padding: 14px 16px;
   border-radius: 16px;
-  border: 1px solid #dce9f2;
+  border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.86);
 }
 
 .overview-card span,
 .table-head span,
 .inventory-name-cell span {
-  color: #6d8aa3;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .overview-card strong {
-  color: #173854;
+  color: var(--ink);
   font-size: 24px;
 }
 
 .overview-card small {
-  color: #7a97b0;
+  color: var(--muted-2);
 }
 
 .inventory-workspace {
@@ -573,7 +573,7 @@ onMounted(async () => {
 
 .table-head strong,
 .inventory-name-cell strong {
-  color: #173854;
+  color: var(--ink);
 }
 
 .table-head strong {
@@ -582,7 +582,7 @@ onMounted(async () => {
 }
 
 .table-frame {
-  border: 1px solid #e4edf4;
+  border: 1px solid var(--border);
   border-radius: 18px;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.95);

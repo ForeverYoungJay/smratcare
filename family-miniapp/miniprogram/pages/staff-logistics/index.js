@@ -1,20 +1,65 @@
 const { getTaskList } = require('../../services/staff');
 
+function isDoneStatus(status) {
+  const text = String(status || '');
+  return text.indexOf('完成') >= 0 || text.indexOf('DONE') >= 0;
+}
+
 Page({
-  data: { maintenanceTasks: [], mealTasks: [] },
+  data: {
+    loading: false,
+    loadError: '',
+    activeTab: 'LOGISTICS',
+    maintenanceTasks: [],
+    mealTasks: [],
+    maintenancePending: 0,
+    mealPending: 0
+  },
+  onLoad(options = {}) {
+    const module = String(options.module || '').toUpperCase();
+    if (module === 'MEAL') {
+      this.setData({ activeTab: 'MEAL' });
+    }
+  },
   onShow() {
     getApp().ensureLogin();
     this.loadData();
   },
-  async loadData() {
-    const [maintenanceTasks, mealTasks] = await Promise.all([
-      getTaskList('LOGISTICS'),
-      getTaskList('MEAL')
-    ]);
-    this.setData({ maintenanceTasks, mealTasks });
+  onPullDownRefresh() {
+    this.loadData(true);
   },
-  openTask(e) {
-    wx.navigateTo({ url: `/pages/staff-task-detail/index?id=${e.currentTarget.dataset.id}` });
+  async loadData(fromPullDown = false) {
+    this.setData({ loading: true, loadError: '' });
+    try {
+      const [maintenanceTasks, mealTasks] = await Promise.all([
+        getTaskList('LOGISTICS'),
+        getTaskList('MEAL')
+      ]);
+      this.setData({
+        maintenanceTasks: maintenanceTasks || [],
+        mealTasks: mealTasks || [],
+        maintenancePending: (maintenanceTasks || []).filter((item) => !isDoneStatus(item.status)).length,
+        mealPending: (mealTasks || []).filter((item) => !isDoneStatus(item.status)).length
+      });
+    } catch (error) {
+      this.setData({ loadError: error.message || '后勤任务加载失败' });
+    } finally {
+      this.setData({ loading: false });
+      if (fromPullDown) wx.stopPullDownRefresh();
+    }
+  },
+  switchTab(e) {
+    const tab = e.currentTarget.dataset.tab;
+    if (!tab || tab === this.data.activeTab) return;
+    this.setData({ activeTab: tab });
+  },
+  openRepair(e) {
+    const id = e.currentTarget.dataset.id;
+    wx.navigateTo({ url: `/pages/staff-repairs/index${id ? `?id=${encodeURIComponent(id)}` : ''}` });
+  },
+  openMeal(e) {
+    const id = e.currentTarget.dataset.id;
+    wx.navigateTo({ url: `/pages/staff-meals/index${id ? `?id=${encodeURIComponent(id)}` : ''}` });
   },
   goMaterial() {
     wx.navigateTo({ url: '/pages/staff-material/index' });

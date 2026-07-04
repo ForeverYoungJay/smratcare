@@ -3162,6 +3162,8 @@ public class AdminHrController {
       String roomNo,
       String status) {
     String normalizedKeyword = normalizeBlank(keyword);
+    String normalizedStatus = normalizeBlank(status);
+    String normalizedStatusUpper = normalizedStatus == null ? null : normalizedStatus.toUpperCase(Locale.ROOT);
     return dormitoryRoomConfigMapper.selectList(
             Wrappers.lambdaQuery(HrDormitoryRoomConfig.class)
                 .eq(HrDormitoryRoomConfig::getOrgId, orgId)
@@ -3169,7 +3171,7 @@ public class AdminHrController {
                 .eq(normalizeBlank(building) != null, HrDormitoryRoomConfig::getBuilding, normalizeBlank(building))
                 .eq(normalizeBlank(floorLabel) != null, HrDormitoryRoomConfig::getFloorLabel, normalizeBlank(floorLabel))
                 .eq(normalizeBlank(roomNo) != null, HrDormitoryRoomConfig::getRoomNo, normalizeBlank(roomNo))
-                .eq(normalizeBlank(status) != null, HrDormitoryRoomConfig::getStatus, normalizeBlank(status).toUpperCase(Locale.ROOT))
+                .eq(normalizedStatusUpper != null, HrDormitoryRoomConfig::getStatus, normalizedStatusUpper)
                 .and(normalizedKeyword != null, wrapper -> wrapper
                     .like(HrDormitoryRoomConfig::getBuilding, normalizedKeyword)
                     .or()

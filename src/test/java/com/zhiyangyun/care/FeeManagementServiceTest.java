@@ -6,8 +6,14 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.zhiyangyun.care.elder.entity.Bed;
+import com.zhiyangyun.care.elder.entity.ElderBedRelation;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
+import com.zhiyangyun.care.elder.entity.Room;
+import com.zhiyangyun.care.elder.mapper.BedMapper;
+import com.zhiyangyun.care.elder.mapper.ElderBedRelationMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
+import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.finance.entity.DischargeSettlement;
 import com.zhiyangyun.care.finance.entity.FinanceRefundVoucher;
 import com.zhiyangyun.care.finance.mapper.DischargeSettlementMapper;
@@ -48,6 +54,15 @@ class FeeManagementServiceTest {
 
   @Autowired
   private ElderMapper elderMapper;
+
+  @Autowired
+  private RoomMapper roomMapper;
+
+  @Autowired
+  private BedMapper bedMapper;
+
+  @Autowired
+  private ElderBedRelationMapper elderBedRelationMapper;
 
   @Autowired
   private DischargeSettlementMapper dischargeSettlementMapper;
@@ -181,6 +196,51 @@ class FeeManagementServiceTest {
     IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
         () -> feeManagementService.createMonthlyAllocation(1L, 500L, req));
     assertEquals("totalAmount > 0 时 targetCount 不能为 0", ex.getMessage());
+  }
+
+  @Test
+  void monthly_allocation_should_accept_relation_backed_room_match_when_bed_projection_is_empty() {
+    Long elderId = createElder("分摊关系占床校验");
+
+    Room room = new Room();
+    room.setTenantId(1L);
+    room.setOrgId(1L);
+    room.setBuilding("A栋");
+    room.setFloorNo("1层");
+    room.setRoomNo("A101-" + System.nanoTime());
+    room.setCapacity(1);
+    room.setStatus(1);
+    roomMapper.insert(room);
+
+    Bed bed = new Bed();
+    bed.setTenantId(1L);
+    bed.setOrgId(1L);
+    bed.setRoomId(room.getId());
+    bed.setBedNo("01");
+    bed.setStatus(1);
+    bed.setElderId(null);
+    bedMapper.insert(bed);
+
+    ElderBedRelation relation = new ElderBedRelation();
+    relation.setTenantId(1L);
+    relation.setOrgId(1L);
+    relation.setElderId(elderId);
+    relation.setBedId(bed.getId());
+    relation.setStartDate(LocalDate.now());
+    relation.setActiveFlag(1);
+    relation.setIsDeleted(0);
+    elderBedRelationMapper.insert(relation);
+
+    MonthlyAllocationCreateRequest req = new MonthlyAllocationCreateRequest();
+    req.setAllocationMonth("2026-03");
+    req.setAllocationName("房间公共分摊");
+    req.setTotalAmount(BigDecimal.valueOf(30));
+    req.setRoomNo(room.getRoomNo());
+    req.setElderIds(List.of(elderId));
+
+    var allocation = feeManagementService.createMonthlyAllocation(1L, 500L, req);
+    assertEquals(1, allocation.getTargetCount());
+    assertEquals(String.valueOf(elderId), allocation.getElderIds());
   }
 
   @Test

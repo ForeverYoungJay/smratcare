@@ -27,18 +27,18 @@
           <a-tag :color="statusColor(record.status)">{{ getDiningOrderStatusLabel(record.status) }}</a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="openEdit(record)">编辑</a-button>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
             <a-dropdown>
-              <a-button type="link">状态</a-button>
+              <a-button type="link" size="small">状态</a-button>
               <template #overlay>
                 <a-menu @click="({ key }: any) => updateStatus(record, key)">
                   <a-menu-item v-for="item in statusOptions" :key="item.value">{{ item.label }}</a-menu-item>
                 </a-menu>
               </template>
             </a-dropdown>
-            <a-button type="link" danger @click="remove(record)">删除</a-button>
-          </a-space>
+            <a-button type="link" size="small" danger @click="remove(record)">删除</a-button>
+          </div>
         </template>
       </template>
     </DataTable>

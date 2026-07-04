@@ -61,6 +61,23 @@
       </template>
     </SearchForm>
 
+    <div class="status-chips" role="tablist" aria-label="按状态筛选">
+      <button
+        type="button"
+        class="status-chip"
+        :class="{ 'is-active': query.status == null }"
+        @click="applyStatusChip(undefined)"
+      >全部</button>
+      <button
+        v-for="opt in statusOptions"
+        :key="opt.value"
+        type="button"
+        class="status-chip"
+        :class="{ 'is-active': query.status === opt.value }"
+        @click="applyStatusChip(opt.value)"
+      >{{ opt.label }}</button>
+    </div>
+
     <DataTable
       rowKey="id"
       :columns="columns"
@@ -83,17 +100,17 @@
           <a-tag color="blue">{{ getEffectivePagePermissions(record).length || 0 }} 项</a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
+          <div class="row-action-links">
             <template v-if="isReservedRole(record)">
               <a-tag color="gold">系统保留</a-tag>
             </template>
             <template v-else>
-              <a-button type="link" @click="openDrawer(record)">编辑</a-button>
+              <a-button type="link" size="small" @click="openDrawer(record)">编辑</a-button>
               <a-popconfirm title="确认删除该角色吗？" ok-text="确认" cancel-text="取消" @confirm="remove(record)">
-                <a-button type="link" danger>删除</a-button>
+                <a-button type="link" size="small" danger>删除</a-button>
               </a-popconfirm>
             </template>
-          </a-space>
+          </div>
         </template>
       </template>
     </DataTable>
@@ -293,6 +310,13 @@ function onReset() {
   fetchData()
 }
 
+function applyStatusChip(status?: number) {
+  query.status = status
+  query.pageNo = 1
+  pagination.current = 1
+  fetchData()
+}
+
 function openDrawer(record?: RoleItem) {
   if (record && isReservedRole(record)) {
     message.warning('系统超管为系统保留角色，不支持在此配置')
@@ -403,7 +427,7 @@ onMounted(async () => {
 
 <style scoped>
 .permission-summary {
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--muted);
   font-size: 12px;
 }
 </style>

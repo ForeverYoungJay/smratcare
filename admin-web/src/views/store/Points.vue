@@ -31,7 +31,7 @@
       <vxe-table
         border
         stripe
-        show-overflow
+        show-overflow="title"
         height="520"
         :loading="loading"
         :data="rows"
@@ -49,7 +49,9 @@
         <vxe-column field="updateTime" title="更新时间" width="180" />
         <vxe-column title="操作" width="140" fixed="right">
           <template #default="{ row }">
-            <a @click="openLogs(row)">查看流水</a>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="openLogs(row)">查看流水</a-button>
+            </div>
           </template>
         </vxe-column>
       </vxe-table>

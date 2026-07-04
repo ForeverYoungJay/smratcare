@@ -17,6 +17,7 @@
     "pages/family-management/index",
     "pages/profile-edit/index",
     "pages/notification-settings/index",
+    "pages/notify-history/index",
     "pages/help-center/index",
     "pages/settings-security/index",
     "pages/security-verify/index",

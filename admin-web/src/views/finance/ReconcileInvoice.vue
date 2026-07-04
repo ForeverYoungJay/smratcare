@@ -55,7 +55,7 @@
       />
 
       <a-card class="card-elevated" :bordered="false">
-        <vxe-table border stripe show-overflow :loading="loading" :data="rows" height="560">
+        <vxe-table border stripe show-overflow="title" :loading="loading" :data="rows" height="560">
           <vxe-column field="paidAt" title="收款时间" width="180" />
           <vxe-column field="elderName" title="长者" min-width="140">
             <template #default="{ row }">{{ row.elderName || '-' }}</template>
@@ -71,10 +71,10 @@
           <vxe-column field="remark" title="备注" min-width="200" />
           <vxe-column title="操作" width="220" fixed="right">
             <template #default="{ row }">
-              <a-space>
-                <a-button v-if="row.billId" type="link" @click="go(`/finance/bill/${row.billId}`)">查看账单</a-button>
-                <a-button type="link" @click="go('/finance/payments/register?from=reconcile_invoice')">去补关联</a-button>
-              </a-space>
+              <div class="row-action-links">
+                <a-button v-if="row.billId" type="link" size="small" @click="go(`/finance/bill/${row.billId}`)">查看账单</a-button>
+                <a-button type="link" size="small" @click="go('/finance/payments/register?from=reconcile_invoice')">去补关联</a-button>
+              </div>
             </template>
           </vxe-column>
         </vxe-table>

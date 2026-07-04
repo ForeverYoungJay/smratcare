@@ -13,7 +13,7 @@
 
 .label {
   min-width: 132rpx;
-  color: #71807a;
+  color: #5C6F69;
 }
 
 .multiline {

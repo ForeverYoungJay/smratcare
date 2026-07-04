@@ -152,5 +152,21 @@ export interface NursingReportSummary {
   planBookingCount?: number
   planCompletedCount?: number
   planAchievementRate?: number
+  qualityReviewCount?: number
+  averageReviewScore?: number
+  exceptionTaskCount?: number
+  exceptionResolvedCount?: number
+  exceptionClosureRate?: number
+  suspiciousExecutionCount?: number
+  handoverCount?: number
+  handoverConfirmedCount?: number
+  handoverConfirmRate?: number
+  monthlyReportSummary?: string
+  aiCareSummary?: string
+  familyReadableSummary?: string
+  reviewActionItems?: string[]
+  careHighlights?: string[]
+  riskSignals?: string[]
+  nextMonthSuggestions?: string[]
   staffWorkloads?: NursingStaffWorkloadItem[]
 }

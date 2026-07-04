@@ -1,6 +1,6 @@
 <view class="container">
   <view class="section-title">维修处理</view>
-  <view class="section-subtitle">到场确认、故障处理、用料记录、拍照验收和后续跟进，形成后勤维修闭环</view>
+  <view class="section-subtitle">到场确认 → 处理登记 → 拍照验收，三步完成后勤维修闭环</view>
 
   <view class="surface state-card" wx:if="{{loading}}">
     <view class="state-title">正在加载维修工单</view>
@@ -29,6 +29,7 @@
           <text class="repair-status">{{item.priority}}</text>
         </view>
       </block>
+      <view class="list-footer" wx:if="{{hasMore}}">上拉加载更多</view>
     </view>
 
     <view class="surface form-card" wx:if="{{activeTask}}">
@@ -40,65 +41,89 @@
         <text class="task-time">{{activeTask.time}}</text>
       </view>
 
-      <view class="check-grid">
-        <view class="check-item {{arrived ? 'checked' : ''}}" data-field="arrived" bindtap="toggleCheck">
-          <text class="check-dot">{{arrived ? '✓' : ''}}</text>
-          <text>已到场并确认位置</text>
+      <view class="step-indicator">
+        <view class="step-node {{currentStep >= 1 ? 'active' : ''}} {{arrived ? 'done' : ''}}">
+          <text class="step-no">{{arrived ? '✓' : '1'}}</text>
+          <text>到场确认</text>
         </view>
-        <view class="check-item {{repaired ? 'checked' : ''}}" data-field="repaired" bindtap="toggleCheck">
-          <text class="check-dot">{{repaired ? '✓' : ''}}</text>
-          <text>已完成维修处理</text>
+        <view class="step-line {{arrived ? 'done' : ''}}"></view>
+        <view class="step-node {{currentStep >= 2 ? 'active' : ''}} {{repaired ? 'done' : ''}}">
+          <text class="step-no">{{repaired ? '✓' : '2'}}</text>
+          <text>处理登记</text>
         </view>
-        <view class="check-item {{accepted ? 'checked' : ''}}" data-field="accepted" bindtap="toggleCheck">
-          <text class="check-dot">{{accepted ? '✓' : ''}}</text>
-          <text>现场验收通过</text>
+        <view class="step-line {{repaired ? 'done' : ''}}"></view>
+        <view class="step-node {{currentStep >= 3 ? 'active' : ''}} {{accepted ? 'done' : ''}}">
+          <text class="step-no">{{accepted ? '✓' : '3'}}</text>
+          <text>拍照验收</text>
         </view>
       </view>
 
-      <view class="tool-row">
-        <button class="tool-btn" bindtap="scanCode">扫码定位</button>
-        <button class="tool-btn" bindtap="choosePhoto">拍照验收</button>
-      </view>
-      <view class="scan-text" wx:if="{{scanText}}">扫码结果：{{scanText}}</view>
-      <view class="photo-grid" wx:if="{{photos.length}}">
-        <block wx:for="{{photos}}" wx:key="*this">
-          <image class="photo" mode="aspectFill" src="{{item}}" />
-        </block>
+      <!-- 第一步：到场确认 -->
+      <view class="step-card">
+        <view class="step-title">第一步 · 到场确认</view>
+        <view class="section-subtitle">扫码或手动确认已到达工单位置，未确认前无法登记处理。</view>
+        <view class="tool-row">
+          <button class="tool-btn" bindtap="scanArrival">扫码确认位置</button>
+          <button class="tool-btn" bindtap="confirmArrivalManually">手动确认到场</button>
+        </view>
+        <view class="scan-text" wx:if="{{scanText}}">扫码结果：{{scanText}}</view>
+        <view class="scan-text" wx:if="{{arrived}}">已到场（{{arrivalMethod}}）</view>
       </view>
 
-      <view class="field-grid">
+      <!-- 第二步：处理登记 -->
+      <view class="step-card {{arrived ? '' : 'locked'}}">
+        <view class="step-title">第二步 · 处理登记</view>
+        <view class="section-subtitle" wx:if="{{!arrived}}">完成到场确认后开放填写。</view>
+        <view class="field-grid">
+          <view class="field">
+            <view class="field-label">故障类型</view>
+            <picker mode="selector" range="{{faultOptions}}" value="{{faultIndex}}" disabled="{{!arrived}}" bindchange="onFaultChange">
+              <view class="picker-line">{{faultOptions[faultIndex]}}</view>
+            </picker>
+          </view>
+          <view class="field">
+            <view class="field-label">处理结果</view>
+            <picker mode="selector" range="{{resultOptions}}" value="{{resultIndex}}" disabled="{{!arrived}}" bindchange="onResultChange">
+              <view class="picker-line">{{resultOptions[resultIndex]}}</view>
+            </picker>
+          </view>
+        </view>
         <view class="field">
-          <view class="field-label">故障类型</view>
-          <picker mode="selector" range="{{faultOptions}}" value="{{faultIndex}}" bindchange="onFaultChange">
-            <view class="picker-line">{{faultOptions[faultIndex]}}</view>
+          <view class="field-label">处理耗时</view>
+          <picker mode="selector" range="{{durationOptions}}" value="{{durationIndex}}" disabled="{{!arrived}}" bindchange="onDurationChange">
+            <view class="picker-line">{{durationOptions[durationIndex]}}</view>
           </picker>
         </view>
         <view class="field">
-          <view class="field-label">处理结果</view>
-          <picker mode="selector" range="{{resultOptions}}" value="{{resultIndex}}" bindchange="onResultChange">
-            <view class="picker-line">{{resultOptions[resultIndex]}}</view>
-          </picker>
+          <view class="field-label">使用物料</view>
+          <input class="input-line" value="{{materials}}" disabled="{{!arrived}}" data-field="materials" bindinput="onInput" placeholder="例如 膨胀螺丝 2 个、扶手垫片 1 套" />
         </view>
+        <view class="field">
+          <view class="field-label">处理说明 / 备注</view>
+          <textarea class="textarea-line" value="{{remark}}" disabled="{{!arrived}}" data-field="remark" bindinput="onInput" maxlength="500" placeholder="说明故障原因、处理过程和验收情况" />
+        </view>
+        <view class="field">
+          <view class="field-label">后续跟进</view>
+          <textarea class="textarea-line small" value="{{followUp}}" disabled="{{!arrived}}" data-field="followUp" bindinput="onInput" maxlength="300" placeholder="如需二次维修、采购备件或通知主管，请写在这里" />
+        </view>
+        <button class="ghost-btn step-confirm-btn" bindtap="confirmRepairDone">{{repaired ? '已完成处理登记（点击撤销）' : '确认完成处理登记'}}</button>
       </view>
-      <view class="field">
-        <view class="field-label">处理耗时</view>
-        <picker mode="selector" range="{{durationOptions}}" value="{{durationIndex}}" bindchange="onDurationChange">
-          <view class="picker-line">{{durationOptions[durationIndex]}}</view>
-        </picker>
+
+      <!-- 第三步：拍照验收提交 -->
+      <view class="step-card {{repaired ? '' : 'locked'}}">
+        <view class="step-title">第三步 · 拍照验收提交</view>
+        <view class="section-subtitle" wx:if="{{!repaired}}">完成处理登记后开放验收。</view>
+        <view class="tool-row">
+          <button class="tool-btn" bindtap="choosePhoto">拍照验收</button>
+          <button class="tool-btn" bindtap="toggleAccepted">{{accepted ? '✓ 现场验收通过' : '确认现场验收'}}</button>
+        </view>
+        <view class="photo-grid" wx:if="{{photos.length}}">
+          <block wx:for="{{photos}}" wx:key="*this">
+            <image class="photo" mode="aspectFill" src="{{item}}" />
+          </block>
+        </view>
+        <button class="primary-btn submit-btn {{accepted ? '' : 'disabled'}}" loading="{{submitting}}" bindtap="submitRepair">提交维修回执</button>
       </view>
-      <view class="field">
-        <view class="field-label">使用物料</view>
-        <input class="input-line" value="{{materials}}" data-field="materials" bindinput="onInput" placeholder="例如 膨胀螺丝 2 个、扶手垫片 1 套" />
-      </view>
-      <view class="field">
-        <view class="field-label">处理说明</view>
-        <textarea class="textarea-line" value="{{remark}}" data-field="remark" bindinput="onInput" maxlength="500" placeholder="说明故障原因、处理过程和验收情况" />
-      </view>
-      <view class="field">
-        <view class="field-label">后续跟进</view>
-        <textarea class="textarea-line small" value="{{followUp}}" data-field="followUp" bindinput="onInput" maxlength="300" placeholder="如需二次维修、采购备件或通知主管，请写在这里" />
-      </view>
-      <button class="primary-btn submit-btn" loading="{{submitting}}" bindtap="submitRepair">提交维修回执</button>
     </view>
   </view>
 </view>

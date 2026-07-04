@@ -5,8 +5,9 @@
 
     <view class="bind-alert" wx:if="{{!hasBindings}}">
       <view class="bind-title">尚未绑定老人，暂无法下单</view>
-      <view class="bind-desc">请先在“绑定入住老人”中完成身份证绑定</view>
+      <view class="bind-desc">{{bindingsError || '请先在“绑定入住老人”中完成身份证绑定'}}</view>
       <button class="primary-btn bind-btn" bindtap="goBindElder">去绑定老人</button>
+      <button class="ghost-btn bind-btn ghost-retry" wx:if="{{bindingsError}}" bindtap="retryBindings">重新加载绑定信息</button>
     </view>
 
     <view class="elder-row" wx:if="{{hasBindings}}">
@@ -29,7 +30,11 @@
     </view>
 
     <view wx:if="{{loadingProducts}}" class="empty">商品加载中...</view>
-    <view wx:if="{{!loadingProducts && products.length === 0}}" class="empty">暂无可售商品</view>
+    <view wx:if="{{!loadingProducts && productsError}}" class="empty">
+      <view>{{productsError}}</view>
+      <button class="ghost-btn retry-btn" bindtap="retryProducts">重新加载商品</button>
+    </view>
+    <view wx:if="{{!loadingProducts && !productsError && products.length === 0}}" class="empty">暂无可售商品</view>
 
     <block wx:for="{{products}}" wx:key="id">
       <view class="item">
@@ -73,7 +78,11 @@
         bindtap="onOrderTabTap">{{item.label}}</view>
     </view>
     <view wx:if="{{loadingOrders}}" class="empty">订单加载中...</view>
-    <view wx:if="{{!loadingOrders && filteredOrders.length === 0}}" class="empty">暂无订单记录</view>
+    <view wx:if="{{!loadingOrders && ordersError}}" class="empty">
+      <view>{{ordersError}}</view>
+      <button class="ghost-btn retry-btn" bindtap="retryOrders">重新加载订单</button>
+    </view>
+    <view wx:if="{{!loadingOrders && !ordersError && filteredOrders.length === 0}}" class="empty">暂无订单记录</view>
     <block wx:for="{{filteredOrders}}" wx:key="orderId">
       <view class="order-item" data-id="{{item.orderId}}" bindtap="goOrderDetail">
         <view class="order-head">

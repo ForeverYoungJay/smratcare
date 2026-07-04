@@ -220,7 +220,7 @@ onMounted(async () => {
   text-align: left;
 }
 .summary .label {
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--muted);
   margin-bottom: 6px;
 }
 .summary .value {

@@ -14,6 +14,18 @@
   padding: 26rpx;
 }
 
+.inline-state {
+  margin-top: 18rpx;
+}
+
+.success-state {
+  background: #E8F3EF;
+}
+
+.error-state {
+  background: #fff3f2;
+}
+
 .care-row {
   display: flex;
   align-items: center;
@@ -27,12 +39,12 @@
 }
 
 .care-row.active {
-  background: #ecf7f3;
+  background: #E8F3EF;
   border-color: #79b7a4;
 }
 
 .care-title {
-  color: #182430;
+  color: #22332E;
   font-size: 28rpx;
   font-weight: 900;
 }
@@ -48,8 +60,8 @@
   flex: none;
   padding: 8rpx 14rpx;
   border-radius: 999rpx;
-  background: #fff2d9;
-  color: #9a5b05;
+  background: #FBF0E2;
+  color: #B27221;
   font-size: 21rpx;
   font-weight: 900;
 }
@@ -84,8 +96,8 @@
 }
 
 .check-item.checked {
-  background: #e8f4ef;
-  color: #1f684d;
+  background: #E8F3EF;
+  color: #21705F;
   font-weight: 850;
 }
 
@@ -103,7 +115,7 @@
 }
 
 .check-item.checked .check-dot {
-  background: #247455;
+  background: #21705F;
 }
 
 .tool-row,
@@ -117,8 +129,8 @@
 .tool-btn {
   height: 76rpx;
   border-radius: 18rpx;
-  background: #edf5f2;
-  color: #1f5f4c;
+  background: #E8F3EF;
+  color: #185C4E;
   font-size: 25rpx;
   font-weight: 850;
   line-height: 76rpx;
@@ -168,9 +180,9 @@
   width: 100%;
   box-sizing: border-box;
   border-radius: 14rpx;
-  border: 1rpx solid #d9e3df;
+  border: 1rpx solid #D7DED8;
   background: #ffffff;
-  color: #182420;
+  color: #22332E;
   font-size: 25rpx;
 }
 

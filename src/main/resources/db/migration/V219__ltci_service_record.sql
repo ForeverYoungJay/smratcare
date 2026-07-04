@@ -1,0 +1,26 @@
+-- 长护险护理服务记录（fee 单位：分）
+CREATE TABLE IF NOT EXISTS ltci_service_record (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NULL,
+  org_id BIGINT NOT NULL,
+  elder_id BIGINT NOT NULL,
+  benefit_id BIGINT NULL,
+  package_id BIGINT NULL,
+  service_date DATE NOT NULL,
+  item_code VARCHAR(64) NULL,
+  item_name VARCHAR(150) NULL,
+  quantity INT NOT NULL DEFAULT 1,
+  fee BIGINT NOT NULL DEFAULT 0,
+  operator_id BIGINT NULL,
+  sign_url VARCHAR(500) NULL,
+  settle_month VARCHAR(6) NULL,
+  settled TINYINT NOT NULL DEFAULT 0,
+  remark VARCHAR(500) NULL,
+  created_by BIGINT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0,
+  KEY idx_ltci_svc_elder_date (org_id, elder_id, service_date),
+  KEY idx_ltci_svc_month (org_id, elder_id, settle_month, is_deleted),
+  KEY idx_ltci_svc_benefit (org_id, benefit_id)
+);

@@ -4,14 +4,29 @@ import vm from 'node:vm'
 
 const ROOT = process.cwd()
 const ROUTES_FILE = path.join(ROOT, 'src/router/routes.ts')
+const LEGACY_FILE = path.join(ROOT, 'src/router/legacyRedirects.ts')
 const SRC_DIR = path.join(ROOT, 'src')
 
+// 加载某个仅导出常量数组的 ts 文件（如 legacyRedirects.ts），用于喂给 routes.ts 的 eval 沙箱
+function loadConstArray(file, exportName) {
+  if (!fs.existsSync(file)) return []
+  let source = fs.readFileSync(file, 'utf8')
+  source = source.replace(/^import[^\n]*\n/gm, '')
+  source = source.replace(new RegExp(`export const ${exportName}\\s*:\\s*RouteRecordRaw\\[\\]\\s*=\\s*`), `const ${exportName} = `)
+  source += `\nmodule.exports = { ${exportName} }\n`
+  const sandbox = { module: { exports: {} }, exports: {} }
+  vm.runInNewContext(source, sandbox, { timeout: 1000 })
+  return sandbox.module.exports[exportName] || []
+}
+
 function loadRoutes() {
+  const legacyModuleRedirects = loadConstArray(LEGACY_FILE, 'legacyModuleRedirects')
   let source = fs.readFileSync(ROUTES_FILE, 'utf8')
   source = source.replace(/^import[^\n]*\n/gm, '')
   source = source.replace(/export const routes\s*:\s*RouteRecordRaw\[\]\s*=\s*/, 'const routes = ')
   source += '\nmodule.exports = { routes }\n'
-  const sandbox = { module: { exports: {} }, exports: {} }
+  // 提供被拆分出去的兼容路由，供 routes.ts 中的 `...legacyModuleRedirects` 展开
+  const sandbox = { module: { exports: {} }, exports: {}, legacyModuleRedirects }
   vm.runInNewContext(source, sandbox, { timeout: 1000 })
   return sandbox.module.exports.routes || []
 }

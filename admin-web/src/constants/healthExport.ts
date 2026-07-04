@@ -95,6 +95,9 @@ export const archiveExportColumns: HealthExportColumn<any>[] = [
   { key: 'bloodType', title: '血型', value: (item) => item.bloodType || '' },
   { key: 'chronicDisease', title: '慢病史', value: (item) => item.chronicDisease || '' },
   { key: 'allergyHistory', title: '过敏史', value: (item) => item.allergyHistory || '' },
+  { key: 'recentMedicalVisit', title: '最近就医记录', value: (item) => item.recentMedicalVisit || '' },
+  { key: 'checkReportSummary', title: '检查报告摘要', value: (item) => item.checkReportSummary || '' },
+  { key: 'rehabilitationRecord', title: '康复记录', value: (item) => item.rehabilitationRecord || '' },
   { key: 'emergencyContact', title: '紧急联系人', value: (item) => item.emergencyContact || '' },
   { key: 'emergencyPhone', title: '联系电话', value: (item) => item.emergencyPhone || '' }
 ]

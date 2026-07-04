@@ -46,7 +46,7 @@ const props = withDefaults(
     resetText?: string
   }>(),
   {
-    title: 'Operational Filters',
+    title: '快速筛选',
     description: '优先输入关键词，再按状态、时间或组织范围逐步缩小结果。',
     searchText: '查询',
     resetText: '清空'
@@ -124,7 +124,7 @@ function onReset() {
   gap: 16px;
   margin-bottom: 16px;
   padding-bottom: 14px;
-  border-bottom: 1px solid #e5eef5;
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .search-copy {
@@ -133,7 +133,7 @@ function onReset() {
 }
 
 .search-copy__eyebrow {
-  color: #7f96aa;
+  color: #8a9a94;
   font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -141,12 +141,12 @@ function onReset() {
 }
 
 .search-copy strong {
-  color: #12314d;
+  color: #22332e;
   font-size: 16px;
 }
 
 .search-copy span {
-  color: #5f7b95;
+  color: #5c6f69;
   font-size: 12px;
   line-height: 1.6;
 }
@@ -164,8 +164,8 @@ function onReset() {
   min-height: 26px;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(19, 108, 181, 0.1);
-  color: #136cb5;
+  background: var(--primary-soft);
+  color: var(--primary);
   font-size: 12px;
   font-weight: 700;
 }

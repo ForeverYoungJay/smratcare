@@ -1,5 +1,12 @@
 <template>
   <PageContainer title="基础疾病维护" subTitle="医护侧统一维护长者基础疾病，并联动商城禁忌与配餐风险">
+    <template #extra>
+      <a-space wrap>
+        <a-button @click="go('/medical-care/center')">服务中心</a-button>
+        <a-button @click="go('/logistics/commerce/risk')">疾病字典/禁忌规则</a-button>
+        <a-button type="primary" @click="fetchData">刷新</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="长者">
         <ElderNameAutocomplete v-model:value="query.fullName" allow-clear placeholder="姓名(编号)" width="220px" />
@@ -17,13 +24,6 @@
           <a-select-option :value="3">离院</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="go('/medical-care/center')">服务中心</a-button>
-          <a-button @click="go('/logistics/commerce/risk')">疾病字典/禁忌规则</a-button>
-          <a-button type="primary" @click="fetchData">刷新</a-button>
-        </a-space>
-      </template>
     </SearchForm>
 
     <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="onTableChange">
@@ -39,10 +39,10 @@
           <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="openDiseaseDrawer(record)">维护基础疾病</a-button>
-            <a-button type="link" @click="go(`/elder/resident-360?residentId=${record.id}&from=medicalDiseaseManager`)">长者总览</a-button>
-          </a-space>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="openDiseaseDrawer(record)">维护基础疾病</a-button>
+            <a-button type="link" size="small" @click="go(`/elder/resident-360?residentId=${record.id}&from=medicalDiseaseManager`)">长者总览</a-button>
+          </div>
         </template>
       </template>
     </DataTable>
@@ -201,6 +201,6 @@ onMounted(() => {
 
 <style scoped>
 .disease-empty {
-  color: #94a3b8;
+  color: var(--muted-2);
 }
 </style>

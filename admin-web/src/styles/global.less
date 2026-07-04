@@ -1,43 +1,49 @@
 :root {
   color-scheme: light;
   --font-sans: 'HarmonyOS Sans SC', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
-  --bg: #f4f8fb;
-  --bg-2: #edf4f9;
-  --bg-3: #e6eef5;
-  --surface: rgba(255, 255, 255, 0.98);
-  --surface-2: rgba(248, 251, 253, 0.96);
-  --surface-3: rgba(242, 247, 251, 0.94);
-  --ink: #12314d;
-  --ink-soft: #27455f;
-  --muted: #5f7b95;
-  --muted-2: #86a0b7;
-  --primary: #136cb5;
-  --primary-rgb: 19, 108, 181;
-  --primary-strong: #0e5a98;
-  --primary-soft: #e7f3ff;
-  --primary-soft-2: #dff0ff;
-  --secondary: #1e8a8f;
-  --success: #2f9b66;
-  --success-rgb: 47, 155, 102;
-  --warning: #d98922;
-  --warning-rgb: 217, 137, 34;
-  --danger: #d64c5f;
-  --danger-rgb: 214, 76, 95;
-  --critical: #b42338;
+  --bg: #f7f6f2;
+  --bg-2: #f1f1ec;
+  --bg-3: #ebebe4;
+  --surface: #ffffff;
+  --surface-2: #fcfcfa;
+  --surface-3: #f7f8f4;
+  --ink: #22332e;
+  --ink-soft: #3c4f48;
+  --muted: #5c6f69;
+  --muted-2: #8a9a94;
+  --primary: #21705f;
+  --primary-rgb: 33, 112, 95;
+  --primary-strong: #185c4e;
+  --primary-soft: #e8f3ef;
+  --primary-soft-2: #dcede6;
+  --primary-gradient: linear-gradient(135deg, #21705f, #2e8a72);
+  --accent: #e58a3a;
+  --accent-rgb: 229, 138, 58;
+  --accent-soft: #fbf0e2;
+  --secondary: #3d7fa6;
+  --info: #3d7fa6;
+  --info-rgb: 61, 127, 166;
+  --success: #3b9a68;
+  --success-rgb: 59, 154, 104;
+  --warning: #de9b3d;
+  --warning-rgb: 222, 155, 61;
+  --danger: #c9504b;
+  --danger-rgb: 201, 80, 75;
+  --critical: #a83b37;
   --offline: #64748b;
-  --disabled: #95a7b8;
-  --border: #d8e5ef;
-  --border-soft: #e5eef5;
-  --border-strong: #c8d8e5;
-  --shadow-xs: 0 4px 12px rgba(18, 49, 77, 0.04);
-  --shadow-sm: 0 10px 24px rgba(18, 49, 77, 0.06);
-  --shadow-md: 0 18px 40px rgba(18, 49, 77, 0.08);
-  --shadow-lg: 0 28px 56px rgba(18, 49, 77, 0.12);
-  --radius-xs: 8px;
-  --radius-sm: 12px;
-  --radius-md: 16px;
-  --radius-lg: 22px;
-  --radius-xl: 28px;
+  --disabled: #a3b0aa;
+  --border: #e4e7e0;
+  --border-soft: #edefe9;
+  --border-strong: #d3d8cf;
+  --shadow-xs: 0 1px 3px rgba(34, 51, 46, 0.08);
+  --shadow-sm: 0 2px 8px rgba(34, 51, 46, 0.09);
+  --shadow-md: 0 6px 18px rgba(34, 51, 46, 0.11);
+  --shadow-lg: 0 12px 28px rgba(34, 51, 46, 0.14);
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
   --space-1: 8px;
   --space-2: 12px;
   --space-3: 16px;
@@ -54,6 +60,49 @@
   box-sizing: border-box;
 }
 
+/* 键盘可达性：全局可见焦点环，长时间键盘操作的工作人员可以看清当前位置 */
+:focus-visible {
+  outline: 2px solid rgba(var(--primary-rgb), 0.55);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* 细滚动条：表格与侧栏长列表更清爽，同时保留可拖拽宽度 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 51, 46, 0.22) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(34, 51, 46, 0.18);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(34, 51, 46, 0.32);
+}
+
+/* 尊重系统"减少动态效果"设置 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 html,
 body {
   margin: 0;
@@ -61,9 +110,8 @@ body {
   min-height: 100vh;
   font-family: var(--font-sans);
   background:
-    radial-gradient(1200px 500px at -6% -14%, rgba(86, 165, 222, 0.14), transparent 52%),
-    radial-gradient(900px 420px at 106% 0%, rgba(85, 199, 187, 0.1), transparent 48%),
-    linear-gradient(180deg, #f9fcfe 0%, var(--bg) 40%, #f1f6fa 100%);
+    linear-gradient(180deg, rgba(33, 112, 95, 0.035) 0%, rgba(33, 112, 95, 0) 220px),
+    var(--bg);
   color: var(--ink);
 }
 
@@ -98,11 +146,11 @@ textarea {
 .page-section,
 .card-elevated {
   position: relative;
-  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
-  border: 1px solid var(--border);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
-  transition: box-shadow 0.22s ease, transform 0.22s ease, border-color 0.22s ease;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .page-section:hover,
@@ -134,10 +182,10 @@ textarea {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  padding: 16px 18px;
+  padding: 14px 18px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: rgba(255, 255, 255, 0.86);
+  background: var(--surface);
   box-shadow: var(--shadow-xs);
 }
 
@@ -170,16 +218,16 @@ textarea {
 .section-head__copy h3,
 .section-head__copy h4 {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
   color: var(--ink);
 }
 
 .section-kicker {
   font-size: 11px;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted-2);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .search-bar,
@@ -242,6 +290,13 @@ textarea {
   flex-wrap: wrap;
 }
 
+/* 表格行内操作链接：加大可点击范围，减少误点 */
+.row-action-links .ant-btn-link,
+.row-action-links .ant-btn-text {
+  min-height: 30px;
+  padding-inline: 7px;
+}
+
 .selection-pill,
 .status-pill,
 .soft-pill {
@@ -251,17 +306,17 @@ textarea {
   padding: 6px 12px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .selection-pill,
 .status-pill {
-  background: rgba(var(--primary-rgb), 0.1);
+  background: var(--primary-soft);
   color: var(--primary-strong);
 }
 
 .soft-pill {
-  background: rgba(95, 123, 149, 0.1);
+  background: rgba(92, 111, 105, 0.1);
   color: var(--ink-soft);
 }
 
@@ -274,7 +329,7 @@ textarea {
   border-radius: 999px;
   border: 1px solid transparent;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
 }
 
@@ -313,6 +368,121 @@ textarea {
   border-color: rgba(100, 116, 139, 0.18);
 }
 
+/* ===== 共享操作模式（所有列表页通用）===== */
+
+/* 状态快捷筛选片：一次点击切换高频状态 */
+.status-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.status-chip {
+  min-height: 32px;
+  padding: 4px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.status-chip:hover {
+  border-color: rgba(var(--primary-rgb), 0.4);
+  color: var(--primary);
+}
+
+.status-chip.is-active {
+  border-color: rgba(var(--primary-rgb), 0.4);
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+
+/* 指标即筛选条：可点击统计卡 */
+.metric-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.metric-chip {
+  display: grid;
+  gap: 2px;
+  min-width: 104px;
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+button.metric-chip {
+  cursor: pointer;
+}
+
+button.metric-chip:hover {
+  border-color: rgba(var(--primary-rgb), 0.4);
+  box-shadow: var(--shadow-sm);
+}
+
+.metric-chip.is-active {
+  border-color: rgba(var(--primary-rgb), 0.5);
+  background: var(--primary-soft);
+}
+
+.metric-chip__label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.metric-chip__value {
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 700;
+}
+
+.metric-chip--info .metric-chip__value {
+  color: var(--info);
+}
+
+.metric-chip--success .metric-chip__value {
+  color: var(--success);
+}
+
+.metric-chip--danger .metric-chip__value {
+  color: var(--danger);
+}
+
+.metric-chip--warning .metric-chip__value {
+  color: var(--warning);
+}
+
+/* 勾选后浮现的批量操作条 */
+.selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border: 1px solid rgba(var(--primary-rgb), 0.24);
+  border-radius: 12px;
+  background: var(--primary-soft);
+}
+
+.selection-bar__count {
+  color: var(--primary-strong);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .metric-grid {
   display: grid;
   gap: 12px;
@@ -324,9 +494,10 @@ textarea {
   gap: 10px;
   padding: 18px;
   min-height: 120px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border);
-  background: linear-gradient(180deg, #fff 0%, #f8fbfd 100%);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
 }
 
 .metric-card__label {
@@ -336,7 +507,7 @@ textarea {
 
 .metric-card__value {
   color: var(--ink);
-  font-size: 30px;
+  font-size: 28px;
   line-height: 1;
   font-weight: 700;
 }
@@ -348,19 +519,23 @@ textarea {
 }
 
 .metric-card--primary {
-  background: linear-gradient(180deg, rgba(var(--primary-rgb), 0.08) 0%, rgba(var(--primary-rgb), 0.03) 100%);
+  border-color: rgba(var(--primary-rgb), 0.2);
+  background: linear-gradient(180deg, rgba(var(--primary-rgb), 0.07) 0%, rgba(var(--primary-rgb), 0.02) 100%);
 }
 
 .metric-card--success {
-  background: linear-gradient(180deg, rgba(var(--success-rgb), 0.09) 0%, rgba(var(--success-rgb), 0.03) 100%);
+  border-color: rgba(var(--success-rgb), 0.2);
+  background: linear-gradient(180deg, rgba(var(--success-rgb), 0.08) 0%, rgba(var(--success-rgb), 0.02) 100%);
 }
 
 .metric-card--warning {
-  background: linear-gradient(180deg, rgba(var(--warning-rgb), 0.1) 0%, rgba(var(--warning-rgb), 0.04) 100%);
+  border-color: rgba(var(--warning-rgb), 0.24);
+  background: linear-gradient(180deg, rgba(var(--warning-rgb), 0.1) 0%, rgba(var(--warning-rgb), 0.03) 100%);
 }
 
 .metric-card--danger {
-  background: linear-gradient(180deg, rgba(var(--danger-rgb), 0.1) 0%, rgba(var(--danger-rgb), 0.04) 100%);
+  border-color: rgba(var(--danger-rgb), 0.2);
+  background: linear-gradient(180deg, rgba(var(--danger-rgb), 0.08) 0%, rgba(var(--danger-rgb), 0.03) 100%);
 }
 
 .drawer-footer {
@@ -372,18 +547,18 @@ textarea {
   gap: 10px;
   padding: 16px 0 0;
   margin-top: 16px;
-  background: linear-gradient(180deg, rgba(247, 251, 254, 0) 0%, rgba(247, 251, 254, 0.94) 30%, rgba(247, 251, 254, 0.98) 100%);
+  background: linear-gradient(180deg, rgba(252, 252, 250, 0) 0%, rgba(252, 252, 250, 0.94) 30%, rgba(252, 252, 250, 0.98) 100%);
 }
 
 .ant-card {
   border-radius: var(--radius-lg) !important;
   border-color: var(--border) !important;
-  box-shadow: var(--shadow-sm);
-  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
+  box-shadow: var(--shadow-xs);
+  background: var(--surface);
 }
 
 .ant-card .ant-card-head {
-  min-height: 62px;
+  min-height: 58px;
   border-bottom-color: var(--border-soft);
   padding-inline: 20px;
 }
@@ -402,7 +577,7 @@ textarea {
 }
 
 .ant-btn {
-  border-radius: 12px !important;
+  border-radius: 10px !important;
   font-weight: 600;
   box-shadow: none;
 }
@@ -410,26 +585,37 @@ textarea {
 .ant-btn-default {
   border-color: var(--border) !important;
   color: var(--ink-soft) !important;
-  background: rgba(255, 255, 255, 0.92) !important;
+  background: #ffffff !important;
 }
 
 .ant-btn-default:hover {
-  border-color: rgba(var(--primary-rgb), 0.36) !important;
+  border-color: rgba(var(--primary-rgb), 0.4) !important;
   color: var(--primary) !important;
 }
 
 .ant-btn-primary {
-  background: linear-gradient(135deg, var(--primary) 0%, #3d96d9 100%) !important;
+  background: var(--primary-gradient) !important;
   border: none !important;
-  box-shadow: 0 12px 24px rgba(var(--primary-rgb), 0.22);
+  box-shadow: 0 1px 2px rgba(var(--primary-rgb), 0.24);
 }
 
 .ant-btn-primary:hover {
-  box-shadow: 0 16px 30px rgba(var(--primary-rgb), 0.28);
+  background: linear-gradient(135deg, #185c4e, #21705f) !important;
+  box-shadow: 0 4px 10px rgba(var(--primary-rgb), 0.22);
 }
 
 .ant-btn-link {
   color: var(--primary) !important;
+}
+
+/* 适老：保证小按钮与链接按钮的点击区与字号，方便中老年工作人员操作 */
+.ant-btn-sm {
+  min-height: 30px !important;
+  font-size: 13px !important;
+}
+
+.ant-btn-lg {
+  min-height: 44px !important;
 }
 
 .ant-input,
@@ -439,7 +625,7 @@ textarea {
 .ant-input-affix-wrapper,
 .ant-input-number,
 .ant-segmented {
-  border-radius: 12px !important;
+  border-radius: 10px !important;
 }
 
 .ant-input,
@@ -449,7 +635,7 @@ textarea {
 .ant-input-number,
 .ant-segmented {
   border-color: var(--border) !important;
-  background: rgba(255, 255, 255, 0.96) !important;
+  background: #ffffff !important;
 }
 
 .ant-input:hover,
@@ -457,7 +643,7 @@ textarea {
 .ant-select-selector:hover,
 .ant-picker:hover,
 .ant-input-number:hover {
-  border-color: rgba(var(--primary-rgb), 0.36) !important;
+  border-color: rgba(var(--primary-rgb), 0.4) !important;
 }
 
 .ant-input:focus,
@@ -499,17 +685,18 @@ textarea {
 .ant-table-wrapper .ant-table-thead > tr > th {
   padding: 14px 16px !important;
   color: var(--ink-soft) !important;
-  font-size: 12px !important;
+  font-size: 14px !important;
   font-weight: 700 !important;
   letter-spacing: 0.02em;
-  text-transform: uppercase;
-  background: linear-gradient(180deg, #f7fafc 0%, #f2f7fb 100%) !important;
+  background: #f3f5f0 !important;
   border-bottom-color: var(--border-soft) !important;
 }
 
+/* 适老：加高行高、放大正文字号，便于中老年工作人员长时间查看 */
 .ant-table-wrapper .ant-table-tbody > tr > td {
-  padding: 14px 16px !important;
+  padding: 16px !important;
   color: var(--ink) !important;
+  font-size: 14px !important;
   border-bottom-color: var(--border-soft) !important;
   vertical-align: middle;
 }
@@ -530,13 +717,13 @@ textarea {
 .ant-pagination .ant-pagination-item,
 .ant-pagination .ant-pagination-prev,
 .ant-pagination .ant-pagination-next {
-  border-radius: 10px;
+  border-radius: 8px;
   border-color: var(--border);
 }
 
 .ant-pagination .ant-pagination-item-active {
-  border-color: rgba(var(--primary-rgb), 0.28);
-  background: rgba(var(--primary-rgb), 0.1);
+  border-color: rgba(var(--primary-rgb), 0.32);
+  background: var(--primary-soft);
 }
 
 .ant-tabs-top > .ant-tabs-nav {
@@ -544,13 +731,13 @@ textarea {
 }
 
 .ant-tabs-tab {
-  border-radius: 12px 12px 0 0;
+  border-radius: 10px 10px 0 0;
 }
 
 .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab {
-  border-radius: 12px 12px 0 0 !important;
+  border-radius: 10px 10px 0 0 !important;
   border-color: var(--border) !important;
-  background: rgba(244, 248, 251, 0.96) !important;
+  background: var(--surface-3) !important;
 }
 
 .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab-active {
@@ -565,7 +752,7 @@ textarea {
   min-height: 26px;
   padding-inline: 10px;
   border-radius: 999px;
-  font-weight: 700;
+  font-weight: 600;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -580,9 +767,9 @@ textarea {
 
 .ant-tag.ant-tag-cyan,
 .ant-tag.ant-tag-geekblue {
-  color: var(--secondary);
-  background: rgba(30, 138, 143, 0.11);
-  border-color: rgba(30, 138, 143, 0.16);
+  color: var(--info);
+  background: rgba(var(--info-rgb), 0.11);
+  border-color: rgba(var(--info-rgb), 0.16);
 }
 
 .ant-tag.ant-tag-green,
@@ -615,24 +802,48 @@ textarea {
   border-color: rgba(123, 76, 191, 0.16);
 }
 
+/* 下拉菜单：加大条目行高与命中区域，操作更不易误点 */
+.ant-dropdown .ant-dropdown-menu,
+.ant-select-dropdown,
+.ant-picker-dropdown .ant-picker-panel-container {
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+}
+
+.ant-dropdown .ant-dropdown-menu {
+  padding: 6px;
+}
+
+.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item {
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item:hover {
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+
 .ant-alert {
-  border-radius: 18px;
+  border-radius: 12px;
   border-width: 1px;
 }
 
 .ant-alert-info {
-  border-color: rgba(var(--primary-rgb), 0.16);
-  background: rgba(var(--primary-rgb), 0.06);
+  border-color: rgba(var(--info-rgb), 0.2);
+  background: rgba(var(--info-rgb), 0.07);
 }
 
 .ant-alert-warning {
-  border-color: rgba(var(--warning-rgb), 0.16);
+  border-color: rgba(var(--warning-rgb), 0.2);
   background: rgba(var(--warning-rgb), 0.08);
 }
 
 .ant-alert-error {
-  border-color: rgba(var(--danger-rgb), 0.16);
-  background: rgba(var(--danger-rgb), 0.08);
+  border-color: rgba(var(--danger-rgb), 0.18);
+  background: rgba(var(--danger-rgb), 0.07);
 }
 
 .ant-empty,
@@ -647,15 +858,15 @@ textarea {
 
 .ant-modal .ant-modal-content,
 .ant-drawer .ant-drawer-content {
-  border-radius: 24px;
+  border-radius: 16px;
   overflow: hidden;
 }
 
 .ant-modal .ant-modal-header,
 .ant-drawer .ant-drawer-header {
-  padding: 20px 22px;
+  padding: 18px 22px;
   border-bottom-color: var(--border-soft);
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbfd 100%);
+  background: #ffffff;
 }
 
 .ant-modal .ant-modal-body,

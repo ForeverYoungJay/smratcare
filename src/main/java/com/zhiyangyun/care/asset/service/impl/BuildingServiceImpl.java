@@ -14,6 +14,7 @@ import com.zhiyangyun.care.elder.entity.Bed;
 import com.zhiyangyun.care.elder.entity.Room;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
+import com.zhiyangyun.care.elder.service.ElderOccupancyReadService;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
@@ -25,12 +26,19 @@ public class BuildingServiceImpl implements BuildingService {
   private final FloorMapper floorMapper;
   private final RoomMapper roomMapper;
   private final BedMapper bedMapper;
+  private final ElderOccupancyReadService elderOccupancyReadService;
 
-  public BuildingServiceImpl(BuildingMapper buildingMapper, FloorMapper floorMapper, RoomMapper roomMapper, BedMapper bedMapper) {
+  public BuildingServiceImpl(
+      BuildingMapper buildingMapper,
+      FloorMapper floorMapper,
+      RoomMapper roomMapper,
+      BedMapper bedMapper,
+      ElderOccupancyReadService elderOccupancyReadService) {
     this.buildingMapper = buildingMapper;
     this.floorMapper = floorMapper;
     this.roomMapper = roomMapper;
     this.bedMapper = bedMapper;
+    this.elderOccupancyReadService = elderOccupancyReadService;
   }
 
   @Override
@@ -145,8 +153,7 @@ public class BuildingServiceImpl implements BuildingService {
             .eq(Bed::getIsDeleted, 0)
             .eq(Bed::getTenantId, tenantId)
             .in(Bed::getRoomId, roomIds));
-    boolean hasOccupiedBed = beds.stream().anyMatch(bed ->
-        bed.getElderId() != null || Integer.valueOf(2).equals(bed.getStatus()));
+    boolean hasOccupiedBed = !elderOccupancyReadService.buildOccupiedBedMapByElderId(null, beds).isEmpty();
     if (hasOccupiedBed) {
       throw new IllegalArgumentException("当前楼栋下存在已入住床位，请先办理退床或换床");
     }

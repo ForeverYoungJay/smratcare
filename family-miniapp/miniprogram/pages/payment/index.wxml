@@ -16,6 +16,10 @@
     <view class="section-title">在线缴费</view>
     <view class="section-subtitle">支持微信充值，到账后可用于服务消费与商品购买</view>
     <view class="runtime-hint">正式环境默认只走真实微信支付，不再自动回退人工记账。</view>
+    <view class="warn-box subtle" wx:if="{{partialWarning}}">
+      <view class="warn-title">部分支付数据暂未同步</view>
+      <view class="warn-sub">{{partialWarning}}</view>
+    </view>
 
     <view class="guard-brief" wx:if="{{guard}}">
       <view class="guard-main">
@@ -40,7 +44,7 @@
 
     <view class="line switch-line">
       <text>自动扣费设置</text>
-      <switch checked="{{summary.autoPayEnabled}}" bindchange="onAutoPaySwitch" color="#246b5f" />
+      <switch checked="{{summary.autoPayEnabled}}" bindchange="onAutoPaySwitch" color="#21705F" />
     </view>
 
     <view class="line"><text>充值金额</text><input class="amount-input" type="digit" value="{{rechargeAmount}}" bindinput="onRechargeInput" /></view>

@@ -52,7 +52,7 @@
     </a-row>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <vxe-table border stripe show-overflow :loading="loading" :data="rows" height="520">
+      <vxe-table border stripe show-overflow="title" :loading="loading" :data="rows" height="520">
         <vxe-column field="paidAt" title="收款时间" width="180" />
         <vxe-column field="elderName" title="长者" min-width="140">
           <template #default="{ row }">{{ row.elderName || '-' }}</template>
@@ -73,10 +73,10 @@
         <vxe-column field="remark" title="备注" min-width="180" />
         <vxe-column title="操作" width="180" fixed="right">
           <template #default="{ row }">
-            <a-space>
-              <a-button type="link" @click="go(`/finance/bill/${row.billId}`)" v-if="row.billId">查看账单</a-button>
-              <a-button type="link" @click="go('/finance/reconcile/invoice?filter=unlinked')" v-if="row.invoiceStatus === 'UNLINKED'">去关联</a-button>
-            </a-space>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="go(`/finance/bill/${row.billId}`)" v-if="row.billId">查看账单</a-button>
+              <a-button type="link" size="small" @click="go('/finance/reconcile/invoice?filter=unlinked')" v-if="row.invoiceStatus === 'UNLINKED'">去关联</a-button>
+            </div>
           </template>
         </vxe-column>
       </vxe-table>

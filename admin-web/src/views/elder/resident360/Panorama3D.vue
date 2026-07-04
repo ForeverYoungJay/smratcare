@@ -24,9 +24,9 @@
       <div class="scene-legend">
         <div class="legend-chip status-occupied">在住</div>
         <div class="legend-chip status-empty">空床</div>
-        <div class="legend-chip status-warning">外出/待退住</div>
-        <div class="legend-chip status-ai">观察</div>
-        <div class="legend-chip status-alert">异常</div>
+        <div class="legend-chip status-warning">维护 / 外出</div>
+        <div class="legend-chip status-ai">重点关注</div>
+        <div class="legend-chip status-alert">异常告警</div>
       </div>
     </div>
 
@@ -57,6 +57,7 @@ import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vu
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { CSS2DObject, CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import gsap from 'gsap'
 
 type PanoramaScopeLevel = 'PARK' | 'BUILDING' | 'FLOOR' | 'ROOM'
@@ -128,6 +129,7 @@ let animationFrameId = 0
 let rebuildSceneTimer = 0
 let lastPointerMoveAt = 0
 let hoveredObj: THREE.Object3D | null = null
+let pointerDownPos: { x: number; y: number } | null = null
 const pickPosition = new THREE.Vector2()
 const raycaster = new THREE.Raycaster()
 
@@ -160,21 +162,23 @@ const currentLevelLabel = computed(() => {
   return '房间'
 })
 
+// 床位状态语义配色（与全局养老绿主题一致）：
+// 在住=品牌绿 / 平稳在住=浅一档的绿 / 关注=蓝紫 / 维护·外出=琥珀 / 异常=红 / 空床=暖灰
 const materials = {
-  buildingShell: new THREE.MeshStandardMaterial({ color: 0xe9f1fb, transparent: true, opacity: 0.98, roughness: 0.74, metalness: 0.06 }),
-  buildingCap: new THREE.MeshStandardMaterial({ color: 0xdbe8f7, transparent: true, opacity: 1, roughness: 0.62, metalness: 0.04 }),
-  buildingHitbox: new THREE.MeshBasicMaterial({ color: 0x7da0ff, transparent: true, opacity: 0.01, side: THREE.DoubleSide }),
-  floor: new THREE.MeshStandardMaterial({ color: 0xf7fbff, transparent: true, opacity: 0.98, roughness: 0.8, metalness: 0.02 }),
-  roomNeutral: new THREE.MeshStandardMaterial({ color: 0xf6efe4, transparent: true, opacity: 0.98, roughness: 0.84, metalness: 0.02 }),
-  roomHover: new THREE.MeshStandardMaterial({ color: 0xe3efff, emissive: 0xe8f3ff, emissiveIntensity: 0.08, transparent: true, opacity: 0.98 }),
-  hover: new THREE.MeshStandardMaterial({ color: 0xe7f2ff, emissive: 0xdcecff, emissiveIntensity: 0.16, transparent: true, opacity: 0.98 }),
-  bedNormal: new THREE.MeshStandardMaterial({ color: 0xc9d2dc, emissive: 0xe5ebf1, emissiveIntensity: 0.08, metalness: 0.12, roughness: 0.44 }),
-  bedOccupied: new THREE.MeshStandardMaterial({ color: 0x58c392, emissive: 0x81e3b7, emissiveIntensity: 0.3, metalness: 0.08, roughness: 0.3 }),
-  bedSleep: new THREE.MeshStandardMaterial({ color: 0xf2b14c, emissive: 0xffd18a, emissiveIntensity: 0.3, metalness: 0.06, roughness: 0.3 }),
-  bedAi: new THREE.MeshStandardMaterial({ color: 0x8b78e8, emissive: 0xb4a6ff, emissiveIntensity: 0.28, metalness: 0.08, roughness: 0.34 }),
-  bedWarning: new THREE.MeshStandardMaterial({ color: 0xf2b14c, emissive: 0xffd18a, emissiveIntensity: 0.24, metalness: 0.06, roughness: 0.3 }),
-  bedAlert: new THREE.MeshStandardMaterial({ color: 0xef6f7c, emissive: 0xff9faa, emissiveIntensity: 0.36, metalness: 0.06, roughness: 0.28 }),
-  bedOffline: new THREE.MeshStandardMaterial({ color: 0xc9d2dc, emissive: 0xdce5ee, emissiveIntensity: 0.08, metalness: 0.08, roughness: 0.42 })
+  buildingShell: new THREE.MeshStandardMaterial({ color: 0xf0f3ec, transparent: true, opacity: 0.98, roughness: 0.74, metalness: 0.06 }),
+  buildingCap: new THREE.MeshStandardMaterial({ color: 0xe2e8dc, transparent: true, opacity: 1, roughness: 0.62, metalness: 0.04 }),
+  buildingHitbox: new THREE.MeshBasicMaterial({ color: 0x2e8a72, transparent: true, opacity: 0.01, side: THREE.DoubleSide }),
+  floor: new THREE.MeshStandardMaterial({ color: 0xf9fbf5, transparent: true, opacity: 0.98, roughness: 0.8, metalness: 0.02 }),
+  roomNeutral: new THREE.MeshStandardMaterial({ color: 0xf4f0e6, transparent: true, opacity: 0.98, roughness: 0.84, metalness: 0.02 }),
+  roomHover: new THREE.MeshStandardMaterial({ color: 0xe4f1ea, emissive: 0xdcede6, emissiveIntensity: 0.08, transparent: true, opacity: 0.98 }),
+  hover: new THREE.MeshStandardMaterial({ color: 0xe8f3ef, emissive: 0xd6eae2, emissiveIntensity: 0.16, transparent: true, opacity: 0.98 }),
+  bedNormal: new THREE.MeshStandardMaterial({ color: 0xccd4cc, emissive: 0xe7ece5, emissiveIntensity: 0.08, metalness: 0.12, roughness: 0.44 }),
+  bedOccupied: new THREE.MeshStandardMaterial({ color: 0x2e8a72, emissive: 0x6cc3a6, emissiveIntensity: 0.3, metalness: 0.08, roughness: 0.3 }),
+  bedSleep: new THREE.MeshStandardMaterial({ color: 0x55a98c, emissive: 0x8fd4ba, emissiveIntensity: 0.22, metalness: 0.06, roughness: 0.3 }),
+  bedAi: new THREE.MeshStandardMaterial({ color: 0x6b79d8, emissive: 0xa4adf0, emissiveIntensity: 0.28, metalness: 0.08, roughness: 0.34 }),
+  bedWarning: new THREE.MeshStandardMaterial({ color: 0xde9b3d, emissive: 0xf3c37e, emissiveIntensity: 0.24, metalness: 0.06, roughness: 0.3 }),
+  bedAlert: new THREE.MeshStandardMaterial({ color: 0xc9504b, emissive: 0xef8f88, emissiveIntensity: 0.36, metalness: 0.06, roughness: 0.28 }),
+  bedOffline: new THREE.MeshStandardMaterial({ color: 0xc7cdc6, emissive: 0xdde2da, emissiveIntensity: 0.08, metalness: 0.08, roughness: 0.42 })
 }
 
 function emitScopeChange(scope: PanoramaScope) {
@@ -226,47 +230,155 @@ function materialForState(state: ReturnType<typeof resolveBedVisualState>) {
 
 function roomMaterialForData(room: RoomScene) {
   const ratio = room.totalBeds ? room.occupiedBeds / room.totalBeds : 0
-  const concernBeds = room.beds.filter((bed) => ['HIGH', 'MEDIUM'].includes(String(bed.riskLevel || '')) || Number(bed.abnormalVital24hCount || 0) > 0).length
+  const alertBeds = room.beds.filter((bed) => String(bed.riskLevel || '') === 'HIGH' || Number(bed.abnormalVital24hCount || 0) > 0).length
+  const concernBeds = room.beds.filter((bed) => String(bed.riskLevel || '') === 'MEDIUM').length
   const material = materials.roomNeutral.clone()
+  if (alertBeds > 0) {
+    // 有高风险/异常床位的房间：地面泛红，一眼即见
+    material.color = new THREE.Color(0xf9ebe9)
+    material.emissive = new THREE.Color(0xf2c7c2)
+    material.emissiveIntensity = 0.07
+    return material
+  }
   if (concernBeds > 0) {
-    material.color = new THREE.Color(0xf3eefe)
-    material.emissive = new THREE.Color(0xded6ff)
+    material.color = new THREE.Color(0xeef0fa)
+    material.emissive = new THREE.Color(0xd4d9f4)
     material.emissiveIntensity = 0.06
     return material
   }
   if (ratio >= 1) {
-    material.color = new THREE.Color(0xe6f5ee)
-    material.emissive = new THREE.Color(0xcff0dd)
+    material.color = new THREE.Color(0xe8f3ec)
+    material.emissive = new THREE.Color(0xd0ecdb)
     material.emissiveIntensity = 0.05
     return material
   }
   if (ratio === 0) {
-    material.color = new THREE.Color(0xf2f5f9)
+    material.color = new THREE.Color(0xf3f5f0)
     return material
   }
-  material.color = new THREE.Color(0xf6efe4)
-  material.emissive = new THREE.Color(0xfff5ea)
+  material.color = new THREE.Color(0xf4f0e6)
+  material.emissive = new THREE.Color(0xfaf3e6)
   material.emissiveIntensity = 0.03
   return material
 }
 
+// 建筑改为"微缩沙盘"手法：单体圆角体量 + 层间凹槽 + 内嵌暖窗 + 出挑屋檐
 function createBuildingMass(totalFloors: number) {
   const group = new THREE.Group()
   const width = 10
   const depth = 10
-  const floorHeight = 1.75
-  for (let index = 0; index < totalFloors; index += 1) {
-    const shell = new THREE.Mesh(
-      new THREE.BoxGeometry(width - index * 0.18, floorHeight, depth - index * 0.18),
-      materials.buildingShell.clone()
-    )
-    shell.position.y = floorHeight / 2 + index * (floorHeight * 0.96)
-    group.add(shell)
+  const floorHeight = 1.72
+  const bodyHeight = totalFloors * floorHeight
+
+  const body = new THREE.Mesh(
+    new RoundedBoxGeometry(width, bodyHeight, depth, 3, 0.42),
+    materials.buildingShell.clone()
+  )
+  body.position.y = bodyHeight / 2
+  body.castShadow = true
+  body.receiveShadow = true
+  group.add(body)
+
+  const grooveMaterial = new THREE.MeshStandardMaterial({ color: 0xdde3d4, roughness: 0.8, metalness: 0.02 })
+  const windowMaterial = new THREE.MeshStandardMaterial({
+    color: 0xf6ecd2,
+    emissive: 0xefdcae,
+    emissiveIntensity: 0.28,
+    roughness: 0.35,
+    metalness: 0.03
+  })
+  const frameMaterial = new THREE.MeshStandardMaterial({ color: 0xe7ebdf, roughness: 0.6, metalness: 0.02 })
+
+  const windowsPerSide = 4
+  const winW = 1.16
+  const winH = 0.76
+  const winGeo = new RoundedBoxGeometry(winW, winH, 0.1, 2, 0.1)
+  const frameGeo = new RoundedBoxGeometry(winW + 0.18, winH + 0.18, 0.05, 2, 0.08)
+
+  for (let level = 0; level < totalFloors; level += 1) {
+    const centerY = level * floorHeight + floorHeight / 2
+
+    // 层间细凹槽，远看有清晰楼层节奏
+    if (level > 0) {
+      const groove = new THREE.Mesh(new THREE.BoxGeometry(width + 0.04, 0.07, depth + 0.04), grooveMaterial)
+      groove.position.y = level * floorHeight
+      group.add(groove)
+    }
+
+    // 四立面窗洞：框 + 暖光窗芯，间隔亮灯更自然
+    for (let w = 0; w < windowsPerSide; w += 1) {
+      const offset = (w - (windowsPerSide - 1) / 2) * (width / windowsPerSide)
+      const lit = (level * 7 + w * 3) % 5 !== 0
+      const winMat = lit ? windowMaterial : new THREE.MeshStandardMaterial({ color: 0xcfd8e2, roughness: 0.3, metalness: 0.08 })
+      ;[-1, 1].forEach((direction) => {
+        const frameZ = new THREE.Mesh(frameGeo, frameMaterial)
+        frameZ.position.set(offset, centerY, direction * (depth / 2 + 0.02))
+        group.add(frameZ)
+        const winZ = new THREE.Mesh(winGeo, winMat)
+        winZ.position.set(offset, centerY, direction * (depth / 2 + 0.06))
+        group.add(winZ)
+
+        const frameX = new THREE.Mesh(frameGeo, frameMaterial)
+        frameX.rotation.y = Math.PI / 2
+        frameX.position.set(direction * (width / 2 + 0.02), centerY, offset)
+        group.add(frameX)
+        const winX = new THREE.Mesh(winGeo, winMat)
+        winX.rotation.y = Math.PI / 2
+        winX.position.set(direction * (width / 2 + 0.06), centerY, offset)
+        group.add(winX)
+      })
+    }
   }
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(width + 0.6, 0.4, depth + 0.6), materials.buildingCap.clone())
-  roof.position.y = totalFloors * (floorHeight * 0.96) + 0.3
-  group.add(roof)
+
+  // 出挑屋檐 + 屋顶设备间，轮廓不再是平顶盒子
+  const eave = new THREE.Mesh(new RoundedBoxGeometry(width + 1.1, 0.34, depth + 1.1, 2, 0.16), materials.buildingCap.clone())
+  eave.position.y = bodyHeight + 0.17
+  eave.castShadow = true
+  group.add(eave)
+
+  const penthouse = new THREE.Mesh(
+    new RoundedBoxGeometry(width * 0.34, 0.72, depth * 0.3, 2, 0.14),
+    new THREE.MeshStandardMaterial({ color: 0xe9eee2, roughness: 0.7, metalness: 0.03 })
+  )
+  penthouse.position.set(-width * 0.2, bodyHeight + 0.34 + 0.36, -depth * 0.18)
+  penthouse.castShadow = true
+  group.add(penthouse)
+
+  const roofGarden = new THREE.Mesh(
+    new RoundedBoxGeometry(width * 0.4, 0.24, depth * 0.42, 2, 0.12),
+    new THREE.MeshStandardMaterial({ color: 0x9dc3a2, roughness: 0.9, metalness: 0.01 })
+  )
+  roofGarden.position.set(width * 0.2, bodyHeight + 0.34 + 0.12, depth * 0.16)
+  group.add(roofGarden)
+
   return group
+}
+
+// 简洁风格化树木：圆角树冠 + 圆柱树干，撑起园区绿意
+function createTree(scale = 1) {
+  const tree = new THREE.Group()
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.14 * scale, 0.2 * scale, 1.1 * scale, 8),
+    new THREE.MeshStandardMaterial({ color: 0x9a7b58, roughness: 0.9, metalness: 0.01 })
+  )
+  trunk.position.y = 0.55 * scale
+  trunk.castShadow = true
+  tree.add(trunk)
+
+  const foliageMaterial = new THREE.MeshStandardMaterial({ color: 0x7fb08a, roughness: 0.85, metalness: 0.01 })
+  const crown = new THREE.Mesh(new THREE.SphereGeometry(1.05 * scale, 14, 12), foliageMaterial)
+  crown.position.y = 1.9 * scale
+  crown.scale.y = 1.12
+  crown.castShadow = true
+  tree.add(crown)
+
+  const crownSide = new THREE.Mesh(new THREE.SphereGeometry(0.62 * scale, 12, 10), foliageMaterial.clone())
+  ;(crownSide.material as THREE.MeshStandardMaterial).color = new THREE.Color(0x92bd97)
+  crownSide.position.set(0.62 * scale, 1.5 * scale, 0.24 * scale)
+  crownSide.castShadow = true
+  tree.add(crownSide)
+
+  return tree
 }
 
 function createBedUnit(bed: any, width: number, depth: number) {
@@ -274,7 +386,7 @@ function createBedUnit(bed: any, width: number, depth: number) {
   const group = new THREE.Group()
   const frameHeight = 0.18
 
-  const frameMaterial = new THREE.MeshStandardMaterial({ color: 0xe5edf6, metalness: 0.12, roughness: 0.38 })
+  const frameMaterial = new THREE.MeshStandardMaterial({ color: 0xeaeee6, metalness: 0.12, roughness: 0.38 })
   const frameRailGeo = new THREE.BoxGeometry(width, frameHeight, 0.08)
   const sideRailGeo = new THREE.BoxGeometry(0.08, frameHeight, depth - 0.18)
   ;[-1, 1].forEach((direction) => {
@@ -292,7 +404,7 @@ function createBedUnit(bed: any, width: number, depth: number) {
     ;[-1, 1].forEach((zDirection) => {
       const leg = new THREE.Mesh(
         new THREE.CylinderGeometry(0.035, 0.05, 0.24, 10),
-        new THREE.MeshStandardMaterial({ color: 0xc8d6e4, metalness: 0.18, roughness: 0.36 })
+        new THREE.MeshStandardMaterial({ color: 0xcdd5cb, metalness: 0.18, roughness: 0.36 })
       )
       leg.position.set(xDirection * (width / 2 - 0.12), 0.12, zDirection * (depth / 2 - 0.12))
       group.add(leg)
@@ -300,80 +412,89 @@ function createBedUnit(bed: any, width: number, depth: number) {
   })
 
   const mattressMaterial = materialForState(state)
-  const mattress = new THREE.Mesh(new THREE.BoxGeometry(width * 0.8, 0.12, depth * 0.68), mattressMaterial)
-  mattress.position.y = frameHeight + 0.06
+  const mattress = new THREE.Mesh(new RoundedBoxGeometry(width * 0.8, 0.14, depth * 0.68, 2, 0.05), mattressMaterial)
+  mattress.position.y = frameHeight + 0.07
+  mattress.castShadow = true
   mattress.userData = { type: 'bed', bed, originalMat: mattressMaterial, state }
   group.add(mattress)
   interactableObjects.push(mattress)
 
   const pillow = new THREE.Mesh(
-    new THREE.BoxGeometry(width * 0.42, 0.08, depth * 0.16),
-    new THREE.MeshStandardMaterial({ color: 0xfafcff, roughness: 0.62, metalness: 0.02 })
+    new RoundedBoxGeometry(width * 0.42, 0.09, depth * 0.16, 2, 0.04),
+    new THREE.MeshStandardMaterial({ color: 0xfdfefb, roughness: 0.62, metalness: 0.02 })
   )
-  pillow.position.set(0, frameHeight + 0.14, -depth * 0.2)
+  pillow.position.set(0, frameHeight + 0.16, -depth * 0.2)
   group.add(pillow)
 
   const blanket = new THREE.Mesh(
-    new THREE.BoxGeometry(width * 0.76, 0.07, depth * 0.32),
+    new RoundedBoxGeometry(width * 0.76, 0.08, depth * 0.34, 2, 0.04),
     new THREE.MeshStandardMaterial({
-      color: state === 'alert' ? 0xffd6dc : state === 'ai' ? 0xe4dcff : state === 'warning' ? 0xffebca : 0xddeaf4,
+      color: state === 'alert' ? 0xf6d4d1 : state === 'ai' ? 0xdde1f8 : state === 'warning' ? 0xf6e4c4 : 0xdfeade,
       roughness: 0.7,
       metalness: 0.02
     })
   )
-  blanket.position.set(0, frameHeight + 0.13, depth * 0.08)
+  blanket.position.set(0, frameHeight + 0.14, depth * 0.08)
   group.add(blanket)
 
   const headboard = new THREE.Mesh(
-    new THREE.BoxGeometry(width * 0.84, 0.3, 0.08),
-    new THREE.MeshStandardMaterial({ color: 0xc8d7ea, metalness: 0.08, roughness: 0.3 })
+    new RoundedBoxGeometry(width * 0.84, 0.34, 0.1, 2, 0.05),
+    new THREE.MeshStandardMaterial({ color: 0xd3c9b4, metalness: 0.08, roughness: 0.4 })
   )
   headboard.position.set(0, 0.3, -depth * 0.34)
+  headboard.castShadow = true
   group.add(headboard)
 
   const tailboard = new THREE.Mesh(
-    new THREE.BoxGeometry(width * 0.72, 0.18, 0.06),
-    new THREE.MeshStandardMaterial({ color: 0xd9e4f0, metalness: 0.08, roughness: 0.36 })
+    new RoundedBoxGeometry(width * 0.72, 0.2, 0.08, 2, 0.04),
+    new THREE.MeshStandardMaterial({ color: 0xddd5c3, metalness: 0.08, roughness: 0.42 })
   )
   tailboard.position.set(0, 0.2, depth * 0.33)
   group.add(tailboard)
 
-  const bedsideMonitor = new THREE.Group()
-  const monitorPole = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.022, 0.03, 0.42, 10),
-    new THREE.MeshStandardMaterial({ color: 0xc6d3e1, metalness: 0.22, roughness: 0.26 })
-  )
-  monitorPole.position.y = 0.28
-  bedsideMonitor.add(monitorPole)
-  const monitorScreen = new THREE.Mesh(
-    new THREE.BoxGeometry(0.18, 0.11, 0.03),
-    new THREE.MeshStandardMaterial({
-      color: state === 'alert' ? 0x2f1820 : 0x182432,
-      emissive: state === 'alert' ? 0xff6d89 : state === 'ai' ? 0xa997ff : 0x57d7ff,
-      emissiveIntensity: state === 'alert' ? 0.35 : 0.18,
-      roughness: 0.34,
-      metalness: 0.18
-    })
-  )
-  monitorScreen.position.set(0, 0.54, 0)
-  bedsideMonitor.add(monitorScreen)
-  bedsideMonitor.position.set(width / 2 + 0.14, 0, -depth * 0.18)
-  group.add(bedsideMonitor)
+  // 床头小柜替代原先的输液杆式监护屏，只在有长者的床位出现，柜上一块小监护屏
+  if (bed.elderId) {
+    const bedside = new THREE.Group()
+    const cabinet = new THREE.Mesh(
+      new RoundedBoxGeometry(0.22, 0.26, 0.22, 2, 0.04),
+      new THREE.MeshStandardMaterial({ color: 0xe3dcc9, roughness: 0.6, metalness: 0.03 })
+    )
+    cabinet.position.y = 0.13
+    cabinet.castShadow = true
+    bedside.add(cabinet)
+    const monitorScreen = new THREE.Mesh(
+      new RoundedBoxGeometry(0.16, 0.1, 0.03, 2, 0.02),
+      new THREE.MeshStandardMaterial({
+        color: state === 'alert' ? 0x2f1820 : 0x18271f,
+        emissive: state === 'alert' ? 0xff7d78 : state === 'ai' ? 0xa4adf0 : 0x63d6b8,
+        emissiveIntensity: state === 'alert' ? 0.35 : 0.16,
+        roughness: 0.34,
+        metalness: 0.18
+      })
+    )
+    monitorScreen.position.set(0, 0.32, 0)
+    monitorScreen.rotation.x = -0.28
+    bedside.add(monitorScreen)
+    bedside.position.set(width / 2 + 0.16, 0, -depth * 0.2)
+    group.add(bedside)
+  }
 
-  const halo = new THREE.Mesh(
-    new THREE.RingGeometry(Math.min(width, depth) * 0.38, Math.min(width, depth) * 0.52, 32),
-    new THREE.MeshBasicMaterial({ color: mattressMaterial.color, transparent: true, opacity: state === 'alert' ? 0.24 : 0.12, side: THREE.DoubleSide })
-  )
-  halo.rotation.x = -Math.PI / 2
-  halo.position.y = 0.03
-  halo.userData.isHalo = true
-  group.add(halo)
-  mattress.userData.halo = halo
+  // 地面光环只保留在需要注意的床位（异常/维护），平稳床位保持干净
+  if (state === 'alert' || state === 'warning') {
+    const halo = new THREE.Mesh(
+      new THREE.RingGeometry(Math.min(width, depth) * 0.38, Math.min(width, depth) * 0.52, 32),
+      new THREE.MeshBasicMaterial({ color: mattressMaterial.color, transparent: true, opacity: state === 'alert' ? 0.26 : 0.14, side: THREE.DoubleSide })
+    )
+    halo.rotation.x = -Math.PI / 2
+    halo.position.y = 0.03
+    halo.userData.isHalo = true
+    group.add(halo)
+    mattress.userData.halo = halo
+  }
 
+  // 只让异常/维护床位有动效，平稳床位静止——整体更安静耐看
   if (state === 'alert') animatedBeds.push({ mesh: mattress, type: 'pulse', baseIntensity: 0.42 })
-  else if (state === 'ai') animatedBeds.push({ mesh: mattress, type: 'ai', baseIntensity: 0.24 })
   else if (state === 'warning') animatedBeds.push({ mesh: mattress, type: 'blink', baseIntensity: 0.28 })
-  else if (state === 'sleep') animatedBeds.push({ mesh: mattress, type: 'sleep', baseIntensity: 0.26 })
 
   return group
 }
@@ -384,43 +505,60 @@ function buildAtmosphere() {
   const campusBase = new THREE.Mesh(
     new THREE.CylinderGeometry(78, 84, 1.4, 64),
     new THREE.MeshStandardMaterial({
-      color: 0xf2f7fd,
+      color: 0xf1f4ec,
       roughness: 0.86,
       metalness: 0.02
     })
   )
   campusBase.position.y = -0.7
+  campusBase.receiveShadow = true
   campusBase.userData.isGenerated = true
   scene.value.add(campusBase)
 
-  const gridHelper = new THREE.GridHelper(180, 28, 0xd5e3f3, 0xe6eef7)
+  // 草坪环带：园区外围一圈柔和的绿意，呼应养老院庭院
+  const lawnRing = new THREE.Mesh(
+    new THREE.RingGeometry(34, 74, 96),
+    new THREE.MeshStandardMaterial({ color: 0xdcead8, roughness: 0.92, metalness: 0.01, transparent: true, opacity: 0.85, side: THREE.DoubleSide })
+  )
+  lawnRing.rotation.x = -Math.PI / 2
+  lawnRing.position.y = 0.015
+  lawnRing.receiveShadow = true
+  lawnRing.userData.isGenerated = true
+  scene.value.add(lawnRing)
+
+  const gridHelper = new THREE.GridHelper(180, 28, 0xd3ddcd, 0xe6ece0)
   gridHelper.position.y = 0.02
   gridHelper.material.transparent = true
-  ;(gridHelper.material as THREE.Material).opacity = 0.24
+  ;(gridHelper.material as THREE.Material).opacity = 0.22
   gridHelper.userData.isGenerated = true
   scene.value.add(gridHelper)
 
-  const ringGeo = new THREE.RingGeometry(28, 31, 96)
-  const ringMat = new THREE.MeshBasicMaterial({ color: 0x7da0ff, transparent: true, opacity: 0.05, side: THREE.DoubleSide })
-  const ringMesh = new THREE.Mesh(ringGeo, ringMat)
-  ringMesh.rotation.x = -Math.PI / 2
-  ringMesh.position.y = 0.04
-  ringMesh.userData.isGenerated = true
-  scene.value.add(ringMesh)
+  // 园区步道环：暖色混凝土质感，替代原先的发光科技环
+  const pathRing = new THREE.Mesh(
+    new THREE.RingGeometry(27.5, 30.5, 96),
+    new THREE.MeshStandardMaterial({ color: 0xe9e2d2, roughness: 0.95, metalness: 0.01, transparent: true, opacity: 0.9, side: THREE.DoubleSide })
+  )
+  pathRing.rotation.x = -Math.PI / 2
+  pathRing.position.y = 0.03
+  pathRing.receiveShadow = true
+  pathRing.userData.isGenerated = true
+  scene.value.add(pathRing)
 
-  const particleGeometry = new THREE.BufferGeometry()
-  const particleCount = 240
-  const positions = new Float32Array(particleCount * 3)
-  for (let i = 0; i < particleCount; i += 1) {
-    positions[i * 3] = (Math.random() - 0.5) * 144
-    positions[i * 3 + 1] = Math.random() * 22 + 5
-    positions[i * 3 + 2] = (Math.random() - 0.5) * 144
+  // 园区树木：确定性伪随机分布在草坪带上，营造疗养花园氛围
+  const treeCount = 16
+  for (let i = 0; i < treeCount; i += 1) {
+    const angle = (i / treeCount) * Math.PI * 2 + (i % 3) * 0.14
+    const radius = 36 + ((i * 37) % 24)
+    const scale = 0.85 + ((i * 13) % 10) / 22
+    const tree = createTree(scale)
+    tree.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius)
+    tree.rotation.y = i * 1.7
+    tree.userData.isGenerated = true
+    scene.value.add(tree)
   }
-  particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-  const particleMaterial = new THREE.PointsMaterial({ size: 0.42, color: 0x8fb3ff, transparent: true, opacity: 0.16 })
-  particles = new THREE.Points(particleGeometry, particleMaterial)
-  particles.userData.isGenerated = true
-  scene.value.add(particles)
+
+  // 不再使用漂浮粒子（噪点感重），保留静谧沙盘氛围
+  particles = null
 }
 
 function initScene() {
@@ -430,8 +568,8 @@ function initScene() {
   const height = canvasRef.value.clientHeight
 
   scene.value = new THREE.Scene()
-  scene.value.background = new THREE.Color(0xf3f8fe)
-  scene.value.fog = new THREE.FogExp2(0xf3f8fe, 0.0022)
+  scene.value.background = new THREE.Color(0xf5f7f1)
+  scene.value.fog = new THREE.FogExp2(0xf5f7f1, 0.0022)
 
   camera.value = new THREE.PerspectiveCamera(40, width / height, 0.1, 1600)
   camera.value.position.set(50, 38, 62)
@@ -439,10 +577,13 @@ function initScene() {
   renderer.value = new THREE.WebGLRenderer({ antialias: true, alpha: true })
   renderer.value.setSize(width, height)
   renderer.value.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-  renderer.value.setClearColor(0xf3f8fe, 1)
+  renderer.value.setClearColor(0xf5f7f1, 1)
   renderer.value.outputColorSpace = THREE.SRGBColorSpace
   renderer.value.toneMapping = THREE.ACESFilmicToneMapping
-  renderer.value.toneMappingExposure = 0.96
+  renderer.value.toneMappingExposure = 0.98
+  // 柔和阴影：让楼栋与地面产生真实体积感
+  renderer.value.shadowMap.enabled = true
+  renderer.value.shadowMap.type = THREE.PCFSoftShadowMap
   canvasRef.value.appendChild(renderer.value.domElement)
 
   cssRenderer.value = new CSS2DRenderer()
@@ -459,27 +600,41 @@ function initScene() {
   controls.value.maxDistance = 220
   controls.value.maxPolarAngle = Math.PI / 2 - 0.06
   controls.value.autoRotate = true
-  controls.value.autoRotateSpeed = 0.14
+  controls.value.autoRotateSpeed = 0.09
   controls.value.target.set(0, 6, 0)
 
-  const ambientLight = new THREE.AmbientLight(0xffffff, 1)
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.72)
   scene.value.add(ambientLight)
 
-  const topLight = new THREE.DirectionalLight(0xffffff, 1.18)
+  // 天空-地面半球光：暖白天光 + 草地反光，比纯环境光更柔和自然
+  const hemiLight = new THREE.HemisphereLight(0xfdfff8, 0xd7e2cf, 0.55)
+  scene.value.add(hemiLight)
+
+  const topLight = new THREE.DirectionalLight(0xfffbf2, 1.12)
   topLight.position.set(40, 90, 40)
+  topLight.castShadow = true
+  topLight.shadow.mapSize.set(2048, 2048)
+  topLight.shadow.camera.left = -90
+  topLight.shadow.camera.right = 90
+  topLight.shadow.camera.top = 90
+  topLight.shadow.camera.bottom = -90
+  topLight.shadow.camera.far = 260
+  topLight.shadow.bias = -0.0006
+  topLight.shadow.radius = 4
   scene.value.add(topLight)
 
-  const fillLight = new THREE.DirectionalLight(0xb7cbff, 0.4)
+  const fillLight = new THREE.DirectionalLight(0xd6e8da, 0.4)
   fillLight.position.set(-56, 28, -46)
   scene.value.add(fillLight)
 
-  const rimLight = new THREE.PointLight(0xb2c6ff, 0.72, 240, 2)
+  const rimLight = new THREE.PointLight(0xbcd9c8, 0.72, 240, 2)
   rimLight.position.set(0, 18, -20)
   scene.value.add(rimLight)
 
   buildAtmosphere()
 
   renderer.value.domElement.addEventListener('pointermove', onPointerMove)
+  renderer.value.domElement.addEventListener('pointerdown', onPointerDown)
   renderer.value.domElement.addEventListener('click', onClick)
   window.addEventListener('resize', onWindowResize)
 
@@ -533,12 +688,22 @@ function buildSceneData() {
     const buildingFloors = props.floors.filter((floor) => props.roomLookup.has(`${buildingName}@@${floor}`))
     const totalFloors = buildingFloors.length || 1
 
+    // 浅色基座平台 + 周边绿植带，替代原先突兀的深色圆柱
     const plinth = new THREE.Mesh(
-      new THREE.CylinderGeometry(7.8, 8.8, 1.4, 18),
-      new THREE.MeshStandardMaterial({ color: 0x0f1b29, roughness: 0.72, metalness: 0.06 })
+      new RoundedBoxGeometry(11.6, 0.8, 11.6, 2, 0.28),
+      new THREE.MeshStandardMaterial({ color: 0xeae5d7, roughness: 0.88, metalness: 0.02 })
     )
-    plinth.position.y = 0.6
+    plinth.position.y = 0.9
+    plinth.receiveShadow = true
     buildingGroup.add(plinth)
+
+    const plinthLawn = new THREE.Mesh(
+      new RoundedBoxGeometry(13.2, 0.36, 13.2, 2, 0.18),
+      new THREE.MeshStandardMaterial({ color: 0xc4dcc0, roughness: 0.94, metalness: 0.01 })
+    )
+    plinthLawn.position.y = 0.5
+    plinthLawn.receiveShadow = true
+    buildingGroup.add(plinthLawn)
 
     const buildingMass = createBuildingMass(totalFloors)
     buildingMass.position.y = 1.3
@@ -560,6 +725,7 @@ function buildSceneData() {
 
       const floorSlab = new THREE.Mesh(new THREE.BoxGeometry(slabWidth, 0.36, slabDepth), materials.floor.clone())
       floorSlab.position.y = 0.18
+      floorSlab.receiveShadow = true
       floorSlab.userData = { type: 'floorSlab', building: buildingName, floor: floorName, originalMat: materials.floor.clone() }
       floorGroup.add(floorSlab)
       interactableObjects.push(floorSlab)
@@ -567,7 +733,7 @@ function buildSceneData() {
 
       const corridor = new THREE.Mesh(
         new THREE.BoxGeometry(Math.max(3.6, slabWidth * 0.24), 0.04, slabDepth - 1.2),
-        new THREE.MeshStandardMaterial({ color: 0xe8eef6, roughness: 0.92, metalness: 0.02 })
+        new THREE.MeshStandardMaterial({ color: 0xefeee6, roughness: 0.92, metalness: 0.02 })
       )
       corridor.position.y = 0.21
       floorGroup.add(corridor)
@@ -580,7 +746,7 @@ function buildSceneData() {
       )
       const stationTop = new THREE.Mesh(
         new THREE.CylinderGeometry(1.05, 1.15, 0.16, 28),
-        new THREE.MeshStandardMaterial({ color: 0xdce8f6, roughness: 0.32, metalness: 0.08 })
+        new THREE.MeshStandardMaterial({ color: 0xd9e8dc, roughness: 0.32, metalness: 0.08 })
       )
       stationTop.position.y = 0.24
       nurseStation.add(stationBase)
@@ -614,6 +780,7 @@ function buildSceneData() {
         const roomMaterial = roomMaterialForData(roomItem)
         const roomTile = new THREE.Mesh(new THREE.BoxGeometry(roomSize, 0.18, roomSize), roomMaterial)
         roomTile.position.y = 0.09
+        roomTile.receiveShadow = true
         roomTile.userData = { type: 'roomTile', ref: roomGroup, data: roomItem, floorName, originalMat: roomMaterial }
         roomGroup.add(roomTile)
         interactableObjects.push(roomTile)
@@ -629,7 +796,7 @@ function buildSceneData() {
         roomCarpet.position.y = 0.2
         roomGroup.add(roomCarpet)
 
-        const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xf8fbff, roughness: 0.86, metalness: 0.02 })
+        const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xfbfaf3, roughness: 0.86, metalness: 0.02 })
         const wallHeight = 1.08
         const wallThickness = 0.08
         const sideWallDepth = roomSize - 0.32
@@ -699,7 +866,7 @@ function buildSceneData() {
 
         const roomEdges = new THREE.LineSegments(
           new THREE.EdgesGeometry(new THREE.BoxGeometry(roomSize, 0.18, roomSize)),
-          new THREE.LineBasicMaterial({ color: roomItem.occupiedBeds >= roomItem.totalBeds ? 0x8ad1dc : 0x546778, transparent: true, opacity: 0.24 })
+          new THREE.LineBasicMaterial({ color: roomItem.occupiedBeds >= roomItem.totalBeds ? 0x5fae97 : 0x5c6f69, transparent: true, opacity: 0.24 })
         )
         roomEdges.position.y = 0.09
         roomGroup.add(roomEdges)
@@ -754,7 +921,7 @@ function buildSceneData() {
 
     const hitboxEdges = new THREE.LineSegments(
       new THREE.EdgesGeometry(new THREE.BoxGeometry(12, hitboxHeight, 12)),
-      new THREE.LineBasicMaterial({ color: 0x8ad1dc, transparent: true, opacity: 0.36 })
+      new THREE.LineBasicMaterial({ color: 0x5fae97, transparent: true, opacity: 0.36 })
     )
     hitboxEdges.position.y = hitboxHeight / 2 + 1.4
     buildingGroup.add(hitboxEdges)
@@ -978,7 +1145,17 @@ function onPointerMove(event: PointerEvent) {
   renderer.value!.domElement.style.cursor = 'pointer'
 }
 
-function onClick() {
+function onPointerDown(event: PointerEvent) {
+  pointerDownPos = { x: event.clientX, y: event.clientY }
+}
+
+function onClick(event: MouseEvent) {
+  // 拖拽旋转视角结束时也会触发 click，位移超过阈值则忽略，避免误返回上级
+  if (pointerDownPos) {
+    const moved = Math.abs(event.clientX - pointerDownPos.x) + Math.abs(event.clientY - pointerDownPos.y)
+    pointerDownPos = null
+    if (moved > 6) return
+  }
   if (!hoveredObj) {
     goUpLevel()
     return
@@ -1166,20 +1343,19 @@ function animate() {
   animatedBeds.forEach((item) => {
     const material = item.mesh.material as THREE.MeshStandardMaterial
     if (item.type === 'pulse') {
-      material.emissiveIntensity = item.baseIntensity + (Math.sin(time * 5.2) + 1) * 0.14
-    } else if (item.type === 'ai') {
-      material.emissiveIntensity = item.baseIntensity + (Math.sin(time * 3.2) + 1) * 0.08
+      // 异常床位：缓慢呼吸式脉动，醒目但不刺眼
+      material.emissiveIntensity = item.baseIntensity + (Math.sin(time * 3.4) + 1) * 0.13
+      if (item.mesh.userData.halo) {
+        const haloMaterial = (item.mesh.userData.halo as THREE.Mesh).material as THREE.MeshBasicMaterial
+        haloMaterial.opacity = 0.18 + (Math.sin(time * 3.4) + 1) * 0.07
+      }
     } else if (item.type === 'blink') {
-      material.emissiveIntensity = Math.sin(time * 6.4) > 0 ? item.baseIntensity + 0.14 : item.baseIntensity * 0.32
+      // 维护/外出：柔和渐变代替生硬闪烁
+      material.emissiveIntensity = item.baseIntensity + (Math.sin(time * 2.2) + 1) * 0.08
     } else {
-      material.emissiveIntensity = item.baseIntensity + (Math.sin(time * 2.8) + 1) * 0.06
+      material.emissiveIntensity = item.baseIntensity + (Math.sin(time * 2.2) + 1) * 0.05
     }
   })
-
-  if (particles) {
-    particles.rotation.y += 0.0006
-    particles.position.y = Math.sin(time * 0.7) * 0.4 + 2
-  }
 
   renderer.value?.render(scene.value, camera.value!)
   cssRenderer.value?.render(scene.value, camera.value!)
@@ -1224,6 +1400,7 @@ onBeforeUnmount(() => {
     rebuildSceneTimer = 0
   }
   renderer.value?.domElement.removeEventListener('pointermove', onPointerMove)
+  renderer.value?.domElement.removeEventListener('pointerdown', onPointerDown)
   renderer.value?.domElement.removeEventListener('click', onClick)
   window.removeEventListener('resize', onWindowResize)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
@@ -1238,16 +1415,16 @@ onBeforeUnmount(() => {
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 760px;
+  min-height: 0;
   overflow: hidden;
-  border-radius: 28px;
+  border-radius: 26px;
   background:
-    radial-gradient(circle at 12% 12%, rgba(141, 194, 255, 0.14), transparent 28%),
-    radial-gradient(circle at 82% 0%, rgba(123, 210, 184, 0.12), transparent 30%),
-    linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+    radial-gradient(circle at 12% 12%, rgba(46, 138, 114, 0.1), transparent 28%),
+    radial-gradient(circle at 82% 0%, rgba(229, 138, 58, 0.08), transparent 30%),
+    linear-gradient(180deg, #f9faf5 0%, #eff3ea 100%);
   box-shadow:
-    inset 0 0 90px rgba(141, 194, 255, 0.05),
-    inset 0 0 30px rgba(123, 210, 184, 0.04);
+    inset 0 0 90px rgba(46, 138, 114, 0.05),
+    inset 0 0 30px rgba(229, 138, 58, 0.03);
 }
 
 .canvas-wrapper {
@@ -1261,8 +1438,8 @@ onBeforeUnmount(() => {
   pointer-events: none;
   z-index: 1;
   background:
-    radial-gradient(circle at center, rgba(255, 255, 255, 0.02), rgba(224, 235, 247, 0.12) 100%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(225, 236, 248, 0.12));
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.02), rgba(231, 238, 227, 0.12) 100%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(232, 239, 229, 0.12));
 }
 
 .scene-toolbar,
@@ -1294,10 +1471,10 @@ onBeforeUnmount(() => {
 .scene-legend {
   padding: 12px 16px;
   border-radius: 18px;
-  border: 1px solid rgba(171, 191, 214, 0.22);
+  border: 1px solid rgba(187, 217, 207, 0.5);
   background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(10px);
-  box-shadow: 0 14px 28px rgba(114, 135, 162, 0.12);
+  box-shadow: 0 14px 28px rgba(34, 51, 46, 0.1);
 }
 
 .toolbar-center {
@@ -1308,12 +1485,12 @@ onBeforeUnmount(() => {
 }
 
 .toolbar-center strong {
-  color: #1f2d41;
+  color: var(--ink);
 }
 
 .toolbar-center small,
 .toolbar-eyebrow {
-  color: #7d8ea5;
+  color: var(--muted-2);
   font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -1321,15 +1498,15 @@ onBeforeUnmount(() => {
 
 .tech-btn {
   background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(171, 191, 214, 0.24);
-  color: #41536b;
+  border: 1px solid rgba(187, 217, 207, 0.55);
+  color: var(--ink-soft);
   border-radius: 14px;
 }
 
 .tech-btn:hover {
-  border-color: rgba(111, 149, 255, 0.32);
-  color: #22324b;
-  box-shadow: 0 10px 24px rgba(111, 149, 255, 0.12);
+  border-color: rgba(var(--primary-rgb), 0.4);
+  color: var(--primary-strong);
+  box-shadow: 0 10px 24px rgba(var(--primary-rgb), 0.14);
 }
 
 .scene-legend {
@@ -1344,7 +1521,7 @@ onBeforeUnmount(() => {
   border: 0;
   background: transparent;
   font-size: 12px;
-  color: #50627a;
+  color: var(--muted);
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1357,22 +1534,22 @@ onBeforeUnmount(() => {
   border-radius: 999px;
 }
 
-.status-occupied::before { background: #4fc291; }
-.status-empty::before { background: #c6d0dc; }
-.status-warning::before { background: #f2b14c; }
-.status-ai::before { background: #8b78e8; }
-.status-alert::before { background: #ef6f7c; }
+.status-occupied::before { background: #2e8a72; }
+.status-empty::before { background: #c7cdc6; }
+.status-warning::before { background: #de9b3d; }
+.status-ai::before { background: #6b79d8; }
+.status-alert::before { background: #c9504b; }
 
 .tech-tooltip {
   position: absolute;
   z-index: 8;
   width: 230px;
   border-radius: 18px;
-  border: 1px solid rgba(171, 191, 214, 0.24);
+  border: 1px solid rgba(187, 217, 207, 0.55);
   background: rgba(255, 255, 255, 0.96);
-  color: #33455d;
+  color: var(--ink-soft);
   backdrop-filter: blur(10px);
-  box-shadow: 0 16px 28px rgba(116, 137, 164, 0.14);
+  box-shadow: 0 16px 28px rgba(34, 51, 46, 0.12);
   padding: 14px;
   pointer-events: none;
 }
@@ -1383,7 +1560,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 12px;
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(166, 199, 219, 0.12);
+  border-bottom: 1px solid rgba(187, 217, 207, 0.4);
   margin-bottom: 8px;
 }
 
@@ -1393,7 +1570,7 @@ onBeforeUnmount(() => {
 
 .tt-header small {
   font-size: 11px;
-  color: #7d8ea5;
+  color: var(--muted-2);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -1411,39 +1588,39 @@ onBeforeUnmount(() => {
 }
 
 .tt-row span {
-  color: #7d8ea5;
+  color: var(--muted-2);
 }
 
 .tt-row strong {
-  color: #22324b;
+  color: var(--ink);
 }
 
-.tt-row strong.cyan { color: #5a8dff; }
-.tt-row strong.green { color: #2f9b6c; }
-.tt-row strong.blue { color: #5a8dff; }
-.tt-row strong.purple { color: #6b56d5; }
-.tt-row strong.red { color: #d65164; }
+.tt-row strong.cyan { color: var(--primary); }
+.tt-row strong.green { color: var(--success); }
+.tt-row strong.blue { color: var(--info); }
+.tt-row strong.purple { color: #6b79d8; }
+.tt-row strong.red { color: var(--danger); }
 
 .tt-tip {
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px dashed rgba(171, 191, 214, 0.24);
-  color: #7d8ea5;
+  border-top: 1px dashed rgba(187, 217, 207, 0.55);
+  color: var(--muted-2);
   font-size: 12px;
 }
 
 :global(.scene-label) {
   padding: 6px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(171, 191, 214, 0.22);
+  border: 1px solid rgba(187, 217, 207, 0.55);
   background: rgba(255, 255, 255, 0.92);
-  color: #354760;
+  color: var(--ink-soft);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   backdrop-filter: blur(10px);
-  box-shadow: 0 12px 26px rgba(114, 135, 162, 0.12);
+  box-shadow: 0 12px 26px rgba(34, 51, 46, 0.1);
   white-space: nowrap;
 }
 

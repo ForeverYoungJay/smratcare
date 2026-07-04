@@ -93,5 +93,12 @@
         <button class="primary-btn submit-draft" wx:if="{{item.status === 'DRAFT'}}" data-id="{{item.id}}" loading="{{operatingId === item.id}}" bindtap="submitDraft">提交草稿</button>
       </view>
     </block>
+    <view class="surface state-card" wx:if="{{loadingMore}}">
+      <view class="section-subtitle">正在加载更多日报...</view>
+    </view>
+    <view class="surface state-card" wx:elif="{{hasMore}}">
+      <view class="section-subtitle">已加载 {{reports.length}} 条日报</view>
+      <button class="ghost-btn retry-btn" bindtap="loadMore">继续加载</button>
+    </view>
   </view>
 </view>

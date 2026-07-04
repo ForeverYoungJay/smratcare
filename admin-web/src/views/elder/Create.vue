@@ -124,7 +124,7 @@
         <div style="margin: 8px 0 16px; display: flex; justify-content: space-between; align-items: center;">
           <div>
             <div class="required-section-title" style="font-weight: 600;">家属信息</div>
-            <div style="color: rgba(0, 0, 0, 0.45); font-size: 12px;">常用联系人集中录入，手机号与身份证号要求完整。</div>
+            <div style="color: var(--muted); font-size: 12px;">常用联系人集中录入，手机号与身份证号要求完整。</div>
           </div>
           <a-button size="small" type="dashed" @click="addFamilyDraftRow">新增家属</a-button>
         </div>
@@ -413,11 +413,9 @@ async function validateAdmissionDate(_rule: unknown, value?: string) {
   return Promise.resolve()
 }
 
-async function validateContractNo(_rule: unknown, value?: string) {
-  const text = trimText(value)
-  if (!text) {
-    return Promise.reject(new Error('请填写历史合同号'))
-  }
+async function validateContractNo(_rule: unknown, _value?: string) {
+  // 历史合同号为选填：填写后会自动办理历史入住补录，留空则仅建档。
+  // 之前这里对空值 reject，导致字段未标必填却强制必填，且报错被吞成通用“保存失败”。
   return Promise.resolve()
 }
 
@@ -525,7 +523,9 @@ async function submit() {
     }
     if (!shouldAdmit) {
       payload.bedId = form.bedId
-      payload.bedStartDate = form.bedStartDate
+      // 仅在实际选择了床位时才带上床位开始日期；否则后端会因“未选择床位却填了床位开始日期”返回 400。
+      // （床位开始日期在表单里默认了今天，未选床位时不应随建档一起提交。）
+      payload.bedStartDate = form.bedId ? form.bedStartDate : undefined
     }
     const created: ElderItem = await createElder(payload)
     if (created?.id && selectedDiseaseIds.value.length > 0) {
@@ -574,7 +574,14 @@ async function submit() {
     message.success(successMessage)
     router.push('/elder/list')
   } catch (error: any) {
-    message.error(error?.message || error?.response?.data?.message || '保存失败')
+    // 表单校验失败时 antd 抛出的是 { errorFields } 对象（无 message），需从中取出首个字段错误提示，
+    // 否则会被吞成通用“保存失败”，用户无法定位是哪个字段有问题。
+    const firstFieldError = error?.errorFields?.[0]?.errors?.[0]
+    if (firstFieldError) {
+      message.error(firstFieldError)
+    } else {
+      message.error(error?.message || error?.response?.data?.message || '保存失败')
+    }
   } finally {
     saving.value = false
   }
@@ -868,10 +875,10 @@ onMounted(async () => {
 }
 
 .family-card {
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px 16px 4px;
-  background: #fafafa;
+  background: var(--surface-3);
 }
 
 .family-card-toolbar {
@@ -883,7 +890,7 @@ onMounted(async () => {
 
 .compact-inline-tip {
   margin-top: 8px;
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -894,7 +901,7 @@ onMounted(async () => {
 .required-label::before,
 .required-section-title::before {
   content: "*";
-  color: #ff4d4f;
+  color: var(--danger);
   margin-right: 4px;
   font-weight: 700;
 }

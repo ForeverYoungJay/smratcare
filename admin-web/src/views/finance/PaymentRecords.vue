@@ -71,7 +71,7 @@
       </div>
 
       <div class="table-frame">
-        <vxe-table border stripe show-overflow :loading="loading" :data="rows" height="520">
+        <vxe-table border stripe show-overflow="title" :loading="loading" :data="rows" height="520">
         <vxe-column field="billMonthlyId" title="账单ID" width="120" />
         <vxe-column field="amount" title="金额" width="120" />
         <vxe-column field="payMethod" title="方式" width="120" />
@@ -211,23 +211,24 @@ onMounted(fetchData)
   gap: 6px;
   padding: 14px 16px;
   border-radius: 16px;
-  border: 1px solid #dce9f2;
+  border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.86);
 }
 
 .overview-card span,
 .table-head span {
-  color: #6d8aa3;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .overview-card strong {
-  color: #173854;
+  color: var(--ink);
   font-size: 24px;
 }
 
 .overview-card small {
-  color: #7a97b0;
+  color: var(--muted-2);
+  font-size: 12px;
 }
 
 .payment-workspace {
@@ -257,12 +258,12 @@ onMounted(fetchData)
 
 .table-head strong {
   display: block;
-  color: #173854;
+  color: var(--ink);
   font-size: 16px;
 }
 
 .table-frame {
-  border: 1px solid #e4edf4;
+  border: 1px solid var(--border-soft);
   border-radius: 18px;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.95);

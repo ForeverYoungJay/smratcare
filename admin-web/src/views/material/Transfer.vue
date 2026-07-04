@@ -1,5 +1,9 @@
 <template>
   <PageContainer title="物资调拨" subTitle="跨仓调拨申请与执行跟踪">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新建调拨单</a-button>
+    </template>
+
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline" :model="query" class="search-form">
         <a-form-item label="状态">
@@ -18,21 +22,18 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px">
-      <div class="table-actions">
-        <a-button type="primary" @click="openCreate">新建调拨单</a-button>
-      </div>
       <a-table row-key="id" :loading="loading" :data-source="rows" :pagination="false" :columns="columns" size="middle">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
             <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
           </template>
           <template v-if="column.key === 'actions'">
-            <a-space>
-              <a @click="viewDetail(record.id)">明细</a>
-              <a v-if="record.status === ORDER_STATUS.DRAFT" @click="openEdit(record.id)">编辑</a>
-              <a v-if="record.status === ORDER_STATUS.DRAFT" @click="complete(record.id)">执行完成</a>
-              <a v-if="record.status === ORDER_STATUS.DRAFT" @click="cancel(record.id)">作废</a>
-            </a-space>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="viewDetail(record.id)">明细</a-button>
+              <a-button v-if="record.status === ORDER_STATUS.DRAFT" type="link" size="small" @click="openEdit(record.id)">编辑</a-button>
+              <a-button v-if="record.status === ORDER_STATUS.DRAFT" type="link" size="small" @click="complete(record.id)">执行完成</a-button>
+              <a-button v-if="record.status === ORDER_STATUS.DRAFT" type="link" danger size="small" @click="cancel(record.id)">作废</a-button>
+            </div>
           </template>
         </template>
       </a-table>
@@ -79,7 +80,9 @@
             <a-input-number v-model:value="record.quantity" :min="1" style="width: 100%" />
           </template>
           <template v-else-if="column.key === 'actions'">
-            <a @click="removeItem(index)">删除</a>
+            <div class="row-action-links">
+              <a-button type="link" danger size="small" @click="removeItem(index)">删除</a-button>
+            </div>
           </template>
         </template>
       </a-table>
@@ -379,11 +382,6 @@ onMounted(async () => {
 <style scoped>
 .search-form {
   row-gap: 8px;
-}
-.table-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 12px;
 }
 .items-header {
   display: flex;

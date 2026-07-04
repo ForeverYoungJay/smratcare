@@ -3,6 +3,15 @@
   <view class="section-subtitle">跌倒、用药、设备、餐食等异常统一留痕</view>
 
   <view class="surface panel form-panel">
+    <view class="state-card inline-state success-state" wx:if="{{submitSuccess}}">
+      <view class="state-title">异常已留痕</view>
+      <view class="section-subtitle">{{submitSuccess}}</view>
+      <view class="section-subtitle" wx:if="{{lastIncidentSummary}}">最近一次：{{lastIncidentSummary}}</view>
+    </view>
+    <view class="state-card inline-state error-state" wx:if="{{submitError}}">
+      <view class="state-title">上报未完成</view>
+      <view class="section-subtitle">{{submitError}}</view>
+    </view>
     <view class="field-label">事件类型</view>
     <picker range="{{incidentTypes}}" bindchange="onTypeChange">
       <view class="picker-value">{{incidentType}}</view>

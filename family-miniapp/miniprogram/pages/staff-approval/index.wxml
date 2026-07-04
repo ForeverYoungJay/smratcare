@@ -9,6 +9,15 @@
 
   <view class="surface form-card">
     <view class="panel-title">{{activeType === 'LEAVE' ? '请假申请' : '调班申请'}}</view>
+    <view class="state-card inline-state success-state" wx:if="{{submitSuccess}}">
+      <view class="state-title">审批申请已提交</view>
+      <view class="section-subtitle">{{submitSuccess}}</view>
+      <view class="section-subtitle" wx:if="{{lastApprovalSummary}}">最近一次：{{lastApprovalSummary}}</view>
+    </view>
+    <view class="state-card inline-state error-state" wx:if="{{submitError}}">
+      <view class="state-title">审批提交失败</view>
+      <view class="section-subtitle">{{submitError}}</view>
+    </view>
 
     <view class="field" wx:if="{{activeType === 'LEAVE'}}">
       <view class="field-label">请假类型</view>
@@ -72,7 +81,7 @@
 
     <checkbox-group bindchange="onPolicyChange" wx:if="{{activeType === 'LEAVE'}}">
       <label class="policy-row">
-        <checkbox value="yes" checked="{{policyAcknowledged}}" color="#246b5f" />
+        <checkbox value="yes" checked="{{policyAcknowledged}}" color="#21705F" />
         <text>我已阅读并确认请假制度，知晓排班补位要求</text>
       </label>
     </checkbox-group>
@@ -89,8 +98,9 @@
   <view class="surface panel">
     <view class="panel-head">
       <text class="panel-title">我的申请</text>
-      <text class="section-subtitle">最近 30 条</text>
+      <text class="section-subtitle">按时间倒序展示</text>
     </view>
+    <view class="list-empty" wx:if="{{loading}}">正在加载审批申请...</view>
     <view class="list-empty" wx:if="{{!loading && approvals.length === 0}}">暂无审批申请</view>
     <view class="approval-row" wx:for="{{approvals}}" wx:key="id">
       <view class="approval-head">
@@ -102,6 +112,13 @@
       </view>
       <view class="approval-remark">{{item.remark || '无备注'}}</view>
       <view class="approval-create">提交时间：{{item.createText || '-'}}</view>
+    </view>
+    <view class="surface state-card" wx:if="{{!loading && approvals.length && loadingMore}}">
+      <view class="section-subtitle">正在加载更多审批记录...</view>
+    </view>
+    <view class="surface state-card" wx:elif="{{!loading && approvals.length && hasMore}}">
+      <view class="section-subtitle">已加载 {{approvals.length}} 条审批记录</view>
+      <button class="ghost-btn retry-btn" bindtap="loadMore">继续加载</button>
     </view>
   </view>
 </view>

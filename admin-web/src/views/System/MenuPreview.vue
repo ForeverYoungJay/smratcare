@@ -91,8 +91,8 @@ const filteredMenuJson = computed(() => JSON.stringify(filteredTree.value, null,
 <style scoped>
 .menu-json {
   margin-top: 12px;
-  background: #0f172a;
-  color: #e2e8f0;
+  background: var(--ink);
+  color: var(--surface-2);
   padding: 16px;
   border-radius: 10px;
   font-size: 12px;

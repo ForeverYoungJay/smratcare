@@ -52,7 +52,11 @@ Page({
     allMessages: [],
     messages: [],
     loading: false,
+    loadingMore: false,
     loadError: '',
+    pageNo: 1,
+    pageSize: 40,
+    hasMore: false,
     sending: false,
     recording: false,
     recordStartAt: 0,
@@ -80,7 +84,7 @@ Page({
   async onShow() {
     getApp().ensureLogin();
     this.setData({ runtimeNotice: getApp().globalData.runtimeNotice || '' });
-    await this.loadMessages();
+    await this.loadMessages({ reset: true });
   },
   onUnload() {
     if (this.recorderManager && this.data.recording) {
@@ -114,11 +118,20 @@ Page({
       wx.showToast({ title: '录音失败，请检查麦克风权限', icon: 'none' });
     });
   },
-  async loadMessages() {
-    this.setData({ loading: true, loadError: '' });
+  async loadMessages(options = {}) {
+    const reset = options.reset !== false;
+    const nextPageNo = reset ? 1 : Number(this.data.pageNo || 1) + 1;
+    this.setData(reset ? { loading: true, loadError: '' } : { loadingMore: true, loadError: '' });
     try {
-      const list = await getCommunicationMessages(1, 80);
-      const allMessages = (list || []).map((item) => {
+      const listRes = await getCommunicationMessages(nextPageNo, this.data.pageSize);
+      const list = Array.isArray(listRes)
+        ? listRes
+        : (listRes && Array.isArray(listRes.list))
+          ? listRes.list
+          : (listRes && Array.isArray(listRes.records))
+            ? listRes.records
+            : [];
+      const normalized = (list || []).map((item) => {
         const msgType = String(item.msgType || 'text').toLowerCase();
         const targetRole = item.targetRole || '客服中心';
         return {
@@ -136,18 +149,25 @@ Page({
           playableUrl: resolveFileUrl(item.mediaUrl || ''),
           voiceDurationText: item && item.mediaDurationSec ? `${item.mediaDurationSec}"` : ''
         };
-      }).reverse().map((item, index, rows) => ({
+      });
+      const batchRows = normalized.slice().reverse();
+      const merged = reset ? batchRows : batchRows.concat(this.data.allMessages || []);
+      const allMessages = merged.map((item, index, rows) => ({
         ...item,
         showTime: index === 0 || rows[index - 1].time !== item.time
       }));
-      this.setData({ allMessages });
+      this.setData({
+        allMessages,
+        pageNo: nextPageNo,
+        hasMore: normalized.length >= this.data.pageSize
+      });
       this.applyConversationMessages();
       return allMessages;
     } catch (error) {
-      this.setData({ loadError: error.message || '沟通信息加载失败，请稍后重试' });
+      this.setData({ loadError: error.message || (reset ? '沟通信息加载失败，请稍后重试' : '更多沟通记录加载失败，请稍后重试') });
       return [];
     } finally {
-      this.setData({ loading: false });
+      this.setData({ loading: false, loadingMore: false });
     }
   },
   onRoleChange(e) {
@@ -168,6 +188,15 @@ Page({
       bookingOpen: false
     });
     this.applyConversationMessages();
+  },
+  loadMoreMessages() {
+    if (this.data.loading || this.data.loadingMore || !this.data.hasMore) {
+      return;
+    }
+    this.loadMessages({ reset: false });
+  },
+  onReachBottom() {
+    this.loadMoreMessages();
   },
   applyConversationMessages() {
     const activeRole = this.data.activeRole || ROLE_OPTIONS[0].value;
@@ -219,7 +248,7 @@ Page({
         targetRole,
         ...payload
       });
-      await this.loadMessages();
+      await this.loadMessages({ reset: true });
     } catch (error) {
       wx.showToast({ title: error.message || '发送失败，请重试', icon: 'none' });
     } finally {
@@ -281,7 +310,7 @@ Page({
         mediaName: uploaded.originalFileName || uploaded.fileName || '语音留言.mp3',
         mediaDurationSec: durationSec > 0 ? durationSec : undefined
       });
-      await this.loadMessages();
+      await this.loadMessages({ reset: true });
     } catch (error) {
       wx.showToast({ title: error.message || '语音发送失败', icon: 'none' });
     } finally {
@@ -330,7 +359,7 @@ Page({
         mediaDurationSec: mediaType === 'video' && file.duration ? Math.max(1, Math.round(Number(file.duration))) : undefined
       });
       this.setData({ showVisitPanel: false, bookingOpen: false });
-      await this.loadMessages();
+      await this.loadMessages({ reset: true });
     } catch (error) {
       const message = error && error.errMsg && error.errMsg.includes('cancel')
         ? ''
@@ -428,7 +457,7 @@ Page({
         activeRoleDesc: ROLE_OPTIONS[managerIndex].desc
       });
       wx.showToast({ title: '探视预约已提交', icon: 'success' });
-      await this.loadMessages();
+      await this.loadMessages({ reset: true });
     } catch (error) {
       wx.showToast({ title: error.message || '预约失败，请稍后重试', icon: 'none' });
     } finally {
@@ -436,6 +465,6 @@ Page({
     }
   },
   retryLoad() {
-    this.loadMessages();
+    this.loadMessages({ reset: true });
   }
 });

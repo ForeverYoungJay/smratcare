@@ -23,7 +23,7 @@
     <input ref="importInputRef" type="file" accept=".csv,text/csv" style="display: none" @change="onImportFileChange" />
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <vxe-table ref="tableRef" border stripe show-overflow :loading="loading" :data="rows" height="560">
+      <vxe-table ref="tableRef" border stripe show-overflow="title" :loading="loading" :data="rows" height="560">
         <vxe-column type="checkbox" width="50" />
         <vxe-column field="channelCode" title="渠道编码" width="160" />
         <vxe-column field="channelName" title="渠道名称" width="140" />
@@ -36,7 +36,9 @@
         </vxe-column>
         <vxe-column title="操作" width="120" fixed="right">
           <template #default="{ row }">
-            <a-button type="link" @click="openEdit(row)">编辑</a-button>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="openEdit(row)">编辑</a-button>
+            </div>
           </template>
         </vxe-column>
       </vxe-table>

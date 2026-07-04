@@ -8,4 +8,7 @@ public class FamilyElderItem {
   private String elderName;
   private String relation;
   private Integer isPrimary;
+  private Integer elderStatus;
+  private String careLevel;
+  private String admissionDate;
 }

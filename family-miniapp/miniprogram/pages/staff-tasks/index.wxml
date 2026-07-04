@@ -29,5 +29,9 @@
         <text class="task-action">{{item.actionText}}</text>
       </view>
     </block>
+    <view class="list-footer" wx:if="{{tasks.length}}">
+      <text wx:if="{{hasMore}}">上拉加载更多</text>
+      <text wx:else>没有更多了</text>
+    </view>
   </view>
 </view>

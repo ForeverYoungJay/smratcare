@@ -24,7 +24,9 @@
       <a-table :columns="columns" :data-source="rows" row-key="source" :pagination="false">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'source'">
-            <a @click="goSourceLeads(record.source)">{{ record.source }}</a>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="goSourceLeads(record.source)">{{ record.source }}</a-button>
+            </div>
           </template>
         </template>
       </a-table>

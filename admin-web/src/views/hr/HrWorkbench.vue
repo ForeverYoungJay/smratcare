@@ -1,14 +1,14 @@
 <template>
-  <PageContainer title="人力资源中心" subTitle="兼容入口会自动回到新的人力资源业务中心结构。">
+  <PageContainer title="人力资源中心" subTitle="招聘、档案、考勤、费用与绩效激励一体化管理。">
     <a-card :bordered="false" class="card-elevated" style="margin-bottom: 12px" title="卡片1：今日人力概况">
       <a-row :gutter="16">
         <a-col :xs="12" :md="4">
-          <div class="stat-clickable" @click="go('/hr/profile/basic?status=1')">
+          <div class="stat-clickable" @click="goFirstAvailable(['/hr/profile/basic?status=1', '/hr/profile/social-security-reminders?scope=active'])">
             <a-statistic title="在职人数" :value="summary.onJobCount" />
           </div>
         </a-col>
         <a-col :xs="12" :md="4">
-          <div class="stat-clickable" @click="go('/hr/profile/basic?status=0')">
+          <div class="stat-clickable" @click="goFirstAvailable(['/hr/profile/basic?status=0', '/hr/profile/social-security-reminders?scope=inactive'])">
             <a-statistic title="离职人数" :value="summary.leftCount" />
           </div>
         </a-col>
@@ -18,17 +18,17 @@
           </div>
         </a-col>
         <a-col :xs="12" :md="4">
-          <div class="stat-clickable" @click="go('/hr/attendance/leave-approval?type=LEAVE&status=PENDING')">
+          <div class="stat-clickable" @click="goFirstAvailable(['/hr/attendance/leave-approval?type=LEAVE&status=PENDING', '/workbench/approvals'])">
             <a-statistic title="请假审批待办" :value="summary.pendingLeaveApprovalCount" />
           </div>
         </a-col>
         <a-col :xs="12" :md="4">
-          <div class="stat-clickable" @click="go('/hr/attendance/abnormal?date=today')">
+          <div class="stat-clickable" @click="goFirstAvailable(['/hr/attendance/abnormal?date=today', '/workbench/attendance'])">
             <a-statistic title="考勤异常" :value="summary.attendanceAbnormalCount" />
           </div>
         </a-col>
         <a-col :xs="12" :md="4">
-          <div class="stat-clickable" @click="go('/hr/profile/contract-reminders?range=30d')">
+          <div class="stat-clickable" @click="goFirstAvailable(['/hr/profile/contract-reminders?range=30d', '/hr/profile/social-security-reminders'])">
             <a-statistic title="合同到期预警" :value="summary.contractExpiringCount" />
           </div>
         </a-col>
@@ -338,6 +338,15 @@ function go(path: string) {
   router.push(path)
 }
 
+function goFirstAvailable(paths: string[]) {
+  const target = paths.find((item) => canAccess(item))
+  if (!target) {
+    message.warning('当前账号暂无权限访问该页面')
+    return
+  }
+  router.push(target)
+}
+
 watch(favoritePaths, (value) => {
   if (typeof window !== 'undefined') {
     window.localStorage.setItem(FAVORITE_STORAGE_KEY, JSON.stringify(value))
@@ -434,7 +443,7 @@ useLiveSyncRefresh({
 }
 
 .favorite-toggle {
-  color: #d48806;
+  color: var(--warning);
 }
 
 .stat-clickable {
@@ -444,6 +453,6 @@ useLiveSyncRefresh({
 }
 
 .stat-clickable:hover {
-  background: rgba(24, 144, 255, 0.06);
+  background: rgba(var(--primary-rgb), 0.06);
 }
 </style>

@@ -19,6 +19,11 @@
   </view>
 
   <view wx:if="{{!loading && !loadError}}">
+    <view class="surface warning-card" wx:if="{{partialWarning}}">
+      <view class="warning-title">部分数据暂未同步</view>
+      <view class="warning-text">{{partialWarning}}</view>
+    </view>
+
     <view class="surface battle-card {{battle.riskTone}}">
       <view class="battle-head">
         <view>

@@ -46,7 +46,7 @@
           <a-tag v-for="reason in (summary?.failureReasons || [])" :key="reason.reason" color="red">{{ reason.reason }} {{ reason.count }}</a-tag>
           <a-tag color="orange">高风险待处理 {{ highRiskCount }}</a-tag>
         </a-space>
-        <vxe-table border stripe show-overflow :loading="loading" :data="filteredRows" height="520">
+        <vxe-table border stripe show-overflow="title" :loading="loading" :data="filteredRows" height="520">
           <vxe-column field="billMonth" title="账单月" width="120" />
           <vxe-column field="elderName" title="长者" min-width="140" />
           <vxe-column field="outstandingAmount" title="应扣金额" width="120" />
@@ -64,10 +64,10 @@
           <vxe-column field="suggestion" title="处理建议" min-width="200" />
           <vxe-column title="操作" width="200" fixed="right">
             <template #default="{ row }">
-              <a-space>
-                <a-button type="link" @click="go(`/finance/accounts/list?elderId=${row.elderId || ''}`)">查看账户</a-button>
-                <a-button type="link" @click="go('/finance/payments/register?from=auto_debit_exception')">转人工收款</a-button>
-              </a-space>
+              <div class="row-action-links">
+                <a-button type="link" size="small" @click="go(`/finance/accounts/list?elderId=${row.elderId || ''}`)">查看账户</a-button>
+                <a-button type="link" size="small" @click="go('/finance/payments/register?from=auto_debit_exception')">转人工收款</a-button>
+              </div>
             </template>
           </vxe-column>
         </vxe-table>

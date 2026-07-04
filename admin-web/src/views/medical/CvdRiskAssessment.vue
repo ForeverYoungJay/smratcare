@@ -1,5 +1,12 @@
 <template>
   <PageContainer title="心血管风险评估" subTitle="评估中心 > 缺血性心血管病风险评估">
+    <template #extra>
+      <a-space wrap>
+        <a-button @click="exportCsvData">导出CSV</a-button>
+        <a-button @click="exportExcelData">导出Excel</a-button>
+        <a-button type="primary" @click="openCreate">新建风险评估</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="长者"><ElderNameAutocomplete v-model:value="query.keyword" placeholder="姓名(编号)" width="220px" /></a-form-item>
       <a-form-item label="评估人"><a-input v-model:value="query.assessorName" placeholder="评估人姓名" allow-clear style="width: 140px" /></a-form-item>
@@ -11,13 +18,6 @@
         </a-select>
       </a-form-item>
       <a-form-item label="日期"><a-range-picker v-model:value="query.dateRange" /></a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="exportCsvData">导出CSV</a-button>
-          <a-button @click="exportExcelData">导出Excel</a-button>
-          <a-button type="primary" @click="openCreate">新建风险评估</a-button>
-        </a-space>
-      </template>
     </SearchForm>
 
     <StatefulBlock :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
@@ -54,13 +54,13 @@
             <a-tag :color="record.status === 'PUBLISHED' ? 'green' : 'blue'">{{ record.status === 'PUBLISHED' ? '已发布' : '草稿' }}</a-tag>
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-space>
-              <a-button type="link" @click="openEdit(record)">编辑</a-button>
-              <a-button type="link" @click="openPublish(record)" :disabled="record.status === 'PUBLISHED'">发布</a-button>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
+              <a-button type="link" size="small" @click="openPublish(record)" :disabled="record.status === 'PUBLISHED'">发布</a-button>
               <a-popconfirm title="确认删除该记录吗？" ok-text="确认" cancel-text="取消" @confirm="remove(record)">
-                <a-button danger type="link">删除</a-button>
+                <a-button type="link" size="small" danger>删除</a-button>
               </a-popconfirm>
-            </a-space>
+            </div>
           </template>
         </template>
       </DataTable>
@@ -493,10 +493,10 @@ useLiveSyncRefresh({
 
 <style scoped>
 :deep(.medical-row-danger > td) {
-  background: #fff1f0 !important;
+  background: rgba(var(--danger-rgb), 0.07) !important;
 }
 
 :deep(.medical-row-warning > td) {
-  background: #fffbe6 !important;
+  background: rgba(var(--warning-rgb), 0.1) !important;
 }
 </style>

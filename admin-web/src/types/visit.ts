@@ -11,7 +11,11 @@ export interface VisitBookingItem {
   visitorRelation?: string
   floorNo?: string
   roomNo?: string
+  visitDate?: string
   visitTime: string
+  visitTimeSlot?: string
+  visitCode?: string
+  verifyCode?: string
   visitorCount: number
   carPlate?: string
   status?: number

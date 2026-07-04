@@ -49,7 +49,7 @@
             <a-button type="link" size="small" @click="previewAttachment(record)">预览</a-button>
           </template>
           <template v-else-if="column.key === 'fileUrl'">
-            <a :href="resolveAttachmentUrl(record.fileUrl)" target="_blank" rel="noopener noreferrer" style="color: #1677ff">
+            <a :href="resolveAttachmentUrl(record.fileUrl)" target="_blank" rel="noopener noreferrer" style="color: var(--info)">
               {{ record.fileName }}
             </a>
           </template>

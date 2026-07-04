@@ -1,12 +1,24 @@
 <template>
   <PageContainer title="长者档案" subTitle="高频查询、在院状态和服务动作集中处理">
+    <template #extra>
+      <a-space wrap>
+        <a-button @click="exportCsvData">导出名单</a-button>
+        <a-button type="primary" @click="goCreate">新建长者</a-button>
+      </a-space>
+    </template>
     <template #meta>
       <span class="soft-pill">当前列表 {{ total }} 位</span>
       <span class="soft-pill">已启用筛选 {{ activeFilterTags.length }} 项</span>
       <span v-for="tag in activeFilterTags.slice(0, 4)" :key="tag" class="selection-pill">{{ tag }}</span>
     </template>
 
-    <SearchForm :model="query" @search="runSearch" @reset="reset">
+    <SearchForm
+      :model="query"
+      title="快速查找长者"
+      description="按姓名、床位、护理等级或入住状态筛选，输入后回车即可查询。"
+      @search="runSearch"
+      @reset="reset"
+    >
       <a-form-item label="姓名">
         <ElderNameAutocomplete v-model:value="query.fullName" placeholder="姓名(编号)" width="220px" @select="runSearch" />
       </a-form-item>
@@ -19,38 +31,42 @@
       <a-form-item label="护理等级">
         <a-input v-model:value="query.careLevel" placeholder="护理等级" allow-clear />
       </a-form-item>
-      <a-form-item label="状态">
-        <a-select v-model:value="query.lifecycleStatus" allow-clear style="width: 160px">
-          <a-select-option value="INTENT">意向</a-select-option>
-          <a-select-option value="TRIAL">试住</a-select-option>
-          <a-select-option value="IN_HOSPITAL">在住</a-select-option>
-          <a-select-option value="OUTING">外出</a-select-option>
-          <a-select-option value="MEDICAL_OUTING">外出就医</a-select-option>
-          <a-select-option value="DISCHARGE_PENDING">待退住</a-select-option>
-          <a-select-option value="DISCHARGED">已退住</a-select-option>
-          <a-select-option value="DECEASED">已身故</a-select-option>
-        </a-select>
-      </a-form-item>
     </SearchForm>
 
     <section class="card-elevated elder-workspace">
-      <div class="action-toolbar">
-        <div class="action-toolbar-copy">
-          <strong>批量动作与快捷处理</strong>
-          <span>先勾选长者，再直接进入详情、编辑、换床、退住或家属绑定。</span>
+      <div class="list-toolbar">
+        <div class="status-chips" role="tablist" aria-label="按在院状态筛选">
+          <button
+            type="button"
+            class="status-chip"
+            :class="{ 'is-active': !query.lifecycleStatus }"
+            @click="applyStatusChip(undefined)"
+          >全部</button>
+          <button
+            v-for="opt in statusChipOptions"
+            :key="opt.value"
+            type="button"
+            class="status-chip"
+            :class="{ 'is-active': query.lifecycleStatus === opt.value }"
+            @click="applyStatusChip(opt.value)"
+          >{{ opt.label }}</button>
         </div>
-        <div class="action-toolbar-main">
-          <a-button :disabled="selectedCount !== 1" @click="goDetailSelected">查看详情</a-button>
-          <a-button :disabled="selectedCount !== 1" @click="goEditSelected">编辑档案</a-button>
-          <a-button :disabled="selectedCount !== 1" @click="openChangeBedSelected">换床</a-button>
-          <a-button :disabled="selectedCount !== 1" @click="openCheckoutSelected">退住申请</a-button>
-        </div>
-        <div class="action-toolbar-side">
-          <span class="selection-pill">已勾选 {{ selectedCount }} 位长者</span>
-          <a-button :disabled="selectedCount !== 1" @click="openBindFamilySelected">绑定家属</a-button>
-          <a-button :disabled="selectedCount !== 1" @click="printElderQrSelected">打印二维码</a-button>
-          <a-button danger :disabled="selectedCount !== 1" @click="deleteSelected">删除档案</a-button>
-        </div>
+        <a-tag color="processing">第 {{ query.pageNo }} / {{ totalPageCount }} 页 · 共 {{ total }} 条</a-tag>
+      </div>
+
+      <div v-if="selectedCount" class="selection-bar">
+        <span class="selection-bar__count">已选 {{ selectedCount }} 位</span>
+        <template v-if="selectedCount === 1">
+          <a-button size="small" @click="goDetailSelected">详情</a-button>
+          <a-button size="small" @click="goEditSelected">编辑</a-button>
+          <a-button size="small" @click="openChangeBedSelected">换床</a-button>
+          <a-button size="small" @click="openCheckoutSelected">退住申请</a-button>
+          <a-button size="small" @click="openBindFamilySelected">绑定家属</a-button>
+          <a-button size="small" @click="printElderQrSelected">打印二维码</a-button>
+          <a-button size="small" danger @click="deleteSelected">删除</a-button>
+        </template>
+        <span v-else class="selection-bar__hint">档案操作需要单选一位长者</span>
+        <a-button size="small" type="text" class="selection-bar__clear" @click="selectedRowKeys = []">取消选择</a-button>
       </div>
 
       <DataTable
@@ -62,7 +78,7 @@
         :row-selection="rowSelection"
         :empty-title="emptyStateTitle"
         :empty-description="emptyStateDescription"
-        :scroll="{ x: 1450, y: 560 }"
+        :scroll="{ x: 1100, y: 560 }"
         @change="onTableChange"
       >
         <template #emptyExtra>
@@ -71,29 +87,30 @@
             <a-button v-if="activeFilterTags.length" @click="reset">清空筛选</a-button>
           </a-space>
         </template>
-        <template #toolbar>
-          <div class="table-head">
-            <div class="table-head__copy">
-              <strong>长者列表</strong>
-              <span>支持排序、批量选择和在院动作直达。</span>
-            </div>
-            <div class="table-head__actions">
-              <a-space wrap>
-                <a-button type="primary" @click="goCreate">新建长者</a-button>
-                <a-button @click="exportCsvData">导出名单</a-button>
-              </a-space>
-              <a-space wrap>
-                <a-tag color="processing">第 {{ query.pageNo }} / {{ totalPageCount }} 页</a-tag>
-                <a-tag color="default">共 {{ total }} 条</a-tag>
-              </a-space>
-            </div>
-          </div>
-        </template>
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'fullName'">
+            <a-tooltip :title="record.homeAddress ? `家庭住址：${record.homeAddress}` : '暂无住址，可在详情补充'">
+              <div class="elder-name-cell">
+                <strong>{{ record.fullName }}</strong>
+                <span>{{ record.roomNo || '-' }} / {{ record.bedNo || '未分配床位' }}</span>
+              </div>
+            </a-tooltip>
+          </template>
+          <template v-else-if="column.key === 'risk'">
+            <div class="risk-tags">
+              <a-tag v-if="record.riskPrecommit === 'RESCUE_FIRST'" color="volcano">抢救优先</a-tag>
+              <a-tag v-else-if="record.riskPrecommit === 'NOTIFY_FAMILY_FIRST'" color="blue">先通知家属</a-tag>
+              <a-tag v-if="record.diseases && record.diseases.length" color="orange">慢病 {{ record.diseases.length }}</a-tag>
+              <span v-if="!record.riskPrecommit && !(record.diseases && record.diseases.length)" class="risk-tags__none">常规</span>
+            </div>
+          </template>
+          <template v-else-if="column.key === 'idCardNo'">
+            <span class="mono-text">{{ maskIdCard(record.idCardNo) }}</span>
+          </template>
+          <template v-else-if="column.key === 'birthDate'">
             <div class="elder-name-cell">
-              <strong>{{ record.fullName }}</strong>
-              <span>{{ record.roomNo || '-' }} / {{ record.bedNo || '未分配床位' }}</span>
+              <strong class="elder-age" v-if="ageOf(record.birthDate) !== null">{{ ageOf(record.birthDate) }}岁</strong>
+              <span>{{ record.birthDate || '-' }}</span>
             </div>
           </template>
           <template v-else-if="column.key === 'status'">
@@ -109,11 +126,24 @@
           </template>
           <template v-else-if="column.key === 'action'">
             <div class="row-action-links">
-              <a-button type="link" size="small" @click="goDetail(record.id)">详情</a-button>
               <a-button type="link" size="small" @click="goResidentCenter(record)">长者中心</a-button>
-              <a-button type="link" size="small" @click="goAssessmentArchive(record)">评估</a-button>
-              <a-button type="link" size="small" @click="goContractsInvoices(record)">合同票据</a-button>
-              <a-button type="link" danger size="small" @click="confirmDelete(record)">删除</a-button>
+              <a-dropdown trigger="click">
+                <a-button type="link" size="small">更多 <DownOutlined /></a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item key="detail" @click="goDetail(record.id)">查看详情</a-menu-item>
+                    <a-menu-item key="assessment" @click="goAssessmentArchive(record)">评估档案</a-menu-item>
+                    <a-menu-item key="contracts" @click="goContractsInvoices(record)">合同票据</a-menu-item>
+                    <a-menu-item key="edit" @click="goEdit(record.id)">编辑档案</a-menu-item>
+                    <a-menu-item key="bed" @click="openChangeBed(record)">换床</a-menu-item>
+                    <a-menu-item key="checkout" @click="openCheckout(record)">退住申请</a-menu-item>
+                    <a-menu-item key="family" @click="openBindFamily(record)">绑定家属</a-menu-item>
+                    <a-menu-item key="qr" @click="printElderQr(record)">打印二维码</a-menu-item>
+                    <a-menu-divider />
+                    <a-menu-item key="delete" danger @click="confirmDelete(record)">删除档案</a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
             </div>
           </template>
         </template>
@@ -184,6 +214,8 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
+import { DownOutlined } from '@ant-design/icons-vue'
+import dayjs from 'dayjs'
 import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
@@ -220,15 +252,25 @@ const query = reactive({
 })
 
 const columns = [
-  { title: '长者信息', dataIndex: 'fullName', key: 'fullName', width: 180, sorter: true },
-  { title: '身份证', dataIndex: 'idCardNo', key: 'idCardNo', width: 180 },
-  { title: '生日', dataIndex: 'birthDate', key: 'birthDate', width: 130, sorter: true },
-  { title: '家庭地址', dataIndex: 'homeAddress', key: 'homeAddress', width: 240 },
-  { title: '护理等级', dataIndex: 'careLevel', key: 'careLevel', width: 120, sorter: true },
-  { title: '来源', dataIndex: 'sourceType', key: 'sourceType', width: 120 },
-  { title: '履约阶段', dataIndex: 'lifecycleStage', key: 'lifecycleStage', width: 130 },
+  { title: '长者 / 床位', dataIndex: 'fullName', key: 'fullName', width: 180, sorter: true },
   { title: '状态', dataIndex: 'status', key: 'status', width: 100, sorter: true },
-  { title: '快捷操作', key: 'action', width: 280, fixed: 'right' }
+  { title: '护理等级', dataIndex: 'careLevel', key: 'careLevel', width: 110, sorter: true },
+  { title: '年龄 / 生日', dataIndex: 'birthDate', key: 'birthDate', width: 120, sorter: true },
+  { title: '风险 / 关注', key: 'risk', width: 170 },
+  { title: '身份证（脱敏）', dataIndex: 'idCardNo', key: 'idCardNo', width: 150 },
+  { title: '履约阶段', dataIndex: 'lifecycleStage', key: 'lifecycleStage', width: 120 },
+  { title: '操作', key: 'action', width: 150, fixed: 'right' }
+]
+
+const statusChipOptions = [
+  { value: 'IN_HOSPITAL', label: '在住' },
+  { value: 'TRIAL', label: '试住' },
+  { value: 'INTENT', label: '意向' },
+  { value: 'OUTING', label: '外出' },
+  { value: 'MEDICAL_OUTING', label: '外出就医' },
+  { value: 'DISCHARGE_PENDING', label: '待退住' },
+  { value: 'DISCHARGED', label: '已退住' },
+  { value: 'DECEASED', label: '已身故' }
 ]
 
 const selectedCount = computed(() => selectedRowKeys.value.length)
@@ -351,6 +393,29 @@ function sourceTypeColor(value?: string) {
 
 function resolveLifecycleStage(item: ElderItem) {
   return normalizeLifecycleStage(item.lifecycleStage, item.lifecycleContractStatus)
+}
+
+function maskIdCard(value?: string): string {
+  const id = String(value || '').trim()
+  if (!id) return '—'
+  if (id.length <= 6) return `${id.slice(0, 1)}****`
+  return `${id.slice(0, 3)}${'*'.repeat(Math.max(4, id.length - 5))}${id.slice(-2)}`
+}
+
+function ageOf(birthDate?: string): number | null {
+  if (!birthDate) return null
+  const d = dayjs(birthDate)
+  if (!d.isValid()) return null
+  const age = dayjs().diff(d, 'year')
+  return age >= 0 && age < 130 ? age : null
+}
+
+function applyStatusChip(value?: string) {
+  query.lifecycleStatus = value
+  query.pageNo = 1
+  syncQueryToRoute()
+    .then(() => fetchData())
+    .catch(() => {})
 }
 
 function requireSingleSelection(actionLabel: string) {
@@ -771,27 +836,10 @@ watch(
 </script>
 
 <style scoped>
-.table-head span,
-.action-toolbar-copy span,
-.elder-name-cell span {
-  color: #6d8aa3;
-  font-size: 12px;
-}
-
-.table-head span {
-  color: #6d8aa3;
-  font-size: 12px;
-}
-
 .elder-workspace {
   padding: 18px;
 }
 
-.action-toolbar,
-.action-toolbar-copy,
-.action-toolbar-main,
-.action-toolbar-side,
-.table-head,
 .elder-name-cell,
 .row-action-links,
 .pager-row {
@@ -799,68 +847,75 @@ watch(
   align-items: center;
 }
 
-.action-toolbar {
-  justify-content: space-between;
-  gap: 14px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid rgba(216, 229, 239, 0.7);
-}
-
-.action-toolbar-copy {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-}
-
-.action-toolbar-copy strong {
-  color: #12314d;
-  font-size: 15px;
-}
-
-.action-toolbar-copy span {
-  color: #5f7b95;
-  font-size: 12px;
-}
-
-.action-toolbar-main,
-.action-toolbar-side {
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.selection-pill {
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: #eef6fd;
-  color: #0f5b99;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.table-head {
+/* 状态快捷筛选：一次点击切换最常用的在院状态 */
+.list-toolbar {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  margin-bottom: 14px;
 }
 
-.table-head__copy {
-  min-width: 0;
-}
-
-.table-head__actions {
+.status-chips {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
-.table-head strong {
-  display: block;
-  color: #173854;
-  font-size: 16px;
+.status-chip {
+  min-height: 32px;
+  padding: 4px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.status-chip:hover {
+  border-color: rgba(var(--primary-rgb), 0.4);
+  color: var(--primary);
+}
+
+.status-chip.is-active {
+  border-color: rgba(var(--primary-rgb), 0.4);
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+
+/* 勾选后才出现的操作条：不占常驻空间，动作跟着选择走 */
+.selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border: 1px solid rgba(var(--primary-rgb), 0.24);
+  border-radius: 12px;
+  background: var(--primary-soft);
+}
+
+.selection-bar__count {
+  color: var(--primary-strong);
+  font-size: 13px;
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.selection-bar__hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.selection-bar__clear {
+  margin-left: auto;
+  color: var(--muted);
 }
 
 .elder-name-cell {
@@ -870,17 +925,38 @@ watch(
 }
 
 .elder-name-cell strong {
-  color: #173854;
+  color: var(--ink);
 }
 
 .elder-name-cell span {
-  color: #6d8aa3;
+  color: var(--muted);
   font-size: 12px;
+}
+
+.elder-age {
+  font-size: 14px;
+}
+
+.risk-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.risk-tags__none {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.mono-text {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--muted);
 }
 
 .row-action-links {
   gap: 2px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .pager-row {

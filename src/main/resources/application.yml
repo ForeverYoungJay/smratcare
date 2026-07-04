@@ -132,3 +132,10 @@ app:
       enabled: true
       cron: "0 0 8 * * ?"
       days: 30
+
+zhiyangyun:
+  staff-mobile:
+    # 员工移动端任务列表/详情为空时是否返回演示兜底数据（生产环境必须为 false）
+    demo-fallback: false
+    # 提交任务回执前是否强制要求已完成今日上班打卡（关闭时仅在回执备注追加 [未打卡提交] 标记）
+    require-on-duty: false

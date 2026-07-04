@@ -62,6 +62,9 @@ public class HealthArchiveController {
     item.setAllergyHistory(request.getAllergyHistory());
     item.setChronicDisease(request.getChronicDisease());
     item.setMedicalHistory(request.getMedicalHistory());
+    item.setRecentMedicalVisit(request.getRecentMedicalVisit());
+    item.setCheckReportSummary(request.getCheckReportSummary());
+    item.setRehabilitationRecord(request.getRehabilitationRecord());
     item.setEmergencyContact(request.getEmergencyContact());
     item.setEmergencyPhone(request.getEmergencyPhone());
     item.setRemark(request.getRemark());
@@ -85,6 +88,9 @@ public class HealthArchiveController {
     item.setAllergyHistory(request.getAllergyHistory());
     item.setChronicDisease(request.getChronicDisease());
     item.setMedicalHistory(request.getMedicalHistory());
+    item.setRecentMedicalVisit(request.getRecentMedicalVisit());
+    item.setCheckReportSummary(request.getCheckReportSummary());
+    item.setRehabilitationRecord(request.getRehabilitationRecord());
     item.setEmergencyContact(request.getEmergencyContact());
     item.setEmergencyPhone(request.getEmergencyPhone());
     item.setRemark(request.getRemark());

@@ -1,0 +1,42 @@
+<view class="container">
+  <view class="surface card">
+    <view class="section-title">通知记录</view>
+    <view class="filter-row">
+      <block wx:for="{{statusFilters}}" wx:key="key">
+        <view
+          class="filter-item {{activeStatus === item.key ? 'active' : ''}}"
+          data-status="{{item.key}}"
+          bindtap="switchStatus">
+          {{item.label}}
+        </view>
+      </block>
+    </view>
+
+    <view wx:if="{{loading}}" class="list-empty">通知记录加载中...</view>
+    <view wx:if="{{!loading && loadError}}" class="error-box">
+      <view class="error-text">{{loadError}}</view>
+      <button class="ghost-btn retry-btn" bindtap="retryLoad">重新加载</button>
+    </view>
+    <view wx:if="{{!loading && !loadError && list.length === 0}}" class="list-empty">
+      暂无通知记录。如长期收不到通知，请在“通知设置”中确认已授权微信服务通知。
+    </view>
+
+    <block wx:if="{{!loading && list.length > 0}}" wx:for="{{list}}" wx:key="id">
+      <view class="log-item">
+        <view class="log-head">
+          <text class="log-type">{{item.eventTypeText}}</text>
+          <text class="log-status status-{{item.status}}">{{item.statusText}}</text>
+        </view>
+        <view class="log-title">{{item.title}}</view>
+        <view class="log-content" wx:if="{{item.content}}">{{item.content}}</view>
+        <view class="log-error" wx:if="{{item.status === 'FAILED' && item.lastError}}">
+          失败原因：{{item.lastError}}（已重试 {{item.retryCount}} 次）
+        </view>
+        <view class="log-time">{{item.createTime}}</view>
+      </view>
+    </block>
+
+    <view wx:if="{{loadingMore}}" class="list-empty">加载更多...</view>
+    <view wx:if="{{!hasMore && list.length > 0}}" class="list-empty">已加载全部通知记录</view>
+  </view>
+</view>

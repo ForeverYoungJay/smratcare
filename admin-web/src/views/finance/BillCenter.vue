@@ -122,7 +122,7 @@
           class="finance-vxe-table"
           border
           stripe
-          show-overflow
+          show-overflow="title"
           height="520"
           :loading="loading"
           :data="displayRows"
@@ -183,13 +183,13 @@
           <vxe-column title="操作" width="320" fixed="right">
             <template #default="{ row }">
               <div class="row-action-links">
-                <a-button type="link" @click="openDetail(row)">查看</a-button>
-                <a-button v-if="row.status !== 9" type="link" @click="openPay(row)">登记收款</a-button>
-                <a-button v-if="row.status !== 9 && row.lastPaymentId" type="link" @click="openEditLatestPayment(row)">改最近收款</a-button>
-                <a-button type="link" @click="openHistory(row)">收款历史</a-button>
-                <a-button v-if="row.status !== 9" type="link" danger @click="markInvalid(row)">无效账单</a-button>
-                <a-tag v-else color="default">已无效</a-tag>
-                <a-button type="link" @click="goConsumption(row)">消费明细</a-button>
+                <a-button type="link" size="small" @click="openDetail(row)">查看</a-button>
+                <a-button v-if="row.status !== 9" type="link" size="small" @click="openPay(row)">登记收款</a-button>
+                <a-button v-if="row.status !== 9 && row.lastPaymentId" type="link" size="small" @click="openEditLatestPayment(row)">改最近收款</a-button>
+                <a-button type="link" size="small" @click="openHistory(row)">收款历史</a-button>
+                <a-button type="link" size="small" @click="goConsumption(row)">消费明细</a-button>
+                <a-tag v-if="row.status === 9" color="default">已无效</a-tag>
+                <a-button v-else type="link" size="small" danger @click="markInvalid(row)">无效账单</a-button>
               </div>
             </template>
           </vxe-column>
@@ -215,7 +215,7 @@
           <a-button @click="printHistory">打印历史</a-button>
         </a-space>
       </div>
-      <vxe-table border stripe show-overflow :loading="historyLoading" :data="historyRows" height="460">
+      <vxe-table border stripe show-overflow="title" :loading="historyLoading" :data="historyRows" height="460">
         <vxe-column field="amount" title="金额" width="110" />
         <vxe-column field="payMethod" title="方式" width="120">
           <template #default="{ row }">{{ payMethodText(row.payMethod) }}</template>
@@ -224,7 +224,9 @@
         <vxe-column field="remark" title="备注" min-width="180" />
         <vxe-column title="操作" width="120" fixed="right">
           <template #default="{ row }">
-            <a-button v-if="!historyReadonly" type="link" @click="openEditHistoryPayment(row)">修改</a-button>
+            <div class="row-action-links">
+              <a-button v-if="!historyReadonly" type="link" size="small" @click="openEditHistoryPayment(row)">修改</a-button>
+            </div>
           </template>
         </vxe-column>
       </vxe-table>
@@ -825,26 +827,26 @@ onMounted(async () => {
   gap: 6px;
   padding: 14px 16px;
   border-radius: 16px;
-  border: 1px solid #dce9f2;
+  border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.86);
 }
 
 .overview-card span,
 .table-head span,
 .bill-insight-card span {
-  color: #6d8aa3;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .overview-card strong {
-  color: #173854;
+  color: var(--ink);
   font-size: 24px;
 }
 
 .overview-card small,
 .bill-insight-card small,
 .bill-person-cell span {
-  color: #7a97b0;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -868,7 +870,7 @@ onMounted(async () => {
   gap: 8px;
   padding: 16px 18px;
   border-radius: 18px;
-  border: 1px solid #dce9f2;
+  border: 1px solid var(--border);
   background: linear-gradient(135deg, rgba(232, 247, 253, 0.96) 0%, rgba(255, 255, 255, 0.96) 100%);
 }
 
@@ -878,7 +880,7 @@ onMounted(async () => {
 
 .bill-insight-card strong,
 .table-head strong {
-  color: #173854;
+  color: var(--ink);
   font-size: 16px;
   line-height: 1.5;
 }
@@ -914,7 +916,7 @@ onMounted(async () => {
 }
 
 .bill-table-frame {
-  border: 1px solid #e4edf4;
+  border: 1px solid var(--border-soft);
   border-radius: 18px;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.95);
@@ -927,7 +929,7 @@ onMounted(async () => {
 }
 
 .bill-person-cell strong {
-  color: #173854;
+  color: var(--ink);
 }
 
 .amount-text,
@@ -936,16 +938,16 @@ onMounted(async () => {
 }
 
 .amount-text {
-  color: #173854;
+  color: var(--ink);
   font-weight: 700;
 }
 
 .amount-text.is-positive {
-  color: #1f8f63;
+  color: var(--success);
 }
 
 .amount-subtext {
-  color: #4f6f86;
+  color: var(--muted);
 }
 
 .amount-chip,
@@ -963,18 +965,18 @@ onMounted(async () => {
 }
 
 .amount-chip.is-danger {
-  background: #fff1f0;
-  color: #cf3f3f;
+  background: rgba(var(--danger-rgb), 0.1);
+  color: var(--danger);
 }
 
 .amount-chip.is-safe {
-  background: #edf8f2;
-  color: #1f8f63;
+  background: rgba(var(--success-rgb), 0.1);
+  color: var(--success);
 }
 
 .pay-method-pill {
-  background: #eef8fc;
-  color: #1b6282;
+  background: rgba(var(--info-rgb), 0.1);
+  color: var(--info);
 }
 
 .row-action-links {
@@ -988,7 +990,7 @@ onMounted(async () => {
 
 .finance-vxe-toolbar :deep(.vxe-toolbar) {
   padding: 14px 16px 10px;
-  border-bottom: 1px solid #e8f0f6;
+  border-bottom: 1px solid var(--border-soft);
   background: rgba(246, 250, 253, 0.88);
 }
 
@@ -1002,7 +1004,7 @@ onMounted(async () => {
 }
 
 .finance-vxe-table :deep(.vxe-header--column) {
-  color: #59758c;
+  color: var(--muted);
   font-weight: 700;
 }
 

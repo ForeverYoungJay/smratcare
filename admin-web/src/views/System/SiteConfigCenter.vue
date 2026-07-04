@@ -1,10 +1,10 @@
 <template>
-  <PageContainer title="官网配置中心" subTitle="按栏目维护官网内容，不再使用 JSON 配置">
+  <PageContainer title="官网配置中心" subTitle="维护机构介绍、动态、招聘等对外官网栏目内容">
     <a-alert
       type="info"
       show-icon
       style="margin-bottom: 12px"
-      message="运营方式已调整为分栏目维护"
+      message="官网内容按栏目分开维护"
       description="机构介绍、机构动态、生活娱乐、资质公示、联系方式、招聘合作分别单独维护。点击上方栏目按钮进入对应子页面，直接按表单填写即可。"
     />
 
@@ -894,7 +894,7 @@ onMounted(() => {
 
 <style scoped>
 .summary-label {
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -914,8 +914,8 @@ onMounted(() => {
 .section-card {
   border-radius: 18px;
   background:
-    linear-gradient(135deg, rgba(244, 249, 255, 0.92), rgba(255, 255, 255, 0.98)),
-    radial-gradient(circle at top right, rgba(35, 110, 199, 0.12), transparent 42%);
+    linear-gradient(135deg, rgba(var(--primary-rgb), 0.08), rgba(255, 255, 255, 0.98)),
+    radial-gradient(circle at top right, rgba(var(--primary-rgb), 0.12), transparent 42%);
 }
 
 .section-card-title {
@@ -936,7 +936,7 @@ onMounted(() => {
 .editor-block {
   margin-top: 18px;
   padding: 16px;
-  border: 1px solid rgba(18, 52, 88, 0.08);
+  border: 1px solid var(--border-soft);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.78);
 }
@@ -952,18 +952,18 @@ onMounted(() => {
 .editor-title {
   font-size: 16px;
   font-weight: 600;
-  color: #183b5b;
+  color: var(--ink);
 }
 
 .editor-tip {
   margin-top: 4px;
   font-size: 12px;
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--muted);
 }
 
 .editable-item {
   padding: 12px 12px 2px;
-  border: 1px dashed rgba(38, 88, 140, 0.18);
+  border: 1px dashed var(--border);
   border-radius: 14px;
   background: rgba(247, 250, 255, 0.85);
 }

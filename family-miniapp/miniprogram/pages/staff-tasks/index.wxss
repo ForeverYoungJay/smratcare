@@ -1,3 +1,6 @@
+/* ===== 员工任务列表 · 紧凑高效 ===== */
+
+/* 工作台入口卡片 */
 .workbench-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -6,23 +9,30 @@
 }
 
 .workbench-card {
-  min-height: 116rpx;
+  min-height: 120rpx;
   padding: 22rpx;
+  border-left: 6rpx solid var(--brand);
+}
+
+.workbench-card:active {
+  transform: translateY(2rpx);
+  opacity: 0.9;
 }
 
 .workbench-title {
-  color: #1d3b34;
+  color: var(--brand-deep);
   font-size: 28rpx;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .workbench-desc {
   margin-top: 8rpx;
-  color: #74847f;
-  font-size: 22rpx;
+  color: var(--muted);
+  font-size: 23rpx;
   line-height: 1.35;
 }
 
+/* 筛选条：胶囊易点 */
 .filter-scroll {
   margin: 22rpx 0 8rpx;
   white-space: nowrap;
@@ -31,31 +41,53 @@
 .filter {
   display: inline-flex;
   align-items: center;
-  height: 58rpx;
+  height: 64rpx;
   margin-right: 12rpx;
-  padding: 0 22rpx;
+  padding: 0 26rpx;
   border-radius: 999rpx;
-  background: #edf2ef;
-  color: #63716b;
-  font-size: 24rpx;
-  font-weight: 800;
+  background: var(--card);
+  border: 1rpx solid var(--border);
+  color: var(--muted);
+  font-size: 25rpx;
+  font-weight: 700;
 }
 
 .filter.active {
-  background: #1f5f8b;
+  background: linear-gradient(135deg, #21705F, #2E8A72);
+  border-color: transparent;
   color: #ffffff;
+  box-shadow: 0 6rpx 16rpx rgba(33, 112, 95, 0.24);
 }
 
+/* 任务列表面板 */
+.panel {
+  margin-top: 14rpx;
+  padding: 8rpx 26rpx;
+}
+
+.empty-text {
+  padding: 40rpx 0;
+  text-align: center;
+  color: var(--faint);
+  font-size: 26rpx;
+}
+
+/* 任务行：紧凑清晰 */
 .task-row {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 18rpx;
-  padding: 20rpx 0;
-  border-top: 1rpx solid #edf1f5;
+  padding: 22rpx 0;
+  border-top: 1rpx solid var(--border);
 }
 
 .task-row:first-of-type {
   border-top: 0;
+}
+
+.task-row:active {
+  opacity: 0.8;
 }
 
 .task-main {
@@ -64,21 +96,53 @@
 }
 
 .task-title {
-  color: #182430;
+  color: var(--ink);
   font-size: 28rpx;
-  font-weight: 900;
+  font-weight: 800;
+  line-height: 1.4;
 }
 
-.task-meta,
-.task-status {
+.task-meta {
   margin-top: 8rpx;
-  color: #73808c;
+  color: var(--faint);
   font-size: 23rpx;
 }
 
+/* 状态徽章：浅底深字 */
+.task-status {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 10rpx;
+  min-height: 40rpx;
+  padding: 2rpx 16rpx;
+  border-radius: 999rpx;
+  background: #EDF4F9;
+  color: var(--info);
+  font-size: 21rpx;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+/* 分批加载提示 */
+.list-footer {
+  padding: 24rpx 0;
+  text-align: center;
+  color: var(--faint);
+  font-size: 23rpx;
+}
+
+/* 行内操作：品牌胶囊按钮，易点 */
 .task-action {
-  color: #1f5f8b;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 60rpx;
+  padding: 0 24rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #21705F, #2E8A72);
+  color: #ffffff;
   font-size: 24rpx;
-  font-weight: 900;
+  font-weight: 800;
   white-space: nowrap;
+  box-shadow: 0 6rpx 14rpx rgba(33, 112, 95, 0.22);
 }

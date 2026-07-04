@@ -32,8 +32,8 @@ withDefaults(defineProps<{
   flex-wrap: wrap;
   padding: 14px 16px;
   border-radius: 18px;
-  border: 1px solid rgba(214, 225, 234, 0.86);
-  background: linear-gradient(180deg, rgba(247, 251, 253, 0.96), rgba(255, 255, 255, 0.96));
+  border: 1px solid var(--border-soft);
+  background: linear-gradient(180deg, var(--surface-2), var(--surface));
 }
 
 .toolbar-left {
@@ -52,15 +52,15 @@ withDefaults(defineProps<{
 }
 
 .toolbar-tip {
-  color: #68839a;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .toolbar-selected {
-  color: #0f7a9d;
+  color: var(--info);
   font-size: 12px;
   padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(15, 122, 157, 0.1);
+  background: rgba(var(--info-rgb), 0.1);
 }
 </style>

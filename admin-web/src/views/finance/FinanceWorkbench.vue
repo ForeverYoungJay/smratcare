@@ -10,7 +10,7 @@
       <section class="finance-stage">
         <section class="command-deck fade-up">
           <div class="command-deck__main">
-            <div class="command-kicker">Finance Operations Center</div>
+            <div class="command-kicker">今日财务重点</div>
             <h2>{{ roleHeadline }}</h2>
             <p>{{ roleHint }}</p>
             <div class="command-search">
@@ -99,7 +99,7 @@
           <article class="journey-panel fade-up">
             <div class="panel-head">
               <div>
-                <div class="panel-kicker">Task Groups</div>
+                <div class="panel-kicker">任务分组</div>
                 <h3>按业务阶段进入功能组</h3>
               </div>
             </div>
@@ -126,7 +126,7 @@
           <article class="journey-panel fade-up">
             <div class="panel-head">
               <div>
-                <div class="panel-kicker">Suggested Route</div>
+                <div class="panel-kicker">建议路径</div>
                 <h3>今天建议这样处理</h3>
               </div>
             </div>
@@ -147,7 +147,7 @@
           <article class="insight-panel insight-panel--dark fade-up">
             <div class="panel-head">
               <div>
-                <div class="panel-kicker">Revenue Snapshot</div>
+                <div class="panel-kicker">收入快照</div>
                 <h3>本月营收结构</h3>
               </div>
               <a-button type="link" @click="go('/finance/reports/revenue-structure?period=this_month')">查看报表</a-button>
@@ -180,7 +180,7 @@
           <article class="insight-panel fade-up">
             <div class="panel-head">
               <div>
-                <div class="panel-kicker">Integrity Watch</div>
+                <div class="panel-kicker">对账校验</div>
                 <h3>财务一致性与风险信号</h3>
               </div>
               <a-button type="link" @click="go('/finance/reconcile/ledger-health')">巡检明细</a-button>
@@ -223,7 +223,7 @@
           <article class="support-panel fade-up">
             <div class="panel-head">
               <div>
-                <div class="panel-kicker">Focus List</div>
+                <div class="panel-kicker">重点清单</div>
                 <h3>今日待办与主管关注项</h3>
               </div>
             </div>
@@ -244,7 +244,7 @@
           <article class="support-panel fade-up">
             <div class="panel-head">
               <div>
-                <div class="panel-kicker">Quick Access</div>
+                <div class="panel-kicker">快捷入口</div>
                 <h3>高频动作与配置入口</h3>
               </div>
               <a-button type="link" @click="go('/finance/config/master-data')">配置中心</a-button>
@@ -894,7 +894,7 @@ onMounted(loadData)
 .mini-list__row span {
   display: block;
   font-size: 12px;
-  color: #6f8298;
+  color: var(--muted);
 }
 
 .signal-tile strong,
@@ -906,7 +906,7 @@ onMounted(loadData)
   display: block;
   margin-top: 8px;
   font-size: 22px;
-  color: #13263b;
+  color: var(--ink);
 }
 
 .signal-tile strong {
@@ -932,7 +932,7 @@ onMounted(loadData)
   padding: 22px;
   border-radius: 24px;
   background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
-  border: 1px solid rgba(215, 226, 237, 0.84);
+  border: 1px solid var(--border);
   box-shadow: 0 18px 42px rgba(15, 23, 42, 0.05);
 }
 
@@ -952,19 +952,19 @@ onMounted(loadData)
 }
 
 .task-lane--navy {
-  border-top: 4px solid #2157d5;
+  border-top: 4px solid var(--primary);
 }
 
 .task-lane--green {
-  border-top: 4px solid #1f8f63;
+  border-top: 4px solid var(--success);
 }
 
 .task-lane--rose {
-  border-top: 4px solid #df5f72;
+  border-top: 4px solid var(--danger);
 }
 
 .task-lane--amber {
-  border-top: 4px solid #d7921a;
+  border-top: 4px solid var(--warning);
 }
 
 .task-lane__head,
@@ -980,7 +980,7 @@ onMounted(loadData)
   margin: 8px 0 0;
   font-size: 24px;
   line-height: 1.2;
-  color: #13263b;
+  color: var(--ink);
 }
 
 .task-lane__hero {
@@ -992,7 +992,7 @@ onMounted(loadData)
   display: block;
   font-size: 28px;
   line-height: 1.1;
-  color: #13263b;
+  color: var(--ink);
 }
 
 .task-lane__hero span,
@@ -1000,7 +1000,7 @@ onMounted(loadData)
 .watch-row__copy span,
 .focus-row span,
 .config-note {
-  color: #66788c;
+  color: var(--muted);
   line-height: 1.7;
 }
 
@@ -1045,7 +1045,7 @@ onMounted(loadData)
   gap: 16px;
   padding: 14px 16px;
   border-radius: 16px;
-  border: 1px solid #e3ecf5;
+  border: 1px solid var(--border-soft);
   background: rgba(255, 255, 255, 0.78);
 }
 
@@ -1057,7 +1057,7 @@ onMounted(loadData)
 }
 
 .watch-row:hover {
-  border-color: #bfd4ea;
+  border-color: var(--primary-soft);
   box-shadow: 0 14px 32px rgba(15, 23, 42, 0.05);
 }
 
@@ -1065,13 +1065,13 @@ onMounted(loadData)
 .watch-row__copy strong,
 .focus-row strong {
   display: block;
-  color: #13263b;
+  color: var(--ink);
   font-weight: 700;
 }
 
 .task-check__hint {
   margin-top: 4px;
-  color: #66788c;
+  color: var(--muted);
   line-height: 1.6;
 }
 
@@ -1099,7 +1099,7 @@ onMounted(loadData)
   gap: 16px;
   padding: 16px 18px;
   border-radius: 18px;
-  border: 1px solid #e3ecf5;
+  border: 1px solid var(--border-soft);
   background: rgba(255, 255, 255, 0.82);
 }
 
@@ -1112,7 +1112,7 @@ onMounted(loadData)
 
 .journey-row:hover {
   transform: translateY(-2px);
-  border-color: #bfd4ea;
+  border-color: var(--primary-soft);
   box-shadow: 0 14px 32px rgba(15, 23, 42, 0.05);
 }
 
@@ -1125,7 +1125,7 @@ onMounted(loadData)
 .journey-row__copy strong,
 .journey-step__copy strong {
   display: block;
-  color: #13263b;
+  color: var(--ink);
 }
 
 .journey-row__copy span,
@@ -1133,7 +1133,7 @@ onMounted(loadData)
 .journey-row__meta small {
   display: block;
   margin-top: 4px;
-  color: #66788c;
+  color: var(--muted);
   line-height: 1.6;
 }
 
@@ -1151,8 +1151,8 @@ onMounted(loadData)
   min-height: 46px;
   padding: 0 14px;
   border-radius: 999px;
-  background: #ecf3fb;
-  color: #1d4ed8;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
   font-weight: 700;
 }
 
@@ -1219,7 +1219,7 @@ onMounted(loadData)
 
 .quick-card {
   background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
-  border-color: #d8e4ef;
+  border-color: var(--border);
 }
 
 .quick-card strong,
@@ -1235,7 +1235,7 @@ onMounted(loadData)
 }
 
 .quick-card span {
-  color: #6f8298;
+  color: var(--muted);
 }
 
 .config-note {

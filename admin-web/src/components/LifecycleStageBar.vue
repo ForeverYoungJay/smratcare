@@ -93,7 +93,7 @@ const stageTagColor = computed(() => lifecycleStageColor(normalizedStage.value))
 const progressStrokeColor = computed(() => {
   if (normalizedStage.value === 'SIGNED') return '#16a34a'
   if (normalizedStage.value === 'PENDING_SIGN') return '#7c3aed'
-  if (normalizedStage.value === 'PENDING_BED_SELECT') return '#2563eb'
+  if (normalizedStage.value === 'PENDING_BED_SELECT') return '#3d7fa6'
   return '#ca8a04'
 })
 
@@ -210,7 +210,7 @@ function stepClass(index: number) {
 
 .lifecycle-step.is-current .lifecycle-dot {
   background: rgba(59, 130, 246, 0.18);
-  color: #1d4ed8;
+  color: #33698a;
   border-color: rgba(37, 99, 235, 0.34);
 }
 

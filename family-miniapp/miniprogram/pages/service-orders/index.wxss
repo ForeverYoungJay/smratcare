@@ -1,6 +1,6 @@
 .card { padding: 24rpx; }
-.item { margin-top: 14rpx; background: #f7faf8; border-radius: 14rpx; border: 1rpx solid #edf2ef; padding: 16rpx; }
+.item { margin-top: 14rpx; background: #FAFAF7; border-radius: 14rpx; border: 1rpx solid #E4E7E0; padding: 16rpx; }
 .row { display: flex; justify-content: space-between; margin-top: 8rpx; }
-.label { font-size: 22rpx; color: #71807a; }
-.value { font-size: 24rpx; color: #16231f; }
-.state { font-size: 24rpx; color: #16704f; }
+.label { font-size: 22rpx; color: #5C6F69; }
+.value { font-size: 24rpx; color: #22332E; }
+.state { font-size: 24rpx; color: #21705F; }

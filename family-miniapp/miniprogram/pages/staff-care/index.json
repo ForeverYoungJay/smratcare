@@ -1,3 +1,4 @@
 {
-  "navigationBarTitleText": "护理执行"
+  "navigationBarTitleText": "护理执行",
+  "enablePullDownRefresh": true
 }

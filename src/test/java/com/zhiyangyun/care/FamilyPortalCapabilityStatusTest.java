@@ -22,6 +22,7 @@ import com.zhiyangyun.care.elder.mapper.lifecycle.ElderMedicalOutingRecordMapper
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderOutingRecordMapper;
 import com.zhiyangyun.care.family.config.FamilyPortalProperties;
 import com.zhiyangyun.care.family.entity.FamilyPortalState;
+import com.zhiyangyun.care.family.mapper.FamilyNotifyLogMapper;
 import com.zhiyangyun.care.family.mapper.FamilyPortalStateMapper;
 import com.zhiyangyun.care.family.mapper.FamilyRechargeOrderMapper;
 import com.zhiyangyun.care.family.model.FamilyPortalModels;
@@ -111,6 +112,7 @@ class FamilyPortalCapabilityStatusTest {
         mock(OrgMapper.class),
         familyPortalStateMapper,
         mock(FamilyRechargeOrderMapper.class),
+        mock(FamilyNotifyLogMapper.class),
         properties,
         familyWechatNotifyService,
         mock(PasswordEncoder.class),

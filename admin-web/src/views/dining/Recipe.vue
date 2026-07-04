@@ -138,10 +138,10 @@
           </a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="openEdit(record)">编辑</a-button>
-            <a-button type="link" danger @click="remove(record)">删除</a-button>
-          </a-space>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
+            <a-button type="link" size="small" danger @click="remove(record)">删除</a-button>
+          </div>
         </template>
       </template>
     </DataTable>
@@ -675,7 +675,7 @@ generatePlannerBoard()
   background:
     radial-gradient(circle at top right, rgba(255, 208, 141, 0.28), transparent 26%),
     linear-gradient(135deg, rgba(255, 250, 241, 0.98), rgba(247, 242, 233, 0.98));
-  border: 1px solid rgba(154, 99, 42, 0.08);
+  border: 1px solid var(--border-soft);
 }
 
 .planner-hero {
@@ -691,20 +691,20 @@ generatePlannerBoard()
   font-size: 12px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: #9a632a;
+  color: var(--warning);
 }
 
 .planner-hero h2 {
   margin: 0;
   font-size: 28px;
   line-height: 1.1;
-  color: #3d2b1f;
+  color: var(--ink);
 }
 
 .planner-copy {
   max-width: 720px;
   margin: 8px 0 0;
-  color: #74533a;
+  color: var(--muted);
 }
 
 .planner-hero-stats {
@@ -718,7 +718,7 @@ generatePlannerBoard()
   padding: 14px 16px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.68);
-  border: 1px solid rgba(154, 99, 42, 0.1);
+  border: 1px solid var(--border-soft);
   box-shadow: 0 14px 30px rgba(88, 52, 22, 0.08);
 }
 
@@ -726,11 +726,11 @@ generatePlannerBoard()
   display: block;
   font-size: 28px;
   font-weight: 700;
-  color: #2f2118;
+  color: var(--ink);
 }
 
 .planner-stat small {
-  color: #86654c;
+  color: var(--muted);
 }
 
 .planner-toolbar {
@@ -760,10 +760,10 @@ generatePlannerBoard()
 .planner-tip {
   margin-bottom: 14px;
   padding: 10px 14px;
-  color: #7a583e;
+  color: var(--muted);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.62);
-  border: 1px dashed rgba(154, 99, 42, 0.24);
+  border: 1px dashed var(--border-strong);
 }
 
 .planner-table :deep(.ant-table-container) {
@@ -791,11 +791,11 @@ generatePlannerBoard()
 
 .date-cell strong {
   font-size: 18px;
-  color: #362419;
+  color: var(--ink);
 }
 
 .date-cell span {
-  color: #86654c;
+  color: var(--muted);
 }
 
 .meal-cell {
@@ -806,7 +806,7 @@ generatePlannerBoard()
   padding: 12px;
   border-radius: 16px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(249, 243, 236, 0.86));
-  border: 1px solid rgba(154, 99, 42, 0.08);
+  border: 1px solid var(--border-soft);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -823,7 +823,7 @@ generatePlannerBoard()
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  color: #5c412d;
+  color: var(--ink-soft);
   font-weight: 600;
 }
 
@@ -834,13 +834,13 @@ generatePlannerBoard()
 }
 
 .meal-cell-summary strong {
-  color: #2f2118;
+  color: var(--ink);
   font-size: 14px;
   line-height: 1.5;
 }
 
 .meal-cell-summary span {
-  color: #8e6a50;
+  color: var(--muted);
   font-size: 12px;
 }
 

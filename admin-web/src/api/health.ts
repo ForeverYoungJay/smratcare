@@ -94,6 +94,18 @@ export function getHealthMedicationTaskPage(params: any) {
   return fetchPage<HealthMedicationTask>('/api/health/medication/task/page', params)
 }
 
+export function generateTodayHealthMedicationTasks() {
+  return request.post<boolean>('/api/health/medication/task/generate-today', {})
+}
+
+export function completeHealthMedicationTask(id: Id, data: Record<string, any> = {}) {
+  return request.put<HealthMedicationTask>(`/api/health/medication/task/${id}/complete`, data)
+}
+
+export function markHealthMedicationTaskMissed(id: Id, data: Record<string, any> = {}) {
+  return request.put<HealthMedicationTask>(`/api/health/medication/task/${id}/missed`, data)
+}
+
 export function getHealthArchivePage(params: any) {
   return fetchPage<HealthArchive>('/api/health/archive/page', params)
 }

@@ -61,7 +61,7 @@
           异常自动升级：{{ rules.autoRaiseTaskFromAbnormal ? '开启' : '关闭' }}
         </a-tag>
       </a-space>
-      <div style="margin-top: 8px; color: #64748b">
+      <div style="margin-top: 8px; color: var(--muted)">
         风险关键词：{{ normalizedKeywords.length ? normalizedKeywords.join('、') : '未配置' }}
       </div>
     </a-card>

@@ -456,7 +456,7 @@ const calendarOptions = computed(() => ({
     title: `${task.title}${task.assigneeName ? ` · ${task.assigneeName}` : ''}`,
     start: task.startTime,
     end: task.endTime,
-    color: task.urgency === 'EMERGENCY' ? '#ff4d4f' : task.priority === 'HIGH' ? '#fa8c16' : '#1677ff',
+    color: task.urgency === 'EMERGENCY' ? '#ff4d4f' : task.priority === 'HIGH' ? '#fa8c16' : '#3d7fa6',
     extendedProps: { task }
   })),
   datesSet: (arg: any) => {
@@ -930,13 +930,13 @@ onUnmounted(() => {
 
 <style scoped>
 .selection-tip {
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--muted);
   font-size: 12px;
 }
 
 .action-group-title {
   font-size: 12px;
-  color: rgba(0, 0, 0, 0.55);
+  color: var(--muted);
 }
 
 .summary-filter-card {
@@ -949,8 +949,8 @@ onUnmounted(() => {
 }
 
 .summary-filter-card.active {
-  box-shadow: 0 0 0 1px #1677ff inset;
-  background: #e6f4ff;
+  box-shadow: 0 0 0 1px var(--info) inset;
+  background: var(--primary-soft);
 }
 
 .calendar-toolbar {

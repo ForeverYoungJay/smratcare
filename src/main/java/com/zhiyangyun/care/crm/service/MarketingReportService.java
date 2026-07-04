@@ -32,7 +32,7 @@ public interface MarketingReportService {
   int normalizeSources(Long tenantId);
 
   MarketingLeadEntrySummaryResponse leadEntrySummary(
-      Long tenantId, String mode, String keyword, String consultantName, String consultantPhone,
+      Long tenantId, Long currentStaffId, boolean adminView, String mode, String keyword, String consultantName, String consultantPhone,
       String elderName, String elderPhone, String consultDateFrom, String consultDateTo, String consultType,
       String mediaChannel, String infoSource, String customerTag, String marketerName);
 }

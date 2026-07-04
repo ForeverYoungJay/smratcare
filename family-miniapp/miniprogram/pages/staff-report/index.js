@@ -19,12 +19,16 @@ function normalizeReport(item) {
 Page({
   data: {
     loading: false,
+    loadingMore: false,
     submitting: false,
     operatingId: '',
     loadError: '',
     profile: null,
     summary: {},
     reports: [],
+    pageNo: 1,
+    pageSize: 10,
+    hasMore: false,
     activeStatus: '',
     statusFilters: [
       { label: '全部', value: '' },
@@ -40,34 +44,51 @@ Page({
   },
   onShow() {
     getApp().ensureLogin();
-    this.loadData();
+    this.loadData({ reset: true });
   },
-  async loadData() {
-    this.setData({ loading: true, loadError: '' });
+  async loadData(options = {}) {
+    const reset = options.reset !== false;
+    const nextPageNo = reset ? 1 : Number(this.data.pageNo || 1) + 1;
+    this.setData(reset ? { loading: true, loadError: '' } : { loadingMore: true, loadError: '' });
     try {
       const [profile, summary, reports] = await Promise.all([
         getStaffProfile(),
         getStaffReportSummary({ reportType: 'DAY' }),
-        getStaffReports({ reportType: 'DAY', status: this.data.activeStatus, pageSize: 20 })
+        getStaffReports({
+          reportType: 'DAY',
+          status: this.data.activeStatus,
+          pageNo: nextPageNo,
+          pageSize: this.data.pageSize
+        })
       ]);
+      const normalized = (reports || []).map(normalizeReport);
       this.setData({
         profile,
         summary: summary || {},
-        reports: (reports || []).map(normalizeReport)
+        reports: reset ? normalized : this.data.reports.concat(normalized),
+        pageNo: nextPageNo,
+        hasMore: normalized.length >= this.data.pageSize
       });
       if (!this.data.title) {
         const name = (profile && (profile.realName || profile.username)) || '员工';
         this.setData({ title: `${name} ${this.data.reportDate} 工作日报` });
       }
     } catch (error) {
-      this.setData({ loadError: error.message || '工作日报加载失败' });
+      this.setData({ loadError: error.message || (reset ? '工作日报加载失败' : '更多日报加载失败，请稍后重试') });
     } finally {
-      this.setData({ loading: false });
+      this.setData({ loading: false, loadingMore: false });
     }
   },
   switchStatus(e) {
     this.setData({ activeStatus: e.currentTarget.dataset.value || '' });
-    this.loadData();
+    this.loadData({ reset: true });
+  },
+  loadMore() {
+    if (this.data.loading || this.data.loadingMore || !this.data.hasMore) return;
+    this.loadData({ reset: false });
+  },
+  onReachBottom() {
+    this.loadMore();
   },
   onDateChange(e) {
     const date = e.detail.value;
@@ -122,7 +143,7 @@ Page({
         nextPlan: ''
       });
       wx.showToast({ title: status === 'SUBMITTED' ? '日报已提交' : '草稿已保存', icon: 'success' });
-      this.loadData();
+      this.loadData({ reset: true });
     } catch (error) {
       wx.showToast({ title: error.message || '保存失败', icon: 'none' });
     } finally {
@@ -136,7 +157,7 @@ Page({
     try {
       await submitStaffReportById(id);
       wx.showToast({ title: '草稿已提交', icon: 'success' });
-      this.loadData();
+      this.loadData({ reset: true });
     } catch (error) {
       wx.showToast({ title: error.message || '提交失败', icon: 'none' });
     } finally {

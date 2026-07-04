@@ -1,9 +1,20 @@
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14rpx;
+  margin-top: 18rpx;
+}
+
+.quick-btn {
+  width: 100%;
+}
+
 .month-picker {
   margin-top: 20rpx;
   padding: 18rpx 22rpx;
   border-radius: 18rpx;
-  background: #edf5f2;
-  color: #1f5f4c;
+  background: #E8F3EF;
+  color: #185C4E;
   font-size: 25rpx;
   font-weight: 850;
 }
@@ -18,11 +29,11 @@
   gap: 18rpx;
   margin-top: 22rpx;
   padding: 26rpx;
-  background: linear-gradient(135deg, rgba(36, 107, 95, 0.13), rgba(255, 255, 255, 0) 58%), #ffffff;
+  background: linear-gradient(135deg, rgba(33, 112, 95, 0.13), rgba(255, 255, 255, 0) 58%), #ffffff;
 }
 
 .today-title {
-  color: #182430;
+  color: #22332E;
   font-size: 32rpx;
   font-weight: 900;
 }
@@ -58,7 +69,7 @@
 
 .summary-card strong {
   margin-top: 8rpx;
-  color: #246b5f;
+  color: #21705F;
   font-size: 38rpx;
   font-weight: 900;
 }
@@ -68,7 +79,7 @@
 }
 
 .summary-card.danger strong {
-  color: #bd2e1f;
+  color: #C9504B;
 }
 
 .day-row {
@@ -100,7 +111,7 @@
 }
 
 .day-time {
-  color: #182430;
+  color: #22332E;
   font-size: 25rpx;
   font-weight: 850;
 }
@@ -113,11 +124,11 @@
 }
 
 .day-alert {
-  color: #bd2e1f;
+  color: #C9504B;
 }
 
 .day-status {
-  color: #1f5f8b;
+  color: #3D7FA6;
   font-size: 22rpx;
   font-weight: 900;
 }

@@ -5,7 +5,7 @@
 .attendance-card {
   margin: 22rpx 0;
   padding: 26rpx;
-  background: linear-gradient(135deg, rgba(36, 107, 95, 0.13), rgba(255, 255, 255, 0) 58%), #ffffff;
+  background: linear-gradient(135deg, rgba(33, 112, 95, 0.13), rgba(255, 255, 255, 0) 58%), #ffffff;
 }
 
 .attendance-head {
@@ -15,7 +15,7 @@
 }
 
 .attendance-title {
-  color: #182430;
+  color: #22332E;
   font-size: 32rpx;
   font-weight: 900;
 }
@@ -31,6 +31,20 @@
   color: #465563;
 }
 
+.attendance-feedback {
+  margin-top: 14rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+
+.success-text {
+  color: #21705F;
+}
+
+.error-text {
+  color: #C9504B;
+}
+
 .punch-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -41,8 +55,8 @@
 .punch-btn {
   height: 74rpx;
   border-radius: 18rpx;
-  background: #edf5f2;
-  color: #1f5f4c;
+  background: #E8F3EF;
+  color: #185C4E;
   font-size: 24rpx;
   font-weight: 850;
   line-height: 74rpx;
@@ -65,7 +79,7 @@
   height: 86rpx;
   border-radius: 24rpx;
   background: #eaf4ef;
-  color: #246b5f;
+  color: #21705F;
   font-size: 25rpx;
   font-weight: 900;
   line-height: 86rpx;
@@ -78,7 +92,7 @@
 }
 
 .schedule-title {
-  color: #182430;
+  color: #22332E;
   font-size: 28rpx;
   font-weight: 900;
 }
@@ -90,7 +104,7 @@
 }
 
 .status {
-  color: #1f5f8b;
+  color: #3D7FA6;
   font-size: 23rpx;
   font-weight: 850;
 }

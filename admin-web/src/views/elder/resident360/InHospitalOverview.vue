@@ -575,7 +575,7 @@ useLiveSyncRefresh({
 
 <style scoped>
 .desc {
-  color: #595959;
+  color: var(--muted);
   line-height: 1.65;
   min-height: 30px;
   font-size: 13px;
@@ -589,15 +589,15 @@ useLiveSyncRefresh({
 }
 
 .line-normal {
-  color: #434343;
+  color: var(--ink-soft);
 }
 
 .line-warning {
-  color: #d48806;
+  color: var(--warning);
 }
 
 .line-danger {
-  color: #cf1322;
+  color: var(--danger);
   font-weight: 600;
 }
 
@@ -610,18 +610,18 @@ useLiveSyncRefresh({
 
 .expand-link {
   margin-top: 8px;
-  color: #1677ff;
+  color: var(--info);
   font-size: 12px;
   cursor: pointer;
 }
 
 :deep(.alert-card .ant-card-head-title) {
-  color: #cf1322;
+  color: var(--danger);
 }
 
 :deep(.alert-card .ant-card-body) {
-  border: 1px solid #ffa39e;
+  border: 1px solid rgba(var(--danger-rgb), 0.4);
   border-radius: 8px;
-  background: linear-gradient(180deg, #fff2f0 0%, #fff 56%);
+  background: linear-gradient(180deg, rgba(var(--danger-rgb), 0.08) 0%, #fff 56%);
 }
 </style>

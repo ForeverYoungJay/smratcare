@@ -39,8 +39,8 @@ defineEmits<{
   place-items: center;
   width: 40px;
   height: 40px;
-  border-radius: 14px;
-  background: rgba(19, 108, 181, 0.1);
+  border-radius: 12px;
+  background: var(--primary-soft);
   color: var(--primary-strong);
   font-size: 20px;
 }

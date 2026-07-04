@@ -67,7 +67,7 @@
           <article class="chart-stage chart-stage--dark fade-up">
             <div class="stage-head">
               <div>
-                <div class="stage-kicker">Primary Trend</div>
+                <div class="stage-kicker">主趋势</div>
                 <h3>{{ pageMeta.leftChartTitle }}</h3>
               </div>
             </div>
@@ -89,7 +89,7 @@
           <article class="chart-stage fade-up">
             <div class="stage-head">
               <div>
-                <div class="stage-kicker">Support View</div>
+                <div class="stage-kicker">辅助视图</div>
                 <h3>{{ pageMeta.rightChartTitle }}</h3>
               </div>
             </div>
@@ -119,11 +119,11 @@
           <article class="table-panel fade-up">
             <div class="stage-head">
               <div>
-                <div class="stage-kicker">Primary Ranking</div>
+                <div class="stage-kicker">主排名</div>
                 <h3>{{ pageMeta.leftTableTitle }}</h3>
               </div>
             </div>
-            <vxe-table border stripe show-overflow :data="leftRows" height="280">
+            <vxe-table border stripe show-overflow="title" :data="leftRows" height="280">
               <vxe-column field="label" :title="pageMeta.leftTableLabel" min-width="180" />
               <vxe-column field="amount" title="金额" width="140">
                 <template #default="{ row }">{{ money(row.amount) }}</template>
@@ -135,11 +135,11 @@
           <article class="table-panel fade-up">
             <div class="stage-head">
               <div>
-                <div class="stage-kicker">Support Ranking</div>
+                <div class="stage-kicker">辅助排名</div>
                 <h3>{{ pageMeta.rightTableTitle }}</h3>
               </div>
             </div>
-            <vxe-table border stripe show-overflow :data="rightRows" height="280">
+            <vxe-table border stripe show-overflow="title" :data="rightRows" height="280">
               <vxe-column field="label" :title="pageMeta.rightTableLabel" min-width="180" />
               <vxe-column field="amount" title="金额" width="140">
                 <template #default="{ row }">{{ money(row.amount) }}</template>
@@ -152,11 +152,11 @@
           <article class="table-panel fade-up">
             <div class="stage-head">
               <div>
-                <div class="stage-kicker">Receivable Risk</div>
+                <div class="stage-kicker">应收风险</div>
                 <h3>{{ pageMeta.arrearsTitle }}</h3>
               </div>
             </div>
-            <vxe-table border stripe show-overflow :data="arrears" height="280">
+            <vxe-table border stripe show-overflow="title" :data="arrears" height="280">
               <vxe-column field="elderName" title="长者" min-width="160">
                 <template #default="{ row }">
                   <span>{{ row.elderName || '未知长者' }}</span>
@@ -171,7 +171,7 @@
           <article class="table-panel fade-up">
             <div class="stage-head">
               <div>
-                <div class="stage-kicker">Report Actions</div>
+                <div class="stage-kicker">报表操作</div>
                 <h3>常用跳转</h3>
               </div>
             </div>
@@ -199,7 +199,7 @@
         <section class="category-stage fade-up">
           <div class="category-stage__head">
             <div>
-              <div class="stage-kicker">Category Analysis</div>
+              <div class="stage-kicker">分类分析</div>
               <h3>类目消费比例与盈利分析</h3>
             </div>
             <a-space wrap>
@@ -248,7 +248,7 @@
             <article class="table-panel table-panel--plain">
               <div class="stage-head">
                 <div>
-                  <div class="stage-kicker">Trend</div>
+                  <div class="stage-kicker">趋势</div>
                   <h3>关键字消费波动线</h3>
                 </div>
               </div>
@@ -258,11 +258,11 @@
             <article class="table-panel table-panel--plain">
               <div class="stage-head">
                 <div>
-                  <div class="stage-kicker">Profitability</div>
+                  <div class="stage-kicker">盈利能力</div>
                   <h3>全类目盈利情况</h3>
                 </div>
               </div>
-              <vxe-table border stripe show-overflow :data="categoryAnalysis.categoryProfit || []" height="320">
+              <vxe-table border stripe show-overflow="title" :data="categoryAnalysis.categoryProfit || []" height="320">
                 <vxe-column field="category" title="类目" min-width="120" />
                 <vxe-column field="totalAmount" title="消费额" width="110">
                   <template #default="{ row }">{{ money(row.totalAmount) }}</template>
@@ -782,7 +782,7 @@ watch(() => route.query.category, (category) => {
   width: 100%;
   padding: 16px;
   text-align: left;
-  border: 1px solid #dbe7f2;
+  border: 1px solid var(--border);
   border-radius: 18px;
   background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
@@ -797,21 +797,21 @@ watch(() => route.query.category, (category) => {
 }
 
 .report-tab--active {
-  border-color: #8bb9ff;
+  border-color: var(--primary);
   background: linear-gradient(180deg, #eff6ff 0%, #f8fbff 100%);
 }
 
 .report-tab strong,
 .action-card strong {
   display: block;
-  color: #13263b;
+  color: var(--ink);
 }
 
 .report-tab span,
 .action-card span {
   display: block;
   margin-top: 6px;
-  color: #66788c;
+  color: var(--muted);
   line-height: 1.6;
 }
 
@@ -821,7 +821,7 @@ watch(() => route.query.category, (category) => {
   gap: 12px;
   padding: 18px;
   border-radius: 22px;
-  border: 1px solid #dbe7f2;
+  border: 1px solid var(--border);
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
 }
 
@@ -834,21 +834,21 @@ watch(() => route.query.category, (category) => {
 .range-chip {
   padding: 8px 12px;
   border-radius: 999px;
-  border: 1px solid #dbe7f2;
+  border: 1px solid var(--border);
   background: #f7fafc;
-  color: #26415f;
+  color: var(--ink-soft);
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .range-chip:hover {
   transform: translateY(-1px);
-  border-color: #bfd4ea;
+  border-color: var(--primary-soft);
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
 }
 
 .range-chip--ghost {
-  color: #66788c;
+  color: var(--muted);
 }
 
 .report-nav__summary span,
@@ -858,7 +858,7 @@ watch(() => route.query.category, (category) => {
 .snapshot-row span {
   display: block;
   font-size: 12px;
-  color: #6f8298;
+  color: var(--muted);
 }
 
 .report-nav__summary strong,
@@ -867,13 +867,13 @@ watch(() => route.query.category, (category) => {
 .snapshot-row strong {
   display: block;
   margin-top: 8px;
-  color: #13263b;
+  color: var(--ink);
 }
 
 .report-nav__summary small {
   display: block;
   margin-top: 8px;
-  color: #66788c;
+  color: var(--muted);
 }
 
 .metric-strip {
@@ -886,7 +886,7 @@ watch(() => route.query.category, (category) => {
   min-height: 126px;
   padding: 18px;
   border-radius: 18px;
-  border: 1px solid #dbe7f2;
+  border: 1px solid var(--border);
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
 }
 
@@ -898,7 +898,7 @@ watch(() => route.query.category, (category) => {
 .metric-tile small {
   display: block;
   margin-top: 12px;
-  color: #66788c;
+  color: var(--muted);
   line-height: 1.6;
 }
 
@@ -916,7 +916,7 @@ watch(() => route.query.category, (category) => {
 .category-stage {
   padding: 22px;
   border-radius: 22px;
-  border: 1px solid #dbe7f2;
+  border: 1px solid var(--border);
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   box-shadow: 0 18px 44px rgba(15, 23, 42, 0.05);
 }
@@ -946,7 +946,7 @@ watch(() => route.query.category, (category) => {
   margin: 8px 0 0;
   font-size: 24px;
   line-height: 1.2;
-  color: #13263b;
+  color: var(--ink);
 }
 
 .chart-box {
@@ -971,7 +971,7 @@ watch(() => route.query.category, (category) => {
   width: 100%;
   padding: 12px 14px;
   text-align: left;
-  border: 1px solid #dbe7f2;
+  border: 1px solid var(--border);
   border-radius: 16px;
   background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -1014,7 +1014,7 @@ watch(() => route.query.category, (category) => {
 .category-stage__head h3 {
   margin: 8px 0 0;
   font-size: 24px;
-  color: #13263b;
+  color: var(--ink);
 }
 
 .table-panel--plain {

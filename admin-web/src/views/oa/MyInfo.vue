@@ -3,7 +3,7 @@
     <div class="my-info-shell">
       <section class="hero-panel">
         <div class="hero-copy">
-          <span class="hero-kicker">Personal Snapshot</span>
+          <span class="hero-kicker">个人概览</span>
           <h1>把入职、试用期、合同、绩效、报销和电费放到同一条时间线上。</h1>
           <p>普通员工默认查看自己；管理员可以选择多名员工并行对比，快速发现谁即将转正、谁合同将到期、谁费用压力更高。</p>
         </div>
@@ -131,7 +131,7 @@
       <section v-if="cards.length > 1" class="compare-panel">
         <div class="compare-head">
           <div>
-            <span class="hero-kicker compare-kicker">Compare Mode</span>
+            <span class="hero-kicker compare-kicker">对比模式</span>
             <h3>员工关键信息对比</h3>
           </div>
           <p>重点看试用期天数、合同签署天数、绩效分、电费与报销额的差异。</p>
@@ -255,12 +255,10 @@ loadSummary()
 
 <style scoped>
 .my-info-shell {
-  --ink: #1a2434;
-  --muted: #697587;
   --sand: #f6efe4;
   --sand-deep: #ecd7b3;
-  --sky: #eef6ff;
-  --line: rgba(124, 139, 160, 0.18);
+  --sky: var(--primary-soft);
+  --line: var(--border-soft);
   display: grid;
   gap: 18px;
 }
@@ -273,7 +271,7 @@ loadSummary()
   border-radius: 28px;
   background:
     radial-gradient(circle at top left, rgba(255, 220, 164, 0.38), transparent 34%),
-    radial-gradient(circle at bottom right, rgba(103, 165, 255, 0.24), transparent 36%),
+    radial-gradient(circle at bottom right, rgba(var(--primary-rgb), 0.24), transparent 36%),
     linear-gradient(135deg, #fff8ef 0%, #fff 48%, #f3f8ff 100%);
   border: 1px solid rgba(221, 205, 177, 0.5);
 }
@@ -418,15 +416,15 @@ loadSummary()
 }
 
 .timeline-chip.warning {
-  background: #fff7e8;
+  background: rgba(var(--warning-rgb), 0.1);
 }
 
 .timeline-chip.danger {
-  background: #fff1f0;
+  background: rgba(var(--danger-rgb), 0.08);
 }
 
 .timeline-chip.safe {
-  background: #f3fbf4;
+  background: rgba(var(--success-rgb), 0.08);
 }
 
 .timeline-chip span,
@@ -519,8 +517,8 @@ loadSummary()
 }
 
 .compare-kicker {
-  background: rgba(34, 94, 184, 0.1);
-  color: #1f56ad;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
 }
 
 .compare-table {

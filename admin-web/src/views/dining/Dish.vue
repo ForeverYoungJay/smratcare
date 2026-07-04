@@ -105,11 +105,11 @@
           </a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="openEdit(record)">编辑</a-button>
-            <a-button type="link" @click="toggleStatus(record)">{{ record.status === DINING_STATUS.enabled ? '停用' : '启用' }}</a-button>
-            <a-button type="link" danger @click="remove(record)">删除</a-button>
-          </a-space>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
+            <a-button type="link" size="small" @click="toggleStatus(record)">{{ record.status === DINING_STATUS.enabled ? '停用' : '启用' }}</a-button>
+            <a-button type="link" size="small" danger @click="remove(record)">删除</a-button>
+          </div>
         </template>
       </template>
     </DataTable>
@@ -466,7 +466,7 @@ getProductTagList()
   background:
     radial-gradient(circle at top right, rgba(255, 224, 173, 0.24), transparent 28%),
     linear-gradient(135deg, #fffaf3, #f8f2e8);
-  border: 1px solid rgba(148, 101, 42, 0.08);
+  border: 1px solid rgba(var(--warning-rgb), 0.16);
 }
 
 .analytics-head {
@@ -479,7 +479,7 @@ getProductTagList()
 
 .analytics-eyebrow {
   margin: 0 0 6px;
-  color: #9a632a;
+  color: var(--warning);
   text-transform: uppercase;
   letter-spacing: 0.18em;
   font-size: 12px;
@@ -487,12 +487,12 @@ getProductTagList()
 
 .analytics-head h2 {
   margin: 0;
-  color: #3b281a;
+  color: var(--ink);
 }
 
 .analytics-copy {
   margin: 8px 0 0;
-  color: #73523b;
+  color: var(--muted);
 }
 
 .analytics-stats {
@@ -503,18 +503,18 @@ getProductTagList()
   padding: 14px 16px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.76);
-  border: 1px solid rgba(148, 101, 42, 0.12);
+  border: 1px solid rgba(var(--warning-rgb), 0.2);
 }
 
 .analytics-stat span {
   display: block;
   font-size: 28px;
   font-weight: 700;
-  color: #2f2118;
+  color: var(--ink);
 }
 
 .analytics-stat small {
-  color: #88674d;
+  color: var(--muted);
 }
 
 .category-collapse,
@@ -526,20 +526,20 @@ getProductTagList()
 .meal-collapse :deep(.ant-collapse-item) {
   border-radius: 14px;
   overflow: hidden;
-  border: 1px solid rgba(148, 101, 42, 0.12);
+  border: 1px solid rgba(var(--warning-rgb), 0.2);
   margin-bottom: 12px;
 }
 
 .category-collapse :deep(.ant-collapse-header),
 .meal-collapse :deep(.ant-collapse-header) {
   background: rgba(255, 255, 255, 0.72);
-  color: #4b3427;
+  color: var(--ink-soft);
   font-weight: 600;
 }
 
 .analytics-note {
   margin-top: 12px;
-  color: #826148;
+  color: var(--muted);
 }
 
 @media (max-width: 768px) {

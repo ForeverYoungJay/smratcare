@@ -7,6 +7,8 @@ import type {
   ElderUnbindRequest,
   ElderDiseaseUpdateRequest,
   ElderDiseaseItem,
+  ElderCareLevelAdjustmentRequest,
+  ElderCareProfile,
   FamilyBindRequest,
   UploadedFileResult,
   Id
@@ -49,6 +51,14 @@ export function getElderDiseases(elderId: Id) {
 export function updateElderDiseases(elderId: Id, diseaseIds: number[]) {
   const body: ElderDiseaseUpdateRequest = { diseaseIds }
   return request.put<void>(`/api/elder/${elderId}/diseases`, body)
+}
+
+export function getElderCareProfile(elderId: Id) {
+  return request.get<ElderCareProfile>(`/api/elder/${elderId}/care-profile`)
+}
+
+export function adjustElderCareLevel(elderId: Id, data: ElderCareLevelAdjustmentRequest) {
+  return request.put<ElderItem>(`/api/elder/${elderId}/care-level`, data)
 }
 
 export function bindFamily(data: FamilyBindRequest) {

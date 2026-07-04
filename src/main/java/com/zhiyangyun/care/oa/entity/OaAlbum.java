@@ -25,6 +25,10 @@ public class OaAlbum {
 
   private String folderName;
 
+  private String albumScope;
+
+  private Long elderId;
+
   private String coverUrl;
 
   private String photosJson;

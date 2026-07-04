@@ -17,6 +17,8 @@ public class InventoryLogResponse {
   private Long refAdjustmentId;
   private String outType;
   private String receiverName;
+  private Long elderId;
+  private String elderName;
   private String outboundNo;
   private String remark;
   private LocalDateTime createTime;

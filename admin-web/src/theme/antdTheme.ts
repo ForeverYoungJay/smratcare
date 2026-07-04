@@ -3,121 +3,124 @@ import { theme as antdTheme } from 'ant-design-vue'
 export const antTheme = {
   algorithm: antdTheme.defaultAlgorithm,
   token: {
-    colorPrimary: '#136cb5',
-    colorSuccess: '#2f9b66',
-    colorWarning: '#d98922',
-    colorError: '#d64c5f',
-    colorInfo: '#136cb5',
-    colorLink: '#136cb5',
-    colorText: '#12314d',
-    colorTextSecondary: '#5f7b95',
-    colorTextTertiary: '#86a0b7',
-    colorBorder: '#d8e5ef',
-    colorBorderSecondary: '#e5eef5',
-    colorSplit: '#eaf1f6',
-    colorBgBase: '#f4f8fb',
-    colorBgLayout: '#f4f8fb',
+    colorPrimary: '#21705F',
+    colorSuccess: '#3B9A68',
+    colorWarning: '#DE9B3D',
+    colorError: '#C9504B',
+    colorInfo: '#3D7FA6',
+    colorLink: '#21705F',
+    colorText: '#22332E',
+    colorTextSecondary: '#5C6F69',
+    colorTextTertiary: '#8A9A94',
+    colorBorder: '#E4E7E0',
+    colorBorderSecondary: '#EDEFE9',
+    colorSplit: '#EDEFE9',
+    colorBgBase: '#F7F6F2',
+    colorBgLayout: '#F7F6F2',
     colorBgContainer: '#ffffff',
     colorBgElevated: '#ffffff',
-    colorFillSecondary: '#eff5fa',
-    colorFillTertiary: '#f6fafc',
-    colorFillQuaternary: '#f9fbfd',
-    colorPrimaryBg: '#e7f3ff',
-    colorPrimaryBgHover: '#d7ebff',
-    colorPrimaryBorder: '#b6d8f5',
-    colorSuccessBg: '#edf9f2',
-    colorWarningBg: '#fff4e7',
-    colorErrorBg: '#fff0f2',
+    colorFillSecondary: '#F1F3EE',
+    colorFillTertiary: '#F5F6F2',
+    colorFillQuaternary: '#FAFAF7',
+    colorPrimaryBg: '#E8F3EF',
+    colorPrimaryBgHover: '#DCEDE6',
+    colorPrimaryBorder: '#BBD9CF',
+    colorPrimaryHover: '#2E8A72',
+    colorPrimaryActive: '#185C4E',
+    colorSuccessBg: '#EBF6F0',
+    colorWarningBg: '#FBF3E4',
+    colorErrorBg: '#FAECEB',
+    colorInfoBg: '#EAF2F7',
     fontFamily: "'HarmonyOS Sans SC', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', system-ui, -apple-system, sans-serif",
     fontSize: 14,
     fontSizeSM: 13,
     fontSizeLG: 15,
     lineHeight: 1.5,
     lineWidth: 1,
-    controlHeight: 38,
-    controlHeightLG: 44,
-    borderRadius: 14,
-    borderRadiusLG: 20,
-    borderRadiusSM: 10,
-    boxShadow: '0 18px 40px rgba(18, 49, 77, 0.08)',
-    boxShadowSecondary: '0 10px 24px rgba(18, 49, 77, 0.06)'
+    controlHeight: 37,
+    controlHeightLG: 42,
+    borderRadius: 10,
+    borderRadiusLG: 14,
+    borderRadiusSM: 8,
+    boxShadow: '0 6px 16px rgba(34, 51, 46, 0.07)',
+    boxShadowSecondary: '0 1px 2px rgba(34, 51, 46, 0.05)'
   },
   components: {
     Layout: {
-      headerBg: 'rgba(255,255,255,0.92)',
-      siderBg: '#f7fafc',
-      bodyBg: '#f4f8fb',
-      triggerBg: '#f7fafc',
-      triggerColor: '#12314d'
+      headerBg: 'rgba(255,255,255,0.95)',
+      siderBg: '#FCFCFA',
+      bodyBg: '#F7F6F2',
+      triggerBg: '#FCFCFA',
+      triggerColor: '#22332E'
     },
     Menu: {
       itemBg: 'transparent',
-      itemColor: '#58748d',
-      itemHoverColor: '#12314d',
-      itemHoverBg: '#edf6fd',
-      itemSelectedColor: '#12314d',
-      itemSelectedBg: '#e4f2fd',
+      itemColor: '#5C6F69',
+      itemHoverColor: '#22332E',
+      itemHoverBg: '#F1F3EE',
+      itemSelectedColor: '#185C4E',
+      itemSelectedBg: '#E8F3EF',
       subMenuItemBg: 'transparent',
       activeBarBorderWidth: 0
     },
     Table: {
-      headerBg: '#f6fafc',
-      headerColor: '#12314d',
-      rowHoverBg: '#f7fbfe',
-      borderColor: '#e3edf4',
-      headerBorderRadius: 14
+      headerBg: '#F3F5F0',
+      headerColor: '#22332E',
+      rowHoverBg: '#F7F9F5',
+      borderColor: '#EDEFE9',
+      headerBorderRadius: 10
     },
     Card: {
-      borderRadiusLG: 22,
+      borderRadiusLG: 14,
       headerBg: 'transparent'
     },
     Button: {
-      borderRadius: 12,
+      borderRadius: 10,
       fontWeight: 600,
-      controlHeight: 38
+      controlHeight: 37
     },
     Input: {
-      borderRadius: 12,
+      borderRadius: 10,
       colorBgContainer: '#ffffff'
     },
     Select: {
-      borderRadius: 12
+      borderRadius: 10
     },
     DatePicker: {
-      borderRadius: 12
+      borderRadius: 10
     },
     Tag: {
       borderRadiusSM: 999
     },
     Tabs: {
-      cardBg: '#f4f8fb',
-      itemSelectedColor: '#12314d',
-      itemActiveColor: '#136cb5',
-      inkBarColor: '#136cb5'
+      cardBg: '#F3F5F0',
+      itemSelectedColor: '#185C4E',
+      itemActiveColor: '#21705F',
+      inkBarColor: '#21705F'
     },
     Pagination: {
-      itemActiveBg: '#e7f3ff',
+      itemActiveBg: '#E8F3EF',
       itemSize: 34
     },
     Breadcrumb: {
-      lastItemColor: '#43617c',
-      itemColor: '#7890a6',
-      separatorColor: '#a0b4c5'
+      lastItemColor: '#42544E',
+      itemColor: '#8A9A94',
+      separatorColor: '#A9B6B0'
     },
     Modal: {
-      borderRadiusLG: 24
+      borderRadiusLG: 16
     },
     Drawer: {
-      colorBgElevated: '#f8fbfd'
+      colorBgElevated: '#FCFCFA'
     },
     Alert: {
-      borderRadiusLG: 18
+      borderRadiusLG: 12
     },
     Form: {
-      labelColor: '#43617c'
+      labelColor: '#42544E'
     },
     Segmented: {
-      trackBg: '#edf4f9',
+      trackBg: '#F1F3EE',
       itemSelectedBg: '#ffffff'
     }
   }

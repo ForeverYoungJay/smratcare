@@ -198,7 +198,7 @@
               <a-tag v-if="isApprovalTodo(record)" color="blue">审批流</a-tag>
               <a-tag v-else-if="isBirthdayReminder(record)" color="magenta">生日提醒</a-tag>
               <a-tag v-else color="default">普通待办</a-tag>
-              <a v-if="isApprovalTodo(record)" @click="openApprovalFromTodo(record)">查看审批</a>
+              <a-button v-if="isApprovalTodo(record)" type="link" size="small" @click="openApprovalFromTodo(record)">查看审批</a-button>
             </a-space>
           </template>
         </template>
@@ -1159,13 +1159,13 @@ useLiveSyncRefresh({
 
 <style scoped>
 .selection-tip {
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--muted);
   font-size: 12px;
 }
 
 .action-group-title {
   font-size: 12px;
-  color: rgba(0, 0, 0, 0.55);
+  color: var(--muted);
 }
 
 .summary-filter-card {
@@ -1178,7 +1178,7 @@ useLiveSyncRefresh({
 }
 
 .summary-filter-card.active {
-  box-shadow: 0 0 0 1px #1677ff inset;
-  background: #e6f4ff;
+  box-shadow: 0 0 0 1px var(--info) inset;
+  background: var(--primary-soft);
 }
 </style>

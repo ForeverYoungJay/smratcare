@@ -3,7 +3,7 @@
     <div class="close-shell">
       <a-card class="close-hero card-elevated" :bordered="false">
         <div>
-          <div class="close-hero__eyebrow">Month Close</div>
+          <div class="close-hero__eyebrow">月度结账</div>
           <h2>财务月结不再靠口头确认，而是直接看到哪一步卡住。</h2>
           <p>这页把本月账单、票据、异常修复和催缴收口状态压成一张进度图。</p>
         </div>
@@ -17,10 +17,10 @@
               <a-button @click="exportData">导出月结单</a-button>
               <a-button @click="printSummary">打印月结单</a-button>
               <a-button type="primary" :disabled="summary?.locked" @click="openCloseModal">发起关账</a-button>
-              <a-button v-if="summary?.locked" danger @click="openUnlockModal">反锁账</a-button>
               <a-button v-if="summary?.locked" @click="openCrossPeriodModal">跨期申请</a-button>
               <a-button @click="go('/finance/reconcile/issue-center')">异常修复中心</a-button>
               <a-button @click="go('/finance/bills/follow-up')">催缴跟进</a-button>
+              <a-button v-if="summary?.locked" danger @click="openUnlockModal">反锁账</a-button>
             </a-space>
           </a-form-item>
         </a-form>
@@ -380,7 +380,7 @@ onMounted(loadData)
 
 .progress-card__label {
   font-size: 13px;
-  color: #64748b;
+  color: var(--muted);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -389,7 +389,7 @@ onMounted(loadData)
   margin-top: 10px;
   font-size: 30px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ink);
 }
 
 .progress-card__meta {
@@ -411,8 +411,8 @@ onMounted(loadData)
 
 .step-card {
   padding: 16px;
-  background: linear-gradient(180deg, #ffffff, #f8fafc);
-  border: 1px solid #e2e8f0;
+  background: linear-gradient(180deg, #ffffff, var(--surface-2));
+  border: 1px solid var(--border);
 }
 
 .step-card__head {
@@ -424,12 +424,12 @@ onMounted(loadData)
 .step-card__title {
   font-size: 16px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ink);
 }
 
 .step-card__detail {
   margin-top: 6px;
-  color: #64748b;
+  color: var(--muted);
 }
 
 .step-card__foot {
@@ -437,7 +437,7 @@ onMounted(loadData)
   justify-content: space-between;
   gap: 10px;
   margin-top: 12px;
-  color: #475569;
+  color: var(--muted);
 }
 
 @media (max-width: 1100px) {

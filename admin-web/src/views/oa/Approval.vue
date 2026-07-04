@@ -2005,18 +2005,17 @@ useLiveSyncRefresh({
   gap: 6px;
   padding: 14px 16px;
   border-radius: 16px;
-  border: 1px solid #dce9f2;
+  border: 1px solid var(--border-soft);
   background: rgba(255, 255, 255, 0.86);
 }
 
-.overview-card span,
-.table-head span {
-  color: #6d8aa3;
+.overview-card span {
+  color: var(--muted);
   font-size: 12px;
 }
 
 .overview-card strong {
-  color: #173854;
+  color: var(--ink);
   font-size: 24px;
 }
 
@@ -2026,7 +2025,7 @@ useLiveSyncRefresh({
 .selection-tip,
 .urge-meta,
 .timeline-time {
-  color: #6d8aa3;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -2042,7 +2041,7 @@ useLiveSyncRefresh({
   gap: 8px;
   min-width: 0;
   padding: 12px 14px;
-  border: 1px solid #e5eef5;
+  border: 1px solid var(--border-soft);
   border-radius: 14px;
   background: rgba(247, 251, 254, 0.88);
 }
@@ -2058,32 +2057,9 @@ useLiveSyncRefresh({
   margin-top: 2px;
 }
 
-.selection-pill {
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: #eef8fc;
-  color: #1b6282;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.table-head,
 .approval-title-cell,
 .approver-cell {
   display: flex;
-}
-
-.table-head {
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.table-head strong {
-  display: block;
-  color: #173854;
-  font-size: 16px;
 }
 
 .approval-title-cell,
@@ -2096,7 +2072,7 @@ useLiveSyncRefresh({
 .approval-title-cell strong,
 .approver-name,
 .approval-amount {
-  color: #173854;
+  color: var(--ink);
   font-weight: 700;
 }
 
@@ -2109,7 +2085,7 @@ useLiveSyncRefresh({
 
 .action-group-title {
   font-size: 12px;
-  color: #5e788f;
+  color: var(--muted);
   font-weight: 700;
 }
 
@@ -2123,8 +2099,8 @@ useLiveSyncRefresh({
 }
 
 .summary-filter-card.active {
-  box-shadow: 0 0 0 1px #1677ff inset;
-  background: #e6f4ff;
+  box-shadow: 0 0 0 1px var(--primary) inset;
+  background: var(--primary-soft);
 }
 
 .upload-hint {
@@ -2141,7 +2117,7 @@ useLiveSyncRefresh({
   justify-content: space-between;
   gap: 8px;
   padding: 4px 8px;
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--border-soft);
   border-radius: 6px;
 }
 
@@ -2151,12 +2127,12 @@ useLiveSyncRefresh({
 
 .timeline-title {
   font-weight: 600;
-  color: #173854;
+  color: var(--ink);
 }
 
 .timeline-desc {
   margin-top: 2px;
-  color: #4f6f86;
+  color: var(--muted);
 }
 
 .timeline-time {
@@ -2164,7 +2140,7 @@ useLiveSyncRefresh({
 }
 
 :deep(.is-urgent-row > td) {
-  background: rgba(255, 247, 230, 0.82);
+  background: rgba(var(--warning-rgb), 0.12);
 }
 
 @media (max-width: 1200px) {

@@ -90,10 +90,13 @@ defineEmits<{
   gap: 12px;
   min-height: 56px;
   padding: 0 16px;
-  border-bottom: 1px solid rgba(208, 222, 231, 0.72);
-  background:
-    linear-gradient(180deg, rgba(249, 252, 254, 0.96), rgba(245, 250, 253, 0.92));
-  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-soft);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-xs);
+  /* Reset the tall line-height inherited from ant-layout-header (64~74px),
+     which otherwise stretches inline children like the search shortcut into a tall bar. */
+  line-height: 1.4;
 }
 
 .global-header__left,
@@ -112,13 +115,13 @@ defineEmits<{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  min-width: 34px;
-  height: 34px;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
   padding: 0;
   border-radius: 10px;
-  border-color: rgba(207, 220, 230, 0.9);
-  background: rgba(255, 255, 255, 0.9);
+  border-color: var(--border);
+  background: #ffffff;
   box-shadow: var(--shadow-xs);
 }
 
@@ -132,7 +135,8 @@ defineEmits<{
 
 .global-header__title-block h1 {
   margin: 0;
-  font-size: 16px;
+  font-size: 17px;
+  font-weight: 700;
   line-height: 1;
   color: var(--ink);
   letter-spacing: 0.01em;
@@ -141,13 +145,13 @@ defineEmits<{
 
 .global-header__divider {
   width: 1px;
-  height: 12px;
-  background: rgba(208, 221, 230, 0.86);
+  height: 14px;
+  background: var(--border);
 }
 
 .global-header__breadcrumb {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1;
   min-width: 0;
   white-space: nowrap;
@@ -158,57 +162,81 @@ defineEmits<{
 .global-header__search {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 10px 0 9px;
-  border: 1px solid rgba(206, 219, 229, 0.9);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: var(--shadow-xs);
+  gap: 7px;
+  height: 34px;
+  padding: 0 10px 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-3);
+  box-shadow: none;
   color: var(--ink);
   cursor: pointer;
-  min-width: 180px;
+  min-width: 208px;
   justify-content: space-between;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.global-header__search:hover {
+  border-color: rgba(var(--primary-rgb), 0.36);
+  background: #ffffff;
 }
 
 .global-header__search-label {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   text-align: left;
   flex: 1;
 }
 
 .global-header__search-icon {
   color: var(--primary-strong);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .global-header__search-shortcut {
-  padding: 2px 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
   border-radius: 999px;
-  background: rgba(19, 108, 181, 0.1);
+  background: var(--primary-soft);
   color: var(--primary-strong);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
+  line-height: 1;
 }
 
 .global-header__icon-btn {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: 10px;
-  border-color: rgba(207, 220, 230, 0.9);
-  background: rgba(255, 255, 255, 0.92);
+  border-color: var(--border);
+  background: #ffffff;
   box-shadow: var(--shadow-xs);
+}
+
+.global-header__icon-btn .anticon {
+  font-size: 16px;
 }
 
 .global-header__user {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 0 0 2px;
+  gap: 7px;
+  padding: 3px 8px 3px 3px;
+  border-radius: 999px;
   color: var(--ink);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
+  transition: background 0.2s ease;
+}
+
+.global-header__user:hover {
+  background: var(--primary-soft);
+  color: var(--primary-strong);
 }
 
 .global-header__user strong {

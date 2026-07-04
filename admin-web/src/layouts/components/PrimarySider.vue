@@ -29,6 +29,12 @@
       @openChange="$emit('open-change', $event)"
       @click="$emit('menu-click', $event)"
     />
+
+    <div v-if="canToggleScope && !collapsed" class="primary-sider__scope">
+      <a-button size="small" block @click="$emit('toggle-menu-scope')">
+        {{ showAllMenu ? '仅看本岗位常用' : '显示全部功能' }}
+      </a-button>
+    </div>
   </a-layout-sider>
 </template>
 
@@ -44,25 +50,31 @@ defineProps<{
   mobile?: boolean
   openKeys: string[]
   selectedKeys: string[]
+  canToggleScope?: boolean
+  showAllMenu?: boolean
 }>()
 
 defineEmits<{
   (e: 'open-change', keys: string[]): void
   (e: 'menu-click', info: any): void
   (e: 'mouseleave'): void
+  (e: 'toggle-menu-scope'): void
 }>()
 </script>
 
 <style scoped>
+.primary-sider__scope {
+  padding: 8px 16px 14px;
+}
+
 .primary-sider {
   position: sticky;
   top: 0;
   height: 100vh;
   overflow: hidden;
-  border-inline-end: 1px solid rgba(201, 216, 227, 0.9);
-  background:
-    linear-gradient(180deg, rgba(250, 253, 255, 0.98) 0%, rgba(243, 249, 252, 0.98) 100%);
-  box-shadow: 10px 0 28px rgba(18, 49, 77, 0.05);
+  border-inline-end: 1px solid var(--border-soft);
+  background: #fcfcfa;
+  box-shadow: 1px 0 2px rgba(34, 51, 46, 0.04);
 }
 
 .primary-sider :deep(.ant-layout-sider-children) {
@@ -77,7 +89,7 @@ defineEmits<{
   align-items: center;
   gap: 12px;
   padding: 8px 12px 12px;
-  border-bottom: 1px solid rgba(220, 231, 238, 0.86);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .primary-sider__logo {
@@ -85,9 +97,9 @@ defineEmits<{
   place-items: center;
   width: 46px;
   height: 46px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, rgba(19, 108, 181, 0.14), rgba(30, 138, 143, 0.14));
-  border: 1px solid rgba(190, 214, 228, 0.9);
+  border-radius: 12px;
+  background: var(--primary-soft);
+  border: 1px solid rgba(var(--primary-rgb), 0.16);
   box-shadow: var(--shadow-xs);
 }
 
@@ -126,10 +138,10 @@ defineEmits<{
 .primary-sider__menu :deep(.ant-menu-item-group-title) {
   position: relative;
   padding: 18px 12px 8px 14px;
-  color: #7f96aa;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 
 .primary-sider__menu :deep(.ant-menu-item-group-title)::before {
@@ -140,7 +152,7 @@ defineEmits<{
   width: 8px;
   height: 2px;
   border-radius: 999px;
-  background: rgba(29, 140, 180, 0.28);
+  background: rgba(var(--primary-rgb), 0.35);
 }
 
 .primary-sider__menu :deep(.ant-menu-item),
@@ -149,15 +161,15 @@ defineEmits<{
   height: 44px;
   line-height: 44px;
   margin: 4px 6px;
-  border-radius: 14px;
-  color: #5c768c;
+  border-radius: 10px;
+  color: var(--muted);
   font-weight: 600;
 }
 
 .primary-sider__menu :deep(.ant-menu-item:hover),
 .primary-sider__menu :deep(.ant-menu-submenu-title:hover) {
   color: var(--ink);
-  background: rgba(19, 108, 181, 0.08);
+  background: rgba(var(--primary-rgb), 0.07);
 }
 
 .primary-sider__menu :deep(.ant-menu-item-selected)::before,
@@ -165,28 +177,27 @@ defineEmits<{
 .primary-sider__menu :deep(.ant-menu-submenu-open > .ant-menu-submenu-title)::before {
   content: '';
   position: absolute;
-  left: 10px;
+  left: 6px;
   top: 10px;
   bottom: 10px;
   width: 3px;
   border-radius: 999px;
-  background: linear-gradient(180deg, #1d8cb4, #45b59f);
+  background: var(--primary);
 }
 
 .primary-sider__menu :deep(.ant-menu-item-selected),
 .primary-sider__menu :deep(.ant-menu-submenu-selected > .ant-menu-submenu-title),
 .primary-sider__menu :deep(.ant-menu-submenu-open > .ant-menu-submenu-title) {
   color: var(--primary-strong);
-  background: linear-gradient(90deg, rgba(19, 108, 181, 0.14), rgba(30, 138, 143, 0.08));
-  box-shadow: inset 0 0 0 1px rgba(19, 108, 181, 0.08);
+  background: var(--primary-soft);
 }
 
 .primary-sider__menu :deep(.ant-menu-sub.ant-menu-inline) {
-  background: rgba(246, 250, 252, 0.82);
+  background: var(--surface-3);
   margin: 2px 6px 8px;
   padding: 6px 4px 8px;
-  border-radius: 18px;
-  box-shadow: inset 0 0 0 1px rgba(220, 231, 238, 0.72);
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--border-soft);
 }
 
 .primary-sider__menu :deep(.ant-menu-sub.ant-menu-inline .ant-menu-item) {
@@ -194,18 +205,18 @@ defineEmits<{
   line-height: 40px;
   margin: 3px 4px;
   padding-inline-start: 18px !important;
-  border-radius: 12px;
-  color: #70889c;
+  border-radius: 10px;
+  color: var(--muted);
   font-size: 13px;
   font-weight: 500;
 }
 
 .primary-sider__menu :deep(.ant-menu-sub.ant-menu-inline .ant-menu-item-selected) {
-  color: var(--ink);
-  background: rgba(255, 255, 255, 0.98);
+  color: var(--primary-strong);
+  background: #ffffff;
   box-shadow:
-    inset 0 0 0 1px rgba(19, 108, 181, 0.1),
-    0 6px 14px rgba(21, 63, 97, 0.06);
+    inset 0 0 0 1px rgba(var(--primary-rgb), 0.14),
+    var(--shadow-xs);
 }
 
 .primary-sider__menu :deep(.ant-menu-item .ant-menu-title-content),
@@ -218,6 +229,35 @@ defineEmits<{
 .primary-sider__menu :deep(.ant-menu-item .anticon),
 .primary-sider__menu :deep(.ant-menu-submenu-title .anticon) {
   font-size: 17px;
+}
+
+/* 收起态：仅保留图标与分组分隔线，去掉残留文字 */
+.primary-sider.ant-layout-sider-collapsed :deep(.ant-layout-sider-children) {
+  padding-inline: 8px;
+}
+
+.primary-sider.ant-layout-sider-collapsed .primary-sider__brand {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.primary-sider.ant-layout-sider-collapsed :deep(.ant-menu-item-group-title) {
+  padding: 14px 0 6px;
+  font-size: 0;
+  line-height: 0;
+}
+
+.primary-sider.ant-layout-sider-collapsed :deep(.ant-menu-item-group-title)::before {
+  left: 50%;
+  top: auto;
+  bottom: 4px;
+  width: 16px;
+  transform: translateX(-50%);
+}
+
+.primary-sider.ant-layout-sider-collapsed :deep(.ant-menu-item),
+.primary-sider.ant-layout-sider-collapsed :deep(.ant-menu-submenu-title) {
+  margin: 4px auto;
 }
 
 @media (max-width: 992px) {

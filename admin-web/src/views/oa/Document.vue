@@ -47,12 +47,41 @@
           <template #extra>
             <a-button type="primary" @click="openCreate">新增文档</a-button>
             <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
+            <a-button @click="downloadExport">导出CSV</a-button>
             <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
             <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
-            <a-button @click="downloadExport">导出CSV</a-button>
             <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
           </template>
         </SearchForm>
+
+        <div v-if="isComplianceMode" class="compliance-panel">
+          <div class="compliance-summary">
+            <div>
+              <strong>{{ activeArchivePreset?.title || '合规档案包' }}</strong>
+              <span>{{ activeArchivePreset?.description || '按协议、告知、记录、报表等材料统一检索和补齐。' }}</span>
+            </div>
+            <a-button size="small" @click="openFolderCreateWithPreset">新建档案夹</a-button>
+          </div>
+          <a-space wrap>
+            <a-button
+              v-for="doc in complianceRequiredDocuments"
+              :key="doc"
+              size="small"
+              @click="applyComplianceKeyword(doc)"
+            >
+              {{ doc }}
+            </a-button>
+            <a-button
+              v-if="activeArchivePreset?.nextDocuments?.length"
+              size="small"
+              type="primary"
+              ghost
+              @click="openComplianceCreate(activeArchivePreset.nextDocuments[0])"
+            >
+              补齐{{ activeArchivePreset.nextDocuments[0] }}
+            </a-button>
+          </a-space>
+        </div>
 
         <DataTable
           rowKey="id"
@@ -210,8 +239,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
+import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -231,6 +261,7 @@ import {
 import type { OaDocument, OaDocumentFolder, PageResult } from '../../types'
 
 const ROOT_KEY = 'ROOT'
+const route = useRoute()
 
 const loading = ref(false)
 const rows = ref<OaDocument[]>([])
@@ -247,6 +278,51 @@ const query = reactive({
 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const selectedRowKeys = ref<string[]>([])
+
+const complianceArchivePresets = {
+  'elder-agreement': {
+    title: '长者入住合规档案',
+    keyword: '入住协议',
+    folderName: '长者入住合规档案',
+    description: '集中补齐入住协议、知情同意、风险告知和联系人授权。',
+    requiredDocuments: ['入住协议', '知情同意书', '风险告知书', '护理等级确认', '家属联系人授权'],
+    nextDocuments: ['风险告知书', '知情同意书']
+  },
+  'medical-care': {
+    title: '医疗护理记录档案',
+    keyword: '护理记录',
+    folderName: '医疗护理记录档案',
+    description: '集中检索护理记录、医嘱、用药确认和交接班材料。',
+    requiredDocuments: ['护理记录', '医嘱记录', '用药确认', '生命体征', '交接班记录'],
+    nextDocuments: ['护理记录', '交接班记录']
+  },
+  incident: {
+    title: '事故与应急档案',
+    keyword: '事故报告',
+    folderName: '事故与应急档案',
+    description: '统一归档事故报告、家属告知、整改措施和复盘结论。',
+    requiredDocuments: ['事故报告', '现场处理', '家属告知', '整改措施', '复盘结论'],
+    nextDocuments: ['事故报告', '整改措施']
+  },
+  government: {
+    title: '监管与经营报表',
+    keyword: '监管报表',
+    folderName: '监管与经营报表',
+    description: '沉淀监管报表、月度经营报表和服务质量报告。',
+    requiredDocuments: ['入住人数', '床位使用率', '月收入', '事故数量', '服务质量'],
+    nextDocuments: ['监管报表', '月度服务报告']
+  },
+  audit: {
+    title: '权限与操作日志',
+    keyword: '操作日志',
+    folderName: '权限与操作日志',
+    description: '收拢角色权限、操作日志、制度更新和培训记录。',
+    requiredDocuments: ['角色权限', '页面权限', '操作日志', '制度更新', '员工培训记录'],
+    nextDocuments: ['操作日志', '制度更新']
+  }
+} as const
+
+type ComplianceArchiveKey = keyof typeof complianceArchivePresets
 
 const columns = [
   { title: '文件名', dataIndex: 'name', key: 'name', width: 260 },
@@ -361,6 +437,66 @@ const uploadDisplayText = computed(() => {
   }
   return '支持 doc/docx/pdf，上传后自动填充文件名、地址、大小'
 })
+const activeArchiveKey = computed(() => {
+  const key = String(route.query.archive || '')
+  return key in complianceArchivePresets ? (key as ComplianceArchiveKey) : undefined
+})
+const activeArchivePreset = computed(() => (activeArchiveKey.value ? complianceArchivePresets[activeArchiveKey.value] : undefined))
+const isComplianceMode = computed(() => route.query.compliance === '1' || Boolean(activeArchivePreset.value))
+const complianceRequiredDocuments = computed(() => activeArchivePreset.value?.requiredDocuments || [])
+
+function getRouteQueryString(value: unknown) {
+  return Array.isArray(value) ? String(value[0] || '') : String(value || '')
+}
+
+function applyDocumentQueryFromRoute() {
+  const archivePreset = activeArchivePreset.value
+  const keyword = getRouteQueryString(route.query.keyword) || archivePreset?.keyword || ''
+  const folderId = getRouteQueryString(route.query.folderId)
+  const visibility = getRouteQueryString(route.query.folderVisibility)
+  query.keyword = keyword
+  query.folderVisibility = visibility === 'PUBLIC' || visibility === 'PRIVATE' ? visibility : undefined
+  query.regionCode = getRouteQueryString(route.query.regionCode)
+  query.folderId = folderId
+  selectedFolderKey.value = folderId || ROOT_KEY
+  query.pageNo = 1
+  pagination.current = 1
+}
+
+function applyComplianceKeyword(keyword: string) {
+  query.keyword = keyword
+  query.pageNo = 1
+  pagination.current = 1
+  fetchData()
+}
+
+function findFolderByName(name?: string) {
+  if (!name) return null
+  for (const folder of folderNodeMap.value.values()) {
+    if (folder.name === name || folder.name.includes(name)) {
+      return folder
+    }
+  }
+  return null
+}
+
+function openComplianceCreate(documentName: string) {
+  openCreate()
+  const preset = activeArchivePreset.value
+  const folder = findFolderByName(preset?.folderName)
+  form.name = documentName
+  form.folderId = folder ? String(folder.id) : form.folderId
+  form.remark = preset ? `${preset.title}：${documentName}` : documentName
+}
+
+function openFolderCreateWithPreset() {
+  openFolderCreate()
+  const preset = activeArchivePreset.value
+  if (preset) {
+    folderForm.name = preset.folderName
+    folderForm.remark = preset.description
+  }
+}
 
 async function fetchFolderTree() {
   const data = await getDocumentFolderTree()
@@ -735,7 +871,16 @@ function formatSize(size?: number) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
 }
 
+applyDocumentQueryFromRoute()
 Promise.all([fetchFolderTree(), fetchData()])
+
+watch(
+  () => route.query,
+  () => {
+    applyDocumentQueryFromRoute()
+    fetchData()
+  }
+)
 </script>
 
 <style scoped>
@@ -759,17 +904,43 @@ Promise.all([fetchFolderTree(), fetchData()])
 }
 
 .selection-tip {
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--muted);
   font-size: 12px;
 }
 
 .upload-hint {
   margin-top: 8px;
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--muted);
   font-size: 12px;
 }
 
 .name-link {
   padding-inline: 0;
+}
+
+.compliance-panel {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(var(--primary-rgb), 0.18);
+  border-radius: 8px;
+  background: var(--primary-soft);
+}
+
+.compliance-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.compliance-summary strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.compliance-summary span {
+  color: var(--muted);
+  font-size: 13px;
 }
 </style>

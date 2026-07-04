@@ -37,6 +37,7 @@ async function safeStaffCall(realCall, fallbackValue) {
     return await realCall();
   } catch (error) {
     if (isAuthRequiredError(error)) throw error;
+    if (!canUseMockFallback()) throw error;
     return typeof fallbackValue === 'function' ? fallbackValue() : fallbackValue;
   }
 }
@@ -140,6 +141,7 @@ async function submitMealDeliveryReceipt(id, payload = {}) {
     payload.remark,
     `餐量反馈：${payload.intake || '未记录'}`,
     `签收人：${payload.signerName || '未记录'}`,
+    payload.deliveredAt ? `送达时间：${payload.deliveredAt}` : '',
     payload.exceptionText ? `异常说明：${payload.exceptionText}` : ''
   ].filter(Boolean);
   return completeTask(id, {
@@ -182,6 +184,8 @@ async function getMedicationTasks() {
 
 async function submitMedicationReceipt(id, payload = {}) {
   const checkedMap = {
+    // 三查七对逐项核对结果（由页面 checklist 提供）优先并入回执。
+    ...(payload.checklist && typeof payload.checklist === 'object' ? payload.checklist : {}),
     核对老人身份: !!payload.identityChecked,
     核对药品剂量: !!payload.drugChecked,
     确认给药完成: !!payload.administered
@@ -262,15 +266,35 @@ async function getTaskReceipts(filter = '') {
   );
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// 上传失败自动重试 2 次，间隔 1s / 3s，缓解弱网下的偶发失败。
+async function uploadWithRetry(uploadCall, retryDelays = [1000, 3000]) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= retryDelays.length; attempt += 1) {
+    try {
+      return await uploadCall();
+    } catch (error) {
+      lastError = error;
+      if (attempt < retryDelays.length) {
+        await sleep(retryDelays[attempt]);
+      }
+    }
+  }
+  throw lastError;
+}
+
 async function uploadStaffTaskEvidence(filePath, options = {}) {
   return withFallback(
-    async () => uploadFile({
+    async () => uploadWithRetry(() => uploadFile({
       url: '/api/files/upload',
       filePath,
       formData: {
         bizType: options.bizType || 'staff-task-evidence'
       }
-    }),
+    })),
     () => ({
       fileName: filePath,
       originalFileName: filePath,

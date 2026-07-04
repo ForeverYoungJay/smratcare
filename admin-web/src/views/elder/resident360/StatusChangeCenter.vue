@@ -67,8 +67,8 @@
         <a-button type="primary" @click="go('/elder/outing')">外出登记</a-button>
         <a-button @click="go('/elder/visit-register')">来访登记</a-button>
         <a-button @click="go('/elder/trial-stay')">试住登记</a-button>
-        <a-button danger @click="go('/elder/discharge-apply')">退住申请</a-button>
         <a-button @click="go('/elder/medical-outing')">外出就医登记</a-button>
+        <a-button danger @click="go('/elder/discharge-apply')">退住申请</a-button>
         <a-button danger @click="go('/elder/death-register')">死亡登记</a-button>
       </a-space>
 
@@ -663,20 +663,20 @@ useLiveSyncRefresh({
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: #334155;
+  color: var(--ink-soft);
   font-size: 12px;
   font-weight: 600;
 }
 
 .receipt-meta {
-  color: #64748b;
+  color: var(--muted);
   font-weight: 500;
 }
 
 .receipt-tile {
   min-height: 136px;
   border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  border: 1px solid var(--border);
   padding: 10px 12px;
   background: linear-gradient(126deg, rgba(248, 250, 252, 0.94) 0%, rgba(241, 245, 249, 0.84) 100%);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -699,14 +699,14 @@ useLiveSyncRefresh({
 }
 
 .receipt-title {
-  color: #0f172a;
+  color: var(--ink);
   font-size: 13px;
   font-weight: 700;
 }
 
 .receipt-main-value {
   margin-top: 6px;
-  color: #0f172a;
+  color: var(--ink);
   font-size: 30px;
   line-height: 1;
   font-weight: 700;
@@ -714,7 +714,7 @@ useLiveSyncRefresh({
 
 .receipt-desc {
   margin-top: 6px;
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -728,8 +728,8 @@ useLiveSyncRefresh({
 .receipt-mini-metrics span {
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.12);
-  color: #334155;
+  background: var(--surface-3);
+  color: var(--ink-soft);
   font-size: 11px;
 }
 
@@ -741,7 +741,7 @@ useLiveSyncRefresh({
 }
 
 .linkage-tile {
-  border: 1px solid rgba(148, 163, 184, 0.24);
+  border: 1px solid var(--border);
   background: linear-gradient(128deg, rgba(248, 250, 252, 0.95) 0%, rgba(241, 245, 249, 0.85) 100%);
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -753,14 +753,14 @@ useLiveSyncRefresh({
 }
 
 .linkage-title {
-  color: #0f172a;
+  color: var(--ink);
   font-size: 13px;
   font-weight: 600;
 }
 
 .linkage-desc {
   margin-top: 6px;
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
   line-height: 1.5;
 }

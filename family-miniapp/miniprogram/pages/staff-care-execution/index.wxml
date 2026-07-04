@@ -40,6 +40,16 @@
         <text class="task-time">{{activeTask.time}}</text>
       </view>
 
+      <view class="state-card inline-state success-state" wx:if="{{submitSuccess}}">
+        <view class="state-title">护理回执已提交</view>
+        <view class="section-subtitle">{{submitSuccess}}</view>
+        <view class="section-subtitle" wx:if="{{lastReceiptSummary}}">最近一次：{{lastReceiptSummary}}</view>
+      </view>
+      <view class="state-card inline-state error-state" wx:if="{{submitError}}">
+        <view class="state-title">护理回执提交失败</view>
+        <view class="section-subtitle">{{submitError}}</view>
+      </view>
+
       <view class="check-grid">
         <view class="check-item {{identityChecked ? 'checked' : ''}}" data-field="identityChecked" bindtap="toggleCheck">
           <text class="check-dot">{{identityChecked ? '✓' : ''}}</text>

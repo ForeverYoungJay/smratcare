@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.Data;
@@ -21,6 +23,7 @@ public final class FamilyPortalModels {
     private MealSummary meal;
     private List<MessageItem> notices = new ArrayList<>();
     private List<String> focusEvents = new ArrayList<>();
+    private List<CareTimelineItem> careTimeline = new ArrayList<>();
   }
 
   @Data
@@ -96,6 +99,16 @@ public final class FamilyPortalModels {
     private String unit;
     private String status;
     private String trend;
+  }
+
+  @Data
+  public static class CareTimelineItem {
+    private String time;
+    private String category;
+    private String title;
+    private String content;
+    private String status;
+    private String linkPath;
   }
 
   @Data
@@ -232,6 +245,7 @@ public final class FamilyPortalModels {
     private String title;
     private String date;
     private String elderName;
+    private String albumScope;
     private String description;
     private String mediaType;
     private String coverText;
@@ -261,6 +275,27 @@ public final class FamilyPortalModels {
     private String destination;
     private String returnTime;
     private String status;
+    private String applicationStatus;
+    private Boolean canCancel;
+    private Boolean canResubmit;
+  }
+
+  @Data
+  public static class OutingApplicationRequest {
+    @NotNull
+    private Long elderId;
+    @NotNull
+    private LocalDate outingDate;
+    private LocalDateTime expectedReturnTime;
+    @Size(max = 80)
+    private String companion;
+    @NotBlank
+    @Size(max = 200)
+    private String reason;
+    @Size(max = 120)
+    private String destination;
+    @Size(max = 500)
+    private String remark;
   }
 
   @Data
@@ -361,6 +396,23 @@ public final class FamilyPortalModels {
     private Boolean bound;
     private String openId;
     private String message;
+  }
+
+  @Data
+  public static class NotifyLogItem {
+    private Long id;
+    private Long elderId;
+    private String eventType;
+    private String eventTypeText;
+    private String level;
+    private String title;
+    private String content;
+    private String status;
+    private String statusText;
+    private Integer retryCount;
+    private String lastError;
+    private String createTime;
+    private String updateTime;
   }
 
   @Data

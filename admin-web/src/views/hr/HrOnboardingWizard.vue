@@ -353,8 +353,8 @@ onMounted(() => {
 <style scoped>
 .wizard-hero {
   --wizard-bg: #f4ede2;
-  --wizard-ink: #1f2937;
-  --wizard-soft: rgba(71, 85, 105, 0.72);
+  --wizard-ink: var(--ink);
+  --wizard-soft: var(--muted);
   --wizard-accent: #b45309;
   --wizard-accent-strong: #0f766e;
   position: relative;
@@ -450,10 +450,10 @@ onMounted(() => {
 .lookup-card,
 .summary-card {
   border-radius: 18px;
-  border: 1px solid rgba(148, 163, 184, 0.16);
+  border: 1px solid var(--border-soft);
   background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(10px);
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .progress-shell {
@@ -515,23 +515,23 @@ onMounted(() => {
   gap: 16px;
   padding: 18px;
   border-radius: 22px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  border: 1px solid var(--border-soft);
   background: #fff;
   transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
 }
 
 .step-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.08);
+  box-shadow: var(--shadow-md);
 }
 
 .step-card.is-current {
-  border-color: rgba(13, 148, 136, 0.3);
+  border-color: rgba(var(--info-rgb), 0.3);
   background: linear-gradient(135deg, rgba(240, 253, 250, 0.95), rgba(255, 255, 255, 0.98));
 }
 
 .step-card.is-done {
-  border-color: rgba(34, 197, 94, 0.24);
+  border-color: rgba(var(--success-rgb), 0.24);
   background: linear-gradient(135deg, rgba(240, 253, 244, 0.96), rgba(255, 255, 255, 0.98));
 }
 
@@ -557,20 +557,20 @@ onMounted(() => {
 }
 
 .step-title {
-  color: #111827;
+  color: var(--ink);
   font-size: 20px;
   font-weight: 700;
 }
 
 .step-subtitle {
   margin-top: 4px;
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .step-description {
   margin: 12px 0 0;
-  color: #475569;
+  color: var(--muted);
   line-height: 1.8;
 }
 
@@ -584,7 +584,7 @@ onMounted(() => {
 .step-notes span {
   padding: 6px 10px;
   border-radius: 999px;
-  color: #475569;
+  color: var(--muted);
   background: rgba(241, 245, 249, 0.9);
   font-size: 12px;
 }
@@ -603,7 +603,7 @@ onMounted(() => {
 
 .lookup-title,
 .summary-title {
-  color: #111827;
+  color: var(--ink);
   font-size: 16px;
   font-weight: 700;
 }
@@ -611,7 +611,7 @@ onMounted(() => {
 .lookup-text,
 .summary-text,
 .lookup-hint {
-  color: #64748b;
+  color: var(--muted);
   line-height: 1.7;
 }
 
@@ -627,7 +627,7 @@ onMounted(() => {
 .summary-list {
   margin: 12px 0 0;
   padding-left: 18px;
-  color: #475569;
+  color: var(--muted);
   line-height: 1.9;
 }
 

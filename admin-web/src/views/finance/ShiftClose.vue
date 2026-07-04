@@ -3,7 +3,7 @@
     <div class="shift-shell">
       <a-card class="shift-hero card-elevated" :bordered="false">
         <div>
-          <div class="shift-hero__eyebrow">Shift Close</div>
+          <div class="shift-hero__eyebrow">交班结账</div>
           <h2>交班前只看今天该收口的四件事。</h2>
           <p>收款流水、票据关联、退款修正和对账异常缺一不可，避免第二天继续挂账。</p>
         </div>
@@ -50,7 +50,7 @@
         <a-row :gutter="[16, 16]" style="margin-top: 16px;">
           <a-col :xs="24" :xl="14">
             <a-card class="card-elevated" :bordered="false" title="收款流水">
-              <vxe-table border stripe show-overflow :loading="loading" :data="payments" height="380">
+              <vxe-table border stripe show-overflow="title" :loading="loading" :data="payments" height="380">
                 <vxe-column field="billMonthlyId" title="账单ID" width="120" />
                 <vxe-column field="amount" title="金额" width="120" />
                 <vxe-column field="payMethod" title="方式" width="120" />
@@ -116,12 +116,25 @@ const query = reactive({
 
 const pendingInvoices = computed(() => invoices.value.filter(item => item.invoiceStatus === 'UNLINKED'))
 const sameDayAdjustments = computed(() => adjustments.value.filter(item => item.occurredAt && dayjs(item.occurredAt).isSame(query.date, 'day')))
-const canClose = computed(() => pendingInvoices.value.length === 0 && sameDayAdjustments.value.length === 0 && exceptions.value.length === 0 && payments.value.length > 0)
-const closeDescription = computed(() => canClose.value
-  ? '票据、修正和异常均已收口，可以执行交班。'
-  : `待补票据 ${pendingInvoices.value.length}；修正 ${sameDayAdjustments.value.length}；异常 ${exceptions.value.length}。`)
+const hasCashActivity = computed(() => payments.value.length > 0)
+const hasUnclosedIssues = computed(() => pendingInvoices.value.length > 0 || sameDayAdjustments.value.length > 0 || exceptions.value.length > 0)
+const canClose = computed(() => !hasUnclosedIssues.value)
+const closeDescription = computed(() => {
+  if (hasUnclosedIssues.value) {
+    return `待补票据 ${pendingInvoices.value.length}；修正 ${sameDayAdjustments.value.length}；异常 ${exceptions.value.length}。`
+  }
+  return hasCashActivity.value
+    ? '票据、修正和异常均已收口，可以执行交班。'
+    : '当前日期暂无收款流水，也未发现票据、修正或对账异常，可按空班完成交班。'
+})
 const closeChecks = computed(() => [
-  { label: '收款流水已核对', hint: payments.value.length ? `已加载 ${payments.value.length} 笔当日流水` : '当前日期暂无收款记录', done: payments.value.length > 0 },
+  {
+    label: '收款流水已核对',
+    hint: payments.value.length
+      ? `已加载 ${payments.value.length} 笔当日流水`
+      : (hasUnclosedIssues.value ? '当前日期暂无收款记录' : '当前日期暂无收款记录，可按空班交班'),
+    done: payments.value.length > 0 || !hasUnclosedIssues.value
+  },
   { label: '票据关联完整', hint: pendingInvoices.value.length ? `仍有 ${pendingInvoices.value.length} 笔未补票据` : '票据关联已补齐', done: pendingInvoices.value.length === 0 },
   { label: '退款/冲正已复核', hint: sameDayAdjustments.value.length ? `仍有 ${sameDayAdjustments.value.length} 笔修正待处理` : '当日无待复核修正', done: sameDayAdjustments.value.length === 0 },
   { label: '对账异常已清零', hint: exceptions.value.length ? `仍有 ${exceptions.value.length} 条异常` : '未发现对账异常', done: exceptions.value.length === 0 }
@@ -195,7 +208,7 @@ onMounted(loadData)
   grid-template-columns: 1.1fr 1fr;
   background:
     radial-gradient(circle at top right, rgba(250, 204, 21, 0.22), transparent 28%),
-    linear-gradient(135deg, #111827 0%, #1d4ed8 46%, #0f766e 100%);
+    linear-gradient(135deg, #111827 0%, #33698a 46%, #0f766e 100%);
   color: #fff;
 }
 
@@ -252,7 +265,7 @@ onMounted(loadData)
   justify-content: space-between;
   gap: 12px;
   padding: 12px 0;
-  border-bottom: 1px dashed #e2e8f0;
+  border-bottom: 1px dashed var(--border-soft);
 }
 
 .close-checks__item:last-child {
@@ -261,12 +274,13 @@ onMounted(loadData)
 
 .close-checks__title {
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ink);
 }
 
 .close-checks__hint {
   margin-top: 4px;
-  color: #64748b;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .issue-list {

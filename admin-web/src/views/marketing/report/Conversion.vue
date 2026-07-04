@@ -68,7 +68,7 @@
           <strong class="conversion-stat-value">{{ item.value }}</strong>
           <div class="conversion-stat-meta">
             <span>{{ item.rate }}</span>
-            <a @click="drillDown(item.stage)">查看明细</a>
+            <a-button type="link" size="small" @click="drillDown(item.stage)">查看明细</a-button>
           </div>
         </a-card>
       </a-col>
@@ -105,7 +105,9 @@
       <a-table :columns="columns" :data-source="rows" :pagination="false" row-key="stage">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'stage'">
-            <a @click="drillDown(record.stage)">{{ record.stage }}</a>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="drillDown(record.stage)">{{ record.stage }}</a-button>
+            </div>
           </template>
         </template>
       </a-table>
@@ -278,7 +280,7 @@ watch(
 .conversion-hero-copy small {
   display: block;
   margin-bottom: 10px;
-  color: #6f869a;
+  color: var(--muted-2);
   font-size: 11px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -286,14 +288,14 @@ watch(
 
 .conversion-hero-copy h2 {
   margin: 0;
-  color: #14324d;
+  color: var(--ink);
   font-size: 28px;
   line-height: 1.2;
 }
 
 .conversion-hero-copy p {
   margin: 12px 0 0;
-  color: #607d95;
+  color: var(--muted);
   line-height: 1.8;
 }
 
@@ -309,16 +311,16 @@ watch(
   padding: 16px 18px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(212, 225, 235, 0.82);
+  border: 1px solid var(--border-soft);
 }
 
 .hero-stat span {
-  color: #67839b;
+  color: var(--muted-2);
   font-size: 12px;
 }
 
 .hero-stat strong {
-  color: #11314d;
+  color: var(--ink);
   font-size: 30px;
   line-height: 1;
 }
@@ -344,12 +346,12 @@ watch(
 }
 
 .conversion-stat-label {
-  color: #617e96;
+  color: var(--muted);
   font-size: 13px;
 }
 
 .conversion-stat-value {
-  color: #14324d;
+  color: var(--ink);
   font-size: 34px;
   line-height: 1;
   letter-spacing: -0.03em;
@@ -360,7 +362,7 @@ watch(
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  color: #6f869a;
+  color: var(--muted-2);
   font-size: 12px;
 }
 
@@ -378,7 +380,7 @@ watch(
   display: grid;
   gap: 8px;
   padding: 16px 0;
-  border-bottom: 1px solid rgba(224, 233, 239, 0.82);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .insight-item:last-child {
@@ -386,18 +388,18 @@ watch(
 }
 
 .insight-item span {
-  color: #5d7891;
+  color: var(--muted);
   font-size: 13px;
 }
 
 .insight-item strong {
-  color: #12314d;
+  color: var(--ink);
   font-size: 28px;
   line-height: 1;
 }
 
 .insight-item small {
-  color: #7a91a5;
+  color: var(--muted-2);
   line-height: 1.6;
 }
 

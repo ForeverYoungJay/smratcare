@@ -82,6 +82,7 @@ export type SearchPaletteItem = {
   group: string
   path?: string
   action?: string
+  keywords?: string
 }
 
 defineProps<{
@@ -138,7 +139,8 @@ defineEmits<{
 }
 
 .global-search-palette__item:hover {
-  border-color: rgba(19, 108, 181, 0.28);
+  border-color: rgba(var(--primary-rgb), 0.3);
+  background: linear-gradient(180deg, #ffffff 0%, var(--primary-soft) 160%);
   box-shadow: var(--shadow-xs);
 }
 

@@ -64,6 +64,11 @@ public class SmartCareController {
     return Result.ok(smartCareService.summary());
   }
 
+  @PostMapping("/alerts/derived-health/refresh")
+  public Result<SmartAlertSummaryResponse> refreshDerivedHealthAlerts() {
+    return Result.ok(smartCareService.refreshDerivedHealthAlerts());
+  }
+
   @GetMapping("/alerts/page")
   public Result<IPage<SmartAlert>> pageAlerts(
       @RequestParam(defaultValue = "1") int pageNo,

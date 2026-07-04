@@ -1019,7 +1019,7 @@ onMounted(() => {
 }
 
 .summary-label {
-  color: #64748b;
+  color: var(--muted);
   font-size: 13px;
 }
 
@@ -1027,19 +1027,19 @@ onMounted(() => {
   margin-top: 8px;
   font-size: 28px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ink);
 }
 
 .mini-value {
   margin-top: 8px;
   font-size: 24px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ink);
 }
 
 .summary-hint {
   margin-top: 6px;
-  color: #94a3b8;
+  color: var(--muted-2);
   font-size: 12px;
 }
 
@@ -1052,15 +1052,15 @@ onMounted(() => {
 
 .staff-cell span,
 .plan-cell span {
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .config-section {
   padding: 18px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
   border-radius: 24px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  background: linear-gradient(180deg, #ffffff 0%, var(--surface-2) 100%);
 }
 
 .section-head {
@@ -1074,26 +1074,26 @@ onMounted(() => {
 .section-head h3 {
   margin: 0;
   font-size: 20px;
-  color: #102a43;
+  color: var(--ink);
 }
 
 .section-head p {
   margin: 8px 0 0;
-  color: #64748b;
+  color: var(--muted);
 }
 
 .config-filters {
   margin: 16px 0;
   padding: 14px;
   border-radius: 18px;
-  background: #f8fafc;
+  background: var(--surface-2);
 }
 
 .batch-tip {
   padding: 12px 14px;
   border-radius: 14px;
-  background: #f8fafc;
-  color: #64748b;
+  background: var(--surface-2);
+  color: var(--muted);
   line-height: 1.6;
 }
 
@@ -1104,7 +1104,7 @@ onMounted(() => {
   margin-bottom: 12px;
   padding: 12px 14px;
   border-radius: 14px;
-  background: #f8fafc;
+  background: var(--surface-2);
 }
 
 @media (max-width: 960px) {

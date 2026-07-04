@@ -1,4 +1,5 @@
 import type { RouteRecordRaw } from 'vue-router'
+import { legacyModuleRedirects } from './legacyRedirects'
 
 export const routes: RouteRecordRaw[] = [
   {
@@ -45,6 +46,12 @@ export const routes: RouteRecordRaw[] = [
         name: 'Portal',
         component: () => import('../views/Portal.vue'),
         meta: { title: '首页', icon: 'HomeOutlined', navSection: 'core', navOrder: 10, navPinned: true }
+      },
+      {
+        path: 'function-map',
+        name: 'FunctionMap',
+        component: () => import('../views/FunctionMap.vue'),
+        meta: { title: '全部功能', icon: 'ApartmentOutlined', navSection: 'core', navOrder: 15, navPinned: true }
       },
       {
         path: 'workbench',
@@ -734,26 +741,8 @@ export const routes: RouteRecordRaw[] = [
           },
         ]
       },
-      {
-        path: 'bed',
-        name: 'Bed',
-        meta: { title: '床位管理', icon: 'HomeOutlined', hidden: true },
-        redirect: '/logistics/assets/room-state-map',
-        children: [
-          {
-            path: 'map',
-            name: 'BedMap',
-            redirect: '/logistics/assets/room-state-map',
-            meta: { title: '房态图', hidden: true }
-          },
-          {
-            path: 'manage',
-            name: 'BedManage',
-            redirect: '/logistics/assets/bed-management',
-            meta: { title: '床位管理', hidden: true }
-          }
-        ]
-      },
+      // 历史兼容重定向（bed/material/store/inventory → logistics/*），见 ./legacyRedirects
+      ...legacyModuleRedirects,
       {
         path: 'logistics',
         name: 'Logistics',
@@ -1134,153 +1123,6 @@ export const routes: RouteRecordRaw[] = [
             name: 'CareWorkbenchTask',
             component: () => import('../views/care/workbench/ServiceBooking.vue'),
             meta: { title: '服务预约', hidden: true }
-          }
-        ]
-      },
-      {
-        path: 'material',
-        name: 'Material',
-        meta: { title: '后勤物资（兼容）', icon: 'DatabaseOutlined', hidden: true },
-        children: [
-          {
-            path: 'info',
-            name: 'MaterialInfo',
-            redirect: '/logistics/storage/item-master',
-            meta: { title: '物资主数据（兼容）', hidden: true }
-          },
-          {
-            path: 'warehouse',
-            name: 'MaterialWarehouse',
-            redirect: '/logistics/storage/warehouse',
-            meta: { title: '仓库设置（兼容）', hidden: true }
-          },
-          {
-            path: 'supplier',
-            name: 'MaterialSupplier',
-            redirect: '/logistics/storage/supplier',
-            meta: { title: '供应商管理（兼容）', hidden: true }
-          },
-          {
-            path: 'inbound',
-            name: 'MaterialInbound',
-            redirect: '/logistics/storage/inbound',
-            meta: { title: '入库管理（兼容）', hidden: true }
-          },
-          {
-            path: 'outbound',
-            name: 'MaterialOutbound',
-            redirect: '/logistics/storage/outbound',
-            meta: { title: '出库管理（兼容）', hidden: true }
-          },
-          {
-            path: 'stock-query',
-            name: 'MaterialStockQuery',
-            redirect: '/logistics/storage/stock-query',
-            meta: { title: '库存查询（兼容）', hidden: true }
-          },
-          {
-            path: 'alerts',
-            name: 'MaterialAlerts',
-            redirect: '/logistics/storage/alerts',
-            meta: { title: '库存预警（兼容）', hidden: true }
-          },
-          {
-            path: 'transfer',
-            name: 'MaterialTransfer',
-            redirect: '/logistics/storage/transfer',
-            meta: { title: '物资调拨（兼容）', hidden: true }
-          },
-          {
-            path: 'stock-amount',
-            name: 'MaterialStockAmount',
-            redirect: '/logistics/storage/stock-amount',
-            meta: { title: '库存金额（兼容）', hidden: true }
-          },
-          {
-            path: 'stock-check',
-            name: 'MaterialStockCheck',
-            redirect: '/logistics/storage/stock-check',
-            meta: { title: '库存盘点（兼容）', hidden: true }
-          },
-          {
-            path: 'purchase',
-            name: 'MaterialPurchase',
-            redirect: '/logistics/storage/purchase',
-            meta: { title: '采购单（兼容）', hidden: true }
-          }
-        ]
-      },
-      {
-        path: 'store',
-        name: 'Store',
-        meta: { title: '后勤商城（兼容）', icon: 'ShopOutlined', hidden: true },
-        children: [
-          {
-            path: 'category',
-            name: 'StoreCategory',
-            redirect: '/logistics/commerce/category',
-            meta: { title: '商品大类（兼容）', hidden: true }
-          },
-          {
-            path: 'product',
-            name: 'StoreProduct',
-            redirect: '/logistics/commerce/product',
-            meta: { title: '商品管理（兼容）', hidden: true }
-          },
-          {
-            path: 'tag',
-            name: 'StoreTag',
-            redirect: '/logistics/commerce/tag',
-            meta: { title: '商品标签（兼容）', hidden: true }
-          },
-          {
-            path: 'order',
-            name: 'StoreOrder',
-            redirect: '/logistics/commerce/order',
-            meta: { title: '订单管理（兼容）', hidden: true }
-          },
-          {
-            path: 'points',
-            name: 'StorePoints',
-            redirect: '/logistics/commerce/points',
-            meta: { title: '积分账户（兼容）', hidden: true }
-          }
-        ]
-      },
-      {
-        path: 'inventory',
-        name: 'Inventory',
-        meta: { title: '库存管理', icon: 'AlertOutlined', hidden: true },
-        children: [
-          {
-            path: '',
-            redirect: '/logistics/storage/stock-query',
-            meta: { hidden: true }
-          },
-          {
-            path: 'overview',
-            redirect: '/logistics/storage/stock-query',
-            meta: { title: '库存总览' }
-          },
-          {
-            path: 'inbound',
-            redirect: '/logistics/storage/inbound',
-            meta: { title: '入库管理' }
-          },
-          {
-            path: 'outbound',
-            redirect: '/logistics/storage/outbound',
-            meta: { title: '出库记录' }
-          },
-          {
-            path: 'alerts',
-            redirect: '/logistics/storage/alerts',
-            meta: { title: '预警中心' }
-          },
-          {
-            path: 'adjustments',
-            redirect: '/logistics/storage/stock-check',
-            meta: { title: '盘点记录' }
           }
         ]
       },
@@ -2058,6 +1900,42 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '智慧设备告警' }
           },
           {
+            path: 'smart-rules',
+            name: 'MedicalCareSmartRules',
+            component: () => import('../views/smart/AlertRules.vue'),
+            meta: { title: '安全场景规则', roles: ['NURSING_MINISTER', 'MEDICAL_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
+          },
+          {
+            path: 'smart-dispatch',
+            name: 'MedicalCareSmartDispatch',
+            component: () => import('../views/smart/DispatchBoard.vue'),
+            meta: { title: '告警派单看板', roles: ['NURSING_EMPLOYEE', 'NURSING_MINISTER', 'MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
+          },
+          {
+            path: 'emr',
+            name: 'MedicalCareEmr',
+            component: () => import('../views/emr/EmrRecords.vue'),
+            meta: { title: '电子病历', roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
+          },
+          {
+            path: 'orders',
+            name: 'MedicalCareOrders',
+            component: () => import('../views/medorder/MedicalOrders.vue'),
+            meta: { title: '医嘱管理', roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
+          },
+          {
+            path: 'order-executions',
+            name: 'MedicalCareOrderExecutions',
+            component: () => import('../views/medorder/OrderExecutions.vue'),
+            meta: { title: '医嘱执行', roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'NURSING_EMPLOYEE', 'NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
+          },
+          {
+            path: 'pharmacy',
+            name: 'MedicalCarePharmacy',
+            component: () => import('../views/pharmacy/Pharmacy.vue'),
+            meta: { title: '药事管理', roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'NURSING_EMPLOYEE', 'NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
+          },
+          {
             path: 'ai-reports',
             name: 'MedicalCareAiReports',
             component: () => import('../views/medical/AiHealthReport.vue'),
@@ -2129,6 +2007,66 @@ export const routes: RouteRecordRaw[] = [
         ]
       },
       {
+        path: 'ltci',
+        name: 'Ltci',
+        meta: {
+          title: '长护险与监管',
+          icon: 'SafetyCertificateOutlined',
+          navSection: 'operations',
+          navOrder: 75,
+          navPinned: true,
+          roles: ['NURSING_EMPLOYEE', 'NURSING_MINISTER', 'MEDICAL_MINISTER', 'FINANCE_EMPLOYEE', 'FINANCE_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
+        },
+        redirect: '/ltci/assessments',
+        children: [
+          {
+            path: 'assessments',
+            name: 'LtciAssessments',
+            component: () => import('../views/ltci/AssessmentRecords.vue'),
+            meta: {
+              title: '失能评估',
+              roles: ['NURSING_EMPLOYEE', 'NURSING_MINISTER', 'MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
+            }
+          },
+          {
+            path: 'benefits',
+            name: 'LtciBenefits',
+            component: () => import('../views/ltci/BenefitManage.vue'),
+            meta: {
+              title: '待遇管理',
+              roles: ['NURSING_MINISTER', 'MEDICAL_MINISTER', 'FINANCE_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
+            }
+          },
+          {
+            path: 'settlements',
+            name: 'LtciSettlements',
+            component: () => import('../views/ltci/Settlement.vue'),
+            meta: {
+              title: '结算管理',
+              roles: ['FINANCE_EMPLOYEE', 'FINANCE_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
+            }
+          },
+          {
+            path: 'gov-report',
+            name: 'GovReportTasks',
+            component: () => import('../views/govreport/ReportTasks.vue'),
+            meta: {
+              title: '监管上报',
+              roles: ['FINANCE_MINISTER', 'MEDICAL_MINISTER', 'NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
+            }
+          },
+          {
+            path: 'gov-channels',
+            name: 'GovReportChannels',
+            component: () => import('../views/govreport/ChannelConfig.vue'),
+            meta: {
+              title: '上报渠道',
+              roles: ['DIRECTOR', 'SYS_ADMIN', 'ADMIN']
+            }
+          }
+        ]
+      },
+      {
         path: 'stats',
         name: 'Stats',
         meta: { title: '统计分析', icon: 'BarChartOutlined', navSection: 'operations', navOrder: 70, navPinned: true },
@@ -2183,6 +2121,78 @@ export const routes: RouteRecordRaw[] = [
             name: 'StatsMonthlyRevenue',
             component: () => import('../views/stats/MonthlyRevenueStats.vue'),
             meta: { title: '月运营收入统计' }
+          },
+          {
+            path: 'operations',
+            name: 'StatsOperationsDashboard',
+            component: () => import('../views/operations/OperationsDashboard.vue'),
+            meta: { title: '管理驾驶舱' }
+          },
+          {
+            path: 'executive-cockpit',
+            name: 'StatsExecutiveCockpit',
+            component: () => import('../views/cockpit/ExecutiveCockpit.vue'),
+            meta: {
+              title: '经营驾驶舱',
+              roles: ['DIRECTOR', 'SYS_ADMIN', 'ADMIN', 'MEDICAL_MINISTER', 'NURSING_MINISTER', 'FINANCE_MINISTER', 'LOGISTICS_MINISTER', 'MARKETING_MINISTER', 'HR_MINISTER']
+            }
+          },
+          {
+            path: 'sensitive-access-audit',
+            name: 'StatsSensitiveAccessAudit',
+            component: () => import('../views/compliance/SensitiveAccessAudit.vue'),
+            meta: {
+              title: '敏感数据审计',
+              roles: ['SYS_ADMIN', 'DIRECTOR', 'ADMIN']
+            }
+          },
+          {
+            path: 'service-compliance',
+            name: 'StatsServiceCompliance',
+            component: () => import('../views/operations/ServiceComplianceCenter.vue'),
+            meta: { title: '服务质量与合规', hidden: true }
+          },
+          {
+            path: 'safety-risk',
+            name: 'StatsSafetyRisk',
+            component: () => import('../views/operations/SafetyRiskCenter.vue'),
+            meta: { title: '安全风险', hidden: true }
+          },
+          {
+            path: 'workforce',
+            name: 'StatsWorkforce',
+            component: () => import('../views/operations/WorkforceCenter.vue'),
+            meta: { title: '员工人力', hidden: true }
+          },
+          {
+            path: 'staff-mobile',
+            name: 'StatsStaffMobile',
+            component: () => import('../views/operations/StaffMobileCenter.vue'),
+            meta: { title: '员工移动端', hidden: true }
+          },
+          {
+            path: 'staff-mobile-ledger',
+            name: 'StatsStaffMobileLedger',
+            component: () => import('../views/operations/StaffMobileLedgerCenter.vue'),
+            meta: { title: '员工现场执行台账', hidden: true }
+          },
+          {
+            path: 'logistics',
+            name: 'StatsLogistics',
+            component: () => import('../views/operations/LogisticsCenter.vue'),
+            meta: { title: '后勤保障', hidden: true }
+          },
+          {
+            path: 'marketing',
+            name: 'StatsMarketing',
+            component: () => import('../views/operations/MarketingCenter.vue'),
+            meta: { title: '营销转化', hidden: true }
+          },
+          {
+            path: 'intelligence',
+            name: 'StatsIntelligence',
+            component: () => import('../views/operations/IntelligenceCenter.vue'),
+            meta: { title: '智能运营', hidden: true }
           },
           {
             path: 'elder-flow-report',
@@ -2480,6 +2490,30 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '行政中心' }
           },
           {
+            path: 'family-service',
+            name: 'OaFamilyService',
+            component: () => import('../views/operations/FamilyServiceCenter.vue'),
+            meta: { title: '家属服务中心' }
+          },
+          {
+            path: 'family-users',
+            name: 'OaFamilyUsers',
+            component: () => import('../views/elder/Family.vue'),
+            meta: { title: '家属账号与绑定' }
+          },
+          {
+            path: 'family-service-health',
+            name: 'OaFamilyServiceHealth',
+            component: () => import('../views/operations/FamilyServiceHealthCenter.vue'),
+            meta: { title: '家属服务健康中心', hidden: true }
+          },
+          {
+            path: 'family-recharge',
+            name: 'OaFamilyRechargeLedger',
+            component: () => import('../views/operations/FamilyRechargeLedgerCenter.vue'),
+            meta: { title: '家属充值台账', hidden: true }
+          },
+          {
             path: 'work-execution',
             name: 'OaWorkExecution',
             meta: { title: '协同办公' },
@@ -2495,7 +2529,7 @@ export const routes: RouteRecordRaw[] = [
                 path: 'family-communication',
                 name: 'OaFamilyCommunication',
                 component: () => import('../views/oa/FamilyCommunication.vue'),
-                meta: { title: '家属沟通' }
+                meta: { title: '家属反馈与沟通' }
               },
               {
                 path: 'calendar',
@@ -2710,6 +2744,18 @@ export const routes: RouteRecordRaw[] = [
             name: 'OaApproval',
             component: () => import('../views/oa/Approval.vue'),
             meta: { title: '审批中心' }
+          },
+          {
+            path: 'staff-collaboration',
+            name: 'OaStaffCollaboration',
+            component: () => import('../views/oa/StaffCollaborationCenter.vue'),
+            meta: { title: '员工协同中心', hidden: true }
+          },
+          {
+            path: 'employee-suggestions',
+            name: 'OaEmployeeSuggestions',
+            component: () => import('../views/oa/EmployeeSuggestionCenter.vue'),
+            meta: { title: '员工建议中心', hidden: true }
           },
           {
             path: 'attendance-leave',

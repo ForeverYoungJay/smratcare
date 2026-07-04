@@ -6,21 +6,31 @@
   font-size: 42rpx;
   line-height: 1.2;
   font-weight: 900;
-  color: #16231f;
+  color: #22332E;
 }
 
 .user-sub {
   margin-top: 8rpx;
   font-size: 24rpx;
-  color: #71807a;
+  color: #5C6F69;
   line-height: 1.45;
+}
+
+.warning-tip {
+  margin-top: 16rpx;
+  padding: 14rpx 16rpx;
+  border-radius: 14rpx;
+  background: #fff8ea;
+  color: #8a5508;
+  font-size: 22rpx;
+  line-height: 1.5;
 }
 
 .menu-list {
   margin-top: 28rpx;
   overflow: hidden;
   border-radius: 16rpx;
-  border: 1rpx solid #edf2ef;
+  border: 1rpx solid #E4E7E0;
 }
 
 .menu-item {
@@ -29,10 +39,10 @@
   justify-content: space-between;
   align-items: center;
   padding: 0 18rpx;
-  border-bottom: 1rpx solid #edf2ef;
+  border-bottom: 1rpx solid #E4E7E0;
   background: #ffffff;
   font-size: 27rpx;
-  color: #182420;
+  color: #22332E;
   font-weight: 800;
 }
 
@@ -50,7 +60,7 @@
   min-width: 32rpx;
   padding: 3rpx 8rpx;
   border-radius: 999rpx;
-  background: #e5484d;
+  background: #C9504B;
   color: #ffffff;
   font-size: 18rpx;
   line-height: 1.4;

@@ -50,6 +50,8 @@ Page({
     loading: false,
     submitting: false,
     loadError: '',
+    submitError: '',
+    submitSuccess: '',
     approvals: [],
     profile: null,
     categoryOptions,
@@ -87,16 +89,32 @@ Page({
     }
   },
   onCategoryChange(e) {
-    this.setData({ categoryIndex: Number(e.detail.value || 0) });
+    this.setData({
+      categoryIndex: Number(e.detail.value || 0),
+      submitError: '',
+      submitSuccess: ''
+    });
   },
   onUrgencyChange(e) {
-    this.setData({ urgencyIndex: Number(e.detail.value || 0) });
+    this.setData({
+      urgencyIndex: Number(e.detail.value || 0),
+      submitError: '',
+      submitSuccess: ''
+    });
   },
   onExpectedDateChange(e) {
-    this.setData({ expectedDate: e.detail.value });
+    this.setData({
+      expectedDate: e.detail.value,
+      submitError: '',
+      submitSuccess: ''
+    });
   },
   onInput(e) {
-    this.setData({ [e.currentTarget.dataset.field]: e.detail.value });
+    this.setData({
+      [e.currentTarget.dataset.field]: e.detail.value,
+      submitError: '',
+      submitSuccess: ''
+    });
   },
   validateForm() {
     if (!this.data.materialName.trim()) return '请填写物资名称';
@@ -137,7 +155,7 @@ Page({
       wx.showToast({ title: validation, icon: 'none' });
       return;
     }
-    this.setData({ submitting: true });
+    this.setData({ submitting: true, submitError: '', submitSuccess: '' });
     try {
       const item = await submitStaffApproval(this.buildPayload());
       this.setData({
@@ -145,10 +163,12 @@ Page({
         materialName: '',
         quantity: '',
         reason: '',
-        urgencyIndex: 0
+        urgencyIndex: 0,
+        submitSuccess: '物资申领已进入 OA 审批流，可在下方查看状态变化。'
       });
       wx.showToast({ title: '申领已提交', icon: 'success' });
     } catch (error) {
+      this.setData({ submitError: error.message || '提交失败，请稍后重试' });
       wx.showToast({ title: error.message || '提交失败', icon: 'none' });
     } finally {
       this.setData({ submitting: false });

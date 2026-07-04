@@ -25,6 +25,25 @@ describe('routeAccess utils', () => {
     expect(canAccessPath(['HR_MINISTER'], ['ADMIN'], '/system/site-config', ['/system/site-config'])).toBe(true)
   })
 
+  it('does not let broad page permissions bypass stricter route roles', () => {
+    expect(
+      canAccessPath(
+        ['HR_EMPLOYEE'],
+        ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'],
+        '/hr/profile/basic',
+        ['/hr']
+      )
+    ).toBe(false)
+    expect(
+      canAccessPath(
+        ['HR_MINISTER'],
+        ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'],
+        '/hr/profile/basic',
+        ['/hr']
+      )
+    ).toBe(true)
+  })
+
   it('keeps module fallback aligned with marketing and fire routes', () => {
     expect(canAccessPath(['MARKETING_EMPLOYEE'], [], '/crm/follow-up')).toBe(true)
     expect(canAccessPath(['GUARD'], [], '/fire/day-patrol')).toBe(true)

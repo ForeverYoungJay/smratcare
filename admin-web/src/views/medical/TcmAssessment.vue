@@ -65,13 +65,13 @@
             <a-tag :color="record.status === 'PUBLISHED' ? 'green' : 'blue'">{{ record.status === 'PUBLISHED' ? '已发布' : '草稿' }}</a-tag>
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-space>
-              <a-button type="link" @click="openEdit(record)">编辑</a-button>
-              <a-button type="link" @click="publish(record)" :disabled="record.status === 'PUBLISHED'">发布</a-button>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
+              <a-button type="link" size="small" @click="publish(record)" :disabled="record.status === 'PUBLISHED'">发布</a-button>
               <a-popconfirm title="确认删除该评估吗？" ok-text="确认" cancel-text="取消" @confirm="remove(record)">
-                <a-button danger type="link">删除</a-button>
+                <a-button type="link" size="small" danger>删除</a-button>
               </a-popconfirm>
-            </a-space>
+            </div>
           </template>
         </template>
       </DataTable>
@@ -518,6 +518,6 @@ useLiveSyncRefresh({
 
 <style scoped>
 :deep(.medical-row-warning > td) {
-  background: #fffbe6 !important;
+  background: rgba(var(--warning-rgb), 0.12) !important;
 }
 </style>

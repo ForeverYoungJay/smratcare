@@ -663,7 +663,7 @@ const trendOption = computed(() => ({
         summary.value.revenueGrowthRate || 0
       ],
       type: 'bar',
-      color: '#1677ff'
+      color: '#3d7fa6'
     }
   ]
 }))
@@ -1039,9 +1039,9 @@ onBeforeUnmount(() => {
 .window-toolbar {
   margin-bottom: 14px;
   padding: 12px 14px;
-  border-radius: 16px;
-  background: linear-gradient(180deg, #f7fbfe 0%, #eef7fb 100%);
-  border: 1px solid #e0edf5;
+  border-radius: 12px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-soft);
 }
 
 :deep(.clickable-card) {
@@ -1054,7 +1054,7 @@ onBeforeUnmount(() => {
   position: absolute;
   inset: auto 0 0 0;
   height: 3px;
-  background: linear-gradient(90deg, #1f8fbe 0%, #70c4e0 100%);
+  background: linear-gradient(90deg, var(--primary) 0%, var(--primary-strong) 100%);
   opacity: 0;
   transition: opacity 0.2s ease;
 }
@@ -1068,12 +1068,12 @@ onBeforeUnmount(() => {
 }
 
 :deep(.ant-statistic-content) {
-  color: #173854;
+  color: var(--ink);
   font-weight: 700;
 }
 
 :deep(.ant-list-item-meta-title) {
-  color: #173854;
+  color: var(--ink);
   font-weight: 600;
 }
 

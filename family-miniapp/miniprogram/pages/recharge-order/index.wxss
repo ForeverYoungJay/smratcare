@@ -1,7 +1,7 @@
 .hero {
   padding: 24rpx;
   background: linear-gradient(140deg, rgba(25, 79, 94, 0.96), rgba(22, 124, 119, 0.96));
-  color: #f7faf8;
+  color: #FAFAF7;
 }
 
 .hero-top {
@@ -71,6 +71,10 @@
   padding: 22rpx;
 }
 
+.error-card {
+  text-align: center;
+}
+
 .line {
   margin-top: 12rpx;
   display: flex;
@@ -101,7 +105,7 @@
   width: 14rpx;
   height: 14rpx;
   border-radius: 50%;
-  background: #246b5f;
+  background: #21705F;
   margin-top: 6rpx;
 }
 
@@ -126,12 +130,12 @@
 .timeline-title {
   font-size: 26rpx;
   font-weight: 700;
-  color: #182420;
+  color: #22332E;
 }
 
 .timeline-time {
   font-size: 22rpx;
-  color: #71807a;
+  color: #5C6F69;
 }
 
 .timeline-desc {

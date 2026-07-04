@@ -121,8 +121,10 @@ public class FamilyPortalController {
   @GetMapping("/activity-albums")
   public Result<List<FamilyPortalModels.ActivityAlbumItem>> activityAlbums(
       @RequestParam(defaultValue = "1") int pageNo,
-      @RequestParam(defaultValue = "20") int pageSize) {
-    return Result.ok(familyPortalService.listActivityAlbums(AuthContext.getOrgId(), AuthContext.getStaffId(), pageNo, pageSize));
+      @RequestParam(defaultValue = "20") int pageSize,
+      @RequestParam(required = false) String scope) {
+    return Result.ok(familyPortalService.listActivityAlbums(
+        AuthContext.getOrgId(), AuthContext.getStaffId(), pageNo, pageSize, scope));
   }
 
   @PostMapping("/activity-albums/{id}/like")
@@ -147,6 +149,19 @@ public class FamilyPortalController {
   public Result<List<FamilyPortalModels.OutingRecordItem>> outingRecords(
       @RequestParam(required = false) Long elderId) {
     return Result.ok(familyPortalService.listOutingRecords(AuthContext.getOrgId(), AuthContext.getStaffId(), elderId));
+  }
+
+  @PostMapping("/outing-applications")
+  public Result<FamilyPortalModels.OutingRecordItem> createOutingApplication(
+      @Valid @RequestBody FamilyPortalModels.OutingApplicationRequest request) {
+    return Result.ok(familyPortalService.createOutingApplication(
+        AuthContext.getOrgId(), AuthContext.getStaffId(), request));
+  }
+
+  @PostMapping("/outing-applications/{id}/cancel")
+  public Result<FamilyPortalModels.OutingRecordItem> cancelOutingApplication(@PathVariable Long id) {
+    return Result.ok(familyPortalService.cancelOutingApplication(
+        AuthContext.getOrgId(), AuthContext.getStaffId(), id));
   }
 
   @GetMapping("/emergency-contacts")
@@ -191,6 +206,15 @@ public class FamilyPortalController {
       @RequestBody(required = false) FamilyPortalModels.WechatNotifyBindRequest request) {
     return Result.ok(familyPortalService.bindWechatNotifyOpenId(
         AuthContext.getOrgId(), AuthContext.getStaffId(), request));
+  }
+
+  @GetMapping("/notify-logs")
+  public Result<List<FamilyPortalModels.NotifyLogItem>> notifyLogs(
+      @RequestParam(defaultValue = "1") int pageNo,
+      @RequestParam(defaultValue = "20") int pageSize,
+      @RequestParam(required = false) String status) {
+    return Result.ok(familyPortalService.listNotifyLogs(
+        AuthContext.getOrgId(), AuthContext.getStaffId(), pageNo, pageSize, status));
   }
 
   @GetMapping("/payment/recharge-orders")

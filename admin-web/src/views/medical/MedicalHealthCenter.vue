@@ -560,9 +560,9 @@ onMounted(() => {
 <style scoped>
 .medical-filter {
   margin-bottom: 12px;
-  border: 1px solid #d9e9ff;
+  border: 1px solid var(--border);
   background:
-    radial-gradient(140% 120% at 0% 0%, rgba(44, 128, 255, 0.11) 0%, rgba(44, 128, 255, 0) 58%),
+    radial-gradient(140% 120% at 0% 0%, rgba(var(--primary-rgb), 0.11) 0%, rgba(var(--primary-rgb), 0) 58%),
     linear-gradient(135deg, #f4faff 0%, #edf5ff 46%, #f8fbff 100%);
 }
 
@@ -581,16 +581,16 @@ onMounted(() => {
 }
 
 .risk-hero {
-  border: 1px solid #cfe4ff;
+  border: 1px solid var(--border);
   background:
-    radial-gradient(120% 110% at 100% 0%, rgba(52, 115, 255, 0.17) 0%, rgba(52, 115, 255, 0) 58%),
+    radial-gradient(120% 110% at 100% 0%, rgba(var(--primary-rgb), 0.17) 0%, rgba(var(--primary-rgb), 0) 58%),
     linear-gradient(132deg, #f7fbff 0%, #ecf4ff 44%, #f8fcff 100%);
 }
 
 .risk-hero__title {
   font-size: 14px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--ink);
 }
 
 .risk-hero__score-row {
@@ -605,25 +605,25 @@ onMounted(() => {
   font-size: 40px;
   line-height: 1;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ink);
 }
 
 .risk-hero__meta {
   margin-top: 8px;
   font-size: 12px;
-  color: #5f6f82;
+  color: var(--muted);
 }
 
 .metric-tile {
   border-radius: 10px;
-  border: 1px solid #d8e7ff;
+  border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.82);
   padding: 10px;
 }
 
 .metric-tile__label {
   font-size: 12px;
-  color: #63758b;
+  color: var(--muted);
 }
 
 .metric-tile__value {
@@ -631,31 +631,31 @@ onMounted(() => {
   font-size: 22px;
   line-height: 1.2;
   font-weight: 700;
-  color: #10243f;
+  color: var(--ink);
 }
 
 .metric-tile__hint {
   margin-top: 4px;
   font-size: 11px;
-  color: #677489;
+  color: var(--muted-2);
 }
 
 .stat-card {
   min-height: 114px;
   cursor: pointer;
-  border: 1px solid #e7efff;
+  border: 1px solid var(--border);
   background: linear-gradient(170deg, #ffffff 0%, #f6f9ff 100%);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .stat-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(20, 61, 130, 0.12);
+  box-shadow: var(--shadow-md);
 }
 
 .stat-card__label {
   font-size: 13px;
-  color: #617286;
+  color: var(--muted);
 }
 
 .stat-card__value {
@@ -663,13 +663,13 @@ onMounted(() => {
   font-size: 30px;
   line-height: 1;
   font-weight: 700;
-  color: #0f1f34;
+  color: var(--ink);
 }
 
 .stat-card__hint {
   margin-top: 8px;
   font-size: 12px;
-  color: #78869a;
+  color: var(--muted-2);
 }
 
 @media (max-width: 992px) {

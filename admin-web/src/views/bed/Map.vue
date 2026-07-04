@@ -248,7 +248,7 @@
       <a-table :loading="roomResidentLoading" :data-source="roomResidents" :pagination="false" :row-key="(item:any)=>item.id" size="small">
         <a-table-column title="头像" key="avatar" width="70">
           <template #default="{ record }">
-            <a-avatar style="background-color: #1677ff">{{ String(record?.fullName || '?').slice(-1) }}</a-avatar>
+            <a-avatar style="background-color: var(--info)">{{ String(record?.fullName || '?').slice(-1) }}</a-avatar>
           </template>
         </a-table-column>
         <a-table-column title="姓名" data-index="fullName" key="fullName" width="120" />
@@ -1035,9 +1035,9 @@ watch([filteredBeds, functionalRooms], () => {
 .search-bar {
   margin-bottom: 20px;
   padding: 20px;
-  background: linear-gradient(135deg, rgba(248, 250, 252, 0.92) 0%, rgba(239, 246, 255, 0.88) 100%);
+  background: linear-gradient(135deg, rgba(var(--info-rgb), 0.05) 0%, rgba(var(--info-rgb), 0.09) 100%);
   border-radius: 18px;
-  border: 1px solid rgba(191, 219, 254, 0.55);
+  border: 1px solid rgba(var(--info-rgb), 0.22);
 }
 
 .overview-cards {
@@ -1047,18 +1047,18 @@ watch([filteredBeds, functionalRooms], () => {
 .overview-cards :deep(.ant-card) {
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(219, 234, 254, 0.8);
+  border: 1px solid rgba(var(--info-rgb), 0.22);
 }
 
 .overview-cards :deep(.ant-statistic-title) {
   font-weight: 600;
-  color: #64748b;
+  color: var(--muted);
   font-size: 13px;
 }
 
 .overview-cards :deep(.ant-statistic-content-value) {
   font-weight: 800;
-  color: #0f3d91;
+  color: var(--primary-strong);
   font-size: 24px;
 }
 
@@ -1080,7 +1080,7 @@ watch([filteredBeds, functionalRooms], () => {
 }
 
 .matrix-tip {
-  color: #64748b;
+  color: var(--muted);
   font-size: 13px;
   font-weight: 500;
 }
@@ -1096,15 +1096,15 @@ watch([filteredBeds, functionalRooms], () => {
 
 .tower-building {
   overflow: hidden;
-  border: 1px solid rgba(191, 219, 254, 0.72);
+  border: 1px solid rgba(var(--info-rgb), 0.3);
   border-radius: 24px;
-  background: linear-gradient(180deg, #eff6ff 0%, #f8fbff 20%, #ffffff 100%);
-  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.06);
+  background: linear-gradient(180deg, rgba(var(--info-rgb), 0.06) 0%, rgba(var(--info-rgb), 0.02) 20%, #ffffff 100%);
+  box-shadow: var(--shadow-md);
 }
 
 .tower-building.active {
-  border-color: #3b82f6;
-  box-shadow: 0 22px 54px rgba(59, 130, 246, 0.16);
+  border-color: var(--info);
+  box-shadow: 0 22px 54px rgba(var(--info-rgb), 0.16);
 }
 
 .tower-building-head {
@@ -1122,11 +1122,11 @@ watch([filteredBeds, functionalRooms], () => {
 .building-name {
   font-size: 22px;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--ink);
 }
 
 .building-kpi {
-  color: #475569;
+  color: var(--muted);
   font-size: 13px;
   font-weight: 600;
   margin-top: 4px;
@@ -1136,15 +1136,15 @@ watch([filteredBeds, functionalRooms], () => {
   align-self: start;
   padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(14, 116, 144, 0.1);
-  color: #0f766e;
+  background: rgba(var(--success-rgb), 0.1);
+  color: var(--success);
   font-size: 12px;
   font-weight: 700;
 }
 
 .building-remark {
   grid-column: 1 / -1;
-  color: #1d4ed8;
+  color: var(--info);
   font-size: 12px;
   font-weight: 600;
 }
@@ -1163,16 +1163,16 @@ watch([filteredBeds, functionalRooms], () => {
 }
 
 .tower-floor.active .tower-floor-badge {
-  border-color: #3b82f6;
-  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+  border-color: var(--info);
+  background: linear-gradient(180deg, var(--info) 0%, var(--primary-strong) 100%);
   color: #fff;
 }
 
 .tower-floor-badge {
-  border: 1px solid rgba(147, 197, 253, 0.85);
+  border: 1px solid rgba(var(--info-rgb), 0.4);
   border-radius: 18px;
-  background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
-  color: #0f3d91;
+  background: linear-gradient(180deg, #ffffff 0%, rgba(var(--info-rgb), 0.06) 100%);
+  color: var(--primary-strong);
   font-weight: 800;
   display: flex;
   flex-direction: column;
@@ -1196,7 +1196,7 @@ watch([filteredBeds, functionalRooms], () => {
 }
 
 .room-cube {
-  border: 1px solid rgba(226, 232, 240, 0.95);
+  border: 1px solid var(--border);
   border-radius: 18px;
   padding: 12px;
   background: #ffffff;
@@ -1206,8 +1206,8 @@ watch([filteredBeds, functionalRooms], () => {
 
 .room-cube:hover {
   transform: translateY(-3px);
-  border-color: #60a5fa;
-  box-shadow: 0 12px 24px rgba(14, 165, 233, 0.08);
+  border-color: rgba(var(--info-rgb), 0.55);
+  box-shadow: 0 12px 24px rgba(var(--info-rgb), 0.08);
 }
 
 .room-cube.is-drag-enabled {
@@ -1238,7 +1238,7 @@ watch([filteredBeds, functionalRooms], () => {
   gap: 8px;
   font-weight: 800;
   font-size: 15px;
-  color: #0f172a;
+  color: var(--ink);
 }
 
 .room-function-icon {
@@ -1263,8 +1263,8 @@ watch([filteredBeds, functionalRooms], () => {
 
 .room-meta {
   font-size: 12px;
-  color: #94a3b8;
-  background: #f8fafc;
+  color: var(--muted-2);
+  background: var(--surface-3);
   padding: 2px 8px;
   border-radius: 12px;
 }
@@ -1277,7 +1277,7 @@ watch([filteredBeds, functionalRooms], () => {
 .room-remark {
   margin: 8px 0 10px;
   font-size: 11px;
-  color: #1d4ed8;
+  color: var(--info);
   font-weight: 600;
 }
 
@@ -1330,40 +1330,40 @@ watch([filteredBeds, functionalRooms], () => {
 }
 
 .bed-pill.is-occupied {
-  background: #eff6ff;
-  color: #1e40af;
-  border-color: #bfdbfe;
+  background: rgba(var(--info-rgb), 0.08);
+  color: var(--info);
+  border-color: rgba(var(--info-rgb), 0.3);
 }
 .bed-pill.is-occupied:hover {
-  background: #dbeafe;
-  border-color: #93c5fd;
+  background: rgba(var(--info-rgb), 0.16);
+  border-color: rgba(var(--info-rgb), 0.45);
 }
 
 .bed-pill.is-idle {
-  background: #f0fdf4;
-  color: #166534;
-  border-color: #bbf7d0;
+  background: rgba(var(--success-rgb), 0.08);
+  color: var(--success);
+  border-color: rgba(var(--success-rgb), 0.3);
 }
 .bed-pill.is-idle:hover {
-  background: #dcfce7;
-  border-color: #86efac;
+  background: rgba(var(--success-rgb), 0.16);
+  border-color: rgba(var(--success-rgb), 0.45);
 }
 
 .bed-pill.is-maintain {
-  background: #fffbeb;
-  color: #b45309;
-  border-color: #fde68a;
+  background: rgba(var(--warning-rgb), 0.08);
+  color: var(--warning);
+  border-color: rgba(var(--warning-rgb), 0.3);
 }
 .bed-pill.is-maintain:hover {
-  background: #fef3c7;
-  border-color: #fcd34d;
+  background: rgba(var(--warning-rgb), 0.16);
+  border-color: rgba(var(--warning-rgb), 0.45);
 }
 
 .bed-card {
   margin-bottom: 20px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(219, 234, 254, 0.9);
+  border: 1px solid var(--border);
 }
 
 .functional-room-card {
@@ -1451,19 +1451,19 @@ watch([filteredBeds, functionalRooms], () => {
   align-items: center;
   font-weight: 800;
   font-size: 16px;
-  color: #1e293b;
+  color: var(--ink);
   margin-bottom: 12px;
 }
 
 .bed-meta {
-  color: #64748b;
+  color: var(--muted);
   font-size: 13px;
   margin-bottom: 6px;
 }
 
 
 .modal-tip {
-  color: #94a3b8;
+  color: var(--muted-2);
   font-style: italic;
   text-align: center;
   padding: 10px 0;
@@ -1473,10 +1473,10 @@ watch([filteredBeds, functionalRooms], () => {
   display: grid;
   justify-items: center;
   margin-top: 20px;
-  background: #f8fafc;
+  background: var(--surface-3);
   padding: 20px;
   border-radius: 12px;
-  border: 1px dashed #cbd5e1;
+  border: 1px dashed var(--border-strong);
 }
 
 .qr-preview img {

@@ -1,6 +1,9 @@
 const { getToken, getUser, clearAuth, setAuth } = require('./utils/auth');
+const offlineQueue = require('./utils/offline-queue');
 
 const RUNTIME_FLAGS_STORAGE_KEY = 'smartcare_family_runtime_flags';
+const OPENID_BIND_STORAGE_KEY = 'smartcare_family_openid_bind';
+const OPENID_REBIND_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function normalizeRuntimeFlags(raw = {}) {
   return {
@@ -56,7 +59,15 @@ App({
     refreshHomeAfterBinding: false,
     pendingMessageFilter: '',
     capabilityAlertCount: 0,
-    mallOrdersDirty: false
+    mallOrdersDirty: false,
+    // 员工端订阅消息模板 ID。请在微信公众平台（小程序后台）->
+    // 功能 -> 订阅消息中申请对应模板后，把模板 ID 填到这里；
+    // 保持空串时 utils/subscribe.js 会静默跳过订阅请求，不影响业务。
+    subscribeTemplates: {
+      taskOverdue: '',
+      approvalResult: '',
+      noticePublish: ''
+    }
   },
   onLaunch() {
     this.initRuntimeConfig();
@@ -71,6 +82,86 @@ App({
     if (!this.globalData.token && this.canUseLocalDevBypass()) {
       this.enableLocalDevSession();
     }
+    if (this.globalData.token && this.globalData.userType === 'family') {
+      this.ensureWechatNotifyBind();
+    }
+    if (typeof wx.onNetworkStatusChange === 'function') {
+      wx.onNetworkStatusChange((res) => {
+        if (res && res.isConnected) {
+          this.flushOfflineQueue();
+        }
+      });
+    }
+  },
+  onShow() {
+    this.flushOfflineQueue();
+  },
+  flushOfflineQueue() {
+    offlineQueue.flush().catch(() => {
+      // 离线队列补交失败时保留队列项，等待下次触发。
+    });
+  },
+  // 登录态存在时自动绑定微信通知 openId：
+  // - 默认按用户节流（7 天内不重复绑定），force = true 时强制重绑
+  // - 绑定失败静默处理，不阻断主流程；callback(ok) 可用于页面提示
+  ensureWechatNotifyBind(force = false, callback = null) {
+    const done = (ok) => {
+      if (typeof callback === 'function') {
+        callback(!!ok);
+      }
+    };
+    if (!this.globalData.runtimeReady || this.globalData.userType !== 'family' || !this.globalData.token) {
+      done(false);
+      return;
+    }
+    if (this.isLocalDevEnvironment() && String(this.globalData.token).indexOf('LOCAL_DEV_TOKEN_') === 0) {
+      done(false);
+      return;
+    }
+    const familyUserId = Number(this.globalData.familyUser && this.globalData.familyUser.familyUserId) || 0;
+    if (!force) {
+      try {
+        const record = wx.getStorageSync(OPENID_BIND_STORAGE_KEY);
+        if (record
+          && Number(record.familyUserId) === familyUserId
+          && Number(record.boundAt) > 0
+          && Date.now() - Number(record.boundAt) < OPENID_REBIND_INTERVAL_MS) {
+          done(true);
+          return;
+        }
+      } catch (error) {
+        // 读取失败按未绑定处理
+      }
+    }
+    wx.login({
+      success: async (loginRes) => {
+        const code = loginRes && loginRes.code ? String(loginRes.code).trim() : '';
+        if (!code) {
+          done(false);
+          return;
+        }
+        try {
+          const { bindWechatNotifyOpenId } = require('./services/family');
+          await bindWechatNotifyOpenId({ loginCode: code });
+          try {
+            wx.setStorageSync(OPENID_BIND_STORAGE_KEY, {
+              familyUserId,
+              boundAt: Date.now()
+            });
+          } catch (error) {
+            // 写入失败不影响绑定结果
+          }
+          done(true);
+        } catch (error) {
+          // openId 绑定失败不阻断主流程
+          done(false);
+        }
+      },
+      fail: () => {
+        // 忽略微信登录失败，避免影响主流程
+        done(false);
+      }
+    });
   },
   initRuntimeConfig() {
     const runtimeProfile = this.getMiniProgramEnvVersion();
@@ -144,6 +235,12 @@ App({
   },
   canUseLocalDevBypass() {
     return this.globalData.localDevBypassLogin && this.isLocalDevEnvironment();
+  },
+  canUseManualRechargeFallback() {
+    return this.globalData.allowManualRechargeFallback
+      && this.globalData.useMockFallback
+      && this.isLocalDevEnvironment()
+      && this.globalData.runtimeProfile === 'develop';
   },
   validateRuntimeConfig() {
     const runtimeProfile = this.globalData.runtimeProfile;
@@ -240,6 +337,11 @@ App({
   },
   logout() {
     clearAuth();
+    try {
+      wx.removeStorageSync(OPENID_BIND_STORAGE_KEY);
+    } catch (error) {
+      // 忽略清理失败
+    }
     this.globalData.token = '';
     this.globalData.userType = '';
     this.globalData.familyUser = null;

@@ -33,19 +33,8 @@
           <div class="status-stack">
             <span class="status-dot"></span>
             <div>
-              <strong>系统平稳运行</strong>
-              <small>{{ commandCenterStatus }}</small>
-            </div>
-          </div>
-          <div class="clock-stack">
-            <span>{{ currentDateText }}</span>
-            <strong>{{ currentTimeText }}</strong>
-          </div>
-          <div class="operator-stack">
-            <a-avatar class="operator-avatar">{{ operatorInitial }}</a-avatar>
-            <div>
-              <strong>{{ operatorName }}</strong>
-              <small>{{ operatorRole }}</small>
+              <strong>{{ commandCenterStatus }}</strong>
+              <small>{{ currentDateText }} {{ currentTimeText }}</small>
             </div>
           </div>
         </div>
@@ -59,8 +48,120 @@
         </div>
       </header>
 
+      <section class="bed-command-bar">
+        <div class="bed-command-bar__primary">
+          <span class="panel-kicker">床位调度</span>
+          <strong>{{ priorityCommand.title }}</strong>
+          <p>{{ priorityCommand.description }}</p>
+        </div>
+
+        <div class="bed-command-bar__filters">
+          <button
+            v-for="item in bedStatusLegend"
+            :key="item.key"
+            type="button"
+            class="bed-status-chip"
+            :class="[item.tone, { active: item.active }]"
+            @click="handleStatusLegendClick(item.key)"
+          >
+            <span class="bed-status-chip__dot"></span>
+            <strong>{{ item.label }}</strong>
+            <small>{{ item.value }}</small>
+          </button>
+        </div>
+
+        <button class="bed-command-bar__cta" type="button" :class="priorityCommand.tone" @click="handleCommandAction(priorityCommand.key)">
+          <strong>{{ priorityCommand.action }}</strong>
+          <span>{{ priorityCommand.actionHint }}</span>
+        </button>
+      </section>
+
+        <section class="stage-brief">
+          <div class="stage-brief__main">
+            <div class="focus-ribbon">
+              <div class="focus-ribbon__main">
+                <div class="focus-ribbon__item">
+                  <span>空间层级</span>
+                  <strong>{{ currentScopeLabel }}</strong>
+                </div>
+                <div class="focus-ribbon__item focus-ribbon__item--wide">
+                  <span>当前范围</span>
+                  <strong>{{ bedGuardSubject }}</strong>
+                </div>
+                <div class="focus-ribbon__item">
+                  <span>当前动作</span>
+                  <strong>{{ focusActionText }}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="stage-quick-actions">
+              <button
+                v-for="item in stageQuickActions"
+                :key="item.key"
+                class="stage-quick-action"
+                :class="item.tone"
+                @click="handleCommandAction(item.key)"
+              >
+                <strong>{{ item.label }}</strong>
+                <span>{{ item.description }}</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="stage-brief__side">
+            <div class="bed-guard-card">
+              <div class="bed-guard-card__head">
+                <span class="panel-kicker">流程状态</span>
+                <strong>{{ bedGuardStageText }}</strong>
+              </div>
+              <div class="bed-guard-steps">
+                <div
+                  v-for="(step, index) in bedGuardSteps"
+                  :key="step"
+                  class="bed-guard-step"
+                  :class="{
+                    'is-current': index === bedGuardCurrentIndex,
+                    'is-done': index < bedGuardCurrentIndex
+                  }"
+                >
+                  <span>{{ index + 1 }}</span>
+                  <strong>{{ step }}</strong>
+                </div>
+              </div>
+              <div v-if="bedGuardBlockers.length" class="bed-guard-blockers">
+                <div v-for="item in bedGuardBlockers" :key="item.code" class="bed-guard-blocker">
+                  <div>
+                    <strong>{{ item.code }}</strong>
+                    <p>{{ item.text }}</p>
+                  </div>
+                  <a-button v-if="item.actionKey" size="small" @click="handleBedGuardAction(item)">
+                    {{ item.actionLabel }}
+                  </a-button>
+                </div>
+              </div>
+              <div v-else class="bed-guard-blockers bed-guard-blockers--quiet">
+                <p>{{ bedGuardHint }}</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
       <div class="dashboard-main">
-        <aside class="hud-left">
+        <button
+          type="button"
+          class="overlay-toggle overlay-toggle--left"
+          :class="{ 'is-shifted': leftPanelOpen }"
+          @click="leftPanelOpen = !leftPanelOpen"
+        >{{ leftPanelOpen ? '‹ 收起' : '空间导航 ›' }}</button>
+        <button
+          v-if="!rightPanelOpen"
+          type="button"
+          class="overlay-toggle overlay-toggle--right"
+          @click="rightPanelOpen = true"
+        >‹ 床位详情</button>
+
+        <aside class="hud-left" :class="{ 'is-closed': !leftPanelOpen }">
           <section class="hud-panel hud-panel--sidebar">
             <div class="hud-panel__head">
               <div>
@@ -69,11 +170,6 @@
               </div>
               <small>{{ roomCount }} 间房 / {{ sourceBeds.length }} 张床位</small>
             </div>
-
-            <label class="field-block">
-              <span class="field-label">搜索目标</span>
-              <a-input-search v-model:value="keyword" placeholder="搜索长者姓名 / 床位 / 房间号" allow-clear />
-            </label>
 
             <div class="campus-tree">
               <div v-for="building in campusTree" :key="building.name" class="tree-building">
@@ -176,77 +272,6 @@
         </aside>
 
         <section class="dashboard-stage">
-          <section class="stage-brief">
-            <div class="stage-brief__main">
-              <div class="focus-ribbon">
-                <div class="focus-ribbon__main">
-                  <div class="focus-ribbon__item">
-                    <span>空间层级</span>
-                    <strong>{{ currentScopeLabel }}</strong>
-                  </div>
-                  <div class="focus-ribbon__item focus-ribbon__item--wide">
-                    <span>当前范围</span>
-                    <strong>{{ bedGuardSubject }}</strong>
-                  </div>
-                  <div class="focus-ribbon__item">
-                    <span>当前动作</span>
-                    <strong>{{ focusActionText }}</strong>
-                  </div>
-                </div>
-              </div>
-
-              <div class="stage-quick-actions">
-                <button
-                  v-for="item in stageQuickActions"
-                  :key="item.key"
-                  class="stage-quick-action"
-                  :class="item.tone"
-                  @click="handleCommandAction(item.key)"
-                >
-                  <strong>{{ item.label }}</strong>
-                  <span>{{ item.description }}</span>
-                </button>
-              </div>
-            </div>
-
-            <div class="stage-brief__side">
-              <div class="bed-guard-card">
-                <div class="bed-guard-card__head">
-                  <span class="panel-kicker">流程状态</span>
-                  <strong>{{ bedGuardStageText }}</strong>
-                </div>
-                <div class="bed-guard-steps">
-                  <div
-                    v-for="(step, index) in bedGuardSteps"
-                    :key="step"
-                    class="bed-guard-step"
-                    :class="{
-                      'is-current': index === bedGuardCurrentIndex,
-                      'is-done': index < bedGuardCurrentIndex
-                    }"
-                  >
-                    <span>{{ index + 1 }}</span>
-                    <strong>{{ step }}</strong>
-                  </div>
-                </div>
-                <div v-if="bedGuardBlockers.length" class="bed-guard-blockers">
-                  <div v-for="item in bedGuardBlockers" :key="item.code" class="bed-guard-blocker">
-                    <div>
-                      <strong>{{ item.code }}</strong>
-                      <p>{{ item.text }}</p>
-                    </div>
-                    <a-button v-if="item.actionKey" size="small" @click="handleBedGuardAction(item)">
-                      {{ item.actionLabel }}
-                    </a-button>
-                  </div>
-                </div>
-                <div v-else class="bed-guard-blockers bed-guard-blockers--quiet">
-                  <p>{{ bedGuardHint }}</p>
-                </div>
-              </div>
-            </div>
-          </section>
-
           <div class="stage-canvas-shell">
             <Panorama3D
               v-if="matrixBuildings.length && matrixFloors.length"
@@ -262,14 +287,18 @@
           </div>
         </section>
 
-        <aside class="hud-right">
+        <aside class="hud-right" :class="{ 'is-closed': !rightPanelOpen }">
           <section class="hud-panel hud-panel--context">
             <div class="hud-panel__head">
               <div>
                 <span class="panel-kicker">床位详情</span>
                 <strong>{{ activeResidentBed?.elderName || '未选中长者' }}</strong>
               </div>
-              <small>{{ activeResidentBed?.roomNo || '-' }} / {{ activeResidentBed?.bedNo || '-' }}</small>
+              <div class="context-head-ops">
+                <small>{{ activeResidentBed?.roomNo || '-' }} / {{ activeResidentBed?.bedNo || '-' }}</small>
+                <a-button v-if="activeResidentBed" size="small" @click="detailOpen = true">全部操作</a-button>
+                <a-button size="small" type="text" @click="rightPanelOpen = false">收起 ›</a-button>
+              </div>
             </div>
 
             <template v-if="activeResidentBed">
@@ -389,8 +418,13 @@
         </aside>
       </div>
 
-      <footer class="hud-bottom">
-        <section class="activity-dock">
+      <footer class="hud-bottom" :class="{ 'is-open': eventDockOpen }">
+        <button type="button" class="dock-pill" @click="eventDockOpen = !eventDockOpen">
+          <span class="dock-pill__dot" :class="{ 'is-alert': eventStreamItems.length > 0 }"></span>
+          异常提醒 {{ eventStreamItems.length }} 条
+          <small>{{ eventDockOpen ? '收起' : '展开' }}</small>
+        </button>
+        <section v-show="eventDockOpen" class="activity-dock">
           <div class="activity-dock__head">
             <div>
               <span class="panel-kicker">异常提醒</span>
@@ -439,8 +473,8 @@
         <a-button block @click="openAssessmentArchive">查看评估档案</a-button>
         <a-button block @click="openContractsInvoices">合同与票据</a-button>
         <a-button block @click="openStatusChangeCenter">状态变更中心</a-button>
-        <a-button block danger @click="createAlert">生成提醒并进入任务中心</a-button>
         <a-button block @click="goScan">扫码执行（定位今日任务）</a-button>
+        <a-button block danger @click="createAlert">生成提醒并进入任务中心</a-button>
       </a-space>
     </a-modal>
 
@@ -463,7 +497,7 @@
       >
         <a-table-column title="头像" key="avatar" width="70">
           <template #default="{ record }">
-            <a-avatar style="background-color: #1677ff">{{ String(record?.fullName || '?').slice(-1) }}</a-avatar>
+            <a-avatar style="background-color: var(--info)">{{ String(record?.fullName || '?').slice(-1) }}</a-avatar>
           </template>
         </a-table-column>
         <a-table-column title="姓名" data-index="fullName" key="fullName" width="110" />
@@ -472,10 +506,10 @@
         <a-table-column title="备注" data-index="remark" key="remark" />
         <a-table-column title="操作" key="action" width="180">
           <template #default="{ record }">
-            <a-space>
+            <div class="row-action-links">
               <a-button type="link" size="small" @click="openElderProfile(record.id)">详情</a-button>
               <a-button type="link" size="small" @click="openResidentBills(record.id)">账单</a-button>
-            </a-space>
+            </div>
           </template>
         </a-table-column>
       </a-table>
@@ -528,13 +562,17 @@ const roomTypeMap = ref<Record<string, string>>({})
 const roomCapacityMap = ref<Record<string, number>>({})
 const keyword = ref('')
 const selectedBed = ref<BedItem | null>(null)
+// 沉浸式布局：3D 画布全屏为主体，左右面板与事件坞均为可收起的悬浮层
+const leftPanelOpen = ref(true)
+const rightPanelOpen = ref(false)
+const eventDockOpen = ref(false)
 const detailOpen = ref(false)
 const roomDetailOpen = ref(false)
 const selectedRoom = ref<RoomScene | null>(null)
 const selectedRoomNo = ref('')
 const roomResidents = ref<ElderItem[]>([])
 const roomResidentLoading = ref(false)
-const quickFilter = ref<'ALL' | 'IDLE' | 'OCCUPIED'>('ALL')
+const quickFilter = ref<'ALL' | 'IDLE' | 'OCCUPIED' | 'ALERT'>('ALL')
 const riskFilterEnabled = ref(false)
 const riskFilterLevel = ref<'ALL' | 'HIGH' | 'MEDIUM' | 'LOW'>('ALL')
 const riskDataLoading = ref(false)
@@ -547,7 +585,8 @@ const activeTrendKey = ref<'occupancy' | 'sleep' | 'alert' | 'device'>('occupanc
 const quickFilterOptions = [
   { label: '全部', value: 'ALL' },
   { label: '仅空床', value: 'IDLE' },
-  { label: '仅入住', value: 'OCCUPIED' }
+  { label: '仅入住', value: 'OCCUPIED' },
+  { label: '仅异常', value: 'ALERT' }
 ]
 const riskLevelOptions = [
   { label: '全部风险', value: 'ALL' },
@@ -581,9 +620,10 @@ const filteredBeds = computed(() => beds.value.filter((b) => {
 }))
 
 const sourceBeds = computed(() => {
-  const bedsByQuick = filteredBeds.value.filter((item) => {
+    const bedsByQuick = filteredBeds.value.filter((item) => {
     if (quickFilter.value === 'IDLE') return isEmptyBed(item)
     if (quickFilter.value === 'OCCUPIED') return !!item.elderId
+    if (quickFilter.value === 'ALERT') return isAlertBed(item)
     return true
   })
   if (!riskFilterEnabled.value || !riskDataReady.value) return bedsByQuick
@@ -753,6 +793,76 @@ const overviewCards = computed(() => ([
   { label: '待处理提醒', numericValue: emergencyCount.value, meta: `${alertFeed.value.length} 条待闭环`, tone: 'tone-orange' },
   { label: '维修床位', numericValue: stats.value.maintenance, meta: '待恢复上线', tone: 'tone-purple' }
 ]))
+
+const bedStatusLegend = computed(() => [
+  { key: 'ALL', label: '全部', value: `${beds.value.length}床`, tone: 'tone-blue', active: quickFilter.value === 'ALL' && !riskFilterEnabled.value },
+  { key: 'IDLE', label: '空床', value: `${stats.value.idle}床`, tone: 'tone-gray', active: quickFilter.value === 'IDLE' },
+  { key: 'OCCUPIED', label: '在住', value: `${stats.value.occupied}床`, tone: 'tone-green', active: quickFilter.value === 'OCCUPIED' },
+  { key: 'ALERT', label: '异常', value: `${concernCount.value}条`, tone: 'tone-red', active: quickFilter.value === 'ALERT' || riskFilterEnabled.value },
+  { key: 'MAINTENANCE', label: '维修', value: `${stats.value.maintenance}床`, tone: 'tone-orange', active: false }
+])
+
+const priorityCommand = computed(() => {
+  const bed = selectedBed.value || activeResidentBed.value
+  if (bed?.riskLevel === 'HIGH') {
+    return {
+      key: 'create-alert',
+      title: `${bed.elderName || bed.bedNo || '当前床位'}存在高优先风险`,
+      description: `24h异常 ${bed.abnormalVital24hCount || 0} 次，建议先生成提醒并同步值班人员。`,
+      action: '生成提醒',
+      actionHint: '进入任务闭环',
+      tone: 'tone-red'
+    }
+  }
+  if (bed && isEmptyBed(bed)) {
+    return {
+      key: 'allocate-bed',
+      title: `${bed.roomNo || '-'} / ${bed.bedNo || '-'} 可用于入住调配`,
+      description: '当前为空床，优先确认清洁、锁床预定或直接办理入住。',
+      action: '办理入住',
+      actionHint: '分配长者到此床',
+      tone: 'tone-cyan'
+    }
+  }
+  if (bed?.elderId) {
+    return {
+      key: 'open-profile',
+      title: `${bed.elderName || '在住长者'}正在照护中`,
+      description: `${bed.roomNo || '-'} / ${bed.bedNo || '-'}，可查看档案、护理记录、评估与状态变更。`,
+      action: '查看长者中心',
+      actionHint: '进入照护详情',
+      tone: 'tone-green'
+    }
+  }
+  if (concernCount.value > 0) {
+    return {
+      key: 'filter-alerts',
+      title: `当前有 ${concernCount.value} 个床位需关注`,
+      description: '优先筛选异常床位，确认生命体征、离床观察和后勤状态。',
+      action: '只看异常',
+      actionHint: '聚焦风险床位',
+      tone: 'tone-red'
+    }
+  }
+  if (stats.value.idle > 0) {
+    return {
+      key: 'filter-idle',
+      title: `当前有 ${stats.value.idle} 张空床可调度`,
+      description: '适合前台、销售或入住办理人员快速确认可用床位。',
+      action: '只看空床',
+      actionHint: '准备入住调配',
+      tone: 'tone-cyan'
+    }
+  }
+  return {
+    key: 'open-map',
+    title: '当前床态运行平稳',
+    description: '可切换平面房态图，进行更高效的日常床位调度。',
+    action: '平面房态',
+    actionHint: '切到房态视图',
+    tone: 'tone-blue'
+  }
+})
 
 const leftStatCards = computed(() => ([
   { label: '空床位', value: stats.value.idle, meta: '待迎接入住', tone: 'tone-gray' },
@@ -1031,19 +1141,44 @@ const focusActionText = computed(() => {
 })
 
 const stageQuickActions = computed(() => ([
-  { key: 'reset-filters', label: '重置筛选', description: '回到总览范围', tone: 'tone-cyan' },
+  {
+    key: priorityCommand.value.key,
+    label: priorityCommand.value.action,
+    description: priorityCommand.value.actionHint,
+    tone: priorityCommand.value.tone
+  },
+  { key: 'filter-alerts', label: '风险床位', description: `${concernCount.value} 个需关注`, tone: 'tone-red' },
   { key: 'open-map', label: '房态视图', description: '切到平面房态图', tone: 'tone-blue' },
+  { key: 'reset-filters', label: '重置筛选', description: '回到总览范围', tone: 'tone-cyan' },
   { key: 'open-manage', label: '床位管理', description: '执行基础维护', tone: 'tone-green' }
 ]))
 
-const commandDeck = computed(() => ([
-  { key: 'open-profile', label: '长者档案', description: '查看长者档案与照护信息', tone: 'tone-blue' },
-  { key: 'allocate-bed', label: '床位分配', description: '为空床发起入住分配', tone: 'tone-cyan' },
-  { key: 'open-assessment', label: '评估档案', description: '进入能力评估归档', tone: 'tone-purple' },
-  { key: 'open-contracts', label: '合同票据', description: '处理合同与账单联动', tone: 'tone-green' },
-  { key: 'open-status-center', label: '状态中心', description: '发起状态变更闭环', tone: 'tone-orange' },
-  { key: 'create-alert', label: '生成提醒', description: '同步推送提醒与任务', tone: 'tone-red' }
-]))
+const commandDeck = computed(() => {
+  const bed = activeResidentBed.value
+  if (!bed) {
+    return [
+      { key: 'filter-idle', label: '查看空床', description: '快速定位可入住床位', tone: 'tone-cyan' },
+      { key: 'filter-alerts', label: '风险床位', description: '聚焦异常与高风险', tone: 'tone-red' },
+      { key: 'open-map', label: '平面房态', description: '切到日常调度视图', tone: 'tone-blue' },
+      { key: 'open-manage', label: '床位管理', description: '维护楼层房间床位', tone: 'tone-green' }
+    ]
+  }
+  if (isEmptyBed(bed)) {
+    return [
+      { key: 'allocate-bed', label: '办理入住', description: '为空床发起入住分配', tone: 'tone-cyan' },
+      { key: 'open-contracts', label: '锁床预定', description: '关联销售线索或合同', tone: 'tone-green' },
+      { key: 'open-manage', label: '维修登记', description: '标记维修、清洁或停用', tone: 'tone-orange' },
+      { key: 'create-alert', label: '生成清洁提醒', description: '同步保洁或后勤任务', tone: 'tone-blue' }
+    ]
+  }
+  return [
+    { key: 'open-profile', label: '长者中心', description: '档案、照护和健康总览', tone: 'tone-blue' },
+    { key: 'open-status-center', label: '状态变更', description: '外出、换床、退住闭环', tone: 'tone-orange' },
+    { key: 'open-assessment', label: '评估档案', description: '查看能力评估与等级', tone: 'tone-purple' },
+    { key: 'open-contracts', label: '合同票据', description: '处理合同、账单和押金', tone: 'tone-green' },
+    { key: 'create-alert', label: bed.riskLevel === 'HIGH' ? '立即提醒' : '生成提醒', description: '同步推送护理任务', tone: 'tone-red' }
+  ]
+})
 
 const trendLabels = computed(() => Array.from({ length: 7 }, (_, index) => dayjs().subtract(6 - index, 'day').format('MM/DD')))
 
@@ -1179,6 +1314,22 @@ function handleCommandAction(action: string) {
     resetFilters()
     return
   }
+  if (action === 'filter-idle') {
+    quickFilter.value = 'IDLE'
+    riskFilterEnabled.value = false
+    return
+  }
+  if (action === 'filter-occupied') {
+    quickFilter.value = 'OCCUPIED'
+    riskFilterEnabled.value = false
+    return
+  }
+  if (action === 'filter-alerts') {
+    quickFilter.value = 'ALERT'
+    riskFilterEnabled.value = true
+    riskFilterLevel.value = 'ALL'
+    return
+  }
   if (action === 'open-map') {
     openBedMap()
     return
@@ -1210,6 +1361,28 @@ function handleCommandAction(action: string) {
   if (action === 'create-alert') {
     createAlert()
   }
+}
+
+function handleStatusLegendClick(key: string) {
+  if (key === 'MAINTENANCE') {
+    quickFilter.value = 'ALL'
+    riskFilterEnabled.value = false
+    message.info('维修床位已在左侧运营口径中展示，可进入床位管理处理')
+    return
+  }
+  if (key === 'ALERT') {
+    handleCommandAction('filter-alerts')
+    return
+  }
+  if (key === 'IDLE') {
+    handleCommandAction('filter-idle')
+    return
+  }
+  if (key === 'OCCUPIED') {
+    handleCommandAction('filter-occupied')
+    return
+  }
+  resetFilters()
 }
 
 function applyScope(scope: PanoramaScope) {
@@ -1322,7 +1495,7 @@ function applyFiltersFromRoute() {
   keyword.value = firstRouteQueryText(route.query.bedKeyword)
 
   const nextQuick = firstRouteQueryText(route.query.bedQuick).toUpperCase()
-  quickFilter.value = nextQuick === 'IDLE' || nextQuick === 'OCCUPIED' ? nextQuick : 'ALL'
+  quickFilter.value = nextQuick === 'IDLE' || nextQuick === 'OCCUPIED' || nextQuick === 'ALERT' ? nextQuick : 'ALL'
 
   riskFilterEnabled.value = firstRouteQueryText(route.query.bedRiskEnabled) === '1'
   const nextRisk = firstRouteQueryText(route.query.bedRiskLevel).toUpperCase()
@@ -1480,7 +1653,8 @@ function selectBed(bed: BedItem) {
   selectedRoomNo.value = String(bed.roomNo || '').trim()
   selectedBuilding.value = String(bed.building || '').trim()
   selectedFloor.value = String(bed.floorNo || '').trim()
-  detailOpen.value = true
+  // 点击床位改为打开右侧悬浮详情面板，完整操作入口在面板里
+  rightPanelOpen.value = true
 }
 
 function parseRemarkSlots(raw?: string) {
@@ -1734,21 +1908,21 @@ watch(
 
 <style scoped>
 .bed-immersive-page {
-  --hud-border: rgba(170, 190, 214, 0.28);
-  --hud-shadow: 0 18px 44px rgba(109, 133, 160, 0.12);
+  --hud-border: rgba(187, 217, 207, 0.5);
+  --hud-shadow: 0 18px 44px rgba(34, 51, 46, 0.1);
   --glass-bg: rgba(255, 255, 255, 0.84);
   --glass-strong: rgba(255, 255, 255, 0.94);
-  --text-strong: #1d2b3f;
-  --text-main: #45576f;
-  --text-soft: #7e90a8;
-  --surface-blue: #f3f8fe;
-  --surface-panel: rgba(248, 251, 255, 0.78);
-  --tone-blue: #6f95ff;
-  --tone-green: #4fc291;
-  --tone-purple: #8c77ea;
-  --tone-orange: #f2ab45;
-  --tone-red: #ef6b7b;
-  --tone-gray: #a5b2c2;
+  --text-strong: #22332e;
+  --text-main: #3c4f48;
+  --text-soft: #8a9a94;
+  --surface-blue: #f4f7f2;
+  --surface-panel: rgba(249, 251, 247, 0.78);
+  --tone-blue: #3d7fa6;
+  --tone-green: #2e8a72;
+  --tone-purple: #6b79d8;
+  --tone-orange: #de9b3d;
+  --tone-red: #c9504b;
+  --tone-gray: #a3b0aa;
   display: block;
   margin: -24px -24px -26px;
 }
@@ -1763,18 +1937,18 @@ watch(
 
 .immersive-stage-shell {
   position: relative;
-  min-height: calc(100vh - 96px);
-  border-radius: 34px;
+  min-height: calc(100vh - 128px);
+  border-radius: 24px;
   overflow: hidden;
-  padding: 24px;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 18px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   background:
-    radial-gradient(circle at 12% 10%, rgba(114, 170, 255, 0.12), transparent 24%),
-    radial-gradient(circle at 92% 6%, rgba(111, 203, 181, 0.1), transparent 20%),
-    linear-gradient(180deg, #f7fbff 0%, #eef4fb 48%, #e8eff7 100%);
-  box-shadow: 0 28px 64px rgba(125, 145, 170, 0.18);
+    radial-gradient(circle at 12% 10%, rgba(46, 138, 114, 0.1), transparent 24%),
+    radial-gradient(circle at 92% 6%, rgba(229, 138, 58, 0.08), transparent 20%),
+    linear-gradient(180deg, #f9faf5 0%, #f0f3ea 48%, #e9eee3 100%);
+  box-shadow: 0 28px 64px rgba(34, 51, 46, 0.14);
 }
 
 .scene-vignette,
@@ -1787,7 +1961,7 @@ watch(
 .scene-vignette {
   inset: 0;
   background:
-    radial-gradient(circle at 50% 48%, rgba(255, 255, 255, 0.01), rgba(220, 232, 245, 0.08) 72%, rgba(201, 216, 233, 0.2) 100%);
+    radial-gradient(circle at 50% 48%, rgba(255, 255, 255, 0.01), rgba(228, 236, 224, 0.08) 72%, rgba(213, 224, 208, 0.2) 100%);
 }
 
 .scene-glow {
@@ -1801,13 +1975,13 @@ watch(
 .scene-glow-left {
   left: -80px;
   bottom: -120px;
-  background: rgba(147, 201, 255, 0.36);
+  background: rgba(46, 138, 114, 0.3);
 }
 
 .scene-glow-right {
   right: -100px;
   top: 100px;
-  background: rgba(142, 224, 197, 0.32);
+  background: rgba(229, 138, 58, 0.22);
 }
 
 .hud-panel,
@@ -1816,7 +1990,7 @@ watch(
 .stream-card,
 .focus-ribbon {
   border: 1px solid var(--hud-border);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 251, 255, 0.88));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 251, 246, 0.88));
   backdrop-filter: blur(12px);
   box-shadow: var(--hud-shadow);
 }
@@ -1828,22 +2002,21 @@ watch(
   gap: 10px;
 }
 
+/* 沉浸式：3D 画布铺满主区域，左右面板与事件坞悬浮其上 */
 .dashboard-main {
   position: relative;
   z-index: 2;
-  display: grid;
-  grid-template-columns: 286px minmax(0, 1fr) 356px;
-  gap: 18px;
-  min-height: 0;
-  align-items: stretch;
+  flex: 1;
+  min-height: 620px;
 }
 
 .dashboard-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 14px;
 }
 
 .stage-canvas-shell {
@@ -1851,15 +2024,20 @@ watch(
   min-height: 0;
   overflow: hidden;
   border-radius: 28px;
-  border: 1px solid rgba(170, 190, 214, 0.22);
+  border: 1px solid rgba(187, 217, 207, 0.22);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(244, 249, 255, 0.82));
   box-shadow: 0 20px 44px rgba(113, 137, 163, 0.12);
+}
+
+.stage-canvas-shell {
+  flex: 1;
+  min-height: 0;
 }
 
 .stage-canvas-shell :deep(.panorama-container),
 .stage-empty {
   height: 100%;
-  min-height: 680px;
+  min-height: 0;
 }
 
 .stage-empty {
@@ -1880,10 +2058,10 @@ watch(
 
 .command-marquee {
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 9px 14px;
   border-radius: 22px;
-  border: 1px solid rgba(170, 190, 214, 0.26);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 251, 255, 0.86));
+  border: 1px solid rgba(187, 217, 207, 0.26);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 251, 246, 0.86));
   box-shadow: var(--hud-shadow);
 }
 
@@ -1900,8 +2078,8 @@ watch(
   height: 44px;
   border-radius: 15px;
   flex-shrink: 0;
-  background: linear-gradient(135deg, #6f95ff, #79b9ff);
-  box-shadow: 0 12px 24px rgba(111, 149, 255, 0.2);
+  background: linear-gradient(135deg, #21705f, #2e8a72);
+  box-shadow: 0 12px 24px rgba(61, 127, 166, 0.2);
 }
 
 .brand-mark span {
@@ -1965,9 +2143,9 @@ watch(
 }
 
 .metric-pill {
-  min-height: 78px;
-  padding: 12px 14px;
-  border-radius: 22px;
+  min-height: 62px;
+  padding: 9px 14px;
+  border-radius: 18px;
   text-align: left;
   position: relative;
   display: grid;
@@ -2002,7 +2180,7 @@ watch(
   min-height: 48px;
   padding: 10px 12px;
   border-radius: 18px;
-  border: 1px solid rgba(170, 190, 214, 0.24);
+  border: 1px solid rgba(187, 217, 207, 0.24);
   background: var(--glass-bg);
   box-shadow: var(--hud-shadow);
 }
@@ -2011,8 +2189,8 @@ watch(
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: #4fc291;
-  box-shadow: 0 0 0 6px rgba(79, 194, 145, 0.14);
+  background: #2e8a72;
+  box-shadow: 0 0 0 6px rgba(46, 138, 114, 0.14);
 }
 
 .clock-stack strong {
@@ -2030,8 +2208,124 @@ watch(
 .hud-left,
 .hud-right,
 .hud-bottom {
-  position: relative;
-  z-index: 2;
+  position: absolute;
+  z-index: 4;
+}
+
+.hud-left {
+  left: 12px;
+  top: 12px;
+  bottom: 12px;
+  width: 302px;
+  transition: transform 0.28s ease, opacity 0.28s ease;
+}
+
+.hud-left.is-closed {
+  transform: translateX(-118%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hud-right {
+  right: 12px;
+  top: 12px;
+  bottom: 12px;
+  width: 360px;
+  transition: transform 0.28s ease, opacity 0.28s ease;
+}
+
+.hud-right.is-closed {
+  transform: translateX(118%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hud-bottom {
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: min(1040px, calc(100% - 48px));
+  pointer-events: none;
+}
+
+.hud-bottom > * {
+  pointer-events: auto;
+}
+
+.dock-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--hud-border);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--hud-shadow);
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dock-pill small {
+  color: var(--text-soft);
+  font-size: 11px;
+}
+
+.dock-pill__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--tone-gray);
+}
+
+.dock-pill__dot.is-alert {
+  background: var(--tone-red);
+  box-shadow: 0 0 0 5px rgba(201, 80, 75, 0.14);
+}
+
+.overlay-toggle {
+  position: absolute;
+  z-index: 5;
+  top: 20px;
+  padding: 8px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--hud-border);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--hud-shadow);
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: left 0.28s ease, right 0.28s ease;
+}
+
+.overlay-toggle--left {
+  left: 12px;
+}
+
+.overlay-toggle--left.is-shifted {
+  left: 326px;
+}
+
+.overlay-toggle--right {
+  right: 12px;
+}
+
+.context-head-ops {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.context-head-ops small {
+  color: var(--text-soft);
 }
 
 .hud-panel {
@@ -2041,16 +2335,11 @@ watch(
   overflow: hidden;
 }
 
-.hud-panel--sidebar {
-  height: 100%;
-  max-height: none;
-  overflow-y: auto;
-}
-
+.hud-panel--sidebar,
 .hud-panel--context {
   height: 100%;
-  min-height: 680px;
-  max-height: 100%;
+  min-height: 0;
+  max-height: none;
   overflow-y: auto;
 }
 
@@ -2079,7 +2368,7 @@ watch(
 .detail-section {
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid rgba(170, 190, 214, 0.22);
+  border-top: 1px solid rgba(187, 217, 207, 0.22);
 }
 
 .field-inline {
@@ -2119,7 +2408,7 @@ watch(
   background: rgba(246, 250, 255, 0.94);
   color: var(--text-main);
   text-align: left;
-  box-shadow: inset 0 0 0 1px rgba(170, 190, 214, 0.24);
+  box-shadow: inset 0 0 0 1px rgba(187, 217, 207, 0.24);
 }
 
 .tree-building__head strong,
@@ -2128,7 +2417,7 @@ watch(
 }
 
 .tree-building__head.active {
-  background: linear-gradient(135deg, rgba(111, 149, 255, 0.16), rgba(141, 194, 255, 0.18));
+  background: linear-gradient(135deg, rgba(61, 127, 166, 0.16), rgba(141, 194, 255, 0.18));
 }
 
 .tree-floor-list {
@@ -2146,11 +2435,11 @@ watch(
   background: rgba(255, 255, 255, 0.76);
   color: var(--text-main);
   text-align: left;
-  box-shadow: inset 0 0 0 1px rgba(170, 190, 214, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(187, 217, 207, 0.18);
 }
 
 .tree-floor.active {
-  background: linear-gradient(135deg, rgba(79, 194, 145, 0.18), rgba(111, 149, 255, 0.14));
+  background: linear-gradient(135deg, rgba(46, 138, 114, 0.18), rgba(61, 127, 166, 0.14));
 }
 
 .status-bars,
@@ -2170,7 +2459,7 @@ watch(
 .distribution-track {
   height: 8px;
   border-radius: 999px;
-  background: rgba(170, 190, 214, 0.2);
+  background: rgba(187, 217, 207, 0.2);
   overflow: hidden;
 }
 
@@ -2182,12 +2471,138 @@ watch(
 .fill-cyan { background: linear-gradient(90deg, #64b8ff, #8dd2ff); }
 .fill-gray { background: linear-gradient(90deg, #b5c1ce, #d0d8e0); }
 .fill-purple { background: linear-gradient(90deg, #8770eb, #a997ff); }
-.fill-orange { background: linear-gradient(90deg, #efa94e, #f6c27d); }
-.fill-red { background: linear-gradient(90deg, #ef6b7b, #f39ba7); }
+.fill-orange { background: linear-gradient(90deg, #de9b3d, #edc28a); }
+.fill-red { background: linear-gradient(90deg, #c9504b, #e0928d); }
 
 .focus-ribbon {
   padding: 10px 12px;
   border-radius: 22px;
+}
+
+.bed-command-bar {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(360px, 1.5fr) 180px;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.bed-command-bar__primary,
+.bed-command-bar__filters,
+.bed-command-bar__cta {
+  border: 1px solid var(--hud-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 251, 246, 0.88));
+  box-shadow: var(--hud-shadow);
+  backdrop-filter: blur(12px);
+}
+
+.bed-command-bar__primary {
+  min-width: 0;
+  padding: 13px 16px;
+  border-radius: 20px;
+  display: grid;
+  gap: 4px;
+}
+
+.bed-command-bar__primary strong {
+  color: var(--text-strong);
+  font-size: 17px;
+}
+
+.bed-command-bar__primary p,
+.bed-command-bar__cta span {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.bed-command-bar__filters {
+  min-width: 0;
+  padding: 8px;
+  border-radius: 20px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.bed-status-chip {
+  min-width: 0;
+  border: 0;
+  border-radius: 16px;
+  padding: 10px 10px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text-main);
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  grid-template-areas:
+    "dot label"
+    "dot value";
+  gap: 2px 8px;
+  text-align: left;
+  box-shadow: inset 0 0 0 1px rgba(187, 217, 207, 0.18);
+}
+
+.bed-status-chip.active {
+  background: rgba(226, 244, 235, 0.95);
+  box-shadow: inset 0 0 0 1px rgba(46, 138, 114, 0.32), 0 8px 20px rgba(46, 138, 114, 0.12);
+}
+
+.bed-status-chip__dot {
+  grid-area: dot;
+  align-self: center;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #7fa2bf;
+}
+
+.bed-status-chip strong {
+  grid-area: label;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-strong);
+}
+
+.bed-status-chip small {
+  grid-area: value;
+  color: var(--text-soft);
+}
+
+.bed-status-chip.tone-green .bed-status-chip__dot { background: var(--tone-green); }
+.bed-status-chip.tone-red .bed-status-chip__dot { background: var(--tone-red); }
+.bed-status-chip.tone-orange .bed-status-chip__dot { background: var(--tone-orange); }
+.bed-status-chip.tone-gray .bed-status-chip__dot { background: var(--tone-gray); }
+.bed-status-chip.tone-blue .bed-status-chip__dot { background: var(--tone-blue); }
+
+.bed-command-bar__cta {
+  border-radius: 20px;
+  padding: 12px 14px;
+  color: var(--text-main);
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+}
+
+.bed-command-bar__cta strong {
+  color: var(--text-strong);
+  font-size: 16px;
+}
+
+.bed-command-bar__cta.tone-red {
+  background: linear-gradient(180deg, rgba(255, 242, 242, 0.96), rgba(255, 248, 248, 0.86));
+}
+
+.bed-command-bar__cta.tone-cyan {
+  background: linear-gradient(180deg, rgba(235, 250, 247, 0.96), rgba(248, 253, 251, 0.86));
+}
+
+.bed-command-bar__cta.tone-green {
+  background: linear-gradient(180deg, rgba(238, 250, 242, 0.96), rgba(249, 253, 250, 0.86));
 }
 
 .focus-ribbon__main {
@@ -2200,7 +2615,7 @@ watch(
   padding: 10px 12px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.8);
-  box-shadow: inset 0 0 0 1px rgba(170, 190, 214, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(187, 217, 207, 0.18);
   display: grid;
   gap: 4px;
 }
@@ -2260,15 +2675,15 @@ watch(
 }
 
 .detail-chip {
-  background: rgba(111, 149, 255, 0.12);
+  background: rgba(61, 127, 166, 0.12);
   color: var(--text-strong);
 }
 
-.detail-chip.tone-green { background: rgba(79, 194, 145, 0.14); color: #1f7452; }
-.detail-chip.tone-red { background: rgba(239, 107, 123, 0.14); color: #b44758; }
+.detail-chip.tone-green { background: rgba(46, 138, 114, 0.14); color: #21705f; }
+.detail-chip.tone-red { background: rgba(239, 107, 123, 0.14); color: #c9504b; }
 .detail-chip.tone-orange { background: rgba(242, 171, 69, 0.16); color: #b76b0e; }
-.detail-chip.tone-purple { background: rgba(140, 119, 234, 0.14); color: #6148ca; }
-.detail-chip.tone-gray { background: rgba(165, 178, 194, 0.14); color: #718092; }
+.detail-chip.tone-purple { background: rgba(107, 121, 216, 0.14); color: #6b79d8; }
+.detail-chip.tone-gray { background: rgba(165, 178, 194, 0.14); color: #8a9a94; }
 
 .detail-tags {
   display: flex;
@@ -2277,8 +2692,8 @@ watch(
 }
 
 .overlay-chip {
-  border: 1px solid rgba(170, 190, 214, 0.22);
-  background: rgba(248, 251, 255, 0.88);
+  border: 1px solid rgba(187, 217, 207, 0.22);
+  background: rgba(248, 251, 246, 0.88);
   color: var(--text-main);
 }
 
@@ -2296,7 +2711,7 @@ watch(
   padding: 12px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.74);
-  box-shadow: inset 0 0 0 1px rgba(170, 190, 214, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(187, 217, 207, 0.2);
   display: grid;
   gap: 4px;
 }
@@ -2328,12 +2743,12 @@ watch(
   padding: 12px 14px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.72);
-  box-shadow: inset 0 0 0 1px rgba(170, 190, 214, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(187, 217, 207, 0.2);
 }
 
 .event-card--soft.tone-red { background: linear-gradient(180deg, rgba(255, 241, 243, 0.92), rgba(255, 249, 250, 0.82)); }
 .event-card--soft.tone-orange { background: linear-gradient(180deg, rgba(255, 248, 236, 0.92), rgba(255, 251, 245, 0.82)); }
-.event-card--soft.tone-blue { background: linear-gradient(180deg, rgba(241, 247, 255, 0.92), rgba(248, 251, 255, 0.82)); }
+.event-card--soft.tone-blue { background: linear-gradient(180deg, rgba(243, 247, 242, 0.92), rgba(248, 251, 246, 0.82)); }
 
 .empty-drawer {
   min-height: 220px;
@@ -2348,10 +2763,13 @@ watch(
 }
 
 .activity-dock {
+  width: 100%;
+  max-height: 250px;
+  overflow-y: auto;
   padding: 14px;
   border-radius: 24px;
   border: 1px solid var(--hud-border);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 251, 255, 0.86));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 251, 246, 0.86));
   box-shadow: var(--hud-shadow);
   backdrop-filter: blur(10px);
 }
@@ -2377,8 +2795,8 @@ watch(
 .campus-scope--focus {
   padding: 10px 14px;
   border-radius: 18px;
-  border: 1px solid rgba(170, 190, 214, 0.22);
-  background: rgba(248, 251, 255, 0.72);
+  border: 1px solid rgba(187, 217, 207, 0.22);
+  background: rgba(248, 251, 246, 0.72);
 }
 
 .hud-topbar__ops--command {
@@ -2398,7 +2816,7 @@ watch(
 .sidebar-mini-card {
   padding: 12px;
   border-radius: 18px;
-  border: 1px solid rgba(170, 190, 214, 0.18);
+  border: 1px solid rgba(187, 217, 207, 0.18);
   background: rgba(255, 255, 255, 0.7);
   display: grid;
   gap: 4px;
@@ -2430,7 +2848,7 @@ watch(
   padding: 12px 14px;
   border-radius: 18px;
   background: linear-gradient(180deg, rgba(244, 249, 255, 0.9), rgba(255, 255, 255, 0.84));
-  border: 1px solid rgba(170, 190, 214, 0.2);
+  border: 1px solid rgba(187, 217, 207, 0.2);
   display: grid;
   gap: 6px;
 }
@@ -2449,7 +2867,7 @@ watch(
   padding: 12px 14px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.76);
-  box-shadow: inset 0 0 0 1px rgba(170, 190, 214, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(187, 217, 207, 0.16);
   display: grid;
   gap: 6px;
 }
@@ -2467,9 +2885,11 @@ watch(
 }
 
 .stage-brief {
+  position: relative;
+  z-index: 2;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 10px;
 }
 
 .stage-brief__main,
@@ -2481,7 +2901,7 @@ watch(
 
 .stage-quick-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -2489,7 +2909,7 @@ watch(
 .bed-guard-card,
 .context-tone-strip > div {
   border: 1px solid var(--hud-border);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 251, 255, 0.88));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 251, 246, 0.88));
   box-shadow: var(--hud-shadow);
   backdrop-filter: blur(12px);
 }
@@ -2528,8 +2948,8 @@ watch(
   gap: 10px;
   padding: 10px 12px;
   border-radius: 16px;
-  background: rgba(248, 251, 255, 0.82);
-  box-shadow: inset 0 0 0 1px rgba(170, 190, 214, 0.16);
+  background: rgba(248, 251, 246, 0.82);
+  box-shadow: inset 0 0 0 1px rgba(187, 217, 207, 0.16);
 }
 
 .bed-guard-step span {
@@ -2546,13 +2966,13 @@ watch(
 }
 
 .bed-guard-step.is-current span {
-  background: rgba(111, 149, 255, 0.16);
-  color: #416ee8;
+  background: rgba(61, 127, 166, 0.16);
+  color: #3d7fa6;
 }
 
 .bed-guard-step.is-done span {
-  background: rgba(79, 194, 145, 0.16);
-  color: #17865b;
+  background: rgba(46, 138, 114, 0.16);
+  color: #2e8a72;
 }
 
 .bed-guard-blockers {
@@ -2608,7 +3028,7 @@ watch(
 
 .stream-card.tone-red { background: linear-gradient(180deg, rgba(255, 242, 244, 0.92), rgba(255, 249, 250, 0.8)); }
 .stream-card.tone-orange { background: linear-gradient(180deg, rgba(255, 247, 236, 0.92), rgba(255, 251, 245, 0.8)); }
-.stream-card.tone-blue { background: linear-gradient(180deg, rgba(241, 247, 255, 0.92), rgba(248, 251, 255, 0.8)); }
+.stream-card.tone-blue { background: linear-gradient(180deg, rgba(243, 247, 242, 0.92), rgba(248, 251, 246, 0.8)); }
 .stream-card.tone-green { background: linear-gradient(180deg, rgba(240, 251, 246, 0.92), rgba(247, 252, 249, 0.8)); }
 
 .bed-immersive-page :deep(.ant-input),
@@ -2618,13 +3038,13 @@ watch(
 .bed-immersive-page :deep(.ant-switch),
 .bed-immersive-page :deep(.ant-btn) {
   border-radius: 14px;
-  border-color: rgba(170, 190, 214, 0.28);
+  border-color: rgba(187, 217, 207, 0.28);
   background: rgba(255, 255, 255, 0.88);
   color: var(--text-main);
 }
 
 .bed-immersive-page :deep(.ant-btn-primary) {
-  background: linear-gradient(135deg, #6f95ff, #8dc0ff) !important;
+  background: linear-gradient(135deg, #3d7fa6, #74a8c8) !important;
   border-color: transparent !important;
   color: white !important;
 }
@@ -2638,8 +3058,12 @@ watch(
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .dashboard-main {
-    grid-template-columns: 260px minmax(0, 1fr) 320px;
+  .bed-command-bar {
+    grid-template-columns: minmax(240px, 1fr) minmax(420px, 1.4fr);
+  }
+
+  .bed-command-bar__cta {
+    grid-column: 1 / -1;
   }
 
   .stage-brief {
@@ -2675,37 +3099,38 @@ watch(
     font-size: 24px;
   }
 
-  .dashboard-main {
-    grid-template-columns: 232px minmax(0, 1fr) 288px;
-    gap: 14px;
+  .stage-quick-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .stage-quick-actions {
+  .bed-command-bar {
     grid-template-columns: 1fr;
+  }
+
+  .bed-command-bar__filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .activity-stream {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .stage-canvas-shell :deep(.panorama-container),
-  .stage-empty,
-  .hud-panel--context {
-    min-height: 620px;
+  .hud-left {
+    width: 272px;
+  }
+
+  .overlay-toggle--left.is-shifted {
+    left: 296px;
+  }
+
+  .hud-right {
+    width: 330px;
   }
 }
 
 @media (max-width: 1120px) {
-  .dashboard-main {
-    grid-template-columns: 240px minmax(0, 1fr);
-  }
-
   .hud-right {
-    grid-column: 1 / -1;
-  }
-
-  .hud-panel--context {
-    min-height: auto;
+    width: min(330px, calc(100% - 24px));
   }
 }
 
@@ -2731,10 +3156,16 @@ watch(
   }
 
   .dashboard-main {
-    grid-template-columns: 1fr;
+    min-height: 520px;
+  }
+
+  .hud-left,
+  .hud-right {
+    width: min(320px, calc(100% - 24px));
   }
 
   .hud-topbar__metrics,
+  .bed-command-bar__filters,
   .sidebar-mini-grid,
   .detail-grid,
   .action-grid,
@@ -2746,7 +3177,7 @@ watch(
 
   .stage-canvas-shell :deep(.panorama-container),
   .stage-empty {
-    min-height: 520px;
+    min-height: 0;
   }
 
   .resident-profile {

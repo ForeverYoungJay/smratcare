@@ -37,6 +37,9 @@
       <a-form-item label="类型">
         <a-select v-model:value="query.dataType" :options="dataTypeOptions" allow-clear placeholder="选择类型" style="width: 180px" />
       </a-form-item>
+      <a-form-item label="来源">
+        <a-select v-model:value="query.source" :options="sourceOptions" allow-clear placeholder="全部来源" style="width: 160px" />
+      </a-form-item>
       <a-form-item label="状态">
         <a-select v-model:value="query.abnormalFlag" :options="abnormalOptions" allow-clear placeholder="全部状态" style="width: 140px" />
       </a-form-item>
@@ -45,6 +48,9 @@
       </a-form-item>
       <template #extra>
         <a-space>
+          <a-button @click="applyQuickFilter('staff-mobile')">员工补录</a-button>
+          <a-button @click="applyQuickFilter('staff-mobile-abnormal-today')">今日异常体征</a-button>
+          <a-button @click="applyQuickFilter('today')">今日记录</a-button>
           <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
           <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
           <a-button type="primary" @click="openCreate">新增数据</a-button>
@@ -72,12 +78,12 @@
           <a-tag :color="record.abnormalFlag ? 'red' : 'green'">{{ record.abnormalFlag ? '异常' : '正常' }}</a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="openEdit(record)">编辑</a-button>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
             <a-popconfirm title="确认删除该记录吗？" ok-text="确认" cancel-text="取消" @confirm="remove(record)">
-              <a-button type="link" danger>删除</a-button>
+              <a-button type="link" size="small" danger>删除</a-button>
             </a-popconfirm>
-          </a-space>
+          </div>
         </template>
       </template>
     </DataTable>
@@ -145,6 +151,7 @@ const rows = ref<HealthDataRecord[]>([])
 const query = reactive({
   keyword: '',
   dataType: '',
+  source: '',
   abnormalFlag: undefined as number | undefined,
   measuredRange: [] as any[],
   pageNo: 1,
@@ -197,6 +204,11 @@ const abnormalOptions = [
   { label: '正常', value: 0 },
   { label: '异常', value: 1 }
 ]
+const sourceOptions = [
+  { label: '员工移动端', value: 'staff-mobile' },
+  { label: '家属端', value: 'family-miniapp' },
+  { label: '后台录入', value: 'admin-web' }
+]
 
 async function fetchData() {
   loading.value = true
@@ -239,6 +251,7 @@ function handleTableChange(pag: any) {
 function onReset() {
   query.keyword = ''
   query.dataType = ''
+  query.source = ''
   query.abnormalFlag = undefined
   query.measuredRange = []
   query.pageNo = 1
@@ -339,6 +352,7 @@ function buildQueryParams() {
   const params: Record<string, any> = {
     keyword: query.keyword || undefined,
     dataType: query.dataType || undefined,
+    source: query.source || undefined,
     abnormalFlag: typeof query.abnormalFlag === 'number' ? query.abnormalFlag : undefined,
     pageNo: query.pageNo,
     pageSize: query.pageSize
@@ -351,6 +365,56 @@ function buildQueryParams() {
     params.measuredTo = dayjs(query.measuredRange[1]).format('YYYY-MM-DDTHH:mm:ss')
   }
   return params
+}
+
+function setTodayRange() {
+  query.measuredRange = [dayjs().startOf('day'), dayjs().endOf('day')]
+}
+
+function applyQuickFilter(mode: 'today' | 'staff-mobile' | 'staff-mobile-abnormal-today') {
+  if (mode === 'today') {
+    query.source = ''
+    query.abnormalFlag = undefined
+    setTodayRange()
+  } else if (mode === 'staff-mobile') {
+    query.source = 'staff-mobile'
+    query.abnormalFlag = undefined
+    query.measuredRange = []
+  } else {
+    query.source = 'staff-mobile'
+    query.abnormalFlag = 1
+    setTodayRange()
+  }
+  query.pageNo = 1
+  pagination.current = 1
+  fetchData()
+}
+
+function parseRouteDateFilter(value: unknown) {
+  if (value === 'today') {
+    setTodayRange()
+    return
+  }
+  if (typeof value === 'string' && value.includes(',')) {
+    const [from, to] = value.split(',')
+    if (from && to) {
+      query.measuredRange = [dayjs(from), dayjs(to)]
+      return
+    }
+  }
+  query.measuredRange = []
+}
+
+function applyRouteFilters() {
+  query.keyword = typeof route.query.keyword === 'string' ? route.query.keyword : ''
+  query.dataType = typeof route.query.dataType === 'string' ? route.query.dataType : ''
+  query.source = typeof route.query.source === 'string' ? route.query.source : ''
+  if (route.query.abnormalFlag === '0' || route.query.abnormalFlag === '1') {
+    query.abnormalFlag = Number(route.query.abnormalFlag)
+  } else {
+    query.abnormalFlag = undefined
+  }
+  parseRouteDateFilter(route.query.date)
 }
 
 function formatType(type?: string) {
@@ -467,12 +531,23 @@ async function loadExportRecords() {
   }
 }
 
+applyRouteFilters()
 fetchData()
 searchElders('')
 
 watch(
   () => [route.query.residentId, route.query.elderId],
   () => {
+    query.pageNo = 1
+    pagination.current = 1
+    fetchData()
+  }
+)
+
+watch(
+  () => [route.query.keyword, route.query.dataType, route.query.source, route.query.abnormalFlag, route.query.date],
+  () => {
+    applyRouteFilters()
     query.pageNo = 1
     pagination.current = 1
     fetchData()
@@ -488,9 +563,9 @@ watch(
   margin-bottom: 12px;
 }
 :deep(.health-row-danger > td) {
-  background: #fff1f0 !important;
+  background: rgba(var(--danger-rgb), 0.08) !important;
 }
 :deep(.health-row-warning > td) {
-  background: #fff7e6 !important;
+  background: rgba(var(--warning-rgb), 0.1) !important;
 }
 </style>

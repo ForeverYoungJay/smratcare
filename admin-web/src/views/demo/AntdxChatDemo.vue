@@ -41,7 +41,7 @@ import PageContainer from '../../components/PageContainer.vue'
   padding: 8px 12px;
   border: none;
   border-radius: 8px;
-  background: #1677ff;
+  background: #3d7fa6;
   color: #fff;
 }
 </style>

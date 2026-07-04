@@ -2,7 +2,7 @@
   <PageContainer title="活动中心" subTitle="计划、方案、审批、执行与复盘在同一工作面完成。">
     <div class="activity-hero">
       <div class="hero-copy">
-        <span class="hero-kicker">Activity Studio</span>
+        <span class="hero-kicker">活动策划</span>
         <h2>养老活动不再只是一张日历，而是一条可追踪的执行链。</h2>
         <p>支持活动方案上传、费用审批、执行签到、照片留存与复盘归档，按钮会根据状态自动变化。</p>
       </div>
@@ -91,8 +91,8 @@
           <span>{{ budgetText(record) }}</span>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space wrap size="small">
-            <a-button size="small" @click="openDetail(record)">查看 / 编辑</a-button>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="openDetail(record)">查看 / 编辑</a-button>
             <a-button
               v-if="record.status === 'PLAN_PENDING' || record.status === 'REJECTED' || record.status === 'DRAFT'"
               size="small"
@@ -120,7 +120,7 @@
             >
               完成
             </a-button>
-          </a-space>
+          </div>
         </template>
       </template>
     </DataTable>
@@ -1152,9 +1152,9 @@ fetchData()
   border-radius: 24px;
   background:
     radial-gradient(circle at top left, rgba(255, 214, 153, 0.32), transparent 38%),
-    radial-gradient(circle at bottom right, rgba(74, 161, 255, 0.22), transparent 35%),
+    radial-gradient(circle at bottom right, rgba(var(--primary-rgb), 0.22), transparent 35%),
     linear-gradient(135deg, #fff8ee 0%, #fff 42%, #f4f8ff 100%);
-  border: 1px solid rgba(214, 199, 173, 0.46);
+  border: 1px solid var(--border-soft);
 }
 
 .hero-kicker {
@@ -1163,7 +1163,7 @@ fetchData()
   padding: 6px 10px;
   border-radius: 999px;
   background: rgba(179, 112, 35, 0.12);
-  color: #9f5b14;
+  color: var(--warning);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -1172,7 +1172,7 @@ fetchData()
 
 .hero-copy h2 {
   margin: 0 0 10px;
-  color: #172033;
+  color: var(--ink);
   font-size: 28px;
   line-height: 1.2;
 }
@@ -1180,7 +1180,7 @@ fetchData()
 .hero-copy p {
   margin: 0;
   max-width: 720px;
-  color: #5f6b7a;
+  color: var(--muted);
   line-height: 1.8;
 }
 
@@ -1194,18 +1194,18 @@ fetchData()
   padding: 18px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(216, 225, 234, 0.9);
-  box-shadow: 0 14px 28px rgba(15, 35, 60, 0.06);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-sm);
 }
 
 .hero-stat strong {
   display: block;
   font-size: 28px;
-  color: #172033;
+  color: var(--ink);
 }
 
 .hero-stat span {
-  color: #687587;
+  color: var(--muted);
   font-size: 13px;
 }
 
@@ -1222,14 +1222,14 @@ fetchData()
   border: 1px solid #eadfc7;
   border-radius: 18px;
   background: linear-gradient(180deg, #fffdf8 0%, #fff7ea 100%);
-  color: #754c24;
+  color: var(--warning);
   text-align: left;
   cursor: pointer;
 }
 
 .status-pill.active {
-  border-color: #b26e1e;
-  box-shadow: 0 10px 22px rgba(178, 110, 30, 0.16);
+  border-color: var(--warning);
+  box-shadow: 0 10px 22px rgba(var(--warning-rgb), 0.16);
 }
 
 .status-pill span,
@@ -1249,11 +1249,11 @@ fetchData()
 }
 
 .activity-cell strong {
-  color: #172033;
+  color: var(--ink);
 }
 
 .activity-cell span {
-  color: #6f7b8a;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -1271,7 +1271,7 @@ fetchData()
 .planner-headline span {
   display: block;
   margin-top: 4px;
-  color: #6f7b8a;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -1279,8 +1279,8 @@ fetchData()
   margin-bottom: 16px;
   padding: 16px;
   border-radius: 18px;
-  background: #f8fbff;
-  border: 1px solid #e3ecf7;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
 }
 
 .section-slab-head {
@@ -1308,12 +1308,12 @@ fetchData()
 .drawer-title-row h3 {
   margin: 0;
   font-size: 24px;
-  color: #182034;
+  color: var(--ink);
 }
 
 .drawer-head p {
   margin: 0;
-  color: #677485;
+  color: var(--muted);
 }
 
 .drawer-grid {
@@ -1325,7 +1325,7 @@ fetchData()
   border-radius: 22px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 251, 255, 0.96) 100%);
-  box-shadow: 0 18px 40px rgba(19, 34, 59, 0.08);
+  box-shadow: var(--shadow-md);
 }
 
 .info-grid {
@@ -1337,18 +1337,18 @@ fetchData()
 .info-grid div {
   padding: 12px;
   border-radius: 14px;
-  background: #f7f9fc;
+  background: var(--surface-2);
 }
 
 .info-grid span {
   display: block;
   margin-bottom: 6px;
-  color: #748092;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .info-grid strong {
-  color: #172033;
+  color: var(--ink);
 }
 
 .tag-row {
@@ -1367,23 +1367,23 @@ fetchData()
   gap: 12px;
   padding: 14px;
   border-radius: 18px;
-  background: #f8fbff;
-  border: 1px solid #e7eef7;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
 }
 
 .approval-step.pending {
-  background: #fff9e9;
-  border-color: #f4d479;
+  background: rgba(var(--warning-rgb), 0.1);
+  border-color: var(--warning);
 }
 
 .approval-step.approved {
-  background: #f3fbf4;
-  border-color: #bfe6c2;
+  background: rgba(var(--success-rgb), 0.1);
+  border-color: var(--success);
 }
 
 .approval-step.rejected {
-  background: #fff3f2;
-  border-color: #f2b8b5;
+  background: rgba(var(--danger-rgb), 0.08);
+  border-color: var(--danger);
 }
 
 .approval-badge {
@@ -1406,7 +1406,7 @@ fetchData()
 .approval-content p,
 .approval-content span {
   margin: 0;
-  color: #677485;
+  color: var(--muted);
 }
 
 .approval-action {
@@ -1424,7 +1424,7 @@ fetchData()
 }
 
 .muted {
-  color: #748092;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -1437,7 +1437,7 @@ fetchData()
 .photo-chip {
   overflow: hidden;
   border-radius: 16px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
   background: #fff;
 }
 
@@ -1452,8 +1452,8 @@ fetchData()
   width: 100%;
   padding: 8px 10px;
   border: 0;
-  background: #fff4f3;
-  color: #b44339;
+  background: rgba(var(--danger-rgb), 0.08);
+  color: var(--danger);
   cursor: pointer;
 }
 

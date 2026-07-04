@@ -1,5 +1,11 @@
 <template>
   <PageContainer title="外出就医登记" subTitle="老人外出就医与返院登记">
+    <template #extra>
+      <a-space wrap>
+        <a-button v-if="canManage" @click="exportRows">导出</a-button>
+        <a-button v-if="canManage" type="primary" @click="openCreate">新增外出就医</a-button>
+      </a-space>
+    </template>
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="老人">
@@ -29,8 +35,6 @@
           <a-space>
             <a-button type="primary" @click="fetchData">搜索</a-button>
             <a-button @click="reset">清空</a-button>
-            <a-button v-if="canManage" @click="exportRows">导出</a-button>
-            <a-button v-if="canManage" type="primary" @click="openCreate">新增外出就医</a-button>
           </a-space>
         </a-form-item>
       </a-form>

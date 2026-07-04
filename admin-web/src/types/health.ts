@@ -88,6 +88,9 @@ export interface HealthArchive {
   allergyHistory?: string
   chronicDisease?: string
   medicalHistory?: string
+  recentMedicalVisit?: string
+  checkReportSummary?: string
+  rehabilitationRecord?: string
   emergencyContact?: string
   emergencyPhone?: string
   remark?: string
@@ -190,4 +193,5 @@ export interface HealthMedicationTask {
   status: string
   registrationId?: Id
   doneTime?: string
+  remark?: string
 }

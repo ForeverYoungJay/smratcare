@@ -30,7 +30,9 @@
       <a-table :columns="columns" :data-source="rows" row-key="date" :pagination="false">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'date'">
-            <a @click="goDailyLeads(record.date)">{{ record.date }}</a>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="goDailyLeads(record.date)">{{ record.date }}</a-button>
+            </div>
           </template>
         </template>
       </a-table>

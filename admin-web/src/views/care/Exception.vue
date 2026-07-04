@@ -26,10 +26,10 @@
         </vxe-column>
         <vxe-column title="操作" width="140" fixed="right">
           <template #default="{ row }">
-            <a-space>
-              <a @click="openDetail(row)">查看</a>
-              <a @click="confirmResolve(row)">标记已处理</a>
-            </a-space>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="openDetail(row)">查看</a-button>
+              <a-button type="link" size="small" @click="openResolve(row)">处理闭环</a-button>
+            </div>
           </template>
         </vxe-column>
       </vxe-table>
@@ -45,15 +45,45 @@
         <a-descriptions-item label="异常原因">{{ current?.status === 'EXCEPTION' ? '执行异常' : '未知' }}</a-descriptions-item>
       </a-descriptions>
     </a-drawer>
+
+    <a-modal v-model:open="resolveOpen" title="异常任务处理闭环" :confirm-loading="resolving" @ok="submitResolve">
+      <a-form layout="vertical">
+        <a-form-item label="任务">
+          <a-input :value="resolveTarget?.taskName || '-'" disabled />
+        </a-form-item>
+        <a-form-item label="处理护工">
+          <a-select
+            v-model:value="resolveForm.staffId"
+            show-search
+            :filter-option="false"
+            :options="staffOptions"
+            placeholder="选择实际处理人"
+            @search="searchStaff"
+          />
+        </a-form-item>
+        <a-form-item label="处理评分">
+          <a-rate v-model:value="resolveForm.score" />
+        </a-form-item>
+        <a-form-item label="处理措施">
+          <a-textarea
+            v-model:value="resolveForm.resolution"
+            :rows="4"
+            :maxlength="500"
+            show-count
+            placeholder="例如：已复核老人状态，补做翻身护理并同步护士长复盘。"
+          />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { Modal, message } from 'ant-design-vue'
+import { computed, reactive, ref, watch } from 'vue'
+import { message } from 'ant-design-vue'
 import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
-import { getTaskPage } from '../../api/care'
+import { getTaskPage, resolveCareTaskException } from '../../api/care'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 import type { CareTaskItem, PageResult } from '../../types'
 import { exportCsv } from '../../utils/export'
@@ -65,9 +95,18 @@ const list = ref<CareTaskItem[]>([])
 const route = useRoute()
 const loading = ref(false)
 const detailOpen = ref(false)
+const resolveOpen = ref(false)
+const resolving = ref(false)
 const current = ref<CareTaskItem | null>(null)
+const resolveTarget = ref<CareTaskItem | null>(null)
 const staffLoaded = ref(false)
-const { searchStaff, findStaffName } = useStaffOptions({ pageSize: 220, preloadSize: 500 })
+const { staffOptions, searchStaff, findStaffName } = useStaffOptions({ pageSize: 220, preloadSize: 500 })
+const resolveForm = reactive({
+  staffId: undefined as number | undefined,
+  score: 5,
+  resolution: ''
+})
+const selectedElderId = computed(() => normalizeResidentId(route.query as Record<string, unknown>))
 
 async function search() {
   loading.value = true
@@ -76,7 +115,7 @@ async function search() {
       pageNo: 1,
       pageSize: 50,
       status: 'EXCEPTION',
-      elderId: normalizeResidentId(route.query as Record<string, unknown>)
+      elderId: selectedElderId.value
     })
     list.value = res.list
     await ensureStaffLoaded()
@@ -93,13 +132,37 @@ function openDetail(row: CareTaskItem) {
   detailOpen.value = true
 }
 
-function confirmResolve(row: CareTaskItem) {
-  Modal.confirm({
-    title: '确认标记已处理？',
-    onOk: async () => {
-      message.success(`已处理任务 ${row.taskDailyId}`)
-    }
-  })
+async function openResolve(row: CareTaskItem) {
+  resolveTarget.value = row
+  resolveForm.staffId = row.staffId
+  resolveForm.score = 5
+  resolveForm.resolution = ''
+  resolveOpen.value = true
+  await ensureStaffLoaded()
+}
+
+async function submitResolve() {
+  if (!resolveTarget.value) return
+  if (!resolveForm.staffId) {
+    message.warning('请选择处理护工')
+    return
+  }
+  resolving.value = true
+  try {
+    await resolveCareTaskException({
+      taskDailyId: resolveTarget.value.taskDailyId,
+      staffId: Number(resolveForm.staffId),
+      score: Number(resolveForm.score || 5),
+      resolution: resolveForm.resolution || undefined
+    })
+    message.success('异常任务已闭环')
+    resolveOpen.value = false
+    await search()
+  } catch (error) {
+    message.error(resolveCareError(error, '异常任务处理失败'))
+  } finally {
+    resolving.value = false
+  }
 }
 
 function exportCsvData() {

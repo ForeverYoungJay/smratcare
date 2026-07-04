@@ -68,6 +68,13 @@ export interface CareTaskReviewRequest {
   reviewTime?: string
 }
 
+export interface CareTaskExceptionResolveRequest {
+  taskDailyId: number
+  staffId?: number
+  score?: number
+  resolution?: string
+}
+
 export interface CareTaskCreateRequest {
   elderId: Id
   templateId?: number

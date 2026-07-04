@@ -1,5 +1,9 @@
 <template>
   <PageContainer title="采购单" subTitle="维护采购计划与采购明细">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新建采购单</a-button>
+    </template>
+
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline" :model="query" class="search-form">
         <a-form-item label="状态">
@@ -18,9 +22,6 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px">
-      <div class="table-actions">
-        <a-button type="primary" @click="openCreate">新建采购单</a-button>
-      </div>
       <a-row :gutter="12" style="margin-bottom: 12px">
         <a-col :span="6"><a-statistic title="固定资产金额" :value="summaryStats.assetAmount" :precision="2" /></a-col>
         <a-col :span="6"><a-statistic title="耗材金额" :value="summaryStats.consumableAmount" :precision="2" /></a-col>
@@ -46,13 +47,13 @@
             <span>{{ typeAmountSummary(record) }}</span>
           </template>
           <template v-if="column.key === 'actions'">
-            <a-space>
-              <a @click="viewDetail(record.id)">明细</a>
-              <a v-if="record.status === ORDER_STATUS.DRAFT" @click="openEdit(record.id)">编辑</a>
-              <a v-if="record.status === ORDER_STATUS.DRAFT" @click="approve(record)">审批流程</a>
-              <a v-if="record.status === ORDER_STATUS.APPROVED" @click="complete(record.id)">完成</a>
-              <a v-if="record.status === ORDER_STATUS.DRAFT || record.status === ORDER_STATUS.APPROVED" @click="cancel(record.id)">作废</a>
-            </a-space>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="viewDetail(record.id)">明细</a-button>
+              <a-button v-if="record.status === ORDER_STATUS.DRAFT" type="link" size="small" @click="openEdit(record.id)">编辑</a-button>
+              <a-button v-if="record.status === ORDER_STATUS.DRAFT" type="link" size="small" @click="approve(record)">审批流程</a-button>
+              <a-button v-if="record.status === ORDER_STATUS.APPROVED" type="link" size="small" @click="complete(record.id)">完成</a-button>
+              <a-button v-if="record.status === ORDER_STATUS.DRAFT || record.status === ORDER_STATUS.APPROVED" type="link" danger size="small" @click="cancel(record.id)">作废</a-button>
+            </div>
           </template>
         </template>
       </a-table>
@@ -130,7 +131,9 @@
             {{ ((record.quantity || 0) * (record.unitPrice || 0)).toFixed(2) }}
           </template>
           <template v-else-if="column.key === 'actions'">
-            <a @click="removeItem(index)">删除</a>
+            <div class="row-action-links">
+              <a-button type="link" danger size="small" @click="removeItem(index)">删除</a-button>
+            </div>
           </template>
         </template>
       </a-table>
@@ -642,11 +645,6 @@ onMounted(async () => {
 <style scoped>
 .search-form {
   row-gap: 8px;
-}
-.table-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 12px;
 }
 .items-header {
   display: flex;

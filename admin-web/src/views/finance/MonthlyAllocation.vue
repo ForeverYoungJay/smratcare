@@ -154,7 +154,7 @@
         <a-descriptions-item label="总金额">{{ Number(previewData?.totalAmount || 0).toFixed(2) }}</a-descriptions-item>
         <a-descriptions-item label="人均">{{ Number(previewData?.avgAmount || 0).toFixed(2) }}</a-descriptions-item>
       </a-descriptions>
-      <vxe-table border stripe show-overflow :data="previewData?.rows || []" height="360" style="margin-top: 12px;">
+      <vxe-table border stripe show-overflow="title" :data="previewData?.rows || []" height="360" style="margin-top: 12px;">
         <vxe-column field="elderName" title="老人姓名" min-width="220" />
         <vxe-column field="amount" title="分摊金额" width="160" />
       </vxe-table>
@@ -676,7 +676,7 @@ searchElders('').catch(() => {})
 <style scoped>
 .form-tip {
   margin-top: 6px;
-  color: #8c8c8c;
+  color: var(--muted);
   font-size: 12px;
   line-height: 1.5;
 }

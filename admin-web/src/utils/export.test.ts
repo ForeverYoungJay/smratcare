@@ -12,6 +12,24 @@ describe('export utils', () => {
   let revokeObjectURLSpy: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
+    // jsdom 的 Blob 未实现 arrayBuffer()，用 FileReader 兜底真实读取字节（Response 会把 Blob 变成字符串）
+    if (typeof Blob.prototype.arrayBuffer !== 'function') {
+      ;(Blob.prototype as unknown as { arrayBuffer: () => Promise<ArrayBuffer> }).arrayBuffer = function (this: Blob) {
+        return new Promise<ArrayBuffer>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result as ArrayBuffer)
+          reader.onerror = () => reject(reader.error)
+          reader.readAsArrayBuffer(this)
+        })
+      }
+    }
+    // jsdom 环境下 URL.createObjectURL / revokeObjectURL 默认不存在，先补桩再 spyOn
+    if (typeof URL.createObjectURL !== 'function') {
+      ;(URL as unknown as { createObjectURL: () => string }).createObjectURL = () => ''
+    }
+    if (typeof URL.revokeObjectURL !== 'function') {
+      ;(URL as unknown as { revokeObjectURL: () => void }).revokeObjectURL = () => {}
+    }
     clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test')
     revokeObjectURLSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})

@@ -1,145 +1,160 @@
+/* ===== 健康数据 · 数值大而醒目 ===== */
+
 .card {
   padding: 28rpx;
 }
 
+/* ---- 二次验证提示 ---- */
 .verify-tip {
   margin-top: 20rpx;
   border-radius: 16rpx;
-  background: #fff7e8;
-  padding: 18rpx;
+  background: var(--accent-soft);
+  border: 1rpx solid rgba(229, 138, 58, 0.25);
+  padding: 22rpx;
 }
 
 .tip-title {
-  font-size: 26rpx;
-  font-weight: 900;
-  color: #8a5508;
+  font-size: 28rpx;
+  font-weight: 800;
+  color: #A96324;
 }
 
 .tip-text {
-  margin-top: 6rpx;
-  font-size: 23rpx;
-  color: #8a5508;
-  line-height: 1.55;
+  margin-top: 8rpx;
+  font-size: 25rpx;
+  color: #A96324;
+  line-height: 1.6;
 }
 
 .verify-btn {
-  margin-top: 14rpx;
-  height: 64rpx;
-  line-height: 64rpx;
-  font-size: 24rpx;
+  margin-top: 16rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  font-size: 26rpx;
 }
 
+/* ---- 时间范围切换 ---- */
 .range-row {
-  margin-top: 18rpx;
+  margin-top: 20rpx;
   display: flex;
-  gap: 10rpx;
-}
-
-.range {
-  padding: 9rpx 18rpx;
-  border-radius: 999rpx;
-  font-size: 23rpx;
-  background: #edf2ef;
-  color: #71807a;
-}
-
-.range.active {
-  background: #246b5f;
-  color: #ffffff;
-  font-weight: 900;
-}
-
-.summary-grid {
-  margin-top: 18rpx;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 12rpx;
 }
 
+.range {
+  padding: 12rpx 26rpx;
+  border-radius: 999rpx;
+  font-size: 25rpx;
+  background: #EFF2EE;
+  color: var(--muted);
+}
+
+.range.active {
+  background: linear-gradient(135deg, #21705F, #2E8A72);
+  color: #ffffff;
+  font-weight: 800;
+  box-shadow: 0 4rpx 12rpx rgba(33, 112, 95, 0.25);
+}
+
+/* ---- 最新数值四宫格（数值醒目） ---- */
+.summary-grid {
+  margin-top: 20rpx;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14rpx;
+}
+
 .summary-item {
-  padding: 16rpx;
+  padding: 22rpx 24rpx;
   border-radius: 16rpx;
-  background: #f7faf8;
+  background: var(--brand-soft);
+  border: 1rpx solid rgba(33, 112, 95, 0.1);
 }
 
 .k {
   display: block;
-  font-size: 22rpx;
-  color: #71807a;
+  font-size: 24rpx;
+  color: var(--muted);
+  font-weight: 600;
 }
 
 .v {
   display: block;
-  margin-top: 4rpx;
-  font-size: 32rpx;
-  color: #16231f;
+  margin-top: 6rpx;
+  font-size: 44rpx;
+  line-height: 1.2;
+  color: var(--brand-deep);
   font-weight: 900;
 }
 
+/* ---- 趋势条 ---- */
 .trend-box {
-  margin-top: 22rpx;
+  margin-top: 24rpx;
 }
 
 .trend-row {
   display: flex;
   align-items: center;
-  margin-top: 12rpx;
+  margin-top: 14rpx;
   gap: 12rpx;
 }
 
 .date {
-  width: 90rpx;
-  font-size: 21rpx;
-  color: #71807a;
+  width: 96rpx;
+  font-size: 22rpx;
+  color: var(--faint);
 }
 
 .bar-wrap {
   flex: 1;
-  height: 12rpx;
+  height: 16rpx;
   border-radius: 999rpx;
   overflow: hidden;
-  background: #e3ebe7;
+  background: #E4EBE6;
 }
 
 .bar {
   height: 100%;
-  background: #246b5f;
+  border-radius: 999rpx;
+  background: linear-gradient(90deg, #21705F, #2E8A72);
 }
 
 .value {
-  width: 120rpx;
+  width: 128rpx;
   text-align: right;
-  font-size: 21rpx;
-  color: #34443f;
+  font-size: 24rpx;
+  color: var(--ink);
+  font-weight: 700;
 }
 
+/* ---- 健康建议 ---- */
 .tips-title {
-  margin-top: 22rpx;
-  font-size: 26rpx;
-  font-weight: 900;
-  color: #182420;
+  margin-top: 26rpx;
+  font-size: 29rpx;
+  font-weight: 800;
+  color: var(--ink);
 }
 
 .tip {
-  margin-top: 10rpx;
-  padding: 12rpx 14rpx;
+  margin-top: 12rpx;
+  padding: 16rpx 18rpx;
   border-radius: 14rpx;
-  background: #f7faf8;
-  color: #52615c;
-  font-size: 23rpx;
-  line-height: 1.55;
+  background: var(--brand-soft);
+  color: var(--brand-deep);
+  font-size: 26rpx;
+  line-height: 1.6;
 }
 
+/* ---- 快捷操作 ---- */
 .action-row {
-  margin-top: 20rpx;
+  margin-top: 24rpx;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10rpx;
+  gap: 12rpx;
 }
 
 .action {
-  height: 64rpx;
-  line-height: 64rpx;
+  height: 76rpx;
+  line-height: 76rpx;
   padding: 0;
-  font-size: 23rpx;
+  font-size: 25rpx;
 }

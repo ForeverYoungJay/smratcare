@@ -225,10 +225,10 @@ onMounted(() => {
 
 <style scoped>
 :deep(.hr-row-danger) {
-  background: #fff1f0 !important;
+  background: rgba(var(--danger-rgb), 0.1) !important;
 }
 
 :deep(.hr-row-warning) {
-  background: #fffbe6 !important;
+  background: rgba(var(--warning-rgb), 0.12) !important;
 }
 </style>

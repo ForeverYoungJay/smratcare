@@ -341,7 +341,7 @@ public class ElderServiceImpl implements ElderService {
     if (shouldClearBed) {
       return unbindBed(elder.getId(), LocalDate.now(), "档案编辑解绑床位", request.getTenantId(), request.getUpdatedBy());
     }
-    Bed bed = elder.getBedId() == null ? null : bedMapper.selectById(elder.getBedId());
+    Bed bed = resolveCurrentBed(elder);
     return toResponse(elder, bed);
   }
 
@@ -354,7 +354,7 @@ public class ElderServiceImpl implements ElderService {
     if (tenantId != null && !tenantId.equals(elder.getTenantId())) {
       return null;
     }
-    Bed bed = elder.getBedId() == null ? null : bedMapper.selectById(elder.getBedId());
+    Bed bed = resolveCurrentBed(elder);
     ElderResponse response = toResponse(elder, bed);
     CrmContract contract = resolveLatestContractMap(List.of(elder), tenantId).get(elder.getId());
     ElderAdmission admission = resolveLatestAdmissionMap(List.of(elder), tenantId).get(elder.getId());
@@ -657,6 +657,13 @@ public class ElderServiceImpl implements ElderService {
       }
     }
     return currentBedMap;
+  }
+
+  private Bed resolveCurrentBed(ElderProfile elder) {
+    if (elder == null || elder.getId() == null) {
+      return null;
+    }
+    return resolveCurrentBedMap(List.of(elder)).get(elder.getId());
   }
 
   private Map<Long, com.zhiyangyun.care.elder.entity.Room> resolveRoomMap(List<Bed> beds) {
@@ -981,13 +988,19 @@ public class ElderServiceImpl implements ElderService {
     }
     ensureNoDuplicateNameOccupied(elder);
 
-    long occupied = bedMapper.selectCount(Wrappers.lambdaQuery(Bed.class)
+    com.zhiyangyun.care.elder.entity.Room room = roomMapper.selectById(bed.getRoomId());
+    List<Bed> roomBeds = bedMapper.selectList(Wrappers.lambdaQuery(Bed.class)
         .eq(elder.getOrgId() != null, Bed::getOrgId, elder.getOrgId())
         .eq(elder.getTenantId() != null, Bed::getTenantId, elder.getTenantId())
         .eq(Bed::getRoomId, bed.getRoomId())
-        .eq(Bed::getStatus, BedStatus.OCCUPIED)
         .eq(Bed::getIsDeleted, 0));
-    com.zhiyangyun.care.elder.entity.Room room = roomMapper.selectById(bed.getRoomId());
+    Map<Long, ElderBedRelation> roomActiveRelationMap = resolveActiveRelationByBedMap(
+        elder.getTenantId(),
+        elder.getOrgId(),
+        roomBeds.stream().map(Bed::getId).filter(Objects::nonNull).toList());
+    long occupied = roomBeds.stream()
+        .filter(item -> occupiesBedCapacity(item, roomActiveRelationMap.get(item.getId())))
+        .count();
     List<ElderBedRelation> elderActiveRelations =
         findActiveRelationsByElderForUpdate(elder.getTenantId(), elder.getOrgId(), elder.getId());
     ElderBedRelation elderActive = elderActiveRelations.stream()
@@ -1003,7 +1016,7 @@ public class ElderServiceImpl implements ElderService {
       sameRoomTransfer = currentBed != null
           && Objects.equals(currentBed.getRoomId(), bed.getRoomId())
           && !Objects.equals(currentBed.getId(), bed.getId());
-      if (sameRoomTransfer && occupied > 0) {
+      if (sameRoomTransfer && occupiesBedCapacity(currentBed, roomActiveRelationMap.get(currentBed.getId())) && occupied > 0) {
         occupied -= 1;
       }
     }
@@ -1176,7 +1189,7 @@ public class ElderServiceImpl implements ElderService {
         continue;
       }
       ElderBedRelation activeRelation = findActiveRelationByBedForUpdate(elder.getTenantId(), elder.getOrgId(), roomBed.getId());
-      Long occupiedElderId = activeRelation == null ? roomBed.getElderId() : activeRelation.getElderId();
+      Long occupiedElderId = resolveOccupiedElderId(roomBed, activeRelation);
       if (occupiedElderId != null && !Objects.equals(occupiedElderId, elder.getId())) {
         throw new IllegalStateException("当前房间已有其他老人入住，不能整租");
       }
@@ -1270,6 +1283,39 @@ public class ElderServiceImpl implements ElderService {
 
   private void ensureNoDuplicateNameOccupied(ElderProfile elder) {
     return;
+  }
+
+  private Map<Long, ElderBedRelation> resolveActiveRelationByBedMap(Long tenantId, Long orgId, List<Long> bedIds) {
+    if (bedIds == null || bedIds.isEmpty()) {
+      return Map.of();
+    }
+    return relationMapper.selectList(Wrappers.lambdaQuery(ElderBedRelation.class)
+            .eq(ElderBedRelation::getIsDeleted, 0)
+            .eq(tenantId != null, ElderBedRelation::getTenantId, tenantId)
+            .eq(orgId != null, ElderBedRelation::getOrgId, orgId)
+            .eq(ElderBedRelation::getActiveFlag, 1)
+            .in(ElderBedRelation::getBedId, bedIds)
+            .orderByDesc(ElderBedRelation::getUpdateTime)
+            .orderByDesc(ElderBedRelation::getCreateTime)
+            .orderByDesc(ElderBedRelation::getId))
+        .stream()
+        .filter(item -> item.getBedId() != null)
+        .collect(Collectors.toMap(ElderBedRelation::getBedId, item -> item, (first, ignored) -> first));
+  }
+
+  private Long resolveOccupiedElderId(Bed bed, ElderBedRelation activeRelation) {
+    if (activeRelation != null && activeRelation.getElderId() != null) {
+      return activeRelation.getElderId();
+    }
+    return bed == null ? null : bed.getElderId();
+  }
+
+  private boolean occupiesBedCapacity(Bed bed, ElderBedRelation activeRelation) {
+    if (bed == null) {
+      return false;
+    }
+    return resolveOccupiedElderId(bed, activeRelation) != null
+        || Objects.equals(bed.getStatus(), BedStatus.OCCUPIED);
   }
 
   @Override

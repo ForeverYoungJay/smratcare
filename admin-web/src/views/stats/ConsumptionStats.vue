@@ -1,5 +1,23 @@
 <template>
   <PageContainer title="消费统计" subTitle="账单与商城消费分析">
+    <template #extra>
+      <a-space>
+        <a-button type="primary" @click="loadData">刷新</a-button>
+        <a-button @click="exportSummary">导出统计</a-button>
+        <a-dropdown>
+          <a-button>更多 ▾</a-button>
+          <template #overlay>
+            <a-menu>
+              <a-menu-item @click="openColumnSetting">列设置</a-menu-item>
+              <a-menu-item :disabled="!displayTopRows.length" @click="printCurrent">打印当前列</a-menu-item>
+              <a-menu-item :disabled="!query.elderId || !displayTopRows.length" @click="printSpecificElder">打印指定老人</a-menu-item>
+              <a-menu-divider />
+              <a-menu-item @click="reset">重置</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+      </a-space>
+    </template>
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline">
         <a-form-item label="起始月份">
@@ -34,16 +52,6 @@
             <a-button size="small" @click="setMonthPreset(3)">近3月</a-button>
             <a-button size="small" @click="setMonthPreset(6)">近6月</a-button>
             <a-button size="small" @click="setThisMonth">本月</a-button>
-          </a-space>
-        </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="loadData">刷新</a-button>
-            <a-button @click="exportSummary">导出统计</a-button>
-            <a-button @click="openColumnSetting">列设置</a-button>
-            <a-button :disabled="!displayTopRows.length" @click="printCurrent">打印当前列</a-button>
-            <a-button :disabled="!query.elderId || !displayTopRows.length" @click="printSpecificElder">打印指定老人</a-button>
-            <a-button @click="reset">重置</a-button>
           </a-space>
         </a-form-item>
       </a-form>
@@ -128,7 +136,7 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="老人消费排行 Top10">
-      <vxe-table border stripe show-overflow :data="displayTopRows" height="320">
+      <vxe-table border stripe show-overflow="title" :data="displayTopRows" height="320">
         <vxe-column field="elderName" title="老人姓名" min-width="180">
           <template #default="{ row }">
             {{ row.elderName || '未知老人' }}

@@ -791,14 +791,14 @@ watch(
 
 <style scoped>
 :deep(.hr-row-danger) {
-  background: #fff1f0 !important;
+  background: rgba(var(--danger-rgb), 0.08) !important;
 }
 :deep(.hr-row-warning) {
-  background: #fffbe6 !important;
+  background: rgba(var(--warning-rgb), 0.12) !important;
 }
 .hint-text {
   margin-top: 8px;
-  color: #8c8c8c;
+  color: var(--muted);
   font-size: 12px;
 }
 </style>

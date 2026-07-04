@@ -14,6 +14,8 @@ Page({
     ],
     activeScope: 'PERSONAL',
     list: [],
+    loading: false,
+    loadError: '',
     activeAlbumId: null,
     comments: [],
     commentInput: '',
@@ -25,21 +27,31 @@ Page({
     await this.loadData();
   },
   async loadData() {
-    const list = await getActivityAlbums(1, 20, { scope: this.data.activeScope });
-    this.setData({
-      list: (list || []).map((item) => {
-        const mediaType = String(item.mediaType || '').toLowerCase();
-        const mediaUrl = item.mediaUrl || item.videoUrl || (mediaType === 'video' ? item.coverUrl : '');
-        return {
-          ...item,
-          resolvedCoverUrl: resolveFileUrl(item.coverUrl || ''),
-          resolvedMediaUrl: resolveFileUrl(mediaUrl || ''),
-          scopeText: item.albumScope === 'PERSONAL' ? '个人相册' : '集体活动',
-          isVideo: mediaType === 'video',
-          isPhoto: mediaType === 'photo' || mediaType === 'image'
-        };
-      })
-    });
+    this.setData({ loading: true, loadError: '' });
+    try {
+      const list = await getActivityAlbums(1, 20, { scope: this.data.activeScope });
+      this.setData({
+        list: (list || []).map((item) => {
+          const mediaType = String(item.mediaType || '').toLowerCase();
+          const mediaUrl = item.mediaUrl || item.videoUrl || (mediaType === 'video' ? item.coverUrl : '');
+          return {
+            ...item,
+            resolvedCoverUrl: resolveFileUrl(item.coverUrl || ''),
+            resolvedMediaUrl: resolveFileUrl(mediaUrl || ''),
+            scopeText: item.albumScope === 'PERSONAL' ? '个人相册' : '集体活动',
+            isVideo: mediaType === 'video',
+            isPhoto: mediaType === 'photo' || mediaType === 'image'
+          };
+        })
+      });
+    } catch (error) {
+      this.setData({ list: [], loadError: error.message || '相册加载失败，请检查网络后重试' });
+    } finally {
+      this.setData({ loading: false });
+    }
+  },
+  retryLoad() {
+    this.loadData();
   },
   async switchScope(e) {
     const scope = e.currentTarget.dataset.scope;
@@ -70,7 +82,12 @@ Page({
   },
   async like(e) {
     const id = Number(e.currentTarget.dataset.id);
-    await toggleAlbumLike(id);
+    try {
+      await toggleAlbumLike(id);
+    } catch (error) {
+      wx.showToast({ title: error.message || '操作失败，请稍后重试', icon: 'none' });
+      return;
+    }
     await this.loadData();
     if (this.data.activeAlbumId === id) {
       await this.loadComments(id);

@@ -11,32 +11,54 @@ function normalizeNotice(item) {
 Page({
   data: {
     loading: false,
+    loadingMore: false,
     detailLoading: false,
     loadError: '',
     keyword: '',
     notices: [],
-    activeNotice: null
+    activeNotice: null,
+    pageNo: 1,
+    pageSize: 20,
+    hasMore: false
   },
   onShow() {
     getApp().ensureLogin();
-    this.loadData();
+    this.loadData({ reset: true });
   },
-  async loadData() {
-    this.setData({ loading: true, loadError: '' });
+  async loadData(options = {}) {
+    const reset = options.reset !== false;
+    const nextPageNo = reset ? 1 : Number(this.data.pageNo || 1) + 1;
+    this.setData(reset ? { loading: true, loadError: '' } : { loadingMore: true, loadError: '' });
     try {
-      const notices = await getStaffNotices({ keyword: this.data.keyword.trim(), pageSize: 30 });
-      this.setData({ notices: (notices || []).map(normalizeNotice) });
+      const notices = await getStaffNotices({
+        keyword: this.data.keyword.trim(),
+        pageNo: nextPageNo,
+        pageSize: this.data.pageSize
+      });
+      const normalized = (notices || []).map(normalizeNotice);
+      this.setData({
+        notices: reset ? normalized : this.data.notices.concat(normalized),
+        pageNo: nextPageNo,
+        hasMore: normalized.length >= this.data.pageSize
+      });
     } catch (error) {
-      this.setData({ loadError: error.message || '通知公告加载失败' });
+      this.setData({ loadError: error.message || (reset ? '通知公告加载失败' : '更多公告加载失败，请稍后重试') });
     } finally {
-      this.setData({ loading: false });
+      this.setData({ loading: false, loadingMore: false });
     }
   },
   onKeywordInput(e) {
     this.setData({ keyword: e.detail.value });
   },
   searchNotices() {
-    this.loadData();
+    this.loadData({ reset: true });
+  },
+  loadMore() {
+    if (this.data.loading || this.data.loadingMore || !this.data.hasMore) return;
+    this.loadData({ reset: false });
+  },
+  onReachBottom() {
+    this.loadMore();
   },
   async openNotice(e) {
     const id = e.currentTarget.dataset.id;

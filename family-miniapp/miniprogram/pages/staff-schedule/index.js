@@ -14,7 +14,9 @@ Page({
     ],
     loading: true,
     punching: false,
-    loadError: ''
+    loadError: '',
+    punchError: '',
+    punchSuccess: ''
   },
   onShow() {
     getApp().ensureLogin();
@@ -27,7 +29,11 @@ Page({
         getSchedule(),
         getAttendanceOverview()
       ]);
-      this.setData({ schedule, attendance });
+      this.setData({
+        schedule,
+        attendance,
+        punchError: ''
+      });
     } catch (error) {
       this.setData({ loadError: error.message || '排班加载失败' });
     } finally {
@@ -37,12 +43,15 @@ Page({
   async punch(e) {
     if (this.data.punching) return;
     const action = e.currentTarget.dataset.action;
-    this.setData({ punching: true });
+    this.setData({ punching: true, punchError: '', punchSuccess: '' });
     try {
       await punchAttendance(action);
+      const actionLabel = (this.data.punchActions.find((item) => item.action === action) || {}).label || '打卡';
       wx.showToast({ title: '打卡成功', icon: 'success' });
       await this.loadData();
+      this.setData({ punchSuccess: `${actionLabel}已提交，可在今日考勤中查看最新状态。` });
     } catch (error) {
+      this.setData({ punchError: error.message || '打卡失败，请稍后重试' });
       wx.showToast({ title: error.message || '打卡失败', icon: 'none' });
     } finally {
       this.setData({ punching: false });

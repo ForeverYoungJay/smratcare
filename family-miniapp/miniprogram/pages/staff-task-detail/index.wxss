@@ -3,7 +3,7 @@
 }
 
 .detail-title {
-  color: #182430;
+  color: #22332E;
   font-size: 34rpx;
   font-weight: 900;
   line-height: 1.35;
@@ -41,8 +41,8 @@
 }
 
 .check-item.checked {
-  background: #e8f4ef;
-  color: #1f684d;
+  background: #E8F3EF;
+  color: #21705F;
   font-weight: 850;
 }
 
@@ -60,7 +60,7 @@
 }
 
 .check-item.checked .check-dot {
-  background: #247455;
+  background: #21705F;
 }
 
 .tool-row {
@@ -73,8 +73,8 @@
 .tool-btn {
   height: 76rpx;
   border-radius: 18rpx;
-  background: #edf5f2;
-  color: #1f5f4c;
+  background: #E8F3EF;
+  color: #185C4E;
   font-size: 25rpx;
   font-weight: 850;
   line-height: 76rpx;
@@ -89,7 +89,7 @@
   height: 76rpx;
   border-radius: 18rpx;
   background: #eef6ff;
-  color: #255a91;
+  color: #3D7FA6;
   font-size: 25rpx;
   font-weight: 850;
   line-height: 76rpx;
@@ -108,13 +108,13 @@
   padding: 14rpx 16rpx;
   border-radius: 14rpx;
   background: #f2f8f5;
-  color: #246b5f;
+  color: #21705F;
   font-size: 23rpx;
   font-weight: 850;
 }
 
 .voice-clear {
-  color: #b42318;
+  color: #C9504B;
 }
 
 .scan-text {
@@ -148,7 +148,7 @@
   padding: 18rpx;
   border-radius: 14rpx;
   background: #f5f7fa;
-  color: #182430;
+  color: #22332E;
   font-size: 26rpx;
 }
 
@@ -183,12 +183,12 @@
   height: 76rpx;
   margin: 0 auto 18rpx;
   border-radius: 50%;
-  background: #246b5f;
+  background: #21705F;
   box-shadow: 0 0 0 18rpx rgba(31, 122, 105, 0.12);
 }
 
 .record-title {
-  color: #15221f;
+  color: #22332E;
   font-size: 28rpx;
   font-weight: 800;
 }

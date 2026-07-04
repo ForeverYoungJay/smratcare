@@ -27,11 +27,11 @@
           <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="createMaintenance(record)">发起维修</a-button>
-            <a-button type="link" @click="openEdit(record)">编辑</a-button>
-            <a-button type="link" danger @click="remove(record)">删除</a-button>
-          </a-space>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="createMaintenance(record)">发起维修</a-button>
+            <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
+            <a-button type="link" size="small" danger @click="remove(record)">删除</a-button>
+          </div>
         </template>
       </template>
     </DataTable>

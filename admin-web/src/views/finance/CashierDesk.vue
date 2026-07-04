@@ -3,7 +3,7 @@
     <div class="cashier-shell">
       <section class="cashier-top fade-up">
         <div class="cashier-top__copy">
-          <div class="cashier-kicker">Cashier Flow</div>
+          <div class="cashier-kicker">收银流程</div>
           <h2>一线财务只需要盯住今天这四步。</h2>
           <p>先收款，再补票据，再复核修正，最后打印交班单。页面不再让你来回找模块。</p>
         </div>
@@ -88,7 +88,7 @@
           <article class="workspace-main fade-up">
             <div class="panel-head">
               <div>
-                <div class="panel-kicker">Payment Stream</div>
+                <div class="panel-kicker">收款流水</div>
                 <h3>当日收款流水</h3>
               </div>
               <a-button type="link" @click="go('/finance/payments/records')">全部流水</a-button>
@@ -109,7 +109,7 @@
                 <strong>全部方式</strong>
               </button>
             </div>
-            <vxe-table border stripe show-overflow :loading="loading" :data="filteredPayments" height="560">
+            <vxe-table border stripe show-overflow="title" :loading="loading" :data="filteredPayments" height="560">
               <vxe-column field="billMonthlyId" title="账单ID" width="120" />
               <vxe-column field="amount" title="金额" width="110">
                 <template #default="{ row }">{{ money(row.amount) }}</template>
@@ -133,7 +133,7 @@
             <article class="side-panel fade-up">
               <div class="panel-head">
                 <div>
-                  <div class="panel-kicker">Invoice Queue</div>
+                  <div class="panel-kicker">待开票</div>
                   <h3>票据待办</h3>
                 </div>
                 <a-button type="link" @click="exportPendingInvoices">导出</a-button>
@@ -164,7 +164,7 @@
             <article class="side-panel fade-up">
               <div class="panel-head">
                 <div>
-                  <div class="panel-kicker">Adjustments</div>
+                  <div class="panel-kicker">调整项</div>
                   <h3>退款与修正</h3>
                 </div>
                 <a-button type="link" @click="go('/finance/payments/refund-reversal?from=cashier_desk')">全部修正</a-button>
@@ -192,7 +192,7 @@
             <article class="side-panel fade-up">
               <div class="panel-head">
                 <div>
-                  <div class="panel-kicker">Shift Checklist</div>
+                  <div class="panel-kicker">交班清单</div>
                   <h3>交班检查单</h3>
                 </div>
               </div>
@@ -409,6 +409,11 @@ async function exportPendingInvoices() {
 }
 
 function printShiftSummary() {
+  if (filteredPayments.value.length === 0 && pendingInvoices.value.length === 0 && todayAdjustments.value.length === 0) {
+    message.info('当前日期暂无收款、票据或修正记录，可直接查看日结与交班页确认空班交接')
+    router.push('/finance/payments/shift-close')
+    return
+  }
   printTableReport({
     title: '收银交班单',
     subtitle: `业务日期：${dayjs(query.date).format('YYYY-MM-DD')}；收款金额：${money(totalAmount.value)}；待补票据：${pendingInvoices.value.length}；修正记录：${todayAdjustments.value.length}`,
@@ -535,7 +540,7 @@ onMounted(loadData)
   padding: 16px;
   border-radius: 18px;
   background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
-  border: 1px solid #dbe7f2;
+  border: 1px solid var(--border);
 }
 
 .step-card__index {
@@ -545,8 +550,8 @@ onMounted(loadData)
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #eaf2fb;
-  color: #1d4ed8;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
   font-weight: 700;
 }
 
@@ -559,7 +564,7 @@ onMounted(loadData)
 .check-row strong,
 .side-row strong {
   display: block;
-  color: #13263b;
+  color: var(--ink);
 }
 
 .step-card__copy span,
@@ -567,7 +572,7 @@ onMounted(loadData)
 .side-row span {
   display: block;
   margin-top: 4px;
-  color: #66788c;
+  color: var(--muted);
   line-height: 1.6;
 }
 
@@ -632,8 +637,8 @@ onMounted(loadData)
   padding: 22px;
   border-radius: 22px;
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  border: 1px solid #dbe7f2;
-  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.05);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
 }
 
 .workspace-side {
@@ -653,7 +658,7 @@ onMounted(loadData)
   margin: 8px 0 0;
   font-size: 24px;
   line-height: 1.2;
-  color: #13263b;
+  color: var(--ink);
 }
 
 .method-strip {
@@ -669,7 +674,7 @@ onMounted(loadData)
   align-items: center;
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid #dbe7f2;
+  border: 1px solid var(--border);
   border-radius: 14px;
   background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
   cursor: pointer;
@@ -677,18 +682,18 @@ onMounted(loadData)
 }
 
 .method-pill strong {
-  color: #13263b;
+  color: var(--ink);
 }
 
 .method-pill:hover,
 .side-row:hover {
   transform: translateY(-2px);
-  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
+  box-shadow: var(--shadow-sm);
 }
 
 .method-pill--clear {
   border-style: dashed;
-  color: #64748b;
+  color: var(--muted);
 }
 
 .side-list,
@@ -706,7 +711,7 @@ onMounted(loadData)
   gap: 12px;
   padding: 14px 16px;
   border-radius: 16px;
-  border: 1px solid #e3ecf5;
+  border: 1px solid var(--border-soft);
   background: rgba(255, 255, 255, 0.85);
 }
 
@@ -719,7 +724,7 @@ onMounted(loadData)
 
 .side-empty {
   padding: 14px 0 2px;
-  color: #66788c;
+  color: var(--muted);
 }
 
 @keyframes fadeUp {

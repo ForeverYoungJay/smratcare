@@ -3206,14 +3206,14 @@ onMounted(async () => {
 
 <style scoped>
 .bed-management-page {
-  --panel-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(246, 251, 255, 1) 100%);
-  --panel-border: #dce8f1;
-  --panel-shadow: 0 16px 34px rgba(73, 130, 178, 0.12);
-  --accent: #1f8fbe;
-  --accent-soft: rgba(31, 143, 190, 0.1);
-  --text-main: #173854;
-  --text-sub: #6d8aa3;
-  --surface-soft: #f5fafc;
+  --panel-bg: #ffffff;
+  --panel-border: var(--border);
+  --panel-shadow: var(--shadow-xs);
+  --accent: var(--primary);
+  --accent-soft: rgba(var(--primary-rgb), 0.1);
+  --text-main: var(--ink);
+  --text-sub: var(--muted);
+  --surface-soft: var(--surface-3);
 }
 .workspace-grid {
   align-items: stretch;
@@ -3296,10 +3296,10 @@ onMounted(async () => {
   min-width: 42px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: #eef7fb;
+  background: rgba(var(--info-rgb), 0.08);
   color: var(--text-sub);
   font-size: 12px;
-  border: 1px solid #dbeaf3;
+  border: 1px solid rgba(var(--info-rgb), 0.18);
 }
 .tree-node-name {
   color: var(--text-main);
@@ -3380,8 +3380,8 @@ onMounted(async () => {
   margin-top: 16px;
   padding: 14px 16px 4px;
   border-radius: 16px;
-  background: #f8fbfe;
-  border: 1px solid #e4eef5;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
 }
 .toolbar-row {
   align-items: center;
@@ -3400,8 +3400,8 @@ onMounted(async () => {
   align-items: center;
   padding: 7px 12px;
   border-radius: 999px;
-  background: #eef7fb;
-  color: #1b6586;
+  background: rgba(var(--info-rgb), 0.1);
+  color: var(--info);
   font-size: 13px;
   font-weight: 700;
 }
@@ -3420,8 +3420,8 @@ onMounted(async () => {
   justify-content: center;
   padding: 4px 10px;
   border-radius: 999px;
-  background: #eef6ff;
-  color: #2563eb;
+  background: rgba(var(--info-rgb), 0.08);
+  color: var(--info);
   font-size: 12px;
   font-weight: 700;
   cursor: grab;
@@ -3431,15 +3431,15 @@ onMounted(async () => {
   transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 .table-card :deep(.room-sortable-row.is-drag-source > td) {
-  background: #f5f3ff;
+  background: var(--primary-soft);
 }
 .table-card :deep(.room-sortable-row.is-drop-before > td) {
-  background: #eef6ff;
-  box-shadow: inset 0 2px 0 rgba(59, 130, 246, 0.7);
+  background: rgba(var(--info-rgb), 0.08);
+  box-shadow: inset 0 2px 0 rgba(var(--info-rgb), 0.7);
 }
 .table-card :deep(.room-sortable-row.is-drop-after > td) {
-  background: #eef6ff;
-  box-shadow: inset 0 -2px 0 rgba(59, 130, 246, 0.7);
+  background: rgba(var(--info-rgb), 0.08);
+  box-shadow: inset 0 -2px 0 rgba(var(--info-rgb), 0.7);
 }
 .pager {
   margin-top: 16px;
@@ -3466,17 +3466,17 @@ onMounted(async () => {
 .wizard-step {
   padding: 10px 12px;
   border-radius: 14px;
-  background: #f5fafc;
+  background: var(--surface-2);
   color: var(--text-sub);
   text-align: center;
   font-size: 13px;
-  border: 1px solid #e4eef5;
+  border: 1px solid var(--border-soft);
 }
 .wizard-step.is-active {
   background: var(--accent-soft);
   color: var(--accent);
   font-weight: 600;
-  border-color: rgba(31, 143, 190, 0.18);
+  border-color: rgba(var(--info-rgb), 0.18);
 }
 .wizard-hint {
   margin-bottom: 12px;
@@ -3485,8 +3485,8 @@ onMounted(async () => {
   margin-top: 8px;
   padding: 12px 14px;
   border-radius: 14px;
-  background: #f7fbfe;
-  border: 1px solid #e4eef5;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
 }
 @media (max-width: 1200px) {
   .workspace-topbar {

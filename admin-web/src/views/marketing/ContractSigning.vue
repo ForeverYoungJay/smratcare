@@ -149,12 +149,19 @@
             <a-tag>{{ ownerDeptText(normalizedOwnerDept(record)) }}</a-tag>
           </template>
           <template v-else-if="column.key === 'operation'">
-            <a-space wrap size="small">
+            <div class="row-action-links">
               <a-button type="link" size="small" @click="handleNextStep(record)">{{ nextStepLabel(record) }}</a-button>
-              <a-button type="link" size="small" @click="openAttachment(record)">附件</a-button>
               <a-button type="link" size="small" @click="view(record)">查看</a-button>
-              <a-button type="link" size="small" @click="openContractTrace(record)">轨迹</a-button>
-            </a-space>
+              <a-dropdown trigger="click">
+                <a-button type="link" size="small">更多 <DownOutlined /></a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item key="attachment" @click="openAttachment(record)">附件</a-menu-item>
+                    <a-menu-item key="trace" @click="openContractTrace(record)">轨迹</a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
+            </div>
           </template>
         </template>
       </a-table>
@@ -597,7 +604,7 @@
               :href="resolveAttachmentUrl(record.fileUrl)"
               target="_blank"
               rel="noopener noreferrer"
-              style="color: #1677ff"
+              style="color: var(--info)"
             >
               {{ record.fileName }}
             </a>
@@ -701,6 +708,7 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
+import { DownOutlined } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import FlowGuardBar from '../../components/FlowGuardBar.vue'
@@ -2928,25 +2936,25 @@ watch(
 }
 
 .board-head-title {
-  color: #0f172a;
+  color: var(--ink);
   font-size: 14px;
   font-weight: 600;
 }
 
 .board-head-meta {
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .board-item {
   padding: 10px 12px;
-  border: 1px solid #e6f4ff;
+  border: 1px solid var(--border-soft);
   border-radius: 8px;
   background: linear-gradient(122deg, rgba(248, 251, 255, 0.95) 0%, rgba(240, 247, 255, 0.95) 100%);
 }
 
 .board-title {
-  color: rgba(0, 0, 0, 0.65);
+  color: var(--muted);
   font-size: 13px;
 }
 
@@ -2958,10 +2966,10 @@ watch(
 
 .contract-workbench {
   --contract-bg: linear-gradient(180deg, #f8fbff 0%, #fdfefe 100%);
-  --contract-border: rgba(100, 116, 139, 0.16);
-  --contract-strong: #0f172a;
-  --contract-muted: #64748b;
-  --contract-accent: #0f766e;
+  --contract-border: var(--border-soft);
+  --contract-strong: var(--ink);
+  --contract-muted: var(--muted);
+  --contract-accent: var(--primary);
   padding: 4px;
 }
 
@@ -3053,7 +3061,7 @@ watch(
   min-height: 88px;
   padding: 14px;
   border-radius: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
+  border: 1px solid var(--border-soft);
   background: rgba(255, 255, 255, 0.72);
 }
 
@@ -3096,7 +3104,7 @@ watch(
 .family-card {
   padding: 14px;
   border-radius: 16px;
-  border: 1px solid rgba(148, 163, 184, 0.24);
+  border: 1px solid var(--border-soft);
   background: rgba(255, 255, 255, 0.82);
 }
 
@@ -3135,7 +3143,7 @@ watch(
 .required-label::before,
 .required-section-title::before {
   content: "*";
-  color: #ff4d4f;
+  color: var(--danger);
   margin-right: 4px;
   font-weight: 700;
 }
@@ -3143,7 +3151,7 @@ watch(
 .readonly-disease-block {
   margin-top: 14px;
   padding-top: 14px;
-  border-top: 1px dashed rgba(148, 163, 184, 0.34);
+  border-top: 1px dashed var(--border-strong);
 }
 
 .readonly-remark {
@@ -3159,7 +3167,7 @@ watch(
   min-height: 172px;
   border-radius: 18px;
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.98) 0%, rgba(255, 255, 255, 1) 100%);
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  border: 1px solid var(--border-soft);
 }
 
 .signed-linkage-card__header {
@@ -3182,17 +3190,17 @@ watch(
 }
 
 .trace-item-title {
-  color: #173854;
+  color: var(--ink);
   font-weight: 600;
 }
 
 .trace-item-meta {
-  color: #6d8aa3;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .trace-item-remark {
-  color: #334155;
+  color: var(--ink-soft);
   margin-top: 4px;
   word-break: break-word;
 }

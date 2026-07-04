@@ -27,5 +27,17 @@ public class IncidentReportRequest {
 
   private String actionTaken;
 
+  private String emergencyPlan;
+
+  private String onsiteHandling;
+
+  private String familyNotification;
+
+  private String rectificationMeasure;
+
+  private String reviewConclusion;
+
+  private String regulatoryReport;
+
   private String status;
 }

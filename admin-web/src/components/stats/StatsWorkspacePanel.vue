@@ -2,7 +2,7 @@
   <a-card class="stats-workspace" :bordered="false">
     <div class="workspace-shell">
       <div class="workspace-copy">
-        <div class="workspace-kicker">Stats Workspace</div>
+        <div class="workspace-kicker">统计分析</div>
         <div class="workspace-title">{{ title }}</div>
         <div class="workspace-summary">{{ summaryText }}</div>
         <div class="workspace-health">

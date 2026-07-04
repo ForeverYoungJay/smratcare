@@ -19,7 +19,9 @@
           <a-tag :color="statusColor(record.orderStatus)">{{ statusText(record.orderStatus) }}</a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a @click="openDetail(record)">详情</a>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="openDetail(record)">详情</a-button>
+          </div>
         </template>
       </template>
     </DataTable>

@@ -53,6 +53,12 @@ Page({
     if (this.data.generating) {
       return;
     }
+    if (!this.data.accessGranted) {
+      await this.verifyAndLoad(true);
+      if (!this.data.accessGranted) {
+        return;
+      }
+    }
     const reportType = e.currentTarget.dataset.type || 'ALL';
     this.setData({ generating: true });
     try {

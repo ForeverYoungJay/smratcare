@@ -1475,6 +1475,60 @@ function updateNotificationSettings(nextState) {
   return getNotificationSettings();
 }
 
+
+function getNotifyLogs(pageNo = 1, pageSize = 20, status = '') {
+  const all = [
+    {
+      id: 9001,
+      elderId: 1,
+      eventType: 'HEALTH_ALERT',
+      eventTypeText: '健康提醒',
+      level: 'WARN',
+      title: '血压偏高提醒',
+      content: '今日晨检血压 152/95，已通知责任护士复测。',
+      status: 'SUCCESS',
+      statusText: '已送达',
+      retryCount: 0,
+      lastError: '',
+      createTime: '2026-07-02 09:12',
+      updateTime: '2026-07-02 09:12'
+    },
+    {
+      id: 9002,
+      elderId: 1,
+      eventType: 'PAYMENT_ALERT',
+      eventTypeText: '费用提醒',
+      level: 'INFO',
+      title: '月度账单已生成',
+      content: '6 月账单合计 ¥3,280，可在缴费中心查看明细。',
+      status: 'SUCCESS',
+      statusText: '已送达',
+      retryCount: 0,
+      lastError: '',
+      createTime: '2026-07-01 08:00',
+      updateTime: '2026-07-01 08:00'
+    },
+    {
+      id: 9003,
+      elderId: 1,
+      eventType: 'ACTIVITY_ALERT',
+      eventTypeText: '活动提醒',
+      level: 'INFO',
+      title: '书法兴趣班报名',
+      content: '本周五下午书法兴趣班开放报名。',
+      status: 'FAILED',
+      statusText: '发送失败',
+      retryCount: 3,
+      lastError: '订阅消息未授权',
+      createTime: '2026-06-30 15:30',
+      updateTime: '2026-06-30 16:10'
+    }
+  ];
+  const filtered = status ? all.filter((item) => item.status === String(status).toUpperCase()) : all;
+  const start = (Math.max(pageNo, 1) - 1) * pageSize;
+  return clone(filtered.slice(start, start + pageSize));
+}
+
 function bindWechatNotifyOpenId(payload = {}) {
   const openId = String(payload.openId || '').trim() || `oMock${Math.random().toString(36).slice(2, 12)}`;
   appState.wechatNotifyOpenId = openId;
@@ -1973,6 +2027,7 @@ module.exports = {
   addAffectionMoment,
   getNotificationSettings,
   updateNotificationSettings,
+  getNotifyLogs,
   getSecuritySettings,
   updateSecuritySettings,
   setSecurityPassword,

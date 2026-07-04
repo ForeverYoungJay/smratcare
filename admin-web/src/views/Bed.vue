@@ -20,10 +20,10 @@
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'action'">
-              <a-space>
-                <a @click="openRoomModal(record)">编辑</a>
-                <a @click="removeRoom(record.id)">删除</a>
-              </a-space>
+              <div class="row-action-links">
+                <a-button type="link" size="small" @click="openRoomModal(record)">编辑</a-button>
+                <a-button type="link" size="small" danger @click="removeRoom(record.id)">删除</a-button>
+              </div>
             </template>
           </template>
         </DataTable>
@@ -53,10 +53,10 @@
               </a-tag>
             </template>
             <template v-else-if="column.key === 'action'">
-              <a-space>
-                <a @click="openBedModal(record)">编辑</a>
-                <a @click="removeBed(record.id)">删除</a>
-              </a-space>
+              <div class="row-action-links">
+                <a-button type="link" size="small" @click="openBedModal(record)">编辑</a-button>
+                <a-button type="link" size="small" danger @click="removeBed(record.id)">删除</a-button>
+              </div>
             </template>
           </template>
         </DataTable>

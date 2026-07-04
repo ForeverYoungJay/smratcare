@@ -1,5 +1,9 @@
 <template>
   <PageContainer title="仓库设置" subTitle="维护仓库主数据与负责人信息">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新增仓库</a-button>
+    </template>
+
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline" :model="query" class="search-form">
         <a-form-item label="关键词">
@@ -18,9 +22,6 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px">
-      <div class="table-actions">
-        <a-button type="primary" @click="openCreate">新增仓库</a-button>
-      </div>
       <a-table
         row-key="id"
         :loading="loading"
@@ -34,12 +35,12 @@
             <a-tag :color="materialEnableStatusColor(record.status)">{{ materialEnableStatusLabel(record.status) }}</a-tag>
           </template>
           <template v-if="column.key === 'actions'">
-            <a-space>
-              <a @click="openEdit(record)">编辑</a>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
               <a-popconfirm title="确认删除该仓库？" @confirm="handleDelete(record.id)">
-                <a>删除</a>
+                <a-button type="link" danger size="small">删除</a-button>
               </a-popconfirm>
-            </a-space>
+            </div>
           </template>
         </template>
       </a-table>
@@ -225,10 +226,5 @@ onMounted(fetchData)
 <style scoped>
 .search-form {
   row-gap: 8px;
-}
-.table-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 12px;
 }
 </style>

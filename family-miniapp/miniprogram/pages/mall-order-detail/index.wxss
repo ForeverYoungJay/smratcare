@@ -6,7 +6,7 @@
 .loading {
   text-align: center;
   font-size: 26rpx;
-  color: #71807a;
+  color: #5C6F69;
 }
 
 .summary-grid {
@@ -27,12 +27,12 @@
 
 .k {
   font-size: 23rpx;
-  color: #71807a;
+  color: #5C6F69;
 }
 
 .v {
   font-size: 23rpx;
-  color: #182420;
+  color: #22332E;
   text-align: right;
 }
 
@@ -40,8 +40,8 @@
   margin-top: 10rpx;
   padding: 12rpx;
   border-radius: 10rpx;
-  background: #f7faf8;
-  border: 1rpx solid #edf2ef;
+  background: #FAFAF7;
+  border: 1rpx solid #E4E7E0;
 }
 
 .line-top {
@@ -58,7 +58,7 @@
 
 .amount {
   font-size: 24rpx;
-  color: #9a5b05;
+  color: #B27221;
 }
 
 .line-sub {
@@ -85,7 +85,7 @@
   padding: 16rpx;
   border: 1rpx solid #dbe3ea;
   border-radius: 10rpx;
-  background: #f7faf8;
+  background: #FAFAF7;
   font-size: 24rpx;
 }
 
@@ -116,5 +116,5 @@
   margin-top: 12rpx;
   text-align: center;
   font-size: 23rpx;
-  color: #71807a;
+  color: #5C6F69;
 }

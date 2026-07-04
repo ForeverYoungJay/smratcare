@@ -29,6 +29,7 @@
           <text class="meal-status">{{item.status}}</text>
         </view>
       </block>
+      <view class="list-footer" wx:if="{{hasMore}}">上拉加载更多</view>
     </view>
 
     <view class="surface form-card" wx:if="{{activeTask}}">
@@ -38,6 +39,16 @@
           <view class="form-subtitle">{{activeTask.title}} · {{activeTask.room}}</view>
         </view>
         <text class="task-time">{{activeTask.time}}</text>
+      </view>
+
+      <view class="state-card inline-state success-state" wx:if="{{submitSuccess}}">
+        <view class="state-title">送餐签收已提交</view>
+        <view class="section-subtitle">{{submitSuccess}}</view>
+        <view class="section-subtitle" wx:if="{{lastReceiptSummary}}">最近一次：{{lastReceiptSummary}}</view>
+      </view>
+      <view class="state-card inline-state error-state" wx:if="{{submitError}}">
+        <view class="state-title">送餐签收提交失败</view>
+        <view class="section-subtitle">{{submitError}}</view>
       </view>
 
       <view class="check-grid">
@@ -60,6 +71,7 @@
         <button class="tool-btn" bindtap="choosePhoto">拍照留痕</button>
       </view>
       <view class="scan-text" wx:if="{{scanText}}">扫码结果：{{scanText}}</view>
+      <view class="scan-text" wx:if="{{deliveredAt}}">送达时间：{{deliveredAt}}（勾选送达签收时自动记录）</view>
       <view class="photo-grid" wx:if="{{photos.length}}">
         <block wx:for="{{photos}}" wx:key="*this">
           <image class="photo" mode="aspectFill" src="{{item}}" />

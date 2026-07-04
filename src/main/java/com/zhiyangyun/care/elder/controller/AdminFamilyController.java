@@ -11,6 +11,7 @@ import com.zhiyangyun.care.elder.entity.FamilyUser;
 import com.zhiyangyun.care.elder.mapper.ElderFamilyMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.FamilyUserMapper;
+import com.zhiyangyun.care.elder.model.FamilyElderItem;
 import com.zhiyangyun.care.elder.model.FamilyBindRequest;
 import com.zhiyangyun.care.elder.model.FamilyRelationItem;
 import com.zhiyangyun.care.elder.model.FamilyUserPageItem;
@@ -219,6 +220,42 @@ public class AdminFamilyController {
     item.setElderCount(0L);
     item.setCreateTime(user.getCreateTime());
     return Result.ok(item);
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @GetMapping("/users/{familyUserId}/elders")
+  public Result<List<FamilyElderItem>> userElders(@PathVariable Long familyUserId) {
+    Long orgId = AuthContext.getOrgId();
+    List<ElderFamily> relations = elderFamilyMapper.selectList(Wrappers.lambdaQuery(ElderFamily.class)
+        .eq(orgId != null, ElderFamily::getOrgId, orgId)
+        .eq(ElderFamily::getFamilyUserId, familyUserId)
+        .eq(ElderFamily::getIsDeleted, 0)
+        .orderByDesc(ElderFamily::getIsPrimary, ElderFamily::getCreateTime));
+    if (relations.isEmpty()) {
+      return Result.ok(List.of());
+    }
+    List<Long> elderIds = relations.stream().map(ElderFamily::getElderId).distinct().toList();
+    Map<Long, ElderProfile> elderMap = elderMapper.selectList(Wrappers.lambdaQuery(ElderProfile.class)
+            .eq(orgId != null, ElderProfile::getOrgId, orgId)
+            .eq(ElderProfile::getIsDeleted, 0)
+            .in(ElderProfile::getId, elderIds))
+        .stream()
+        .collect(Collectors.toMap(ElderProfile::getId, elder -> elder, (a, b) -> a));
+
+    List<FamilyElderItem> items = new ArrayList<>();
+    for (ElderFamily relation : relations) {
+      ElderProfile elder = elderMap.get(relation.getElderId());
+      FamilyElderItem item = new FamilyElderItem();
+      item.setElderId(relation.getElderId());
+      item.setElderName(elder == null ? null : elder.getFullName());
+      item.setRelation(relation.getRelation());
+      item.setIsPrimary(relation.getIsPrimary());
+      item.setElderStatus(elder == null ? null : elder.getStatus());
+      item.setCareLevel(elder == null ? null : elder.getCareLevel());
+      item.setAdmissionDate(elder == null || elder.getAdmissionDate() == null ? null : elder.getAdmissionDate().toString());
+      items.add(item);
+    }
+    return Result.ok(items);
   }
 
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")

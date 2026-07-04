@@ -37,7 +37,7 @@
 
 .label {
   font-size: 22rpx;
-  color: #71807a;
+  color: #5C6F69;
 }
 
 .value {
@@ -47,7 +47,7 @@
 }
 
 .warn {
-  color: #9a5b05;
+  color: #B27221;
 }
 
 .divider-v {
@@ -63,7 +63,7 @@
 
 .panel-title {
   font-size: 28rpx;
-  color: #182420;
+  color: #22332E;
   font-weight: 700;
 }
 
@@ -97,22 +97,22 @@
 
 .stat-item.paid {
   background: #e9f9ef;
-  color: #16704f;
+  color: #21705F;
 }
 
 .stat-item.pending {
   background: #eef6ff;
-  color: #255a91;
+  color: #3D7FA6;
 }
 
 .stat-item.closed {
   background: #fff4e8;
-  color: #9a5b05;
+  color: #B27221;
 }
 
 .stat-item.failed {
   background: #fff4f2;
-  color: #b42318;
+  color: #C9504B;
 }
 
 .tip-item {
@@ -120,7 +120,7 @@
   display: flex;
   align-items: flex-start;
   gap: 10rpx;
-  background: #f7faf8;
+  background: #FAFAF7;
   border-radius: 10rpx;
   padding: 10rpx 12rpx;
 }
@@ -129,7 +129,7 @@
   width: 34rpx;
   height: 34rpx;
   border-radius: 50%;
-  background: #246b5f;
+  background: #21705F;
   color: #fff;
   font-size: 21rpx;
   text-align: center;
@@ -167,7 +167,7 @@
 
 .trade-no {
   font-size: 22rpx;
-  color: #182420;
+  color: #22332E;
 }
 
 .status {
@@ -178,22 +178,22 @@
 }
 
 .status-paid {
-  color: #16704f;
+  color: #21705F;
   background: #e9f9ef;
 }
 
 .status-pending {
-  color: #255a91;
+  color: #3D7FA6;
   background: #eef6ff;
 }
 
 .status-closed {
-  color: #9a5b05;
+  color: #B27221;
   background: #fff4e8;
 }
 
 .status-failed {
-  color: #b42318;
+  color: #C9504B;
   background: #fff4f2;
 }
 

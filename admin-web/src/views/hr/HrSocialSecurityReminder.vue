@@ -65,15 +65,6 @@
               院长通过
             </a-button>
             <a-button
-              v-if="record.socialSecurityWorkflowStatus === 'PENDING_DIRECTOR'"
-              size="small"
-              danger
-              type="link"
-              @click="directorDecision(record, false)"
-            >
-              驳回
-            </a-button>
-            <a-button
               v-if="record.socialSecurityWorkflowStatus === 'PENDING_FINANCE' || record.socialSecurityStatus === 'PROCESSING'"
               size="small"
               type="link"
@@ -88,6 +79,15 @@
               @click="generateCurrentMonthBills(record)"
             >
               生成本月记账
+            </a-button>
+            <a-button
+              v-if="record.socialSecurityWorkflowStatus === 'PENDING_DIRECTOR'"
+              size="small"
+              danger
+              type="link"
+              @click="directorDecision(record, false)"
+            >
+              驳回
             </a-button>
           </a-space>
         </template>
@@ -477,10 +477,10 @@ onMounted(() => {
 
 <style scoped>
 :deep(.hr-row-danger) {
-  background: #fff1f0 !important;
+  background: rgba(var(--danger-rgb), 0.08) !important;
 }
 
 :deep(.hr-row-warning) {
-  background: #fffbe6 !important;
+  background: rgba(var(--warning-rgb), 0.08) !important;
 }
 </style>

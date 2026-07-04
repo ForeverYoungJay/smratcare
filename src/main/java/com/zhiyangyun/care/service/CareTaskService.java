@@ -31,6 +31,9 @@ public interface CareTaskService {
   void reviewTask(Long tenantId, Long taskDailyId, Long staffId, Integer score, String comment,
       String reviewerType, Long reviewerId, String reviewerName, LocalDateTime reviewTime);
 
+  void resolveException(Long tenantId, Long taskDailyId, Long staffId, Integer score, String resolution,
+      Long reviewerId, String reviewerName, LocalDateTime reviewTime);
+
   Long createTask(Long tenantId, CareTaskCreateRequest request);
 
   ExecuteTaskResponse executeTask(Long tenantId, ExecuteTaskRequest request);

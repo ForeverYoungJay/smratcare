@@ -87,6 +87,10 @@
         </view>
       </view>
     </block>
+    <view wx:if="{{!loading && !loadError && loadingMore}}" class="loading-text">正在加载更多沟通记录...</view>
+    <view wx:elif="{{!loading && !loadError && hasMore && messages.length}}" class="loading-text">
+      <button class="ghost-btn retry-btn" bindtap="loadMoreMessages">继续加载历史记录</button>
+    </view>
     <view id="chat-bottom" class="chat-bottom"></view>
   </scroll-view>
 

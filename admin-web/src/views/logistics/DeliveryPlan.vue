@@ -31,11 +31,11 @@
           {{ record.failureReason || '-' }}
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="markDelivered(record)" v-if="record.status !== 'DELIVERED'">标记送达</a-button>
-            <a-button type="link" danger @click="openFail(record)" v-if="record.status !== 'FAILED'">标记失败</a-button>
-            <a-button type="link" @click="openRedispatch(record)" v-if="record.status !== 'DELIVERED'">重派</a-button>
-          </a-space>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="markDelivered(record)" v-if="record.status !== 'DELIVERED'">标记送达</a-button>
+            <a-button type="link" size="small" @click="openRedispatch(record)" v-if="record.status !== 'DELIVERED'">重派</a-button>
+            <a-button type="link" size="small" danger @click="openFail(record)" v-if="record.status !== 'FAILED'">标记失败</a-button>
+          </div>
         </template>
       </template>
     </DataTable>

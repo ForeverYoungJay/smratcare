@@ -1,9 +1,9 @@
 .card { padding: 24rpx; }
 .ai-row { margin-top: 10rpx; display: flex; gap: 10rpx; flex-wrap: wrap; }
 .ai-btn { height: 58rpx; line-height: 58rpx; padding: 0 16rpx; font-size: 22rpx; }
-.item { margin-top: 14rpx; padding: 16rpx; border: 1rpx solid #edf2ef; border-radius: 12rpx; background: #f7faf8; }
-.name { font-size: 28rpx; color: #16231f; font-weight: 700; }
-.meta { margin-top: 6rpx; font-size: 22rpx; color: #71807a; }
+.item { margin-top: 14rpx; padding: 16rpx; border: 1rpx solid #E4E7E0; border-radius: 12rpx; background: #FAFAF7; }
+.name { font-size: 28rpx; color: #22332E; font-weight: 700; }
+.meta { margin-top: 6rpx; font-size: 22rpx; color: #5C6F69; }
 .summary { margin-top: 8rpx; font-size: 23rpx; color: #34443f; }
 .score { margin-top: 8rpx; font-size: 23rpx; color: #92400e; }
 .action { margin-top: 12rpx; height: 60rpx; line-height: 60rpx; font-size: 22rpx; }

@@ -3,7 +3,7 @@ import { defineComponent } from 'vue'
 import { mount } from '@vue/test-utils'
 import DischargeSettlement from '../DischargeSettlement.vue'
 
-const getDischargeSettlementPage = vi.fn().mockResolvedValue({ list: [], total: 0, pageNo: 1, pageSize: 10 })
+const getDischargeSettlementPage = vi.hoisted(() => vi.fn().mockResolvedValue({ list: [], total: 0, pageNo: 1, pageSize: 10 }))
 
 vi.mock('../../../api/financeFee', () => ({
   getDischargeSettlementPage,

@@ -7,6 +7,7 @@ import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.oa.entity.OaSuggestion;
 import com.zhiyangyun.care.oa.mapper.OaSuggestionMapper;
+import com.zhiyangyun.care.oa.model.OaSuggestionHandleRequest;
 import com.zhiyangyun.care.oa.model.OaSuggestionRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/oa/suggestion")
 public class OaSuggestionController {
+  private static final String REPLY_MARKER = "\n\n[处理反馈] ";
   private final OaSuggestionMapper suggestionMapper;
 
   public OaSuggestionController(OaSuggestionMapper suggestionMapper) {
@@ -33,7 +35,8 @@ public class OaSuggestionController {
       @RequestParam(defaultValue = "10") long pageSize,
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String keyword,
-      @RequestParam(defaultValue = "false") boolean familyCommunicationOnly) {
+      @RequestParam(defaultValue = "false") boolean familyCommunicationOnly,
+      @RequestParam(defaultValue = "false") boolean employeeSuggestionOnly) {
     Long orgId = AuthContext.getOrgId();
     String normalizedStatus = normalizeStatus(status);
     String normalizedKeyword = keyword == null ? null : keyword.trim();
@@ -42,6 +45,7 @@ public class OaSuggestionController {
         .eq(orgId != null, OaSuggestion::getOrgId, orgId)
         .eq(normalizedStatus != null, OaSuggestion::getStatus, normalizedStatus)
         .like(familyCommunicationOnly, OaSuggestion::getContent, "[家属沟通]")
+        .like(employeeSuggestionOnly, OaSuggestion::getContent, "【员工建议｜")
         .and(normalizedKeyword != null && !normalizedKeyword.isBlank(), nested -> nested
             .like(OaSuggestion::getContent, normalizedKeyword)
             .or()
@@ -78,6 +82,24 @@ public class OaSuggestionController {
     return Result.ok(suggestion);
   }
 
+  @PutMapping("/{id}/handle")
+  public Result<OaSuggestion> handle(@PathVariable Long id, @Valid @RequestBody OaSuggestionHandleRequest request) {
+    OaSuggestion suggestion = findAccessible(id);
+    if (suggestion == null) {
+      return Result.ok(null);
+    }
+    String normalizedStatus = normalizeStatus(request == null ? null : request.getStatus());
+    if (normalizedStatus != null) {
+      suggestion.setStatus(normalizedStatus);
+    }
+    String reply = blankToNull(request == null ? null : request.getReply());
+    if (reply != null) {
+      suggestion.setContent(replaceReply(suggestion.getContent(), reply));
+    }
+    suggestionMapper.updateById(suggestion);
+    return Result.ok(suggestion);
+  }
+
   private OaSuggestion findAccessible(Long id) {
     Long orgId = AuthContext.getOrgId();
     return suggestionMapper.selectOne(Wrappers.lambdaQuery(OaSuggestion.class)
@@ -110,5 +132,14 @@ public class OaSuggestionController {
       return null;
     }
     return value.trim();
+  }
+
+  private String replaceReply(String content, String reply) {
+    String base = content == null ? "" : content;
+    int markerIndex = base.indexOf(REPLY_MARKER);
+    if (markerIndex >= 0) {
+      base = base.substring(0, markerIndex).trim();
+    }
+    return base + REPLY_MARKER + reply.trim();
   }
 }

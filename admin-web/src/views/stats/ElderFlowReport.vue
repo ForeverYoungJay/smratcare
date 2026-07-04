@@ -1,5 +1,23 @@
 <template>
   <PageContainer title="老人出入报表" subTitle="老人入院/离院明细查询">
+    <template #extra>
+      <a-space>
+        <a-button type="primary" @click="search">查询</a-button>
+        <a-button @click="exportCsvReport">导出报表</a-button>
+        <a-dropdown>
+          <a-button>更多 ▾</a-button>
+          <template #overlay>
+            <a-menu>
+              <a-menu-item @click="openColumnSetting">列设置</a-menu-item>
+              <a-menu-item :disabled="!printRows.length" @click="printCurrent">打印当前列</a-menu-item>
+              <a-menu-item :disabled="!canPrintSpecific" @click="printSpecificElder">打印指定老人</a-menu-item>
+              <a-menu-divider />
+              <a-menu-item @click="reset">重置</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+      </a-space>
+    </template>
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline">
         <a-form-item label="开始日期">
@@ -40,16 +58,6 @@
             <a-button size="small" @click="setDayPreset(7)">近7天</a-button>
             <a-button size="small" @click="setDayPreset(30)">近30天</a-button>
             <a-button size="small" @click="setDayPreset(90)">近90天</a-button>
-          </a-space>
-        </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="search">查询</a-button>
-            <a-button @click="exportCsvReport">导出报表</a-button>
-            <a-button @click="openColumnSetting">列设置</a-button>
-            <a-button :disabled="!printRows.length" @click="printCurrent">打印当前列</a-button>
-            <a-button :disabled="!canPrintSpecific" @click="printSpecificElder">打印指定老人</a-button>
-            <a-button @click="reset">重置</a-button>
           </a-space>
         </a-form-item>
       </a-form>
@@ -111,23 +119,21 @@
     </a-row>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <div class="batch-action-bar">
-        <a-space wrap>
-          <a-tag color="blue">已选 {{ selectedRows.length }} 条</a-tag>
-          <a-button size="small" :disabled="!rows.length" @click="selectAllCurrentPage">全选本页</a-button>
-          <a-button size="small" :disabled="!rows.length" @click="selectByEventType('ADMISSION')">勾选全部入院</a-button>
-          <a-button size="small" :disabled="!rows.length" @click="selectByEventType('DISCHARGE')">勾选全部离院</a-button>
-          <a-button size="small" :disabled="!selectedRows.length" @click="clearSelection">清空勾选</a-button>
-          <a-button size="small" type="primary" :disabled="!selectedRows.length" @click="printSelectedRows">批量打印勾选</a-button>
-          <a-button size="small" :disabled="!selectedRows.length" @click="exportSelectedRowsCsv">批量导出勾选</a-button>
-        </a-space>
+      <div class="selection-bar">
+        <span class="selection-bar__count">已选 {{ selectedRows.length }} 条</span>
+        <a-button size="small" :disabled="!rows.length" @click="selectAllCurrentPage">全选本页</a-button>
+        <a-button size="small" :disabled="!rows.length" @click="selectByEventType('ADMISSION')">勾选全部入院</a-button>
+        <a-button size="small" :disabled="!rows.length" @click="selectByEventType('DISCHARGE')">勾选全部离院</a-button>
+        <a-button size="small" :disabled="!selectedRows.length" @click="clearSelection">清空勾选</a-button>
+        <a-button size="small" type="primary" :disabled="!selectedRows.length" @click="printSelectedRows">批量打印勾选</a-button>
+        <a-button size="small" :disabled="!selectedRows.length" @click="exportSelectedRowsCsv">批量导出勾选</a-button>
       </div>
 
       <vxe-table
         ref="tableRef"
         border
         stripe
-        show-overflow
+        show-overflow="title"
         :row-id="'rowKey'"
         :data="rows"
         height="420"
@@ -694,10 +700,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.batch-action-bar {
+.selection-bar {
   margin-bottom: 10px;
-  padding: 10px 12px;
-  background: var(--ant-color-fill-tertiary, #fafafa);
-  border-radius: 8px;
 }
 </style>

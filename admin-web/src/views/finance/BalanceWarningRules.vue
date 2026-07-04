@@ -27,7 +27,7 @@
         :description="healthIssues.length ? healthIssues.join('；') : '阈值、通知对象、催缴联动配置均正常'"
       />
       <a-card class="card-elevated" :bordered="false" style="margin-top: 12px;" title="风险摘要明细">
-        <vxe-table border stripe show-overflow :data="summary.topItems || []" height="220">
+        <vxe-table border stripe show-overflow="title" :data="summary.topItems || []" height="220">
           <vxe-column field="label" title="维度" min-width="180" />
           <vxe-column field="count" title="数量" width="120" />
           <vxe-column field="amount" title="金额（元）" width="160" />
@@ -69,7 +69,7 @@
       </a-row>
 
       <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="规则快照">
-        <vxe-table border stripe show-overflow :data="rows" height="420">
+        <vxe-table border stripe show-overflow="title" :data="rows" height="420">
           <vxe-column field="configKey" title="配置键" min-width="280" />
           <vxe-column field="configValue" title="配置值" width="140" />
           <vxe-column field="effectiveMonth" title="生效月份" width="120" />

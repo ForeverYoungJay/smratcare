@@ -127,7 +127,7 @@ onMounted(() => {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
-  color: #173854;
+  color: var(--ink);
   font-size: 12px;
   line-height: 1.6;
 }

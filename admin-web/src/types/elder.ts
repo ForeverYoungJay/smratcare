@@ -82,6 +82,43 @@ export interface ElderDiseaseUpdateRequest {
   diseaseIds: number[]
 }
 
+export interface ElderCareAssessmentSnapshot {
+  id: Id
+  assessmentType?: string
+  levelCode?: string
+  score?: number
+  assessmentDate?: string
+  status?: string
+  resultSummary?: string
+  suggestion?: string
+}
+
+export interface ElderCareLevelChangeSnapshot {
+  id: Id
+  beforeValue?: string
+  afterValue?: string
+  reason?: string
+  createTime?: string
+}
+
+export interface ElderCareProfile {
+  elderId: Id
+  elderName?: string
+  currentCareLevel?: string
+  suggestedCareLevel?: string
+  recommendationReason?: string
+  adjustmentRequired?: boolean
+  riskTags?: string[]
+  latestAssessments?: ElderCareAssessmentSnapshot[]
+  changeLogs?: ElderCareLevelChangeSnapshot[]
+}
+
+export interface ElderCareLevelAdjustmentRequest {
+  careLevel: string
+  reason?: string
+  assessmentRecordId?: Id
+}
+
 export interface FamilyBindingItem {
   id: Id
   familyUserId: Id
@@ -108,6 +145,16 @@ export interface FamilyRelationItem {
   idCardNo?: string
   relation?: string
   isPrimary?: boolean
+}
+
+export interface FamilyElderItem {
+  elderId: Id
+  elderName?: string
+  relation?: string
+  isPrimary?: boolean | number
+  elderStatus?: number
+  careLevel?: string
+  admissionDate?: string
 }
 
 export interface FamilyBindRequest {
@@ -199,7 +246,7 @@ export interface ChangeLogItem {
 
 export type TrialStayStatus = 'REGISTERED' | 'FINISHED' | 'CONVERTED' | 'CANCELLED'
 export type DischargeApplyStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
-export type OutingStatus = 'OUT' | 'RETURNED'
+export type OutingStatus = 'APPLIED' | 'OUT' | 'RETURNED' | 'CANCELLED'
 export type MedicalOutingStatus = 'OUT' | 'RETURNED'
 export type DeathRegisterStatus = 'REGISTERED' | 'CANCELLED'
 

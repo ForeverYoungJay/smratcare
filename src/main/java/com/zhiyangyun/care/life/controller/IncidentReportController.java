@@ -76,7 +76,8 @@ public class IncidentReportController {
     var wrapper = buildQueryWrapper(keyword, elderName, incidentType, reporterName, level, status, incidentTimeStart, incidentTimeEnd);
     wrapper.orderByDesc(IncidentReport::getIncidentTime);
     List<IncidentReport> records = incidentMapper.selectList(wrapper);
-    List<String> headers = List.of("老人姓名", "事故类型", "事故等级", "值班护工", "事故描述", "处理措施", "发生时间", "处理状态");
+    List<String> headers = List.of("老人姓名", "事故类型", "事故等级", "值班护工", "事故描述", "处理措施",
+        "应急预案", "现场处置", "家属告知", "整改措施", "复盘结论", "监管上报", "发生时间", "处理状态");
     List<List<String>> rows = records.stream()
         .map(item -> List.of(
             safe(item.getElderName()),
@@ -85,6 +86,12 @@ public class IncidentReportController {
             safe(item.getReporterName()),
             safe(item.getDescription()),
             safe(item.getActionTaken()),
+            safe(item.getEmergencyPlan()),
+            safe(item.getOnsiteHandling()),
+            safe(item.getFamilyNotification()),
+            safe(item.getRectificationMeasure()),
+            safe(item.getReviewConclusion()),
+            safe(item.getRegulatoryReport()),
             safe(item.getIncidentTime()),
             "CLOSED".equals(item.getStatus()) ? "已关闭" : "处理中"))
         .toList();
@@ -105,6 +112,12 @@ public class IncidentReportController {
     report.setLevel(normalizeIncidentLevelForWrite(request.getLevel()));
     report.setDescription(request.getDescription());
     report.setActionTaken(request.getActionTaken());
+    report.setEmergencyPlan(request.getEmergencyPlan());
+    report.setOnsiteHandling(request.getOnsiteHandling());
+    report.setFamilyNotification(request.getFamilyNotification());
+    report.setRectificationMeasure(request.getRectificationMeasure());
+    report.setReviewConclusion(request.getReviewConclusion());
+    report.setRegulatoryReport(request.getRegulatoryReport());
     report.setStatus(normalizeIncidentStatusForWrite(request.getStatus()));
     report.setCreatedBy(AuthContext.getStaffId());
     incidentMapper.insert(report);
@@ -125,6 +138,12 @@ public class IncidentReportController {
     existing.setLevel(normalizeIncidentLevelForWrite(request.getLevel()));
     existing.setDescription(request.getDescription());
     existing.setActionTaken(request.getActionTaken());
+    existing.setEmergencyPlan(request.getEmergencyPlan());
+    existing.setOnsiteHandling(request.getOnsiteHandling());
+    existing.setFamilyNotification(request.getFamilyNotification());
+    existing.setRectificationMeasure(request.getRectificationMeasure());
+    existing.setReviewConclusion(request.getReviewConclusion());
+    existing.setRegulatoryReport(request.getRegulatoryReport());
     existing.setStatus(normalizeIncidentStatusForWrite(request.getStatus()));
     incidentMapper.updateById(existing);
     return Result.ok(existing);

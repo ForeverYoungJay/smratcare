@@ -10,12 +10,22 @@
 
   <view class="surface panel">
     <view class="panel-title">新增交接</view>
+    <view class="state-card inline-state success-state" wx:if="{{submitSuccess}}">
+      <view class="state-title">交接已提交</view>
+      <view class="section-subtitle">{{submitSuccess}}</view>
+    </view>
+    <view class="state-card inline-state error-state" wx:if="{{submitError}}">
+      <view class="state-title">交接提交失败</view>
+      <view class="section-subtitle">{{submitError}}</view>
+    </view>
     <textarea class="handover-input" value="{{note}}" placeholder="填写需要下一班关注的老人、房间、异常和处理状态" bindinput="onNoteInput" />
     <button class="primary-btn submit-btn" loading="{{submitting}}" bindtap="submitNote">提交交接</button>
   </view>
 
   <view class="surface panel">
     <view class="panel-title">交接记录</view>
+    <view class="state-title" wx:if="{{loading}}">正在加载交接记录</view>
+    <view class="section-subtitle" wx:if="{{!loading && !handovers.length && !loadError}}">暂无交接记录</view>
     <block wx:for="{{handovers}}" wx:key="id">
       <view class="handover-row">
         <view class="handover-head">

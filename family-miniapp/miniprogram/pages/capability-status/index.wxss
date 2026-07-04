@@ -3,10 +3,18 @@
   padding: 24rpx;
 }
 
+.error-panel {
+  text-align: center;
+}
+
+.retry-btn {
+  margin-top: 20rpx;
+}
+
 .checked {
   margin-top: 10rpx;
   font-size: 22rpx;
-  color: #71807a;
+  color: #5C6F69;
 }
 
 .summary-grid {
@@ -26,7 +34,7 @@
 .summary-item .label {
   display: block;
   font-size: 22rpx;
-  color: #71807a;
+  color: #5C6F69;
 }
 
 .summary-item .value {
@@ -34,7 +42,7 @@
   margin-top: 6rpx;
   font-size: 28rpx;
   font-weight: 700;
-  color: #182420;
+  color: #22332E;
 }
 
 .ops-row {
@@ -63,7 +71,7 @@
 
 .title {
   font-size: 27rpx;
-  color: #182420;
+  color: #22332E;
   font-weight: 700;
 }
 
@@ -74,12 +82,12 @@
 }
 
 .badge-ok {
-  color: #16704f;
-  background: #e8f7ef;
+  color: #21705F;
+  background: #E8F3EF;
 }
 
 .badge-warn {
-  color: #9a5b05;
+  color: #B27221;
   background: #fff7e8;
 }
 
@@ -89,7 +97,7 @@
 }
 
 .badge-danger {
-  color: #b42318;
+  color: #C9504B;
   background: #fff4f2;
 }
 

@@ -48,7 +48,9 @@
       <a-table :columns="columns" :data-source="rows" :pagination="false" row-key="name">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'name'">
-            <a @click="drillDown(record.name)">{{ record.name }}</a>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="drillDown(record.name)">{{ record.name }}</a-button>
+            </div>
           </template>
         </template>
       </a-table>

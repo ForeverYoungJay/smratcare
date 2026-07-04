@@ -19,15 +19,27 @@
 }
 
 .type-tab.active {
-  background: #246b5f;
+  background: #21705F;
   color: #ffffff;
-  box-shadow: 0 12rpx 24rpx rgba(36, 107, 95, 0.18);
+  box-shadow: 0 12rpx 24rpx rgba(33, 112, 95, 0.18);
 }
 
 .form-card,
 .panel {
   padding: 26rpx;
   margin-top: 18rpx;
+}
+
+.inline-state {
+  margin-top: 18rpx;
+}
+
+.success-state {
+  background: #E8F3EF;
+}
+
+.error-state {
+  background: #fff3f2;
 }
 
 .field {
@@ -52,9 +64,9 @@
 .reason-box {
   width: 100%;
   border-radius: 14rpx;
-  border: 1rpx solid #d9e3df;
+  border: 1rpx solid #D7DED8;
   background: #ffffff;
-  color: #182420;
+  color: #22332E;
   font-size: 25rpx;
 }
 
@@ -104,7 +116,7 @@
 }
 
 .approval-title {
-  color: #182430;
+  color: #22332E;
   font-size: 27rpx;
   font-weight: 900;
 }
@@ -113,7 +125,7 @@
 .approval-remark,
 .approval-create {
   margin-top: 8rpx;
-  color: #71807a;
+  color: #5C6F69;
   font-size: 22rpx;
   line-height: 1.5;
 }
@@ -126,18 +138,18 @@
   flex: none;
   padding: 8rpx 14rpx;
   border-radius: 999rpx;
-  background: #fff2d9;
-  color: #9a5b05;
+  background: #FBF0E2;
+  color: #B27221;
   font-size: 21rpx;
   font-weight: 900;
 }
 
 .status-pill.success {
-  background: #e5f5ef;
-  color: #16704f;
+  background: #E8F3EF;
+  color: #21705F;
 }
 
 .status-pill.danger {
-  background: #fde8e5;
-  color: #b42318;
+  background: #F9E7E6;
+  color: #C9504B;
 }

@@ -1,0 +1,28 @@
+-- 经营驾驶舱：每日经营指标快照（预聚合，避免大屏直查业务库）
+CREATE TABLE IF NOT EXISTS cockpit_metric_snapshot (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NULL,
+  org_id BIGINT NOT NULL,
+  stat_date DATE NOT NULL,
+  total_beds INT NOT NULL DEFAULT 0,
+  occupied_beds INT NOT NULL DEFAULT 0,
+  available_beds INT NOT NULL DEFAULT 0,
+  occupancy_rate DECIMAL(5,2) NOT NULL DEFAULT 0,
+  resident_count INT NOT NULL DEFAULT 0,
+  admissions INT NOT NULL DEFAULT 0,
+  discharges INT NOT NULL DEFAULT 0,
+  net_change INT NOT NULL DEFAULT 0,
+  revenue_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+  paid_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+  outstanding_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+  collection_rate DECIMAL(5,2) NOT NULL DEFAULT 0,
+  alert_total INT NOT NULL DEFAULT 0,
+  alert_resolved INT NOT NULL DEFAULT 0,
+  alert_timeout INT NOT NULL DEFAULT 0,
+  alert_resp_rate DECIMAL(5,2) NOT NULL DEFAULT 0,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0,
+  UNIQUE KEY uk_cockpit_snapshot_org_date (org_id, stat_date, is_deleted),
+  KEY idx_cockpit_snapshot_org (org_id, stat_date)
+);

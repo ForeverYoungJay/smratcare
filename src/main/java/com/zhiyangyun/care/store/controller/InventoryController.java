@@ -248,9 +248,14 @@ public class InventoryController {
         .distinct()
         .collect(Collectors.collectingAndThen(Collectors.toList(), ids ->
             ids.isEmpty() ? Map.of() : inventoryBatchMapper.selectBatchIds(ids).stream().collect(Collectors.toMap(InventoryBatch::getId, b -> b))));
+    Map<Long, String> elderNameMap = elderNameMap(orgId, page.getRecords().stream()
+        .map(InventoryOutboundSheet::getElderId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList());
     IPage<InventoryOutboundSheetResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
     resp.setRecords(page.getRecords().stream()
-        .map(sheet -> toOutboundSheetResponse(sheet, itemMap.get(sheet.getId()), productMap, batchMap))
+        .map(sheet -> toOutboundSheetResponse(sheet, itemMap.get(sheet.getId()), productMap, batchMap, elderNameMap.get(sheet.getElderId())))
         .toList());
     return Result.ok(resp);
   }
@@ -283,7 +288,7 @@ public class InventoryController {
         .distinct()
         .collect(Collectors.collectingAndThen(Collectors.toList(), ids ->
             ids.isEmpty() ? Map.of() : inventoryBatchMapper.selectBatchIds(ids).stream().collect(Collectors.toMap(InventoryBatch::getId, b -> b))));
-    return Result.ok(toOutboundSheetResponse(sheet, itemList, productMap, batchMap));
+    return Result.ok(toOutboundSheetResponse(sheet, itemList, productMap, batchMap, resolveElderName(orgId, sheet.getElderId())));
   }
 
   @PostMapping("/outbound/sheet/confirm")
@@ -309,6 +314,7 @@ public class InventoryController {
     if (items.isEmpty()) {
       throw new IllegalArgumentException("领用单明细为空");
     }
+    String elderName = resolveElderName(orgId, sheet.getElderId());
     for (InventoryOutboundSheetItem item : items) {
       InventoryOutboundRequest outbound = new InventoryOutboundRequest();
       outbound.setOrgId(orgId);
@@ -318,6 +324,8 @@ public class InventoryController {
       outbound.setBatchId(item.getBatchId());
       outbound.setQuantity(item.getQuantity());
       outbound.setReceiverName(sheet.getReceiverName());
+      outbound.setElderId(sheet.getElderId());
+      outbound.setElderName(firstNonBlank(elderName, sheet.getReceiverName()));
       outbound.setReason(item.getReason());
       outbound.setOutboundNo(sheet.getOutboundNo());
       inventoryService.outbound(outbound);
@@ -470,6 +478,7 @@ public class InventoryController {
       @RequestParam(required = false) Long warehouseId,
       @RequestParam(required = false) String changeType,
       @RequestParam(required = false) String outType,
+      @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) String dateFrom,
       @RequestParam(required = false) String dateTo) {
     Long orgId = AuthContext.getOrgId();
@@ -478,6 +487,7 @@ public class InventoryController {
         .eq(InventoryLog::getIsDeleted, 0)
         .eq(productId != null, InventoryLog::getProductId, productId)
         .eq(warehouseId != null, InventoryLog::getWarehouseId, warehouseId)
+        .eq(elderId != null, InventoryLog::getElderId, elderId)
         .eq(changeType != null && !changeType.isBlank(), InventoryLog::getChangeType, changeType);
     if (outType != null && !outType.isBlank()) {
       if ("SALE".equalsIgnoreCase(outType)) {
@@ -536,6 +546,8 @@ public class InventoryController {
         item.setOutType(log.getRefOrderId() != null ? "SALE" : "CONSUME");
       }
       item.setReceiverName(log.getReceiverName());
+      item.setElderId(log.getElderId());
+      item.setElderName(log.getElderName());
       item.setOutboundNo(log.getOutboundNo());
       item.setRemark(log.getRemark());
       item.setCreateTime(log.getCreateTime());
@@ -552,7 +564,7 @@ public class InventoryController {
       @RequestParam(required = false) Long warehouseId,
       @RequestParam(required = false) String dateFrom,
       @RequestParam(required = false) String dateTo) {
-    return logPage(pageNo, pageSize, productId, warehouseId, "IN", null, dateFrom, dateTo);
+    return logPage(pageNo, pageSize, productId, warehouseId, "IN", null, null, dateFrom, dateTo);
   }
 
   @GetMapping("/outbound/page")
@@ -562,9 +574,10 @@ public class InventoryController {
       @RequestParam(required = false) Long productId,
       @RequestParam(required = false) Long warehouseId,
       @RequestParam(required = false) String outType,
+      @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) String dateFrom,
       @RequestParam(required = false) String dateTo) {
-    return logPage(pageNo, pageSize, productId, warehouseId, "OUT", outType, dateFrom, dateTo);
+    return logPage(pageNo, pageSize, productId, warehouseId, "OUT", outType, elderId, dateFrom, dateTo);
   }
 
   @GetMapping("/adjustment/page")
@@ -792,12 +805,14 @@ public class InventoryController {
       InventoryOutboundSheet sheet,
       List<InventoryOutboundSheetItem> items,
       Map<Long, Product> productMap,
-      Map<Long, InventoryBatch> batchMap) {
+      Map<Long, InventoryBatch> batchMap,
+      String elderName) {
     InventoryOutboundSheetResponse response = new InventoryOutboundSheetResponse();
     response.setId(sheet.getId());
     response.setOutboundNo(sheet.getOutboundNo());
     response.setReceiverName(sheet.getReceiverName());
     response.setElderId(sheet.getElderId());
+    response.setElderName(firstNonBlank(elderName, sheet.getReceiverName()));
     response.setContractNo(sheet.getContractNo());
     response.setApplyDept(sheet.getApplyDept());
     response.setOperatorStaffId(sheet.getOperatorStaffId());
@@ -826,6 +841,33 @@ public class InventoryController {
         }).toList();
     response.setItems(detail);
     return response;
+  }
+
+  private Map<Long, String> elderNameMap(Long orgId, List<Long> elderIds) {
+    if (elderIds == null || elderIds.isEmpty()) {
+      return Map.of();
+    }
+    return elderMapper.selectList(
+            Wrappers.lambdaQuery(ElderProfile.class)
+                .eq(ElderProfile::getIsDeleted, 0)
+                .eq(orgId != null, ElderProfile::getOrgId, orgId)
+                .in(ElderProfile::getId, elderIds))
+        .stream()
+        .filter(elder -> normalizeText(elder.getFullName()) != null)
+        .collect(Collectors.toMap(ElderProfile::getId, elder -> normalizeText(elder.getFullName()), (a, b) -> a));
+  }
+
+  private String resolveElderName(Long orgId, Long elderId) {
+    if (elderId == null) {
+      return null;
+    }
+    ElderProfile elder = elderMapper.selectOne(
+        Wrappers.lambdaQuery(ElderProfile.class)
+            .eq(ElderProfile::getIsDeleted, 0)
+            .eq(ElderProfile::getId, elderId)
+            .eq(orgId != null, ElderProfile::getOrgId, orgId)
+            .last("LIMIT 1"));
+    return elder == null ? null : normalizeText(elder.getFullName());
   }
 
   @GetMapping("/adjustment/diff-report")

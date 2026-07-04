@@ -55,7 +55,7 @@
       <vxe-table
         border
         stripe
-        show-overflow
+        show-overflow="title"
         height="520"
         :loading="loading"
         :data="rows"

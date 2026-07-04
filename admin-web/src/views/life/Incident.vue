@@ -56,12 +56,20 @@
             {{ record.status === 'CLOSED' ? '已关闭' : '处理中' }}
           </a-tag>
         </template>
-        <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="openEdit(record)">编辑</a-button>
-            <a-button type="link" @click="closeIncidentRow(record)">关闭</a-button>
-            <a-button type="link" danger @click="remove(record)">删除</a-button>
+        <template v-else-if="column.key === 'closure'">
+          <a-space wrap>
+            <a-tag :color="record.emergencyPlan ? 'green' : 'default'">预案</a-tag>
+            <a-tag :color="record.familyNotification ? 'green' : 'default'">告知</a-tag>
+            <a-tag :color="record.rectificationMeasure ? 'green' : 'default'">整改</a-tag>
+            <a-tag :color="record.reviewConclusion ? 'green' : 'default'">复盘</a-tag>
           </a-space>
+        </template>
+        <template v-else-if="column.key === 'action'">
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
+            <a-button type="link" size="small" @click="closeIncidentRow(record)">关闭</a-button>
+            <a-button type="link" size="small" danger @click="remove(record)">删除</a-button>
+          </div>
         </template>
       </template>
     </DataTable>
@@ -97,6 +105,24 @@
         </a-form-item>
         <a-form-item label="处理措施">
           <a-textarea v-model:value="form.actionTaken" :rows="2" />
+        </a-form-item>
+        <a-form-item label="应急预案">
+          <a-textarea v-model:value="form.emergencyPlan" :rows="2" placeholder="记录启动的应急预案、责任人和关键节点" />
+        </a-form-item>
+        <a-form-item label="现场处置">
+          <a-textarea v-model:value="form.onsiteHandling" :rows="2" placeholder="记录现场保护、救治、转运、陪同等处置过程" />
+        </a-form-item>
+        <a-form-item label="家属告知">
+          <a-textarea v-model:value="form.familyNotification" :rows="2" placeholder="记录告知时间、告知对象、沟通结论" />
+        </a-form-item>
+        <a-form-item label="整改措施">
+          <a-textarea v-model:value="form.rectificationMeasure" :rows="2" placeholder="记录整改责任人、整改动作和完成时限" />
+        </a-form-item>
+        <a-form-item label="复盘结论">
+          <a-textarea v-model:value="form.reviewConclusion" :rows="2" placeholder="关闭事故前建议填写原因分析和复盘结论" />
+        </a-form-item>
+        <a-form-item label="监管上报">
+          <a-textarea v-model:value="form.regulatoryReport" :rows="2" placeholder="记录是否上报、上报对象、材料编号或报表位置" />
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="form.status" :options="statusOptions" />
@@ -139,6 +165,7 @@ const columns = [
   { title: '值班护工', dataIndex: 'reporterName', key: 'reporterName', width: 120 },
   { title: '事故描述', dataIndex: 'description', key: 'description' },
   { title: '发生时间', dataIndex: 'incidentTime', key: 'incidentTime', width: 180 },
+  { title: '闭环留痕', key: 'closure', width: 180 },
   { title: '处理状态', dataIndex: 'status', key: 'status', width: 100 },
   { title: '操作', key: 'action', width: 180 }
 ]
@@ -156,6 +183,12 @@ const form = reactive({
   level: 'NORMAL',
   description: '',
   actionTaken: '',
+  emergencyPlan: '',
+  onsiteHandling: '',
+  familyNotification: '',
+  rectificationMeasure: '',
+  reviewConclusion: '',
+  regulatoryReport: '',
   status: 'OPEN'
 })
 
@@ -222,6 +255,12 @@ function openCreate() {
   form.level = 'NORMAL'
   form.description = ''
   form.actionTaken = ''
+  form.emergencyPlan = ''
+  form.onsiteHandling = ''
+  form.familyNotification = ''
+  form.rectificationMeasure = ''
+  form.reviewConclusion = ''
+  form.regulatoryReport = ''
   form.status = 'OPEN'
   editOpen.value = true
 }
@@ -237,6 +276,12 @@ function openEdit(record: IncidentReport) {
   form.level = record.level || 'NORMAL'
   form.description = record.description
   form.actionTaken = record.actionTaken || ''
+  form.emergencyPlan = record.emergencyPlan || ''
+  form.onsiteHandling = record.onsiteHandling || ''
+  form.familyNotification = record.familyNotification || ''
+  form.rectificationMeasure = record.rectificationMeasure || ''
+  form.reviewConclusion = record.reviewConclusion || ''
+  form.regulatoryReport = record.regulatoryReport || ''
   form.status = record.status || 'OPEN'
   editOpen.value = true
 }
@@ -261,6 +306,12 @@ async function submit() {
       level: form.level,
       description: form.description,
       actionTaken: form.actionTaken,
+      emergencyPlan: form.emergencyPlan,
+      onsiteHandling: form.onsiteHandling,
+      familyNotification: form.familyNotification,
+      rectificationMeasure: form.rectificationMeasure,
+      reviewConclusion: form.reviewConclusion,
+      regulatoryReport: form.regulatoryReport,
       status: form.status
     }
     if (form.id) {
@@ -276,6 +327,11 @@ async function submit() {
 }
 
 async function closeIncidentRow(record: IncidentReport) {
+  if (!record.reviewConclusion) {
+    message.warning('请先补齐复盘结论后再关闭事故')
+    openEdit(record)
+    return
+  }
   await closeIncident(record.id)
   fetchData()
 }

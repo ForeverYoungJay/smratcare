@@ -55,10 +55,12 @@ public class MarketingReportController {
       @RequestParam(required = false) String customerTag,
       @RequestParam(required = false) String marketerName) {
     Long orgId = AuthContext.getOrgId();
+    Long currentStaffId = AuthContext.getStaffId();
+    boolean adminView = AuthContext.isMinisterOrHigher();
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "MARKETING_REPORT_QUERY", "MARKETING_LEAD_ENTRY_SUMMARY", null, "lead entry summary");
     return Result.ok(marketingReportService.leadEntrySummary(
-        orgId, mode, keyword, consultantName, consultantPhone, elderName, elderPhone,
+        orgId, currentStaffId, adminView, mode, keyword, consultantName, consultantPhone, elderName, elderPhone,
         consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName));
   }
 

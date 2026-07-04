@@ -116,12 +116,12 @@ function onChange(pagination: TablePaginationConfig, filters: any, sorter: any) 
 }
 
 .empty-copy__title {
-  color: #12314d;
+  color: #22332e;
   font-size: 15px;
 }
 
 .empty-copy__description {
-  color: #5f7b95;
+  color: #5c6f69;
   font-size: 12px;
   line-height: 1.7;
 }

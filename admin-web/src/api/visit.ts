@@ -14,6 +14,10 @@ export function guardTodayVisits() {
   return request.get<VisitBookingItem[]>('/api/guard/visit/today')
 }
 
+export function guardVisits(params?: { elderId?: Id; status?: number; fromDate?: string; toDate?: string }) {
+  return request.get<VisitBookingItem[]>('/api/guard/visit', { params })
+}
+
 export function guardCheckin(data: VisitCheckinRequest) {
   return request.post<void>('/api/guard/visit/checkin', data)
 }

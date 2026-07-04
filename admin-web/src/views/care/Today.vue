@@ -1,101 +1,79 @@
 <template>
   <PageContainer title="今日护理任务" subTitle="任务分派与执行跟踪">
-    <a-card :bordered="false" class="card-elevated">
-      <a-form layout="inline" class="search-bar" @submit.prevent>
-        <a-form-item label="日期范围">
-          <a-range-picker v-model:value="query.range" />
-        </a-form-item>
-        <a-form-item label="护工">
-          <a-select
-            v-model:value="query.staffId"
-            show-search
-            allow-clear
-            placeholder="输入姓名搜索"
-            :filter-option="false"
-            :options="staffOptions"
-            style="width: 180px"
-            @search="searchStaff"
-          />
-        </a-form-item>
-        <a-form-item label="老人">
-          <a-select
-            v-model:value="query.elderId"
-            show-search
-            allow-clear
-            placeholder="输入姓名搜索"
-            :filter-option="false"
-            :options="elderOptions"
-            style="width: 180px"
-            @search="searchElders"
-            @focus="() => !elderOptions.length && searchElders('')"
-          />
-        </a-form-item>
-        <a-form-item label="房间">
-          <a-input v-model:value="query.roomNo" placeholder="房间号" allow-clear />
-        </a-form-item>
-        <a-form-item label="护理等级">
-          <a-input v-model:value="query.careLevel" placeholder="如 A/B/C" allow-clear />
-        </a-form-item>
-        <a-form-item label="状态">
-          <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 140px" />
-        </a-form-item>
-        <a-form-item label="关键词">
-          <a-input v-model:value="query.keyword" placeholder="任务ID/床位ID" allow-clear @pressEnter="searchFromFilters" />
-        </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="searchFromFilters">查询</a-button>
-            <a-button @click="reset">重置</a-button>
-            <a-button type="primary" @click="openAction">新增/派发任务</a-button>
-            <a-button @click="exportCsvData">导出CSV</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
-
-      <a-row :gutter="12" class="metrics-row">
-        <a-col :span="4">
-          <a-card :bordered="false" class="metric-card clickable" :class="{ active: activeMetric === 'total' }" @click="applyMetricFilter('total')">
-            <div class="metric-label">任务总数</div>
-            <div class="metric-value">{{ summary.totalCount || 0 }}</div>
-          </a-card>
-        </a-col>
-        <a-col :span="4">
-          <a-card :bordered="false" class="metric-card clickable" :class="{ active: activeMetric === 'pending' }" @click="applyMetricFilter('pending')">
-            <div class="metric-label">待执行</div>
-            <div class="metric-value">{{ summary.pendingCount || 0 }}</div>
-          </a-card>
-        </a-col>
-        <a-col :span="4">
-          <a-card :bordered="false" class="metric-card clickable" :class="{ active: activeMetric === 'done' }" @click="applyMetricFilter('done')">
-            <div class="metric-label">已完成</div>
-            <div class="metric-value">{{ summary.doneCount || 0 }}</div>
-          </a-card>
-        </a-col>
-        <a-col :span="4">
-          <a-card :bordered="false" class="metric-card clickable" :class="{ active: activeMetric === 'exception' }" @click="applyMetricFilter('exception')">
-            <div class="metric-label">异常</div>
-            <div class="metric-value">{{ summary.exceptionCount || 0 }}</div>
-          </a-card>
-        </a-col>
-        <a-col :span="4">
-          <a-card :bordered="false" class="metric-card clickable" :class="{ active: activeMetric === 'overdue' }" @click="applyMetricFilter('overdue')">
-            <div class="metric-label">逾期</div>
-            <div class="metric-value text-warning">{{ summary.overdueCount || 0 }}</div>
-          </a-card>
-        </a-col>
-        <a-col :span="4">
-          <a-card :bordered="false" class="metric-card clickable" :class="{ active: activeMetric === 'done' }" @click="applyMetricFilter('done')">
-            <div class="metric-label">完成率</div>
-            <div class="metric-value">{{ pct(summary.completionRate) }}</div>
-          </a-card>
-        </a-col>
-      </a-row>
-      <a-space v-if="activeMetric !== 'total'" class="quick-filter-bar">
-        <a-tag color="processing" closable @close.prevent="clearMetricFilter">
-          快速筛选：{{ metricLabel(activeMetric) }}
-        </a-tag>
+    <template #extra>
+      <a-space wrap>
+        <a-button @click="exportCsvData">导出CSV</a-button>
+        <a-button type="primary" @click="openAction">新增/派发任务</a-button>
       </a-space>
-      <div class="summary-tip">统计卡片基于当前查询条件；点击卡片仅影响下方任务列表。</div>
+    </template>
+
+    <SearchForm :model="query" @search="searchFromFilters" @reset="reset">
+      <a-form-item label="日期范围">
+        <a-range-picker v-model:value="query.range" />
+      </a-form-item>
+      <a-form-item label="护工">
+        <a-select
+          v-model:value="query.staffId"
+          show-search
+          allow-clear
+          placeholder="输入姓名搜索"
+          :filter-option="false"
+          :options="staffOptions"
+          style="width: 180px"
+          @search="searchStaff"
+        />
+      </a-form-item>
+      <a-form-item label="老人">
+        <a-select
+          v-model:value="query.elderId"
+          show-search
+          allow-clear
+          placeholder="输入姓名搜索"
+          :filter-option="false"
+          :options="elderOptions"
+          style="width: 180px"
+          @search="searchElders"
+          @focus="() => !elderOptions.length && searchElders('')"
+        />
+      </a-form-item>
+      <a-form-item label="房间">
+        <a-input v-model:value="query.roomNo" placeholder="房间号" allow-clear />
+      </a-form-item>
+      <a-form-item label="护理等级">
+        <a-input v-model:value="query.careLevel" placeholder="如 A/B/C" allow-clear />
+      </a-form-item>
+      <a-form-item label="状态">
+        <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 140px" />
+      </a-form-item>
+      <a-form-item label="关键词">
+        <a-input v-model:value="query.keyword" placeholder="任务ID/床位ID" allow-clear @pressEnter="searchFromFilters" />
+      </a-form-item>
+    </SearchForm>
+
+    <section class="card-elevated care-workspace">
+      <div class="metric-strip" role="tablist" aria-label="按任务状态过滤">
+        <button
+          v-for="chip in metricChips"
+          :key="chip.key"
+          type="button"
+          class="metric-chip"
+          :class="[chip.tone ? `metric-chip--${chip.tone}` : '', { 'is-active': activeMetric === chip.key }]"
+          @click="applyMetricFilter(chip.key)"
+        >
+          <span class="metric-chip__label">{{ chip.label }}</span>
+          <strong class="metric-chip__value">{{ chip.value }}</strong>
+        </button>
+        <div class="metric-chip metric-chip--static">
+          <span class="metric-chip__label">完成率</span>
+          <strong class="metric-chip__value">{{ pct(summary.completionRate) }}</strong>
+        </div>
+        <div class="metric-strip__hint">
+          <a-tag v-if="activeMetric !== 'total'" color="processing" closable @close.prevent="clearMetricFilter">
+            已按「{{ metricLabel(activeMetric) }}」过滤
+          </a-tag>
+          <span v-else>统计基于当前查询条件，点击指标可快速过滤任务列表</span>
+        </div>
+      </div>
 
       <vxe-table
         border
@@ -126,11 +104,11 @@
         </vxe-column>
         <vxe-column title="操作" width="200" fixed="right">
           <template #default="{ row }">
-            <a-space>
-              <a @click="openDetail(row)">详情</a>
-              <a @click="openAssign(row)">派发</a>
-              <a @click="openReview(row)">评价</a>
-            </a-space>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="openDetail(row)">详情</a-button>
+              <a-button type="link" size="small" @click="openAssign(row)">派发</a-button>
+              <a-button type="link" size="small" @click="openReview(row)">评价</a-button>
+            </div>
           </template>
         </vxe-column>
       </vxe-table>
@@ -144,7 +122,7 @@
           @showSizeChange="handlePageSizeChange"
         />
       </div>
-    </a-card>
+    </section>
 
     <a-drawer v-model:open="detailOpen" title="任务详情" width="520">
       <a-descriptions :column="1" bordered size="small">
@@ -429,6 +407,7 @@ import dayjs from 'dayjs'
 import { Modal, message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import SearchForm from '../../components/SearchForm.vue'
 import {
   getTaskPage,
   getTaskSummary,
@@ -603,6 +582,14 @@ const createRules = {
     }
   ]
 }
+
+const metricChips = computed(() => ([
+  { key: 'total' as const, label: '任务总数', value: summary.totalCount || 0, tone: '' },
+  { key: 'pending' as const, label: '待执行', value: summary.pendingCount || 0, tone: 'info' },
+  { key: 'done' as const, label: '已完成', value: summary.doneCount || 0, tone: 'success' },
+  { key: 'exception' as const, label: '异常', value: summary.exceptionCount || 0, tone: 'danger' },
+  { key: 'overdue' as const, label: '逾期', value: summary.overdueCount || 0, tone: 'warning' }
+]))
 
 const actionModeLabel = computed(() => {
   switch (actionMode.value) {
@@ -1208,45 +1195,86 @@ search()
 </script>
 
 <style scoped>
-.search-bar {
-  margin-bottom: 12px;
-  row-gap: 8px;
+.care-workspace {
+  padding: 18px;
 }
-.metrics-row {
-  margin-bottom: 12px;
+
+/* 指标即筛选：点数字直接过滤任务列表 */
+.metric-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
 }
-.metric-card {
-  border-radius: 10px;
-  transition: all .2s ease;
-}
-.metric-card.clickable {
+
+.metric-chip {
+  display: grid;
+  gap: 2px;
+  min-width: 104px;
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff;
+  text-align: left;
   cursor: pointer;
+  transition: all 0.15s ease;
 }
-.metric-card.clickable:hover {
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+
+.metric-chip:hover {
+  border-color: rgba(var(--primary-rgb), 0.4);
+  box-shadow: var(--shadow-sm);
 }
-.metric-card.active {
-  border: 1px solid #1677ff;
-  box-shadow: 0 8px 20px rgba(22, 119, 255, 0.12);
+
+.metric-chip.is-active {
+  border-color: rgba(var(--primary-rgb), 0.5);
+  background: var(--primary-soft);
 }
-.metric-label {
-  color: #64748b;
+
+.metric-chip__label {
+  color: var(--muted);
   font-size: 12px;
+  font-weight: 600;
 }
-.metric-value {
-  margin-top: 4px;
+
+.metric-chip__value {
+  color: var(--ink);
   font-size: 22px;
+  line-height: 1.1;
   font-weight: 700;
 }
-.text-warning {
-  color: #d97706;
+
+.metric-chip--info .metric-chip__value {
+  color: var(--info);
 }
-.quick-filter-bar {
-  margin-bottom: 8px;
+
+.metric-chip--success .metric-chip__value {
+  color: var(--success);
 }
-.summary-tip {
-  margin-bottom: 8px;
-  color: #64748b;
+
+.metric-chip--danger .metric-chip__value {
+  color: var(--danger);
+}
+
+.metric-chip--warning .metric-chip__value {
+  color: var(--warning);
+}
+
+.metric-chip--static {
+  cursor: default;
+  background: var(--surface-3);
+}
+
+.metric-chip--static:hover {
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+.metric-strip__hint {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  color: var(--muted-2);
   font-size: 12px;
 }
 .template-empty-tip {

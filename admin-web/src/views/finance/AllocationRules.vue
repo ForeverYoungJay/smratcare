@@ -10,7 +10,7 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <vxe-table border stripe show-overflow :loading="loading" :data="rows" height="560">
+      <vxe-table border stripe show-overflow="title" :loading="loading" :data="rows" height="560">
         <vxe-column field="ruleTypeLabel" title="规则类型" width="150" />
         <vxe-column field="configKey" title="规则键" min-width="220" />
         <vxe-column field="configValue" title="规则值" width="150" />

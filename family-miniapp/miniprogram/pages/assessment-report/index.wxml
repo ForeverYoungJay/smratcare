@@ -3,7 +3,7 @@
     <view class="section-title">评估报告中心</view>
     <view class="section-subtitle" wx:if="{{!accessGranted}}">为保护老人隐私，查看报告前需要再次验证身份。</view>
     <view class="section-subtitle" wx:if="{{accessGranted}}">支持查看机构上传报告与 AI 生成报告。</view>
-    <view class="ai-row">
+    <view class="ai-row" wx:if="{{accessGranted}}">
       <button class="ghost-btn ai-btn" loading="{{generating}}" data-type="TCM" bindtap="generateAi">生成中医评估</button>
       <button class="ghost-btn ai-btn" loading="{{generating}}" data-type="CARDIO" bindtap="generateAi">生成心血管评估</button>
       <button class="primary-btn ai-btn" loading="{{generating}}" data-type="ALL" bindtap="generateAi">一键生成AI评估</button>

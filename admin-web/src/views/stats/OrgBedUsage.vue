@@ -1,5 +1,22 @@
 <template>
   <PageContainer title="床位使用统计" subTitle="机构床位使用概况">
+    <template #extra>
+      <a-space>
+        <a-button type="primary" @click="loadData">刷新</a-button>
+        <a-button @click="exportSummary">导出汇总</a-button>
+        <a-dropdown>
+          <a-button>更多 ▾</a-button>
+          <template #overlay>
+            <a-menu>
+              <a-menu-item @click="openColumnSetting">列设置</a-menu-item>
+              <a-menu-item @click="printCurrent">打印</a-menu-item>
+              <a-menu-divider />
+              <a-menu-item @click="reset">重置</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+      </a-space>
+    </template>
     <a-card class="card-elevated" :bordered="false" style="margin-bottom: 16px;">
       <a-form layout="inline">
         <a-form-item label="机构ID">
@@ -15,15 +32,6 @@
         </a-form-item>
         <a-form-item label="打印备注">
           <a-input v-model:value="query.printRemark" allow-clear placeholder="例如：床态巡检版" style="width: 200px" />
-        </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="loadData">刷新</a-button>
-            <a-button @click="exportSummary">导出汇总</a-button>
-            <a-button @click="openColumnSetting">列设置</a-button>
-            <a-button @click="printCurrent">打印</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
         </a-form-item>
       </a-form>
     </a-card>

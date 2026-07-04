@@ -1,3 +1,50 @@
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12rpx;
+  margin-top: 18rpx;
+}
+
+.summary-card {
+  padding: 20rpx 12rpx;
+  text-align: center;
+}
+
+.summary-card text,
+.summary-card strong {
+  display: block;
+}
+
+.summary-card text {
+  color: #73808c;
+  font-size: 22rpx;
+  font-weight: 800;
+}
+
+.summary-card strong {
+  margin-top: 8rpx;
+  color: #21705F;
+  font-size: 38rpx;
+  font-weight: 900;
+}
+
+.summary-card.warning strong {
+  color: #9a6400;
+}
+
+.summary-card.danger strong {
+  color: #C9504B;
+}
+
+.state-card {
+  margin-top: 22rpx;
+  padding: 34rpx;
+}
+
+.retry-btn {
+  margin-top: 20rpx;
+}
+
 .quick-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -17,7 +64,35 @@
   padding: 20rpx 0;
   border-top: 1rpx solid #edf1f5;
 }
-.work-row:first-child { border-top: 0; }
-.work-title { color: #182430; font-size: 28rpx; font-weight: 900; }
+.work-row:first-of-type { border-top: 0; }
+.work-main { flex: 1; min-width: 0; }
+.work-title { color: #22332E; font-size: 28rpx; font-weight: 900; }
 .work-meta { margin-top: 8rpx; color: #73808c; font-size: 23rpx; }
-.work-action { color: #1f5f8b; font-size: 24rpx; font-weight: 900; white-space: nowrap; }
+.work-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10rpx;
+  flex: none;
+}
+.work-action { color: #3D7FA6; font-size: 24rpx; font-weight: 900; white-space: nowrap; }
+
+.status-badge {
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  background: #FBF0E2;
+  color: #B27221;
+  font-size: 21rpx;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.status-badge.done {
+  background: #E8F3EF;
+  color: #21705F;
+}
+
+.status-badge.danger {
+  background: #fdeceb;
+  color: #C9504B;
+}

@@ -56,6 +56,9 @@ Page({
     loadingProducts: false,
     loadingOrders: false,
     loadingBindings: false,
+    bindingsError: '',
+    productsError: '',
+    ordersError: '',
     keyword: '',
     submittingId: '',
     previewingId: '',
@@ -104,7 +107,7 @@ Page({
     await this.loadOrders();
   },
   async loadBindings() {
-    this.setData({ loadingBindings: true });
+    this.setData({ loadingBindings: true, bindingsError: '' });
     try {
       const dashboard = await getHomeDashboard({ elderId: null });
       const list = (dashboard && dashboard.elders) || [];
@@ -134,16 +137,17 @@ Page({
         bindings,
         hasBindings: bindings.length > 0,
         selectedElderId,
-        selectedElderIndex
+        selectedElderIndex,
+        bindingsError: ''
       });
     } catch (error) {
       this.setData({
         bindings: [],
         hasBindings: false,
         selectedElderId: null,
-        selectedElderIndex: 0
+        selectedElderIndex: 0,
+        bindingsError: error.message || '老人绑定信息加载失败，请稍后重试'
       });
-      wx.showToast({ title: error.message || '老人绑定信息加载失败', icon: 'none' });
     } finally {
       this.setData({ loadingBindings: false });
     }
@@ -191,7 +195,7 @@ Page({
     return category === '全部' ? '' : category;
   },
   async loadProducts() {
-    this.setData({ loadingProducts: true });
+    this.setData({ loadingProducts: true, productsError: '' });
     try {
       const list = await getMallProducts({
         keyword: this.data.keyword,
@@ -218,26 +222,33 @@ Page({
       const currentCategory = this.data.categoryOptions[this.data.categoryIndex] || '全部';
       const nextIdx = categoryOptions.findIndex((item) => item === currentCategory);
       categoryIndex = nextIdx >= 0 ? nextIdx : 0;
-      this.setData({ products, qtyMap, categoryOptions, categoryIndex });
+      this.setData({ products, qtyMap, categoryOptions, categoryIndex, productsError: '' });
     } catch (error) {
-      wx.showToast({ title: error.message || '商品加载失败', icon: 'none' });
+      this.setData({
+        products: [],
+        productsError: error.message || '商品加载失败，请稍后重试'
+      });
     } finally {
       this.setData({ loadingProducts: false });
     }
   },
   async loadOrders() {
     if (!this.data.hasBindings) {
-      this.setData({ orders: [], filteredOrders: [] });
+      this.setData({ orders: [], filteredOrders: [], ordersError: '' });
       return;
     }
-    this.setData({ loadingOrders: true });
+    this.setData({ loadingOrders: true, ordersError: '' });
     try {
       const list = await getMallOrders({ pageNo: 1, pageSize: 40, elderId: null });
       const orders = (list || []).map(resolveOrderSummary);
-      this.setData({ orders });
+      this.setData({ orders, ordersError: '' });
       this.applyOrderFilter();
     } catch (error) {
-      wx.showToast({ title: error.message || '订单加载失败', icon: 'none' });
+      this.setData({
+        orders: [],
+        filteredOrders: [],
+        ordersError: error.message || '订单加载失败，请稍后重试'
+      });
     } finally {
       this.setData({ loadingOrders: false });
     }
@@ -273,6 +284,15 @@ Page({
   },
   goBindElder() {
     wx.navigateTo({ url: '/pages/bind/index' });
+  },
+  retryBindings() {
+    this.loadBindings();
+  },
+  retryProducts() {
+    this.loadProducts();
+  },
+  retryOrders() {
+    this.loadOrders();
   },
   selectedElderIdOrToast() {
     const elderId = safeNumber(this.data.selectedElderId, 0) || safeNumber(getApp().globalData.selectedElderId, 0);

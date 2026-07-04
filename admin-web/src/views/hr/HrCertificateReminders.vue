@@ -1,5 +1,30 @@
 <template>
   <PageContainer title="证书到期提醒" subTitle="培训与发展 / 证书到期提醒">
+    <template #stats>
+      <div class="certificate-summary">
+        <div class="summary-card summary-card--danger">
+          <span>已过期</span>
+          <strong>{{ expiredCount }}</strong>
+          <small>需立即补证或暂停高风险岗位</small>
+        </div>
+        <div class="summary-card summary-card--warning">
+          <span>7天内到期</span>
+          <strong>{{ urgentCount }}</strong>
+          <small>优先安排续证材料和培训</small>
+        </div>
+        <div class="summary-card">
+          <span>30天内到期</span>
+          <strong>{{ warningCount }}</strong>
+          <small>纳入本月资质合规清单</small>
+        </div>
+        <div class="summary-card">
+          <span>提醒范围</span>
+          <strong>{{ query.warningDays }}</strong>
+          <small>当前筛选预警天数</small>
+        </div>
+      </div>
+    </template>
+
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="证书名称/编号/机构" allow-clear />
@@ -40,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -67,6 +92,15 @@ const columns = [
 const rows = ref<HrStaffCertificateItem[]>([])
 const loading = ref(false)
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
+const expiredCount = computed(() => rows.value.filter((item) => Number(item.remainingDays ?? 0) < 0).length)
+const urgentCount = computed(() => rows.value.filter((item) => {
+  const days = Number(item.remainingDays ?? 9999)
+  return days >= 0 && days <= 7
+}).length)
+const warningCount = computed(() => rows.value.filter((item) => {
+  const days = Number(item.remainingDays ?? 9999)
+  return days >= 0 && days <= 30
+}).length)
 
 async function fetchData() {
   loading.value = true
@@ -136,10 +170,45 @@ onMounted(fetchData)
 
 <style scoped>
 :deep(.hr-row-danger) {
-  background: #fff1f0 !important;
+  background: rgba(var(--danger-rgb), 0.1) !important;
 }
 
 :deep(.hr-row-warning) {
-  background: #fffbe6 !important;
+  background: rgba(var(--warning-rgb), 0.12) !important;
+}
+
+.certificate-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.summary-card {
+  padding: 14px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.summary-card span,
+.summary-card small {
+  display: block;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.summary-card strong {
+  display: block;
+  margin: 4px 0;
+  color: var(--ink);
+  font-size: 26px;
+  line-height: 1.2;
+}
+
+.summary-card--danger strong {
+  color: var(--danger);
+}
+
+.summary-card--warning strong {
+  color: var(--warning);
 }
 </style>

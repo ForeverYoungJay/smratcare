@@ -29,9 +29,31 @@ public class IncidentReport {
 
   private String level;
 
+  private String location;
+
+  private String scanText;
+
+  private String attachmentUrls;
+
+  private String voiceUrl;
+
+  private Integer voiceDurationSec;
+
   private String description;
 
   private String actionTaken;
+
+  private String emergencyPlan;
+
+  private String onsiteHandling;
+
+  private String familyNotification;
+
+  private String rectificationMeasure;
+
+  private String reviewConclusion;
+
+  private String regulatoryReport;
 
   private String status;
 

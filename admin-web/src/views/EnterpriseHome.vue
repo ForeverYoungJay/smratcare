@@ -16,8 +16,6 @@
         <div class="top-actions">
           <a-button type="primary" @click="openConsultModal">预约参观</a-button>
           <a-button @click="openAppointment">电话咨询</a-button>
-          <a-button v-if="canManageSiteConfig" @click="goSiteConfig">官网配置</a-button>
-          <a-button v-if="hasToken" @click="goAdmin">管理后台</a-button>
         </div>
       </div>
     </header>
@@ -29,35 +27,95 @@
     </a-drawer>
 
     <div class="floating-actions">
-      <a-button @click="openConsultModal">预约参观</a-button>
-      <a-button type="primary" @click="openAppointment">电话咨询</a-button>
-      <a-button @click="toggleReadingMode">{{ readingMode ? '标准模式' : '阅读模式' }}</a-button>
+      <a-button type="primary" @click="openConsultModal">预约参观</a-button>
+      <a-button @click="openAppointment">电话咨询</a-button>
       <a-button @click="openMapNavigation">到院导航</a-button>
-      <a-button v-if="canManageSiteConfig" @click="goSiteConfig">官网配置</a-button>
-      <a-button v-if="hasToken" @click="goAdmin">管理后台</a-button>
-      <a-button @click="scrollTo('top')">回到顶部</a-button>
     </div>
 
     <section id="top" class="hero">
       <div class="hero-mask" />
       <div class="container hero-content">
-        <div class="hero-badge">弋阳养老院 · 医养结合 · 预约参观</div>
-        <div v-if="contentRiskCount > 0" class="risk-badge">内容待完善 {{ contentRiskCount }} 项</div>
-        <h1>{{ profile.heroTitle }}</h1>
-        <p>{{ profile.heroDesc }}</p>
-        <div class="hero-actions">
-          <a-button type="primary" size="large" @click="openConsultModal">立即预约</a-button>
-          <a-button size="large" @click="openAppointment">电话咨询</a-button>
-          <a-button size="large" @click="scrollTo('service-system')">查看服务体系</a-button>
-          <a-button size="large" @click="openMapNavigation">到院导航</a-button>
-          <a-button size="large" @click="scrollTo('contact')">查看联系方式</a-button>
-        </div>
-        <div class="hero-link-group">
-          <a href="/services.html">服务项目</a>
-          <a href="/pricing.html">收费与入住</a>
-          <a href="/disability-care.html">失能护理</a>
-          <a href="/memory-care.html">记忆照护</a>
-          <a href="/faq.html">常见问题</a>
+        <div class="hero-shell">
+          <div class="hero-main">
+            <div class="hero-meta">
+              <div class="hero-badge">弋阳养老院 · 医养结合 · 预约参观</div>
+              <div v-if="canManageSiteConfig && contentRiskCount > 0" class="risk-badge">内容待完善 {{ contentRiskCount }} 项</div>
+            </div>
+            <h1>{{ profile.heroTitle }}</h1>
+            <p>{{ profile.heroDesc }}</p>
+            <div class="hero-highlights">
+              <span v-for="item in heroHighlights" :key="item" class="hero-highlight">{{ item }}</span>
+            </div>
+            <div class="hero-decision-grid">
+              <button
+                v-for="item in familyDecisionCards"
+                :key="item.key"
+                type="button"
+                class="hero-decision-card"
+                @click="handleHeroDecision(item.key)"
+              >
+                <span>{{ item.label }}</span>
+                <strong>{{ item.value }}</strong>
+                <small>{{ item.desc }}</small>
+              </button>
+            </div>
+            <div class="hero-actions">
+              <a-button type="primary" size="large" @click="prefillConsult('到院参观预约')">立即预约</a-button>
+              <a-button size="large" @click="openAppointment">电话咨询</a-button>
+              <a-button size="large" @click="scrollTo('service-system')">查看服务体系</a-button>
+              <a-button size="large" @click="openMapNavigation">到院导航</a-button>
+            </div>
+            <div class="hero-link-group">
+              <a href="/services.html">服务项目</a>
+              <a href="/pricing.html">收费与入住</a>
+              <a href="/disability-care.html">失能护理</a>
+              <a href="/memory-care.html">记忆照护</a>
+              <a href="/faq.html">常见问题</a>
+            </div>
+            <div class="hero-trust-strip">
+              <span v-for="item in heroTrustSignals" :key="item" class="hero-trust-item">{{ item }}</span>
+            </div>
+          </div>
+          <aside class="hero-panel">
+            <div class="hero-panel-eyebrow">到院前 3 分钟完成初评</div>
+            <h2>快速预约初评</h2>
+            <p>先留下家属关注点与期望到院时间，院方会按需求优先安排护理、医疗或接待同事回访。</p>
+            <div class="hero-panel-stats">
+              <div v-for="item in heroPanelStats" :key="item.label" class="hero-panel-stat">
+                <strong>{{ item.value }}</strong>
+                <span>{{ item.label }}</span>
+              </div>
+            </div>
+            <div class="hero-panel-section">
+              <div class="hero-panel-title">优先对接部门</div>
+              <div class="hero-department-list">
+                <button
+                  v-for="item in quickConsultDepartments"
+                  :key="item.department"
+                  type="button"
+                  class="hero-department-chip"
+                  @click="selectQuickDepartment(item.department)"
+                >
+                  <span>{{ item.department }}</span>
+                  <small>{{ item.dutyHours }}</small>
+                </button>
+              </div>
+            </div>
+            <div class="hero-panel-section">
+              <div class="hero-panel-title">本周接待提醒</div>
+              <div class="hero-visit-list">
+                <div v-for="item in heroVisitWindows" :key="item.title" class="hero-visit-item">
+                  <strong>{{ item.title }}</strong>
+                  <span>{{ item.desc }}</span>
+                </div>
+              </div>
+            </div>
+            <div class="hero-panel-actions">
+              <a-button type="primary" block @click="openConsultModal">填写预约信息</a-button>
+              <a-button block @click="openMapNavigation">查看路线</a-button>
+              <a-button block @click="openConsultRecordsModal">查看预约记录（{{ consultRecordCount }}）</a-button>
+            </div>
+          </aside>
         </div>
       </div>
     </section>
@@ -87,7 +145,7 @@
             </a-card>
           </a-col>
         </a-row>
-        <div class="freshness-tip" :class="{ 'freshness-warning': contentFreshnessDays > 30 }">
+        <div v-if="canManageSiteConfig" class="freshness-tip" :class="{ 'freshness-warning': contentFreshnessDays > 30 }">
           内容新鲜度：最近更新距今 {{ contentFreshnessDays }} 天，{{ governanceStatusText }}
         </div>
       </div>
@@ -728,15 +786,8 @@ const careMatcher = ref({
 const careRecommendation = ref<{ title: string; desc: string } | null>(null)
 const publicNavItems = [
   { id: 'service-system', label: '服务体系' },
-  { id: 'resident-system', label: '龟峰居民' },
-  { id: 'community', label: '社区动态' },
-  { id: 'news', label: '新闻资讯' },
-  { id: 'activities', label: '居民活动' },
   { id: 'service-packages', label: '服务套餐' },
-  { id: 'care-matcher', label: '照护推荐' },
-  { id: 'about-us', label: '关于我们' },
-  { id: 'join-us', label: '加入我们' },
-  { id: 'cooperation', label: '业务合作' },
+  { id: 'care-matcher', label: '照护评估' },
   { id: 'compliance', label: '机构公示' },
   { id: 'family-voice', label: '家属评价' },
   { id: 'contact', label: '联系我们' }
@@ -748,6 +799,36 @@ const adminNavItems = [
 ] as const
 
 const navItems = computed(() => (canManageSiteConfig.value ? [...publicNavItems, ...adminNavItems] : [...publicNavItems]))
+const heroHighlights = [
+  '适配自理 / 半失能 / 失能 / 认知障碍长者',
+  '支持到院面评、短住试住与个案照护建议',
+  '家属可先咨询再预约，减少无效奔波'
+]
+const heroPanelStats = [
+  { label: '回访节奏', value: '30 分钟内' },
+  { label: '参观安排', value: '最快当天' },
+  { label: '服务协同', value: '六部门联动' }
+]
+const familyDecisionCards = computed(() => ([
+  {
+    key: 'service-match',
+    label: '适合谁先咨询',
+    value: '4 类长者',
+    desc: '自理、半失能、失能、认知障碍长者都可以先做初步匹配。'
+  },
+  {
+    key: 'visit-window',
+    label: '最快多久安排',
+    value: '当天参观',
+    desc: `今日已登记 ${consultTodayCount.value} 条咨询，建议先电话确认时段。`
+  },
+  {
+    key: 'prepare-docs',
+    label: '到院前准备',
+    value: '3 类资料',
+    desc: '既往诊疗、当前用药和家属最关注的问题，能让面评更准确。'
+  }
+]))
 
 function safeStorage() {
   try {
@@ -941,6 +1022,24 @@ const consultTopDepartment = computed(() => {
   })
   const first = Array.from(countMap.entries()).sort((a, b) => b[1] - a[1])[0]
   return first ? `${first[0]}（${first[1]}）` : '暂无'
+})
+
+const heroTrustSignals = computed(() => ([
+  '7×24 小时连续照护',
+  `${profile.compliance.qualifications.length} 项证照公示`,
+  '收费区间公开透明',
+  `参观时段 ${profile.contact.visitingTime || '请电话确认'}`
+]))
+
+const quickConsultDepartments = computed(() => profile.departmentDutyBoard.slice(0, 4))
+
+const heroVisitWindows = computed(() => {
+  const nextSlots = [
+    { title: '工作日参观', desc: `${profile.contact.visitingTime}，建议提前 1 天确认。` },
+    { title: '重点需求沟通', desc: '失能照护、记忆照护、短住试住可先做线上初评。' },
+    { title: '资料准备', desc: '如已有诊疗、评估或用药信息，可在电话沟通时一并说明。' }
+  ]
+  return nextSlots
 })
 
 const pageMaintainer = computed(() => {
@@ -1178,8 +1277,35 @@ function openMapNavigation() {
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 
+function handleHeroDecision(key: string) {
+  if (key === 'service-match') {
+    scrollTo('service-packages')
+    return
+  }
+  if (key === 'visit-window') {
+    openConsultModal()
+    return
+  }
+  if (key === 'prepare-docs') {
+    scrollTo('contact')
+    return
+  }
+}
+
 function openConsultModal() {
   consultModalOpen.value = true
+}
+
+function selectQuickDepartment(department: string) {
+  consultForm.value.department = department
+  if (!consultModalOpen.value) {
+    consultModalOpen.value = true
+  }
+}
+
+function prefillConsult(need: string) {
+  consultForm.value.need = need
+  openConsultModal()
 }
 
 function openConsultRecordsModal() {
@@ -1388,12 +1514,12 @@ function scrollTo(id: string) {
 <style scoped>
 .enterprise-home {
   min-height: 100vh;
-  color: #1a202c;
-  background: #f0f4f8;
-  background-image: 
-    radial-gradient(at 0% 0%, hsla(210,100%,94%,1) 0, transparent 50%), 
-    radial-gradient(at 50% 0%, hsla(220,100%,96%,1) 0, transparent 50%), 
-    radial-gradient(at 100% 0%, hsla(230,100%,94%,1) 0, transparent 50%);
+  color: #22332e;
+  background: #f7f6f2;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(33, 112, 95, 0.09) 0, transparent 50%),
+    radial-gradient(at 50% 0%, rgba(46, 138, 114, 0.06) 0, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(229, 138, 58, 0.07) 0, transparent 50%);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Helvetica, Arial, sans-serif;
   letter-spacing: -0.01em;
 }
@@ -1408,22 +1534,23 @@ function scrollTo(id: string) {
   inset-inline: 0;
   top: 0;
   z-index: 50;
-  background: rgba(13, 25, 52, 0.45);
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid #e4e7e0;
+  box-shadow: 0 2px 12px rgba(34, 51, 46, 0.05);
   transition: all 0.3s ease;
 }
 
 .topbar:hover {
-  background: rgba(13, 25, 52, 0.7);
+  background: rgba(255, 255, 255, 0.98);
 }
 
 .topbar-inner {
   height: 76px;
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 24px;
+  grid-template-columns: minmax(230px, auto) minmax(0, 1fr) auto;
+  gap: 18px;
   align-items: center;
 }
 
@@ -1443,35 +1570,37 @@ function scrollTo(id: string) {
   width: 52px;
   height: 52px;
   object-fit: contain;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.94);
+  border-radius: 12px;
+  background: #e8f3ef;
   padding: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(33, 112, 95, 0.14);
 }
 
 .brand-text .name {
   font-size: 18px;
   font-weight: 700;
-  color: #ffffff;
+  color: #21705f;
   letter-spacing: 0.5px;
 }
 
 .brand-text .desc {
   margin-top: 2px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.75);
+  color: #5c6f69;
 }
 
 .nav-list {
   display: flex;
   justify-content: center;
-  gap: 20px;
+  gap: 18px;
   font-size: 14px;
   font-weight: 500;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .nav-list a {
-  color: rgba(255, 255, 255, 0.85);
+  color: #3f5049;
   text-decoration: none;
   cursor: pointer;
   padding: 6px 0;
@@ -1486,13 +1615,13 @@ function scrollTo(id: string) {
   left: 0;
   width: 0;
   height: 2px;
-  background: #60a5fa;
+  background: #21705f;
   transition: width 0.3s ease;
   border-radius: 2px;
 }
 
 .nav-list a:hover {
-  color: #ffffff;
+  color: #21705f;
 }
 
 .nav-list a:hover::after {
@@ -1501,7 +1630,8 @@ function scrollTo(id: string) {
 
 .top-actions {
   display: flex;
-  gap: 12px;
+  gap: 10px;
+  white-space: nowrap;
 }
 
 .mobile-menu-btn {
@@ -1519,7 +1649,7 @@ function scrollTo(id: string) {
   bottom: 30px;
   z-index: 40;
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .hero {
@@ -1527,8 +1657,9 @@ function scrollTo(id: string) {
   min-height: 720px;
   padding: 180px 0 100px;
   background:
-    linear-gradient(135deg, rgba(13, 33, 76, 0.88) 0%, rgba(25, 74, 168, 0.78) 50%, rgba(46, 110, 222, 0.72) 100%),
-    url('../assets/home.jpg') center / cover no-repeat;
+    linear-gradient(90deg, rgba(19, 55, 47, 0.92) 0%, rgba(24, 92, 78, 0.78) 45%, rgba(24, 92, 78, 0.34) 74%, rgba(24, 92, 78, 0.2) 100%),
+    url('../assets/home-login.jpg') center / cover no-repeat,
+    linear-gradient(135deg, #185c4e 0%, #21705f 100%);
   display: flex;
   align-items: center;
 }
@@ -1540,14 +1671,16 @@ function scrollTo(id: string) {
   left: 0;
   right: 0;
   height: 120px;
-  background: linear-gradient(to top, #f0f4f8, transparent);
+  background: linear-gradient(to top, #f7f6f2, transparent);
   pointer-events: none;
 }
 
 .hero-mask {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.15), transparent 50%);
+  background:
+    linear-gradient(180deg, rgba(13, 45, 38, 0.2), rgba(13, 45, 38, 0.45)),
+    radial-gradient(circle at 22% 36%, rgba(255, 255, 255, 0.14), transparent 42%);
   pointer-events: none;
 }
 
@@ -1555,6 +1688,24 @@ function scrollTo(id: string) {
   position: relative;
   color: #fff;
   z-index: 10;
+}
+
+.hero-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 420px);
+  gap: 40px;
+  align-items: end;
+}
+
+.hero-main {
+  max-width: 780px;
+}
+
+.hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
 }
 
 .hero-badge {
@@ -1589,19 +1740,19 @@ function scrollTo(id: string) {
 
 .hero h1 {
   margin: 0;
-  font-size: clamp(40px, 6vw, 64px);
+  font-size: clamp(40px, 5.3vw, 62px);
   font-weight: 800;
   line-height: 1.15;
   white-space: pre-line;
   text-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  background: linear-gradient(180deg, #ffffff 0%, #e2edff 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #dcefe6 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .hero p {
   margin: 24px 0 0;
-  max-width: 800px;
+  max-width: 760px;
   font-size: 18px;
   line-height: 1.8;
   color: rgba(255, 255, 255, 0.85);
@@ -1609,8 +1760,72 @@ function scrollTo(id: string) {
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+.hero-highlights {
+  margin-top: 26px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.hero-highlight {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 13px;
+  line-height: 1.4;
+  backdrop-filter: blur(12px);
+}
+
+.hero-decision-grid {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.hero-decision-card {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 22px;
+  padding: 16px 18px;
+  text-align: left;
+  cursor: pointer;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.hero-decision-card span,
+.hero-decision-card small {
+  display: block;
+}
+
+.hero-decision-card span {
+  color: rgba(223, 240, 233, 0.85);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.hero-decision-card strong {
+  display: block;
+  margin: 10px 0 8px;
+  color: #ffffff;
+  font-size: 24px;
+  line-height: 1.08;
+}
+
+.hero-decision-card small {
+  color: rgba(240, 248, 244, 0.8);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
 .hero-actions {
-  margin-top: 40px;
+  margin-top: 32px;
   display: flex;
   gap: 16px;
   flex-wrap: wrap;
@@ -1621,7 +1836,7 @@ function scrollTo(id: string) {
   padding: 0 28px;
   font-size: 16px;
   font-weight: 500;
-  border-radius: 24px;
+  border-radius: 10px;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
   transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
 }
@@ -1650,13 +1865,179 @@ function scrollTo(id: string) {
   border-bottom-color: rgba(255, 255, 255, 0.85);
 }
 
+.hero-trust-strip {
+  margin-top: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.hero-trust-item {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  color: rgba(240, 248, 244, 0.88);
+  font-size: 12px;
+  line-height: 1.4;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.hero-panel {
+  padding: 28px;
+  border-radius: 28px;
+  background: rgba(13, 45, 38, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 28px 60px rgba(7, 18, 41, 0.25);
+  backdrop-filter: blur(20px);
+  color: #fff;
+}
+
+.hero-panel-eyebrow {
+  display: inline-flex;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(229, 138, 58, 0.3);
+  color: #fbf0e2;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.hero-panel h2 {
+  margin: 16px 0 0;
+  color: #ffffff;
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.hero-panel > p {
+  margin: 14px 0 0;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.hero-panel-stats {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.hero-panel-stat {
+  padding: 14px 12px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.hero-panel-stat strong {
+  display: block;
+  font-size: 18px;
+  color: #ffffff;
+}
+
+.hero-panel-stat span {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.hero-panel-section {
+  margin-top: 22px;
+}
+
+.hero-panel-title {
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.hero-department-list {
+  display: grid;
+  gap: 10px;
+}
+
+.hero-department-chip {
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.hero-department-chip:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(232, 243, 239, 0.45);
+}
+
+.hero-department-chip span,
+.hero-department-chip small {
+  display: block;
+}
+
+.hero-department-chip span {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.hero-department-chip small {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.hero-visit-list {
+  display: grid;
+  gap: 10px;
+}
+
+.hero-visit-item {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.hero-visit-item strong,
+.hero-visit-item span {
+  display: block;
+}
+
+.hero-visit-item strong {
+  font-size: 14px;
+  color: #ffffff;
+}
+
+.hero-visit-item span {
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.hero-panel-actions {
+  margin-top: 22px;
+  display: grid;
+  gap: 10px;
+}
+
 .section {
   padding: 80px 0;
   position: relative;
 }
 
 .section-alt {
-  background: linear-gradient(180deg, rgba(234, 240, 255, 0.6) 0%, rgba(245, 248, 255, 0.2) 100%);
+  background: linear-gradient(180deg, rgba(232, 243, 239, 0.65) 0%, rgba(247, 246, 242, 0.2) 100%);
 }
 
 .section-title {
@@ -1668,13 +2049,13 @@ function scrollTo(id: string) {
   margin: 0;
   font-size: 36px;
   font-weight: 800;
-  color: #1a202c;
+  color: #22332e;
   letter-spacing: -0.5px;
 }
 
 .section-title p {
   margin: 12px auto 0;
-  color: #4a5568;
+  color: #5c6f69;
   font-size: 16px;
   max-width: 600px;
   line-height: 1.6;
@@ -1695,7 +2076,7 @@ function scrollTo(id: string) {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow: 0 10px 30px rgba(31, 38, 135, 0.03);
+  box-shadow: 0 10px 30px rgba(34, 51, 46, 0.03);
   transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
   position: relative;
   overflow: hidden;
@@ -1708,7 +2089,7 @@ function scrollTo(id: string) {
 .flow-item:hover,
 .contact-card:hover {
   transform: translateY(-6px);
-  box-shadow: 0 20px 40px rgba(31, 38, 135, 0.08);
+  box-shadow: 0 20px 40px rgba(34, 51, 46, 0.08);
   background: rgba(255, 255, 255, 0.9);
   border-color: rgba(255, 255, 255, 1);
 }
@@ -1721,7 +2102,7 @@ function scrollTo(id: string) {
   left: 0;
   width: 100%;
   height: 4px;
-  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  background: linear-gradient(90deg, #21705f, #2e8a72);
   opacity: 0;
   transition: opacity 0.4s ease;
 }
@@ -1744,21 +2125,21 @@ function scrollTo(id: string) {
 .stat-value {
   font-size: 36px;
   font-weight: 800;
-  background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+  background: linear-gradient(135deg, #185c4e, #21705f);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .stat-label {
   margin-top: 10px;
-  color: #4a5568;
+  color: #5c6f69;
   font-weight: 600;
   font-size: 15px;
 }
 
 .stat-tip {
   margin-top: 6px;
-  color: #718096;
+  color: #8a9a94;
   font-size: 12px;
 }
 
@@ -1766,8 +2147,8 @@ function scrollTo(id: string) {
   margin-top: 20px;
   padding: 14px 20px;
   border-radius: 12px;
-  color: #1e3a8a;
-  background: rgba(219, 234, 254, 0.6);
+  color: #185c4e;
+  background: rgba(232, 243, 239, 0.75);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.5);
   font-size: 14px;
@@ -1806,7 +2187,7 @@ function scrollTo(id: string) {
 }
 
 .guide-bar .ant-btn {
-  border-radius: 20px;
+  border-radius: 10px;
   height: 42px;
   padding: 0 24px;
 }
@@ -1827,18 +2208,18 @@ function scrollTo(id: string) {
   padding: 4px 12px;
   font-size: 13px;
   border: none;
-  background: rgba(59, 130, 246, 0.1);
-  color: #2563eb;
+  background: rgba(33, 112, 95, 0.1);
+  color: #21705f;
   transition: all 0.2s;
 }
 
 .guide-tag:hover {
-  background: #3b82f6;
+  background: #21705f;
   color: #fff;
 }
 
 .guide-empty {
-  color: #718096;
+  color: #8a9a94;
   font-size: 13px;
 }
 
@@ -1848,13 +2229,13 @@ function scrollTo(id: string) {
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 12px 30px rgba(31, 38, 135, 0.05);
+  box-shadow: 0 12px 30px rgba(34, 51, 46, 0.05);
   padding: 16px 20px;
 }
 
 .announcement-title {
   font-size: 14px;
-  color: #1e3a8a;
+  color: #185c4e;
   font-weight: 700;
   margin-bottom: 12px;
   display: flex;
@@ -1886,19 +2267,19 @@ function scrollTo(id: string) {
 
 .announcement-date {
   margin-right: 12px;
-  color: #718096;
+  color: #8a9a94;
   font-size: 13px;
   font-weight: 500;
 }
 
-.announcement-info { background: rgba(239, 246, 255, 0.8); }
+.announcement-info { background: rgba(232, 243, 239, 0.8); }
 .announcement-success { background: rgba(240, 253, 244, 0.8); }
 .announcement-warning { background: rgba(255, 251, 235, 0.8); }
 
 .card h3,
 .news-card h3 {
   margin: 0;
-  color: #1a202c;
+  color: #22332e;
   font-size: 20px;
   font-weight: 700;
 }
@@ -1906,7 +2287,7 @@ function scrollTo(id: string) {
 .card p,
 .news-card p {
   margin: 12px 0 0;
-  color: #4a5568;
+  color: #5c6f69;
   line-height: 1.7;
   font-size: 15px;
 }
@@ -1938,8 +2319,8 @@ function scrollTo(id: string) {
 }
 
 .news-tag {
-  background: rgba(59, 130, 246, 0.1);
-  color: #2563eb;
+  background: rgba(33, 112, 95, 0.1);
+  color: #21705f;
   border-radius: 999px;
   padding: 4px 12px;
   font-size: 12px;
@@ -1947,7 +2328,7 @@ function scrollTo(id: string) {
 }
 
 .news-date {
-  color: #a0aec0;
+  color: #8a9a94;
   font-size: 13px;
   font-weight: 500;
 }
@@ -1959,10 +2340,10 @@ function scrollTo(id: string) {
 }
 
 .package-suitable {
-  color: #2b6cb0;
+  color: #21705f;
   font-weight: 600;
   font-size: 14px;
-  background: rgba(235, 248, 255, 0.6);
+  background: rgba(232, 243, 239, 0.7);
   padding: 6px 12px;
   border-radius: 8px;
   display: inline-block;
@@ -1971,14 +2352,14 @@ function scrollTo(id: string) {
 .package-list {
   margin: 16px 0 auto;
   padding-left: 20px;
-  color: #4a5568;
+  color: #5c6f69;
   line-height: 1.8;
   flex-grow: 1;
 }
 
 .package-fee {
   margin-top: 20px;
-  color: #2563eb;
+  color: #d97b2c;
   font-weight: 800;
   font-size: 20px;
   padding-top: 16px;
@@ -1998,11 +2379,11 @@ function scrollTo(id: string) {
 }
 
 .matcher-form .ant-select-selector {
-  border-radius: 12px !important;
+  border-radius: 10px !important;
 }
 
 .matcher-form .ant-btn {
-  border-radius: 12px;
+  border-radius: 10px;
 }
 
 .activity-meta {
@@ -2010,7 +2391,7 @@ function scrollTo(id: string) {
   display: flex;
   justify-content: space-between;
   font-size: 13px;
-  color: #718096;
+  color: #8a9a94;
   font-weight: 500;
   padding-top: 12px;
   border-top: 1px solid rgba(0,0,0,0.05);
@@ -2038,14 +2419,14 @@ function scrollTo(id: string) {
   place-items: center;
   font-weight: 800;
   color: #fff;
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  background: linear-gradient(135deg, #21705f, #2e8a72);
   font-size: 16px;
-  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 4px 10px rgba(33, 112, 95, 0.3);
   margin-bottom: 16px;
 }
 
 .flow-text {
-  color: #2d3748;
+  color: #22332e;
   font-weight: 700;
   font-size: 15px;
 }
@@ -2053,8 +2434,8 @@ function scrollTo(id: string) {
 .job-dept {
   margin-top: 16px;
   display: inline-block;
-  color: #2b6cb0;
-  background: rgba(235, 248, 255, 0.8);
+  color: #21705f;
+  background: rgba(232, 243, 239, 0.8);
   border-radius: 8px;
   padding: 6px 12px;
   font-size: 13px;
@@ -2064,13 +2445,13 @@ function scrollTo(id: string) {
 .compliance-list {
   margin: 12px 0 0;
   padding-left: 20px;
-  color: #4a5568;
+  color: #5c6f69;
   line-height: 2;
 }
 
 .map-note {
   font-size: 13px;
-  color: #718096;
+  color: #8a9a94;
   margin-top: 8px;
 }
 
@@ -2090,7 +2471,7 @@ function scrollTo(id: string) {
 }
 
 .metric-label {
-  color: #718096;
+  color: #8a9a94;
   font-size: 14px;
   font-weight: 600;
 }
@@ -2098,13 +2479,13 @@ function scrollTo(id: string) {
 .metric-value {
   margin-top: 8px;
   font-size: 32px;
-  color: #1e3a8a;
+  color: #185c4e;
   font-weight: 800;
 }
 
 .metric-tip {
   margin-top: 4px;
-  color: #a0aec0;
+  color: #8a9a94;
   font-size: 13px;
 }
 
@@ -2112,8 +2493,8 @@ function scrollTo(id: string) {
   margin-top: 16px;
   padding: 12px 16px;
   border-radius: 12px;
-  background: rgba(239, 246, 255, 0.8);
-  color: #1e3a8a;
+  background: rgba(232, 243, 239, 0.8);
+  color: #185c4e;
   font-size: 14px;
   font-weight: 500;
 }
@@ -2136,13 +2517,13 @@ function scrollTo(id: string) {
 
 .duty-name {
   font-weight: 800;
-  color: #1a202c;
+  color: #22332e;
   font-size: 15px;
 }
 
 .duty-hours {
   font-size: 12px;
-  color: #718096;
+  color: #8a9a94;
   background: rgba(0,0,0,0.05);
   padding: 2px 8px;
   border-radius: 999px;
@@ -2150,14 +2531,14 @@ function scrollTo(id: string) {
 
 .duty-scope {
   margin-top: 8px;
-  color: #4a5568;
+  color: #5c6f69;
   font-size: 14px;
   line-height: 1.5;
 }
 
 .duty-contact {
   margin-top: 10px;
-  color: #2563eb;
+  color: #21705f;
   font-size: 14px;
   font-weight: 600;
 }
@@ -2174,20 +2555,20 @@ function scrollTo(id: string) {
 
 .contact-card li {
   margin: 12px 0;
-  color: #4a5568;
+  color: #5c6f69;
   font-size: 16px;
 }
 
 .contact-card li span {
   font-weight: 700;
-  color: #2d3748;
+  color: #22332e;
   display: inline-block;
   width: 90px;
 }
 
 .appointment-strip {
   padding: 48px 0;
-  background: linear-gradient(90deg, #1e3a8a, #3b82f6);
+  background: linear-gradient(135deg, #185c4e, #2e8a72);
 }
 
 .appointment-inner {
@@ -2230,7 +2611,7 @@ function scrollTo(id: string) {
 
 .faq-answer {
   margin: 0;
-  color: #4a5568;
+  color: #5c6f69;
   line-height: 1.8;
   font-weight: 400;
   font-size: 15px;
@@ -2238,7 +2619,7 @@ function scrollTo(id: string) {
 
 .testimonial-content {
   margin: 0;
-  color: #2d3748;
+  color: #22332e;
   line-height: 1.9;
   font-size: 15px;
   font-style: italic;
@@ -2248,7 +2629,7 @@ function scrollTo(id: string) {
   margin-top: 20px;
   display: flex;
   justify-content: space-between;
-  color: #718096;
+  color: #8a9a94;
   font-size: 13px;
   font-weight: 600;
   padding-top: 16px;
@@ -2258,7 +2639,7 @@ function scrollTo(id: string) {
 .footer {
   margin-top: 60px;
   padding: 40px 0;
-  background: #0f172a;
+  background: #17332c;
   color: rgba(255, 255, 255, 0.6);
 }
 
@@ -2322,6 +2703,23 @@ function scrollTo(id: string) {
     padding-top: 200px;
   }
 
+  .hero-shell {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .hero-main {
+    max-width: none;
+  }
+
+  .hero-decision-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .top-actions {
+    display: none;
+  }
+
   .news-list {
     grid-template-columns: 1fr;
   }
@@ -2350,9 +2748,85 @@ function scrollTo(id: string) {
     width: calc(100vw - 32px);
   }
 
+  .section {
+    padding: 48px 0;
+  }
+
+  .section-title {
+    margin-bottom: 28px;
+  }
+
+  .section-title h2 {
+    font-size: 28px;
+  }
+
+  .stats {
+    margin-top: -48px;
+  }
+
   .floating-actions {
+    left: 16px;
     right: 16px;
-    bottom: 24px;
+    bottom: 16px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px;
+    border-radius: 20px;
+    background: rgba(13, 45, 38, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(16px);
+  }
+
+  .hero {
+    min-height: auto;
+    padding: 132px 0 112px;
+    background:
+      linear-gradient(180deg, rgba(19, 55, 47, 0.88) 0%, rgba(24, 92, 78, 0.76) 58%, rgba(24, 92, 78, 0.48) 100%),
+      url('../assets/home-login.jpg') center / cover no-repeat,
+      linear-gradient(135deg, #185c4e 0%, #21705f 100%);
+  }
+
+  .hero h1 {
+    font-size: clamp(30px, 10.6vw, 44px);
+    line-height: 1.18;
+  }
+
+  .hero p {
+    font-size: 16px;
+    line-height: 1.72;
+  }
+
+  .hero-actions {
+    gap: 12px;
+  }
+
+  .hero-actions .ant-btn {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
+    padding: 0 18px;
+  }
+
+  .hero-actions .ant-btn:nth-child(n + 3) {
+    display: none;
+  }
+
+  .hero-decision-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-panel {
+    padding: 22px;
+    border-radius: 22px;
+  }
+
+  .hero-panel-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .floating-actions :deep(.ant-btn) {
+    height: 40px;
+    padding: 0 10px;
+    font-size: 13px;
   }
 
   .flow-list {
@@ -2367,12 +2841,16 @@ function scrollTo(id: string) {
 }
 
 @media (max-width: 520px) {
-  .flow-list {
-    grid-template-columns: 1fr;
+  .floating-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .floating-actions {
-    display: none;
+  .hero-link-group {
+    gap: 10px 14px;
+  }
+
+  .flow-list {
+    grid-template-columns: 1fr;
   }
 }
 </style>

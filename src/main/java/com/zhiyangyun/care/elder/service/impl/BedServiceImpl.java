@@ -108,16 +108,17 @@ public class BedServiceImpl implements BedService {
     if (bed == null) {
       return null;
     }
+    boolean occupied = hasActiveOccupancy(bed);
     if (request.getBedNo() == null || request.getBedNo().isBlank()) {
       request.setBedNo(bed.getBedNo());
     }
-    if (bed.getElderId() != null && !Objects.equals(bed.getRoomId(), request.getRoomId())) {
+    if (occupied && !Objects.equals(bed.getRoomId(), request.getRoomId())) {
       throw new IllegalArgumentException("当前床位已绑定长者，不可直接变更所属房间");
     }
-    if (bed.getElderId() != null && request.getStatus() != null && request.getStatus() != 2) {
+    if (occupied && request.getStatus() != null && request.getStatus() != 2) {
       throw new IllegalArgumentException("当前床位已入住，状态只能保持“入住”");
     }
-    if (bed.getElderId() == null
+    if (!occupied
         && hasActiveReservation(bed.getTenantId(), bed.getId())
         && request.getStatus() != null
         && !Objects.equals(request.getStatus(), bed.getStatus())
@@ -135,7 +136,7 @@ public class BedServiceImpl implements BedService {
     bed.setStatus(request.getStatus());
     syncManualOccupancyState(bed);
     bedMapper.updateById(bed);
-    return toResponse(bed);
+    return enrichBeds(request.getTenantId(), List.of(bed), false).stream().findFirst().orElseGet(() -> toResponse(bed));
   }
 
   @Override
@@ -344,7 +345,7 @@ public class BedServiceImpl implements BedService {
     if (tenantId == null || !tenantId.equals(bed.getTenantId())) {
       throw new IllegalArgumentException("无权限删除该床位");
     }
-    if (bed.getElderId() != null) {
+    if (hasActiveOccupancy(bed)) {
       throw new IllegalArgumentException("当前床位已绑定长者，请先办理退床或换床");
     }
     if (hasActiveReservation(tenantId, id)) {
@@ -441,7 +442,7 @@ public class BedServiceImpl implements BedService {
         response.setRoomQrCode(room.getRoomQrCode());
       }
       ElderBedRelation activeRelation = activeRelationMap.get(bed.getId());
-      Long occupiedElderId = activeRelation == null ? bed.getElderId() : activeRelation.getElderId();
+      Long occupiedElderId = resolveOccupiedElderId(bed, activeRelation);
       if (activeRelation != null) {
         response.setStatus(BedStatus.OCCUPIED);
         response.setElderId(occupiedElderId);
@@ -476,7 +477,7 @@ public class BedServiceImpl implements BedService {
         continue;
       }
       ElderBedRelation activeRelation = activeRelationMap.get(bed.getId());
-      Long occupiedElderId = activeRelation == null ? bed.getElderId() : activeRelation.getElderId();
+      Long occupiedElderId = resolveOccupiedElderId(bed, activeRelation);
       if (activeRelation != null) {
         response.setStatus(BedStatus.OCCUPIED);
         response.setElderId(occupiedElderId);
@@ -490,13 +491,13 @@ public class BedServiceImpl implements BedService {
         response.setLockExpiresAt(null);
         continue;
       }
-      if (bed.getElderId() != null) {
-        response.setElderId(bed.getElderId());
+      if (occupiedElderId != null) {
+        response.setElderId(occupiedElderId);
         response.setOccupancySource(OCCUPANCY_SOURCE_SELF);
         response.setOccupancyRefType(OCCUPANCY_REF_TYPE_ELDER);
-        response.setOccupancyRefId(bed.getElderId());
+        response.setOccupancyRefId(occupiedElderId);
         if (isBlank(response.getOccupancyNote())) {
-          ElderProfile elder = elderMap.get(bed.getElderId());
+          ElderProfile elder = elderMap.get(occupiedElderId);
           response.setOccupancyNote(elder == null ? "长者在住" : "长者在住：" + elder.getFullName());
         }
         response.setLockExpiresAt(null);
@@ -515,7 +516,7 @@ public class BedServiceImpl implements BedService {
     List<Long> candidateBedIds = beds.stream()
         .filter(item -> item.getId() != null)
         .filter(item -> !activeRelationMap.containsKey(item.getId()))
-        .filter(item -> item.getElderId() == null)
+        .filter(item -> !hasOccupiedElderProjection(item, activeRelationMap))
         .filter(item -> !Objects.equals(item.getStatus(), BedStatus.MAINTENANCE))
         .map(Bed::getId)
         .toList();
@@ -544,7 +545,7 @@ public class BedServiceImpl implements BedService {
       if (response == null
           || bed == null
           || activeRelationMap.containsKey(bed.getId())
-          || bed.getElderId() != null
+          || hasOccupiedElderProjection(bed, activeRelationMap)
           || Objects.equals(bed.getStatus(), BedStatus.MAINTENANCE)
           || (!isBlank(response.getOccupancySource()) && !"RESERVATION".equals(response.getOccupancySource()))) {
         continue;
@@ -577,7 +578,7 @@ public class BedServiceImpl implements BedService {
       if (response == null
           || bed == null
           || activeRelationMap.containsKey(bed.getId())
-          || bed.getElderId() != null
+          || hasOccupiedElderProjection(bed, activeRelationMap)
           || Objects.equals(bed.getStatus(), BedStatus.MAINTENANCE)
           || !isBlank(response.getOccupancySource())) {
         continue;
@@ -685,6 +686,27 @@ public class BedServiceImpl implements BedService {
       bed.setLockExpiresAt(null);
       bed.setOccupancyNote(null);
     }
+  }
+
+  private boolean hasActiveOccupancy(Bed bed) {
+    if (bed == null || bed.getId() == null) {
+      return false;
+    }
+    if (bed.getElderId() != null) {
+      return true;
+    }
+    return resolveActiveRelationMap(bed.getTenantId(), bed.getOrgId(), List.of(bed.getId())).containsKey(bed.getId());
+  }
+
+  private boolean hasOccupiedElderProjection(Bed bed, Map<Long, ElderBedRelation> activeRelationMap) {
+    return resolveOccupiedElderId(bed, activeRelationMap == null || bed == null ? null : activeRelationMap.get(bed.getId())) != null;
+  }
+
+  private Long resolveOccupiedElderId(Bed bed, ElderBedRelation activeRelation) {
+    if (activeRelation != null && activeRelation.getElderId() != null) {
+      return activeRelation.getElderId();
+    }
+    return bed == null ? null : bed.getElderId();
   }
 
   private Map<Long, ElderBedRelation> resolveActiveRelationMap(Long tenantId, Long orgId, List<Long> bedIds) {

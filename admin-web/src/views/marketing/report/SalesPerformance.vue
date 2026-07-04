@@ -25,7 +25,9 @@
       <a-table :columns="columns" :data-source="rows" :pagination="false" row-key="marketerName">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'marketerName'">
-            <a @click="goMarketerLeads(record.marketerName)">{{ record.marketerName }}</a>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="goMarketerLeads(record.marketerName)">{{ record.marketerName }}</a-button>
+            </div>
           </template>
         </template>
       </a-table>

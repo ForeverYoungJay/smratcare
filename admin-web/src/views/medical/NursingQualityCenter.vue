@@ -504,22 +504,22 @@ onMounted(() => {
 
 <style scoped>
 .quality-filter {
-  border: 1px solid #d7e9ff;
+  border: 1px solid var(--border);
   background:
-    radial-gradient(130% 120% at 0% 0%, rgba(40, 126, 255, 0.12) 0%, rgba(40, 126, 255, 0) 56%),
-    linear-gradient(135deg, #f5faff 0%, #edf5ff 45%, #f8fbff 100%);
+    radial-gradient(130% 120% at 0% 0%, rgba(var(--primary-rgb), 0.12) 0%, rgba(var(--primary-rgb), 0) 56%),
+    linear-gradient(135deg, var(--surface-2) 0%, var(--surface-3) 45%, var(--surface-2) 100%);
 }
 
 .quality-hero {
-  border: 1px solid #d4e6ff;
+  border: 1px solid var(--border);
   background:
-    radial-gradient(130% 110% at 100% 0%, rgba(39, 121, 255, 0.18) 0%, rgba(39, 121, 255, 0) 58%),
-    linear-gradient(132deg, #f7fbff 0%, #edf5ff 45%, #f8fbff 100%);
+    radial-gradient(130% 110% at 100% 0%, rgba(var(--primary-rgb), 0.18) 0%, rgba(var(--primary-rgb), 0) 58%),
+    linear-gradient(132deg, var(--surface-2) 0%, var(--surface-3) 45%, var(--surface-2) 100%);
 }
 
 .quality-hero__title {
   font-size: 14px;
-  color: #1f2f45;
+  color: var(--ink);
   font-weight: 600;
 }
 
@@ -535,25 +535,25 @@ onMounted(() => {
   font-size: 38px;
   line-height: 1;
   font-weight: 700;
-  color: #0f1f34;
+  color: var(--ink);
 }
 
 .quality-hero__meta {
   margin-top: 8px;
   font-size: 12px;
-  color: #5f7087;
+  color: var(--muted);
 }
 
 .metric-tile {
   border-radius: 10px;
-  border: 1px solid #dce9ff;
+  border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.86);
   padding: 10px;
 }
 
 .metric-tile__label {
   font-size: 12px;
-  color: #66798e;
+  color: var(--muted);
 }
 
 .metric-tile__value {
@@ -561,18 +561,18 @@ onMounted(() => {
   font-size: 24px;
   line-height: 1;
   font-weight: 700;
-  color: #10243f;
+  color: var(--ink);
 }
 
 .metric-tile__hint {
   margin-top: 6px;
   font-size: 11px;
-  color: #73849b;
+  color: var(--muted-2);
 }
 
 .trend-card {
-  border: 1px solid #dae7ff;
-  background: linear-gradient(165deg, #ffffff 0%, #f5f9ff 100%);
+  border: 1px solid var(--border);
+  background: linear-gradient(165deg, #ffffff 0%, var(--surface-2) 100%);
 }
 
 .trend-list {
@@ -590,14 +590,14 @@ onMounted(() => {
 
 .trend-date {
   font-size: 12px;
-  color: #64748b;
+  color: var(--muted);
 }
 
 .trend-bar-track {
   width: 100%;
   height: 10px;
   border-radius: 999px;
-  background: #eaf1ff;
+  background: var(--surface-3);
   overflow: hidden;
 }
 
@@ -609,7 +609,7 @@ onMounted(() => {
 
 .trend-meta {
   font-size: 12px;
-  color: #5f7087;
+  color: var(--muted);
 }
 
 @media (max-width: 992px) {

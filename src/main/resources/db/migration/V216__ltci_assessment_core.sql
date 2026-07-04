@@ -1,0 +1,72 @@
+-- 长护险失能评估核心表：评估员、评估申请、评估记录
+
+CREATE TABLE IF NOT EXISTS ltci_assessor (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NULL,
+  org_id BIGINT NOT NULL,
+  staff_id BIGINT NULL,
+  name VARCHAR(60) NOT NULL,
+  cert_no VARCHAR(80) NULL,
+  cert_expire DATE NULL,
+  org_belong VARCHAR(150) NULL,
+  phone VARCHAR(30) NULL,
+  status TINYINT NOT NULL DEFAULT 1,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0,
+  UNIQUE KEY uk_ltci_assessor (org_id, cert_no, is_deleted),
+  KEY idx_ltci_assessor_staff (org_id, staff_id)
+);
+
+CREATE TABLE IF NOT EXISTS ltci_assess_apply (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NULL,
+  org_id BIGINT NOT NULL,
+  elder_id BIGINT NOT NULL,
+  apply_type VARCHAR(16) NOT NULL DEFAULT 'FIRST',
+  apply_source VARCHAR(32) NULL,
+  applicant_name VARCHAR(60) NULL,
+  applicant_phone VARCHAR(30) NULL,
+  assess_status VARCHAR(24) NOT NULL DEFAULT 'APPLIED',
+  accepted_by BIGINT NULL,
+  accepted_at DATETIME NULL,
+  assessor_id BIGINT NULL,
+  remark VARCHAR(500) NULL,
+  created_by BIGINT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0,
+  KEY idx_ltci_apply_elder (org_id, elder_id, is_deleted),
+  KEY idx_ltci_apply_status (org_id, assess_status)
+);
+
+CREATE TABLE IF NOT EXISTS ltci_assessment (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NULL,
+  org_id BIGINT NOT NULL,
+  apply_id BIGINT NULL,
+  elder_id BIGINT NOT NULL,
+  template_id BIGINT NOT NULL,
+  assessor_id BIGINT NULL,
+  assess_date DATE NOT NULL,
+  adl_score DECIMAL(6,2) NULL,
+  cognitive_score DECIMAL(6,2) NULL,
+  perception_score DECIMAL(6,2) NULL,
+  total_score DECIMAL(6,2) NULL,
+  disability_level TINYINT NULL,
+  level_label VARCHAR(32) NULL,
+  answers_json JSON NULL,
+  escalated TINYINT NOT NULL DEFAULT 0,
+  effective_start DATE NULL,
+  effective_end DATE NULL,
+  assess_status VARCHAR(24) NOT NULL DEFAULT 'JUDGED',
+  review_of_id BIGINT NULL,
+  remark VARCHAR(500) NULL,
+  created_by BIGINT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0,
+  KEY idx_ltci_assess_elder (org_id, elder_id, is_deleted),
+  KEY idx_ltci_assess_apply (org_id, apply_id),
+  KEY idx_ltci_assess_effective (org_id, elder_id, effective_start, effective_end)
+);

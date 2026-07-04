@@ -24,12 +24,12 @@
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="openEdit(record)">编辑</a-button>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
             <a-popconfirm title="确认删除该记录吗？" ok-text="确认" cancel-text="取消" @confirm="remove(record)">
-              <a-button type="link" danger>删除</a-button>
+              <a-button type="link" size="small" danger>删除</a-button>
             </a-popconfirm>
-          </a-space>
+          </div>
         </template>
       </template>
     </DataTable>
@@ -344,9 +344,9 @@ watch(
 
 <style scoped>
 :deep(.health-row-danger > td) {
-  background: #fff1f0 !important;
+  background: rgba(var(--danger-rgb), 0.08) !important;
 }
 :deep(.health-row-warning > td) {
-  background: #fff7e6 !important;
+  background: rgba(var(--warning-rgb), 0.1) !important;
 }
 </style>

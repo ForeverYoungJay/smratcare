@@ -237,6 +237,40 @@ public class ElderResidenceController {
   }
 
   @PreAuthorize("@elderAuthz.canManageOuting()")
+  @PutMapping("/outing/{id}/approve")
+  public Result<ElderOutingRecord> approveOutingApplication(@PathVariable Long id) {
+    Long orgId = AuthContext.getOrgId();
+    ElderOutingRecord record = outingMapper.selectById(id);
+    if (record == null || !Objects.equals(orgId, record.getOrgId()) || Integer.valueOf(1).equals(record.getIsDeleted())) {
+      throw new IllegalArgumentException("记录不存在");
+    }
+    if (!ResidenceLifecycleConstants.OUTING_APPLIED.equals(record.getStatus())) {
+      throw new IllegalStateException("仅待审批外出申请可批准");
+    }
+    ensureNoActiveOuting(record.getElderId(), orgId);
+    ElderProfile elder = resolveElder(record.getElderId());
+    Integer beforeStatus = elder.getStatus();
+    record.setStatus(ResidenceLifecycleConstants.OUTING_OUT);
+    outingMapper.updateById(record);
+    updateElderStatus(
+        elder,
+        ElderStatus.OUTING,
+        com.zhiyangyun.care.elder.model.ElderLifecycleStatus.OUTING,
+        null,
+        "OUTING_APPROVE",
+        record.getReason(),
+        "ELDER_OUTING",
+        record.getId());
+    recordStatusChange(record.getElderId(), beforeStatus, ElderStatus.OUTING, "外出申请批准");
+    auditLogService.recordStructured(
+        orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "OUTING_APPROVE", "ELDER", record.getElderId(), "外出申请批准",
+        buildStatusSnapshot(beforeStatus, elder.getBedId()), record,
+        buildStatusTransitionContext(beforeStatus, ElderStatus.OUTING, record.getReason()));
+    return Result.ok(record);
+  }
+
+  @PreAuthorize("@elderAuthz.canManageOuting()")
   @PutMapping("/outing/{id}/return")
   public Result<ElderOutingRecord> returnFromOuting(@PathVariable Long id, @RequestBody OutingReturnRequest request) {
     Long orgId = AuthContext.getOrgId();

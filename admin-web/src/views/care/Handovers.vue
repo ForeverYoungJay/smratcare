@@ -42,10 +42,10 @@
             <span v-else>-</span>
           </template>
           <template v-else-if="column.key === 'actions'">
-            <a-space>
-              <a @click="openModal(record)">编辑</a>
-              <a class="danger-text" @click="remove(record.id)">删除</a>
-            </a-space>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="openModal(record)">编辑</a-button>
+              <a-button type="link" size="small" danger @click="remove(record.id)">删除</a-button>
+            </div>
           </template>
         </template>
       </a-table>
@@ -139,13 +139,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance } from 'ant-design-vue'
+import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { useStaffOptions } from '../../composables/useStaffOptions'
-import { createShiftHandover, deleteShiftHandover, getShiftHandoverPage, updateShiftHandover } from '../../api/nursing'
+import { createShiftHandover, deleteShiftHandover, getShiftHandover, getShiftHandoverPage, updateShiftHandover } from '../../api/nursing'
 import { handoverExportColumns, mapCareExportRows } from '../../constants/careExport'
 import { exportCsv, exportExcel } from '../../utils/export'
 import { getHandoverRiskKeywords, syncMedicalAlertRules } from '../../utils/medicalAlertRule'
@@ -153,6 +154,7 @@ import { uploadOaFile } from '../../api/oa'
 import type { PageResult, ShiftHandoverItem } from '../../types'
 import { resolveCareError } from './careError'
 
+const route = useRoute()
 const rows = ref<ShiftHandoverItem[]>([])
 const loading = ref(false)
 const exporting = ref(false)
@@ -162,6 +164,7 @@ const uploadingAttachment = ref(false)
 const formRef = ref<FormInstance>()
 const { staffOptions, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 120 })
 const attachmentFiles = ref<HandoverAttachmentFile[]>([])
+const lastAutoOpenTaskKey = ref('')
 
 const query = reactive({
   pageNo: 1,
@@ -277,6 +280,49 @@ function openModal(record?: ShiftHandoverItem) {
   modalOpen.value = true
 }
 
+function normalizeLoadedRow(item: ShiftHandoverItem) {
+  return {
+    ...item,
+    onDutySummary: item.onDutySummary || item.summary,
+    attentionNote: item.attentionNote || item.riskNote,
+    handoverTime: toIsoDateTime(item.handoverTime),
+    confirmTime: toIsoDateTime(item.confirmTime)
+  }
+}
+
+async function autoOpenFromRoute() {
+  const idRaw = Array.isArray(route.query.id) ? route.query.id[0] : route.query.id
+  const taskId = Number(idRaw)
+  if (!Number.isFinite(taskId) || taskId <= 0) {
+    return
+  }
+  const routeStatus = Array.isArray(route.query.status) ? route.query.status[0] : route.query.status
+  const autoOpenKey = `${taskId}|${String(routeStatus || '')}`
+  if (lastAutoOpenTaskKey.value === autoOpenKey) {
+    return
+  }
+  const matched = rows.value.find((item) => Number(item.id) === taskId)
+  if (matched) {
+    openModal(matched)
+    lastAutoOpenTaskKey.value = autoOpenKey
+    return
+  }
+  try {
+    const detail = await getShiftHandover(taskId)
+    if (detail?.id) {
+      openModal(normalizeLoadedRow(detail as ShiftHandoverItem))
+      lastAutoOpenTaskKey.value = autoOpenKey
+    }
+  } catch {
+    // Keep the list usable even if the task detail cannot be preloaded.
+  }
+}
+
+function syncQueryFromRoute() {
+  const routeStatus = Array.isArray(route.query.status) ? route.query.status[0] : route.query.status
+  query.status = typeof routeStatus === 'string' && routeStatus.trim() ? routeStatus.trim() : undefined
+}
+
 async function submit() {
   try {
     await formRef.value?.validate()
@@ -381,14 +427,9 @@ async function load() {
       shiftCode: query.shiftCode,
       status: query.status
     })
-    rows.value = res.list.map((item) => ({
-      ...item,
-      onDutySummary: item.onDutySummary || item.summary,
-      attentionNote: item.attentionNote || item.riskNote,
-      handoverTime: toIsoDateTime(item.handoverTime),
-      confirmTime: toIsoDateTime(item.confirmTime)
-    }))
+    rows.value = res.list.map((item) => normalizeLoadedRow(item))
     query.total = res.total
+    await autoOpenFromRoute()
   } catch (error) {
     message.error(resolveCareError(error, '加载交接日志失败'))
     rows.value = []
@@ -541,24 +582,34 @@ async function beforeUploadAttachment(file: File) {
   return false
 }
 
+syncQueryFromRoute()
 load()
 searchStaff('')
 syncMedicalAlertRules().catch(() => {})
+
+watch(
+  () => [route.query.id, route.query.status],
+  () => {
+    lastAutoOpenTaskKey.value = ''
+    syncQueryFromRoute()
+    load()
+  }
+)
 </script>
 
 <style scoped>
 .danger-text {
-  color: #ef4444;
+  color: var(--danger);
 }
 .upload-tip {
   margin-top: 6px;
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 :deep(.handover-row-warning > td) {
-  background: #fff7e6 !important;
+  background: rgba(var(--warning-rgb), 0.12) !important;
 }
 :deep(.handover-row-danger > td) {
-  background: #fff1f0 !important;
+  background: rgba(var(--danger-rgb), 0.08) !important;
 }
 </style>

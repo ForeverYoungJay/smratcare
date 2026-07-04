@@ -13,6 +13,7 @@ import com.zhiyangyun.care.elder.entity.Room;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
+import com.zhiyangyun.care.elder.service.ElderOccupancyReadService;
 import com.zhiyangyun.care.finance.model.FinanceArrearsItem;
 import com.zhiyangyun.care.finance.model.FinanceCategoryConsumptionAnalysisResponse;
 import com.zhiyangyun.care.finance.model.FinanceReportEntrySummaryResponse;
@@ -63,6 +64,7 @@ public class FinanceReportController {
   private final ElderMapper elderMapper;
   private final BedMapper bedMapper;
   private final RoomMapper roomMapper;
+  private final ElderOccupancyReadService elderOccupancyReadService;
   private final OrderItemMapper orderItemMapper;
   private final ProductMapper productMapper;
   private final InventoryBatchMapper inventoryBatchMapper;
@@ -77,6 +79,7 @@ public class FinanceReportController {
       ElderMapper elderMapper,
       BedMapper bedMapper,
       RoomMapper roomMapper,
+      ElderOccupancyReadService elderOccupancyReadService,
       OrderItemMapper orderItemMapper,
       ProductMapper productMapper,
       InventoryBatchMapper inventoryBatchMapper,
@@ -89,6 +92,7 @@ public class FinanceReportController {
     this.elderMapper = elderMapper;
     this.bedMapper = bedMapper;
     this.roomMapper = roomMapper;
+    this.elderOccupancyReadService = elderOccupancyReadService;
     this.orderItemMapper = orderItemMapper;
     this.productMapper = productMapper;
     this.inventoryBatchMapper = inventoryBatchMapper;
@@ -132,9 +136,7 @@ public class FinanceReportController {
         Wrappers.lambdaQuery(Room.class)
             .eq(Room::getIsDeleted, 0)
             .eq(orgId != null, Room::getOrgId, orgId));
-    Map<Long, Bed> elderBedMap = beds.stream()
-        .filter(item -> item.getElderId() != null)
-        .collect(Collectors.toMap(Bed::getElderId, Function.identity(), (a, b) -> a));
+    Map<Long, Bed> elderBedMap = elderOccupancyReadService.buildOccupiedBedMapByElderId(orgId, beds);
     Map<Long, Room> roomMap = rooms.stream()
         .collect(Collectors.toMap(Room::getId, Function.identity(), (a, b) -> a));
 
@@ -335,7 +337,6 @@ public class FinanceReportController {
           Wrappers.lambdaQuery(Bed.class)
               .eq(Bed::getIsDeleted, 0)
               .eq(orgId != null, Bed::getOrgId, orgId)
-              .isNotNull(Bed::getElderId)
               .isNotNull(Bed::getRoomId));
       Map<Long, Room> roomMap = roomMapper.selectList(
               Wrappers.lambdaQuery(Room.class)
@@ -344,13 +345,15 @@ public class FinanceReportController {
           .stream()
           .collect(Collectors.toMap(Room::getId, Function.identity(), (a, b) -> a));
       Map<Long, Room> elderRoomMap = new HashMap<>();
-      for (Bed bed : beds) {
-        if (bed.getElderId() == null || bed.getRoomId() == null || elderRoomMap.containsKey(bed.getElderId())) {
+      for (Map.Entry<Long, Bed> entry : elderOccupancyReadService.buildOccupiedBedMapByElderId(orgId, beds).entrySet()) {
+        Long occupiedElderId = entry.getKey();
+        Bed bed = entry.getValue();
+        if (occupiedElderId == null || bed == null || bed.getRoomId() == null || elderRoomMap.containsKey(occupiedElderId)) {
           continue;
         }
         Room room = roomMap.get(bed.getRoomId());
         if (room != null) {
-          elderRoomMap.put(bed.getElderId(), room);
+          elderRoomMap.put(occupiedElderId, room);
         }
       }
       orders = orders.stream()

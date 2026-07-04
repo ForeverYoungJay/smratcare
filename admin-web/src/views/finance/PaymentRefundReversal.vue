@@ -13,7 +13,7 @@
           </a-space>
         </a-form-item>
       </a-form>
-      <a-alert style="margin-top: 12px;" type="info" show-icon message="页面已切到后端专用接口，统一输出作废账单与收款修正记录，不再在前端自行推断。" />
+      <a-alert style="margin-top: 12px;" type="info" show-icon message="统一输出作废账单与收款修正记录，确保退款与冲正有据可查。" />
     </a-card>
 
     <a-row :gutter="[12, 12]" style="margin-top: 16px;">
@@ -23,7 +23,7 @@
     </a-row>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="作废账单">
-      <vxe-table border stripe show-overflow :loading="loading" :data="invalidBills" height="260">
+      <vxe-table border stripe show-overflow="title" :loading="loading" :data="invalidBills" height="260">
         <vxe-column field="occurredAt" title="发生时间" width="180" />
         <vxe-column field="billId" title="账单ID" width="120" />
         <vxe-column field="elderName" title="长者" min-width="140" />
@@ -40,17 +40,17 @@
         </vxe-column>
         <vxe-column title="操作" width="180" fixed="right">
           <template #default="{ row }">
-            <a-space>
-              <a-button type="link" @click="go(`/finance/bill/${row.billId}`)">查看账单</a-button>
-              <a-button type="link" :disabled="approvalDisabled(row.approvalStatus)" @click="openApproval(row)">{{ approvalActionText(row.approvalStatus) }}</a-button>
-            </a-space>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="go(`/finance/bill/${row.billId}`)">查看账单</a-button>
+              <a-button type="link" size="small" :disabled="approvalDisabled(row.approvalStatus)" @click="openApproval(row)">{{ approvalActionText(row.approvalStatus) }}</a-button>
+            </div>
           </template>
         </vxe-column>
       </vxe-table>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="收款修正记录">
-      <vxe-table border stripe show-overflow :loading="loading" :data="adjustedPayments" height="260">
+      <vxe-table border stripe show-overflow="title" :loading="loading" :data="adjustedPayments" height="260">
         <vxe-column field="occurredAt" title="发生时间" width="180" />
         <vxe-column field="billId" title="账单ID" width="120" />
         <vxe-column field="amount" title="金额" width="120" />
@@ -66,10 +66,10 @@
         </vxe-column>
         <vxe-column title="操作" width="180" fixed="right">
           <template #default="{ row }">
-            <a-space>
-              <a-button type="link" @click="go(`/finance/bill/${row.billId}`)">查看账单</a-button>
-              <a-button type="link" :disabled="approvalDisabled(row.approvalStatus)" @click="openApproval(row)">{{ approvalActionText(row.approvalStatus) }}</a-button>
-            </a-space>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="go(`/finance/bill/${row.billId}`)">查看账单</a-button>
+              <a-button type="link" size="small" :disabled="approvalDisabled(row.approvalStatus)" @click="openApproval(row)">{{ approvalActionText(row.approvalStatus) }}</a-button>
+            </div>
           </template>
         </vxe-column>
       </vxe-table>

@@ -1,11 +1,11 @@
 .card { padding: 24rpx; }
-.row { display: flex; align-items: center; padding: 14rpx 0; border-bottom: 1rpx dashed #edf2ef; }
+.row { display: flex; align-items: center; padding: 14rpx 0; border-bottom: 1rpx dashed #E4E7E0; }
 .row:last-child { border-bottom: none; }
-.time { width: 96rpx; font-size: 23rpx; color: #71807a; }
+.time { width: 96rpx; font-size: 23rpx; color: #5C6F69; }
 .main { flex: 1; }
-.name { display: block; font-size: 27rpx; color: #16231f; }
-.desc { display: block; margin-top: 4rpx; font-size: 22rpx; color: #71807a; }
+.name { display: block; font-size: 27rpx; color: #22332E; }
+.desc { display: block; margin-top: 4rpx; font-size: 22rpx; color: #5C6F69; }
 .state { font-size: 22rpx; padding: 4rpx 12rpx; border-radius: 999rpx; }
-.todo { background: #f1f5f9; color: #71807a; }
+.todo { background: #f1f5f9; color: #5C6F69; }
 .doing { background: #eaf1ff; color: #1d4ed8; }
-.done { background: #e7f8ef; color: #16704f; }
+.done { background: #e7f8ef; color: #21705F; }

@@ -32,6 +32,12 @@ export interface IncidentReport {
   level?: string
   description: string
   actionTaken?: string
+  emergencyPlan?: string
+  onsiteHandling?: string
+  familyNotification?: string
+  rectificationMeasure?: string
+  reviewConclusion?: string
+  regulatoryReport?: string
   status?: string
 }
 

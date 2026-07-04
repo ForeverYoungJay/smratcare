@@ -9,7 +9,9 @@ import com.zhiyangyun.care.visit.model.VisitCheckInResponse;
 import com.zhiyangyun.care.visit.model.VisitPrintTicketResponse;
 import com.zhiyangyun.care.visit.service.VisitService;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
 import java.util.List;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -33,6 +36,16 @@ public class GuardVisitController {
   @GetMapping("/today")
   public Result<List<VisitBookingResponse>> today() {
     return Result.ok(visitService.todayList(AuthContext.getOrgId()));
+  }
+
+  @PreAuthorize("hasAnyRole('GUARD','STAFF','ADMIN')")
+  @GetMapping
+  public Result<List<VisitBookingResponse>> list(
+      @RequestParam(required = false) Long elderId,
+      @RequestParam(required = false) Integer status,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
+    return Result.ok(visitService.listBookings(AuthContext.getOrgId(), elderId, status, fromDate, toDate));
   }
 
   @PreAuthorize("hasAnyRole('GUARD','STAFF','ADMIN')")

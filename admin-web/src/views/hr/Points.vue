@@ -185,12 +185,12 @@ fetchData()
 
 <style scoped>
 .pos {
-  color: #2f54eb;
+  color: var(--primary);
   font-weight: 600;
 }
 
 .neg {
-  color: #cf1322;
+  color: var(--danger);
   font-weight: 600;
 }
 </style>

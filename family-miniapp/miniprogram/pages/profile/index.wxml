@@ -9,6 +9,7 @@
     <view class="user-name">{{profile.realName}}</view>
     <view class="user-sub">{{profile.phone}} · {{profile.preferredContact}}</view>
     <view class="user-sub">已绑定 {{elderCount}} 位老人</view>
+    <view class="warning-tip" wx:if="{{partialWarning}}">{{partialWarning}}</view>
 
     <view class="menu-list">
       <view class="menu-item" data-path="/pages/weekly-brief/index" bindtap="go">

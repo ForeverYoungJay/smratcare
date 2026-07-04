@@ -1029,10 +1029,10 @@ watch(
 
 .plan-card {
   min-height: 252px;
-  border: 1px solid rgba(214, 225, 234, 0.82);
+  border: 1px solid var(--border);
   border-radius: 22px;
   background:
-    radial-gradient(circle at top right, rgba(77, 187, 227, 0.1), transparent 24%),
+    radial-gradient(circle at top right, rgba(var(--info-rgb), 0.1), transparent 24%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 250, 252, 0.96));
 }
 
@@ -1060,7 +1060,7 @@ watch(
 }
 
 .plan-tabs :deep(.ant-tabs-tab.ant-tabs-tab-active) {
-  background: linear-gradient(135deg, rgba(15, 122, 157, 0.12), rgba(255, 193, 94, 0.12));
+  background: linear-gradient(135deg, rgba(var(--info-rgb), 0.12), rgba(var(--warning-rgb), 0.12));
 }
 
 .plan-card-meta {

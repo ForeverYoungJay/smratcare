@@ -31,10 +31,14 @@ public class StaffPointsRuleServiceImpl implements com.zhiyangyun.care.hr.servic
         .eq(orgId != null, StaffPointsRule::getOrgId, orgId)
         .orderByDesc(StaffPointsRule::getUpdateTime);
     IPage<StaffPointsRule> page = ruleMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
-    Map<Long, CareTaskTemplate> templateMap = templateMapper.selectBatchIds(
-            page.getRecords().stream().map(StaffPointsRule::getTemplateId).filter(java.util.Objects::nonNull).toList())
-        .stream()
-        .collect(Collectors.toMap(CareTaskTemplate::getId, t -> t));
+    // 收集非空模板ID；必须先判空——MyBatis-Plus selectBatchIds(空集合) 会生成非法 SQL「IN ()」，
+    // 抛 BadSqlGrammarException，被全局处理器误报成 503「数据库结构未完成升级」。
+    java.util.List<Long> templateIds = page.getRecords().stream()
+        .map(StaffPointsRule::getTemplateId).filter(java.util.Objects::nonNull).distinct().toList();
+    Map<Long, CareTaskTemplate> templateMap = templateIds.isEmpty()
+        ? new java.util.HashMap<>()
+        : templateMapper.selectBatchIds(templateIds).stream()
+            .collect(Collectors.toMap(CareTaskTemplate::getId, t -> t));
 
     IPage<StaffPointsRuleResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
     resp.setRecords(page.getRecords().stream().map(rule -> {

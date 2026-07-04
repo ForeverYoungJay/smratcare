@@ -53,11 +53,11 @@
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'actions'">
-          <a-space size="small">
-            <a @click="goElderDetail(record)">长者档案</a>
-            <a @click="createBirthdayActivity(record)">创建活动</a>
-            <a @click="openBirthdayMaterial(record)">物资准备</a>
-          </a-space>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="goElderDetail(record)">长者档案</a-button>
+            <a-button type="link" size="small" @click="createBirthdayActivity(record)">创建活动</a-button>
+            <a-button type="link" size="small" @click="openBirthdayMaterial(record)">物资准备</a-button>
+          </div>
         </template>
       </template>
     </DataTable>

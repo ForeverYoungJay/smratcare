@@ -24,9 +24,9 @@
           </a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a @click="openDrawer(record)">编辑</a>
-          </a-space>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="openDrawer(record)">编辑</a-button>
+          </div>
         </template>
       </template>
     </DataTable>

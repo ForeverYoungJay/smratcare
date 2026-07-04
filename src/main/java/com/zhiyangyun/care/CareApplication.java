@@ -34,7 +34,15 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "com.zhiyangyun.care.medicalcare.mapper",
     "com.zhiyangyun.care.logistics.mapper",
     "com.zhiyangyun.care.family.mapper",
-    "com.zhiyangyun.care.smart.mapper"
+    "com.zhiyangyun.care.smart.mapper",
+    "com.zhiyangyun.care.operations.mapper",
+    "com.zhiyangyun.care.cockpit.mapper",
+    "com.zhiyangyun.care.compliance.mapper",
+    "com.zhiyangyun.care.ltci.mapper",
+    "com.zhiyangyun.care.govreport.mapper",
+    "com.zhiyangyun.care.emr.mapper",
+    "com.zhiyangyun.care.medorder.mapper",
+    "com.zhiyangyun.care.pharmacy.mapper"
 })
 public class CareApplication {
   public static void main(String[] args) {

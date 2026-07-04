@@ -160,10 +160,10 @@
           <a-tag :color="riskScoreColor(record.riskMeta.score)">{{ record.riskMeta.score }}</a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="go('/medical-care/medication-registration', { elderId: record.elderId, keyword: record.drugName })">去登记</a-button>
-            <a-button type="link" @click="go('/medical-care/medication-registration', { elderId: record.elderId, date: query.taskDate, filter: 'pending_or_abnormal' })">查看执行</a-button>
-          </a-space>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="go('/medical-care/medication-registration', { elderId: record.elderId, keyword: record.drugName })">去登记</a-button>
+            <a-button type="link" size="small" @click="go('/medical-care/medication-registration', { elderId: record.elderId, date: query.taskDate, filter: 'pending_or_abnormal' })">查看执行</a-button>
+          </div>
         </template>
       </template>
     </DataTable>
@@ -795,15 +795,15 @@ watch(
 
 <style scoped>
 .order-hero {
-  border: 1px solid #d4e6ff;
+  border: 1px solid var(--border);
   background:
-    radial-gradient(130% 110% at 100% 0%, rgba(39, 121, 255, 0.18) 0%, rgba(39, 121, 255, 0) 58%),
-    linear-gradient(132deg, #f7fbff 0%, #edf5ff 45%, #f8fbff 100%);
+    radial-gradient(130% 110% at 100% 0%, rgba(var(--primary-rgb), 0.18) 0%, rgba(var(--primary-rgb), 0) 58%),
+    linear-gradient(132deg, var(--surface-2) 0%, var(--primary-soft) 45%, var(--surface-2) 100%);
 }
 
 .order-hero__title {
   font-size: 14px;
-  color: #1f2f45;
+  color: var(--ink);
   font-weight: 600;
 }
 
@@ -819,25 +819,25 @@ watch(
   font-size: 38px;
   line-height: 1;
   font-weight: 700;
-  color: #0f1f34;
+  color: var(--ink);
 }
 
 .order-hero__meta {
   margin-bottom: 8px;
   font-size: 12px;
-  color: #5f7087;
+  color: var(--muted);
 }
 
 .order-tile {
   border-radius: 10px;
-  border: 1px solid #dce9ff;
+  border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.86);
   padding: 10px;
 }
 
 .order-tile__label {
   font-size: 12px;
-  color: #66798e;
+  color: var(--muted);
 }
 
 .order-tile__value {
@@ -845,44 +845,44 @@ watch(
   font-size: 24px;
   line-height: 1;
   font-weight: 700;
-  color: #10243f;
+  color: var(--ink);
 }
 
 .order-tile__hint {
   margin-top: 6px;
   font-size: 11px;
-  color: #73849b;
+  color: var(--muted-2);
 }
 
 .order-actions {
   min-height: 138px;
-  border: 1px solid #dce8ff;
+  border: 1px solid var(--border);
   background:
-    radial-gradient(120% 100% at 100% 0%, rgba(67, 143, 255, 0.12) 0%, rgba(67, 143, 255, 0) 55%),
-    linear-gradient(145deg, #f8fbff 0%, #f2f7ff 45%, #ffffff 100%);
+    radial-gradient(120% 100% at 100% 0%, rgba(var(--primary-rgb), 0.12) 0%, rgba(var(--primary-rgb), 0) 55%),
+    linear-gradient(145deg, var(--surface-2) 0%, var(--primary-soft) 45%, #ffffff 100%);
 }
 
 .risk-queue-title {
   margin-top: 10px;
   margin-bottom: 6px;
   padding-top: 8px;
-  border-top: 1px dashed #dce8ff;
+  border-top: 1px dashed var(--border);
   font-size: 12px;
-  color: #4b5f79;
+  color: var(--muted);
   font-weight: 600;
 }
 
 .risk-queue-meta {
-  color: #5f7087;
+  color: var(--muted);
   font-size: 12px;
 }
 
 :deep(.medical-row-danger > td) {
-  background: #fff1f0 !important;
+  background: rgba(var(--danger-rgb), 0.06) !important;
 }
 
 :deep(.medical-row-warning > td) {
-  background: #fffbe6 !important;
+  background: rgba(var(--warning-rgb), 0.08) !important;
 }
 
 @media (max-width: 992px) {

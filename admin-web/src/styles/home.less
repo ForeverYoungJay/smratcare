@@ -1,15 +1,21 @@
 :root {
   color-scheme: light;
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Helvetica, Arial, sans-serif;
-  --bg: #f4f8fb;
-  --ink: #12314d;
-  --muted: #5f7b95;
-  --muted-2: #86a0b7;
-  --border: #d8e5ef;
-  --border-strong: #c8d8e5;
-  --shadow-xs: 0 4px 12px rgba(18, 49, 77, 0.04);
-  --shadow-sm: 0 10px 24px rgba(18, 49, 77, 0.06);
-  --shadow-md: 0 18px 40px rgba(18, 49, 77, 0.08);
+  --bg: #f7f6f2;
+  --ink: #22332e;
+  --muted: #5c6f69;
+  --muted-2: #8a9a94;
+  --border: #e4e7e0;
+  --border-strong: #d5dbd3;
+  --brand: #21705f;
+  --brand-dark: #185c4e;
+  --brand-soft: #e8f3ef;
+  --cta: #e58a3a;
+  --cta-hover: #d97b2c;
+  --cta-soft: #fbf0e2;
+  --shadow-xs: 0 4px 12px rgba(34, 51, 46, 0.04);
+  --shadow-sm: 0 6px 20px rgba(34, 51, 46, 0.08);
+  --shadow-md: 0 18px 40px rgba(34, 51, 46, 0.1);
 }
 
 * {
@@ -23,9 +29,9 @@ body {
   min-height: 100vh;
   font-family: var(--font-sans);
   background:
-    radial-gradient(1200px 500px at -6% -14%, rgba(86, 165, 222, 0.14), transparent 52%),
-    radial-gradient(900px 420px at 106% 0%, rgba(85, 199, 187, 0.1), transparent 48%),
-    linear-gradient(180deg, #f9fcfe 0%, var(--bg) 40%, #f1f6fa 100%);
+    radial-gradient(1200px 500px at -6% -14%, rgba(33, 112, 95, 0.1), transparent 52%),
+    radial-gradient(900px 420px at 106% 0%, rgba(229, 138, 58, 0.08), transparent 48%),
+    linear-gradient(180deg, #fdfcf8 0%, var(--bg) 40%, #f1efe9 100%);
   color: var(--ink);
 }
 
@@ -49,4 +55,56 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+/* ---- ant-design-vue 主题微调（仅首页入口加载） ---- */
+/* 主按钮 = 主 CTA：暖橙促转化 */
+button.ant-btn {
+  border-radius: 10px;
+}
+
+.ant-btn.ant-btn-primary {
+  background: var(--cta);
+  border-color: var(--cta);
+  box-shadow: 0 6px 16px rgba(217, 123, 44, 0.28);
+}
+
+.ant-btn.ant-btn-primary:not(:disabled):not(.ant-btn-disabled):hover,
+.ant-btn.ant-btn-primary:not(:disabled):not(.ant-btn-disabled):focus-visible {
+  background: var(--cta-hover);
+  border-color: var(--cta-hover);
+}
+
+.ant-btn.ant-btn-primary:not(:disabled):not(.ant-btn-disabled):active {
+  background: #c96f24;
+  border-color: #c96f24;
+}
+
+/* 次按钮 hover：品牌松柏绿 */
+.ant-btn.ant-btn-default:not(:disabled):not(.ant-btn-disabled):hover,
+.ant-btn.ant-btn-default:not(:disabled):not(.ant-btn-disabled):focus-visible {
+  color: var(--brand);
+  border-color: var(--brand);
+}
+
+/* 输入/选择框聚焦色同步品牌绿 */
+.ant-input.ant-input:hover,
+.ant-input.ant-input:focus,
+.ant-input-affix-wrapper.ant-input-affix-wrapper:hover,
+.ant-input-affix-wrapper.ant-input-affix-wrapper-focused {
+  border-color: var(--brand);
+}
+
+.ant-input.ant-input:focus,
+.ant-input-affix-wrapper.ant-input-affix-wrapper-focused {
+  box-shadow: 0 0 0 2px rgba(33, 112, 95, 0.12);
+}
+
+.ant-select.ant-select:not(.ant-select-disabled):hover .ant-select-selector,
+.ant-select.ant-select-focused:not(.ant-select-disabled) .ant-select-selector {
+  border-color: var(--brand) !important;
+}
+
+.ant-select.ant-select-focused:not(.ant-select-disabled) .ant-select-selector {
+  box-shadow: 0 0 0 2px rgba(33, 112, 95, 0.12) !important;
 }

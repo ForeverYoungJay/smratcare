@@ -3,7 +3,7 @@ import { defineComponent } from 'vue'
 import { mount } from '@vue/test-utils'
 import ConsumptionRegister from '../ConsumptionRegister.vue'
 
-const getConsumptionPage = vi.fn().mockResolvedValue({ list: [], total: 0, pageNo: 1, pageSize: 10 })
+const getConsumptionPage = vi.hoisted(() => vi.fn().mockResolvedValue({ list: [], total: 0, pageNo: 1, pageSize: 10 }))
 
 vi.mock('../../../api/financeFee', () => ({
   getConsumptionPage,
@@ -14,11 +14,11 @@ vi.mock('../../../api/elder', () => ({
   getElderPage: vi.fn().mockResolvedValue({ list: [], total: 0, pageNo: 1, pageSize: 20 })
 }))
 
-const message = {
+const message = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
   warning: vi.fn()
-}
+}))
 
 vi.mock('ant-design-vue', () => ({
   message

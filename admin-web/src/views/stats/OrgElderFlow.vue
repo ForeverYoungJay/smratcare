@@ -1,5 +1,23 @@
 <template>
   <PageContainer title="老人出入统计" subTitle="机构维度老人出入院趋势">
+    <template #extra>
+      <a-space>
+        <a-button type="primary" @click="loadData">刷新</a-button>
+        <a-button @click="exportCsvReport">导出报表</a-button>
+        <a-dropdown>
+          <a-button>更多 ▾</a-button>
+          <template #overlay>
+            <a-menu>
+              <a-menu-item @click="openColumnSetting">列设置</a-menu-item>
+              <a-menu-item :disabled="!displayRows.length" @click="printCurrent">打印当前列</a-menu-item>
+              <a-menu-item :disabled="!query.monthKeyword.trim() || !displayRows.length" @click="printSpecificMonth">打印指定月份</a-menu-item>
+              <a-menu-divider />
+              <a-menu-item @click="reset">重置</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+      </a-space>
+    </template>
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline">
         <a-form-item label="起始月份">
@@ -22,16 +40,6 @@
             <a-button size="small" @click="setMonthPreset(3)">近3月</a-button>
             <a-button size="small" @click="setMonthPreset(6)">近6月</a-button>
             <a-button size="small" @click="setThisMonth">本月</a-button>
-          </a-space>
-        </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="loadData">刷新</a-button>
-            <a-button @click="exportCsvReport">导出报表</a-button>
-            <a-button @click="openColumnSetting">列设置</a-button>
-            <a-button :disabled="!displayRows.length" @click="printCurrent">打印当前列</a-button>
-            <a-button :disabled="!query.monthKeyword.trim() || !displayRows.length" @click="printSpecificMonth">打印指定月份</a-button>
-            <a-button @click="reset">重置</a-button>
           </a-space>
         </a-form-item>
       </a-form>
@@ -80,7 +88,7 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="老人出入明细">
-      <vxe-table border stripe show-overflow :data="displayRows" height="320">
+      <vxe-table border stripe show-overflow="title" :data="displayRows" height="320">
         <vxe-column field="month" title="月份" width="140" />
         <vxe-column field="admissions" title="入住人数" width="120" />
         <vxe-column field="discharges" title="离院人数" width="120" />

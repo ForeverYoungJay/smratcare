@@ -21,7 +21,7 @@
       </a-col>
       <a-col :span="6">
         <a-card class="metric-card" :bordered="false">
-          <div class="metric-label">完成率</div>
+          <div class="metric-label">执行完成率</div>
           <div class="metric-value">{{ pct(summary.completionRate) }}</div>
         </a-card>
       </a-col>
@@ -29,6 +29,74 @@
         <a-card class="metric-card" :bordered="false">
           <div class="metric-label">超时数</div>
           <div class="metric-value">{{ summary.overdueCount || 0 }}</div>
+        </a-card>
+      </a-col>
+    </a-row>
+
+    <a-card class="card-elevated report-card" :bordered="false" title="月度服务报告摘要">
+      <div class="report-summary">{{ summary.monthlyReportSummary || '暂无护理服务报告摘要' }}</div>
+      <a-alert
+        class="ai-summary"
+        type="info"
+        show-icon
+        :message="summary.aiCareSummary || '暂无AI护理摘要'"
+        :description="summary.familyReadableSummary || '暂无家属可读摘要'"
+      />
+      <a-row :gutter="16" class="quality-row">
+        <a-col :span="6">
+          <a-statistic title="计划达成率" :value="pct(summary.planAchievementRate)" />
+        </a-col>
+        <a-col :span="6">
+          <a-statistic title="质检次数" :value="summary.qualityReviewCount || 0" />
+        </a-col>
+        <a-col :span="6">
+          <a-statistic title="平均评分" :value="scoreText(summary.averageReviewScore)" />
+        </a-col>
+        <a-col :span="6">
+          <a-statistic title="可疑执行" :value="summary.suspiciousExecutionCount || 0" />
+        </a-col>
+      </a-row>
+      <a-row :gutter="16" class="quality-row">
+        <a-col :span="6">
+          <a-statistic title="异常任务" :value="summary.exceptionTaskCount || 0" />
+        </a-col>
+        <a-col :span="6">
+          <a-statistic title="异常已闭环" :value="summary.exceptionResolvedCount || 0" />
+        </a-col>
+        <a-col :span="6">
+          <a-statistic title="异常闭环率" :value="pct(summary.exceptionClosureRate)" />
+        </a-col>
+        <a-col :span="6">
+          <a-statistic title="交接确认率" :value="pct(summary.handoverConfirmRate)" />
+        </a-col>
+      </a-row>
+      <a-list :data-source="summary.reviewActionItems || []" size="small" class="action-list">
+        <template #renderItem="{ item }">
+          <a-list-item>{{ item }}</a-list-item>
+        </template>
+      </a-list>
+    </a-card>
+
+    <a-row :gutter="16" class="report-insights">
+      <a-col :xs="24" :lg="8">
+        <a-card title="照护亮点" :bordered="false" class="card-elevated">
+          <a-list :data-source="summary.careHighlights || []" size="small">
+            <template #renderItem="{ item }"><a-list-item>{{ item }}</a-list-item></template>
+          </a-list>
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :lg="8">
+        <a-card title="风险提醒" :bordered="false" class="card-elevated">
+          <a-list :data-source="summary.riskSignals || []" size="small">
+            <template #renderItem="{ item }"><a-list-item>{{ item }}</a-list-item></template>
+          </a-list>
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :lg="8">
+        <a-card title="下月建议" :bordered="false" class="card-elevated">
+          <a-list :data-source="summary.nextMonthSuggestions || []" size="small">
+            <template #renderItem="{ item }"><a-list-item>{{ item }}</a-list-item></template>
+          </a-list>
         </a-card>
       </a-col>
     </a-row>
@@ -62,6 +130,22 @@ const summary = reactive<NursingReportSummary>({
   planBookingCount: 0,
   planCompletedCount: 0,
   planAchievementRate: 0,
+  qualityReviewCount: 0,
+  averageReviewScore: 0,
+  exceptionTaskCount: 0,
+  exceptionResolvedCount: 0,
+  exceptionClosureRate: 0,
+  suspiciousExecutionCount: 0,
+  handoverCount: 0,
+  handoverConfirmedCount: 0,
+  handoverConfirmRate: 0,
+  monthlyReportSummary: '',
+  aiCareSummary: '',
+  familyReadableSummary: '',
+  reviewActionItems: [],
+  careHighlights: [],
+  riskSignals: [],
+  nextMonthSuggestions: [],
   staffWorkloads: []
 })
 
@@ -77,6 +161,11 @@ const columns = [
 function pct(value?: number | null) {
   if (value == null) return '0%'
   return `${(value * 100).toFixed(1)}%`
+}
+
+function scoreText(value?: number | null) {
+  if (value == null) return '0.0'
+  return Number(value).toFixed(1)
 }
 
 async function fetchData() {
@@ -97,6 +186,22 @@ async function fetchData() {
       planBookingCount: 0,
       planCompletedCount: 0,
       planAchievementRate: 0,
+      qualityReviewCount: 0,
+      averageReviewScore: 0,
+      exceptionTaskCount: 0,
+      exceptionResolvedCount: 0,
+      exceptionClosureRate: 0,
+      suspiciousExecutionCount: 0,
+      handoverCount: 0,
+      handoverConfirmedCount: 0,
+      handoverConfirmRate: 0,
+      monthlyReportSummary: '',
+      aiCareSummary: '',
+      familyReadableSummary: '',
+      reviewActionItems: [],
+      careHighlights: [],
+      riskSignals: [],
+      nextMonthSuggestions: [],
       staffWorkloads: []
     })
   }
@@ -120,7 +225,7 @@ fetchData()
 }
 
 .metric-label {
-  color: #64748b;
+  color: var(--muted);
   font-size: 13px;
 }
 
@@ -128,5 +233,31 @@ fetchData()
   font-size: 24px;
   font-weight: 700;
   margin-top: 6px;
+}
+
+.report-card {
+  margin-bottom: 16px;
+}
+
+.report-summary {
+  color: var(--ink);
+  font-size: 15px;
+  margin-bottom: 16px;
+}
+
+.ai-summary {
+  margin-bottom: 16px;
+}
+
+.quality-row {
+  margin-bottom: 12px;
+}
+
+.report-insights {
+  margin-bottom: 16px;
+}
+
+.action-list {
+  margin-top: 4px;
 }
 </style>

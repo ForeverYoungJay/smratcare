@@ -40,6 +40,7 @@
     "vue": "^3.4.35",
     "vue-echarts": "^6.7.0",
     "vue-router": "^4.4.3",
+    "vxe-pc-ui": "^4.11.0",
     "vxe-table": "^4.17.48",
     "xe-utils": "^3.9.1"
   },

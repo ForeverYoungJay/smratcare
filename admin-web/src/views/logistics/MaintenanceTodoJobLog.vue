@@ -76,7 +76,9 @@
           命中{{ record.totalMatched || 0 }} / 新建{{ record.createdCount || 0 }} / 跳过{{ record.skippedCount || 0 }}
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-button type="link" @click="rerun(record)">按本次天数重跑</a-button>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="rerun(record)">按本次天数重跑</a-button>
+          </div>
         </template>
       </template>
     </DataTable>
@@ -331,7 +333,7 @@ onMounted(fetchData)
 .error-line {
   margin-top: 4px;
   min-height: 22px;
-  color: #cf1322;
+  color: var(--danger);
   line-height: 1.45;
 }
 </style>

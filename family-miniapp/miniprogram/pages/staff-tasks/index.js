@@ -1,5 +1,7 @@
 const { getTaskList } = require('../../services/staff');
 
+const RENDER_PAGE_SIZE = 20;
+
 function routeForTask(task = {}) {
   const idParam = task.id ? `&id=${encodeURIComponent(task.id)}` : '';
   if (task.module === 'CARE') return `/pages/staff-care-execution/index${task.id ? `?id=${encodeURIComponent(task.id)}` : ''}`;
@@ -15,6 +17,15 @@ function normalizeTask(task = {}) {
     ...task,
     route: task.route || routeForTask(task)
   };
+}
+
+// 按角色推断默认任务模块 Tab：护理类→护理，医护类→用药，后勤类→后勤。
+function defaultModuleForRoles(roles = []) {
+  const joined = roles.map((item) => String(item || '').toUpperCase()).join(',');
+  if (joined.indexOf('NURSING') >= 0) return 'CARE';
+  if (joined.indexOf('MEDICAL') >= 0 || joined.indexOf('DOCTOR') >= 0 || joined.indexOf('NURSE') >= 0) return 'MEDICATION';
+  if (joined.indexOf('LOGISTICS') >= 0) return 'LOGISTICS';
+  return '';
 }
 
 Page({
@@ -36,20 +47,50 @@ Page({
       { label: '后勤', value: 'LOGISTICS' },
       { label: '送餐', value: 'MEAL' }
     ],
-    tasks: []
+    tasks: [],
+    hasMore: false
   },
   onLoad(options = {}) {
-    this.setData({ active: options.module || '' });
+    let active = options.module || '';
+    if (!active) {
+      const app = getApp();
+      const staffUser = (app && app.globalData && app.globalData.staffUser) || {};
+      active = defaultModuleForRoles(staffUser.roles || []);
+    }
+    this.allTasks = [];
+    this.setData({ active });
     this.loadData();
   },
-  async loadData() {
+  onPullDownRefresh() {
+    this.loadData(true);
+  },
+  onReachBottom() {
+    this.renderMore();
+  },
+  async loadData(fromPullDown = false) {
     this.setData({ loading: true });
     try {
       const tasks = await getTaskList(this.data.active);
-      this.setData({ tasks: (tasks || []).map(normalizeTask) });
+      // 接口一次性返回全部任务，前端分批渲染，避免长列表卡顿。
+      this.allTasks = (tasks || []).map(normalizeTask);
+      this.setData({
+        tasks: this.allTasks.slice(0, RENDER_PAGE_SIZE),
+        hasMore: this.allTasks.length > RENDER_PAGE_SIZE
+      });
     } finally {
       this.setData({ loading: false });
+      if (fromPullDown) wx.stopPullDownRefresh();
     }
+  },
+  renderMore() {
+    const all = this.allTasks || [];
+    const rendered = this.data.tasks.length;
+    if (rendered >= all.length) return;
+    const next = all.slice(0, rendered + RENDER_PAGE_SIZE);
+    this.setData({
+      tasks: next,
+      hasMore: next.length < all.length
+    });
   },
   switchFilter(e) {
     this.setData({ active: e.currentTarget.dataset.value || '' });

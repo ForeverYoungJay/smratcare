@@ -29,7 +29,7 @@
       />
 
       <a-card class="card-elevated" :bordered="false">
-        <vxe-table border stripe show-overflow :loading="loading" :data="data?.rows || []" height="560">
+        <vxe-table border stripe show-overflow="title" :loading="loading" :data="data?.rows || []" height="560">
           <vxe-column field="settlementId" title="结算单ID" width="130" />
           <vxe-column field="elderName" title="老人" min-width="140">
             <template #default="{ row }">{{ row.elderName || '-' }}</template>
@@ -44,10 +44,10 @@
           <vxe-column field="occupiedBedId" title="占用床位ID" width="120" />
           <vxe-column title="操作" width="220" fixed="right">
             <template #default="{ row }">
-              <a-space>
-                <a-button type="link" @click="go(`/finance/discharge/settlement`)">看结算</a-button>
-                <a-button type="link" @click="executeOne(row)">执行回写</a-button>
-              </a-space>
+              <div class="row-action-links">
+                <a-button type="link" size="small" @click="go(`/finance/discharge/settlement`)">看结算</a-button>
+                <a-button type="link" size="small" @click="executeOne(row)">执行回写</a-button>
+              </div>
             </template>
           </vxe-column>
         </vxe-table>

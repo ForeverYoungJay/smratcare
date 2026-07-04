@@ -109,13 +109,22 @@
           <span v-else>-</span>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space wrap>
-            <a-button v-if="viewConfig.supportsQr" type="link" @click="openQr(record)">{{ qrButtonText }}</a-button>
-            <a-button v-if="viewConfig.supportsRecheck" type="link" @click="triggerRecheck(record)">二次检查登记</a-button>
-            <a-button type="link" @click="openEdit(record)">编辑</a-button>
-            <a-button type="link" :disabled="record.status === 'CLOSED'" @click="closeRecord(record)">关闭</a-button>
-            <a-button type="link" danger @click="remove(record)">删除</a-button>
-          </a-space>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
+            <a-button type="link" size="small" :disabled="record.status === 'CLOSED'" @click="closeRecord(record)">关闭</a-button>
+            <a-dropdown v-if="viewConfig.supportsQr || viewConfig.supportsRecheck" trigger="click">
+              <a-button type="link" size="small">更多 <DownOutlined /></a-button>
+              <template #overlay>
+                <a-menu>
+                  <a-menu-item v-if="viewConfig.supportsQr" key="qr" @click="openQr(record)">{{ qrButtonText }}</a-menu-item>
+                  <a-menu-item v-if="viewConfig.supportsRecheck" key="recheck" @click="triggerRecheck(record)">二次检查登记</a-menu-item>
+                  <a-menu-divider />
+                  <a-menu-item key="delete" danger @click="remove(record)">删除</a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
+            <a-button v-else type="link" size="small" danger @click="remove(record)">删除</a-button>
+          </div>
         </template>
       </template>
     </DataTable>
@@ -364,6 +373,7 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import dayjs, { Dayjs } from 'dayjs'
 import QRCode from 'qrcode'
 import { message, Modal } from 'ant-design-vue'
+import { DownOutlined } from '@ant-design/icons-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import SearchForm from '../../../components/SearchForm.vue'
 import DataTable from '../../../components/DataTable.vue'
@@ -642,7 +652,7 @@ const columns = computed(() => {
 
   items.push(
     { title: '状态', dataIndex: 'status', key: 'status', width: 90 },
-    { title: '操作', key: 'action', width: viewConfig.value.supportsQr || viewConfig.value.supportsRecheck ? 360 : 200 }
+    { title: '操作', key: 'action', width: viewConfig.value.supportsQr || viewConfig.value.supportsRecheck ? 220 : 160 }
   )
   return items
 })

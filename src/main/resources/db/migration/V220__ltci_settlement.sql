@@ -1,0 +1,28 @@
+-- 长护险月度结算单（金额单位：分）
+CREATE TABLE IF NOT EXISTS ltci_settlement (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NULL,
+  org_id BIGINT NOT NULL,
+  elder_id BIGINT NOT NULL,
+  benefit_id BIGINT NULL,
+  settle_month VARCHAR(6) NOT NULL,
+  service_days INT NOT NULL DEFAULT 0,
+  total_fee BIGINT NOT NULL DEFAULT 0,
+  fund_pay BIGINT NOT NULL DEFAULT 0,
+  self_pay BIGINT NOT NULL DEFAULT 0,
+  over_quota BIGINT NOT NULL DEFAULT 0,
+  daily_quota BIGINT NULL,
+  pay_ratio DECIMAL(5,4) NULL,
+  settle_status VARCHAR(24) NOT NULL DEFAULT 'DRAFT',
+  settle_no VARCHAR(64) NULL,
+  detail_json JSON NULL,
+  submitted_by BIGINT NULL,
+  submitted_at DATETIME NULL,
+  remark VARCHAR(500) NULL,
+  created_by BIGINT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0,
+  UNIQUE KEY uk_ltci_settle_elder_month (org_id, elder_id, settle_month, is_deleted),
+  KEY idx_ltci_settle_month (org_id, settle_month, settle_status)
+);

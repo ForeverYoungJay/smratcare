@@ -38,7 +38,7 @@
         :message="summary.warningMessage"
       />
       <a-card class="card-elevated" :bordered="false">
-        <vxe-table border stripe show-overflow :loading="loading" :data="rows" height="560">
+        <vxe-table border stripe show-overflow="title" :loading="loading" :data="rows" height="560">
           <vxe-column field="consumeDate" title="消费日期" width="140" />
           <vxe-column field="elderName" title="长者" min-width="140">
             <template #default="{ row }">{{ row.elderName || '-' }}</template>
@@ -50,16 +50,17 @@
           <vxe-column field="remark" title="备注" min-width="220" />
           <vxe-column title="操作" width="180" fixed="right">
             <template #default="{ row }">
-              <a-space>
+              <div class="row-action-links">
                 <a-button
                   v-if="supportsConsumptionDrilldown && row.elderId"
                   type="link"
+                  size="small"
                   @click="go(`/finance/flows/consumption?elderId=${row.elderId}`)"
                 >
                   消费明细
                 </a-button>
-                <a-button type="link" @click="go('/finance/reconcile/exception')">异常处理</a-button>
-              </a-space>
+                <a-button type="link" size="small" @click="go('/finance/reconcile/exception')">异常处理</a-button>
+              </div>
             </template>
           </vxe-column>
         </vxe-table>

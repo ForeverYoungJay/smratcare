@@ -47,7 +47,7 @@
     </a-row>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <vxe-table border stripe show-overflow :loading="loading" :data="filteredRows" height="560">
+      <vxe-table border stripe show-overflow="title" :loading="loading" :data="filteredRows" height="560">
         <vxe-column field="createTime" title="时间" width="180" />
         <vxe-column field="actorName" title="操作人" width="140">
           <template #default="{ row }">{{ row.actorName || '-' }}</template>
@@ -67,9 +67,9 @@
         <vxe-column field="detail" title="变更详情" min-width="300" />
         <vxe-column title="操作" width="160" fixed="right">
           <template #default="{ row }">
-            <a-space>
-              <a-button type="link" @click="rollback(row)">回滚</a-button>
-            </a-space>
+            <div class="row-action-links">
+              <a-button type="link" size="small" danger @click="rollback(row)">回滚</a-button>
+            </div>
           </template>
         </vxe-column>
       </vxe-table>

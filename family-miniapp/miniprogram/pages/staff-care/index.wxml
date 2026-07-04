@@ -1,18 +1,56 @@
 <view class="container">
   <view class="section-title">护理执行</view>
   <view class="section-subtitle">扫码、拍照、补录体征和交接备注</view>
+
+  <view class="summary-grid">
+    <view class="surface summary-card">
+      <text>今日任务</text>
+      <strong>{{overview.totalCount}}</strong>
+    </view>
+    <view class="surface summary-card warning">
+      <text>待办</text>
+      <strong>{{overview.pendingCount}}</strong>
+    </view>
+    <view class="surface summary-card">
+      <text>已完成</text>
+      <strong>{{overview.doneCount}}</strong>
+    </view>
+    <view class="surface summary-card danger">
+      <text>超时/异常</text>
+      <strong>{{overview.overdueCount}}</strong>
+    </view>
+  </view>
+
   <view class="quick-actions">
     <button class="ghost-btn quick-btn" bindtap="goCareExecution">护理执行</button>
     <button class="ghost-btn quick-btn" bindtap="goVitals">体征补录</button>
+    <button class="ghost-btn quick-btn" bindtap="goIncident">异常上报</button>
+    <button class="ghost-btn quick-btn" bindtap="goHandover">交接班</button>
   </view>
-  <view class="surface panel">
+
+  <view class="surface state-card" wx:if="{{loading}}">
+    <view class="state-title">正在加载护理任务</view>
+  </view>
+
+  <view class="surface state-card" wx:if="{{!loading && loadError}}">
+    <view class="state-title">护理任务加载失败</view>
+    <view class="section-subtitle">{{loadError}}</view>
+    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
+  </view>
+
+  <view class="surface panel" wx:if="{{!loading && !loadError}}">
+    <view class="panel-title">今日护理任务</view>
+    <view class="section-subtitle" wx:if="{{tasks.length === 0}}">暂无护理任务，护理计划派发后会出现在这里。</view>
     <block wx:for="{{tasks}}" wx:key="id">
       <view class="work-row" data-id="{{item.id}}" bindtap="openCare">
-        <view>
+        <view class="work-main">
           <view class="work-title">{{item.title}}</view>
           <view class="work-meta">{{item.resident}} · {{item.room}} · {{item.time}}</view>
         </view>
-        <text class="work-action">{{item.actionText}}</text>
+        <view class="work-side">
+          <text class="status-badge {{item.statusTone}}">{{item.status || '待执行'}}</text>
+          <text class="work-action">{{item.actionText}}</text>
+        </view>
       </view>
     </block>
   </view>

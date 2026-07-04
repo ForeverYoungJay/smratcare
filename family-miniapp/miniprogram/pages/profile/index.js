@@ -2,6 +2,15 @@ const { getMyElders, getProfile, getCapabilityStatus } = require('../../services
 
 const CAPABILITY_ALERT_STATUSES = new Set(['OFF', 'MOCK', 'BIND_REQUIRED', 'DEPRECATED']);
 
+function canUseMockFallback() {
+  const app = getApp();
+  return !!(app
+    && app.globalData
+    && app.globalData.useMockFallback
+    && typeof app.isLocalDevEnvironment === 'function'
+    && app.isLocalDevEnvironment());
+}
+
 function countCapabilityAlerts(status) {
   if (!status || !Array.isArray(status.items)) {
     return 0;
@@ -14,6 +23,7 @@ Page({
     elderCount: 0,
     profile: null,
     capabilityAlertCount: 0,
+    partialWarning: '',
     loadError: '',
     supportInfo: {}
   },
@@ -26,19 +36,26 @@ Page({
     this.loadData();
   },
   async loadData() {
-    this.setData({ loadError: '', supportInfo: getApp().globalData.supportInfo || {} });
+    this.setData({ loadError: '', partialWarning: '', supportInfo: getApp().globalData.supportInfo || {} });
     try {
-      const [elders, profile, capabilityStatus] = await Promise.all([
+      const [elders, profile, capabilityStatusResult] = await Promise.all([
         getMyElders(),
         getProfile(),
-        getCapabilityStatus().catch(() => null)
+        getCapabilityStatus()
+          .then((status) => ({ status, error: null }))
+          .catch((error) => ({ status: null, error }))
       ]);
+      const capabilityStatus = capabilityStatusResult && capabilityStatusResult.status;
+      const capabilityError = capabilityStatusResult && capabilityStatusResult.error;
       const capabilityAlertCount = countCapabilityAlerts(capabilityStatus);
       getApp().updateCapabilityAlerts(capabilityAlertCount);
       this.setData({
         elderCount: (elders || []).length,
         profile,
-        capabilityAlertCount
+        capabilityAlertCount,
+        partialWarning: capabilityError && !canUseMockFallback()
+          ? '能力状态暂未刷新，支付、通知和安全链路请进入“能力状态”页后重试。'
+          : ''
       });
     } catch (error) {
       this.setData({

@@ -47,7 +47,7 @@
         <div class="panel panel-priority">
           <div class="panel-head">
             <div>
-              <div class="panel-kicker">Today</div>
+              <div class="panel-kicker">今日</div>
               <h3>优先处理</h3>
             </div>
             <a-button size="small" type="link" @click="openPath('/workbench/todo')">查看全部</a-button>
@@ -70,7 +70,7 @@
         <div class="panel panel-actions">
           <div class="panel-head">
             <div>
-              <div class="panel-kicker">Actions</div>
+              <div class="panel-kicker">快捷操作</div>
               <h3>高频入口</h3>
             </div>
           </div>
@@ -90,7 +90,7 @@
         <div class="panel panel-workflow">
           <div class="panel-head">
             <div>
-              <div class="panel-kicker">Approvals</div>
+              <div class="panel-kicker">待审批</div>
               <h3>我的审批</h3>
             </div>
           </div>
@@ -111,7 +111,7 @@
         <div class="panel panel-feed">
           <div class="panel-head">
             <div>
-              <div class="panel-kicker">Feed</div>
+              <div class="panel-kicker">最新动态</div>
               <h3>公告与待办流</h3>
             </div>
           </div>
@@ -257,7 +257,7 @@ useLiveSyncRefresh({
   grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
   gap: 16px;
   padding: 24px;
-  border: 1px solid rgba(195, 217, 231, 0.82);
+  border: 1px solid var(--border-soft);
   border-radius: 22px;
   background:
     linear-gradient(135deg, rgba(248, 251, 255, 0.98) 0%, rgba(236, 244, 251, 0.96) 100%);
@@ -274,20 +274,20 @@ useLiveSyncRefresh({
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #7290a8;
+  color: var(--muted);
 }
 
 .hero-value {
   font-size: clamp(42px, 6vw, 68px);
   line-height: 0.95;
   font-weight: 800;
-  color: #143654;
+  color: var(--ink);
 }
 
 .hero-title {
   font-size: 20px;
   font-weight: 700;
-  color: #173854;
+  color: var(--ink);
 }
 
 .hero-description {
@@ -295,7 +295,7 @@ useLiveSyncRefresh({
   max-width: 640px;
   font-size: 14px;
   line-height: 1.7;
-  color: #5f7b92;
+  color: var(--muted);
 }
 
 .hero-actions {
@@ -313,35 +313,35 @@ useLiveSyncRefresh({
 .hero-alert {
   padding: 14px 16px;
   border-radius: 18px;
-  border: 1px solid rgba(195, 217, 231, 0.9);
+  border: 1px solid var(--border-soft);
   background: rgba(255, 255, 255, 0.86);
 }
 
 .hero-alert.is-danger {
-  border-color: rgba(222, 91, 99, 0.22);
-  background: rgba(255, 244, 244, 0.92);
+  border-color: rgba(var(--danger-rgb), 0.22);
+  background: rgba(var(--danger-rgb), 0.06);
 }
 
 .hero-alert.is-warning {
-  border-color: rgba(240, 165, 74, 0.24);
-  background: rgba(255, 248, 238, 0.92);
+  border-color: rgba(var(--warning-rgb), 0.24);
+  background: rgba(var(--warning-rgb), 0.08);
 }
 
 .hero-alert.is-focus {
-  border-color: rgba(27, 107, 207, 0.2);
-  background: rgba(242, 247, 255, 0.94);
+  border-color: rgba(var(--primary-rgb), 0.2);
+  background: rgba(var(--primary-rgb), 0.06);
 }
 
 .hero-alert-value {
   font-size: 28px;
   font-weight: 800;
-  color: #173854;
+  color: var(--ink);
 }
 
 .hero-alert-label {
   margin-top: 4px;
   font-size: 12px;
-  color: #6a8398;
+  color: var(--muted);
 }
 
 .snapshot-rail {
@@ -352,7 +352,7 @@ useLiveSyncRefresh({
 }
 
 .snapshot-item {
-  border: 1px solid rgba(195, 217, 231, 0.82);
+  border: 1px solid var(--border-soft);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.78);
   padding: 14px;
@@ -363,21 +363,21 @@ useLiveSyncRefresh({
 
 .snapshot-item:hover {
   transform: translateY(-1px);
-  border-color: rgba(27, 107, 207, 0.22);
+  border-color: rgba(var(--primary-rgb), 0.22);
   background: rgba(255, 255, 255, 0.94);
 }
 
 .snapshot-label {
   display: block;
   font-size: 12px;
-  color: #7590a5;
+  color: var(--muted);
 }
 
 .snapshot-value {
   display: block;
   margin-top: 10px;
   font-size: 24px;
-  color: #173854;
+  color: var(--ink);
 }
 
 .portal-grid {
@@ -388,7 +388,7 @@ useLiveSyncRefresh({
 }
 
 .panel {
-  border: 1px solid rgba(195, 217, 231, 0.82);
+  border: 1px solid var(--border-soft);
   border-radius: 20px;
   padding: 18px;
   background: rgba(255, 255, 255, 0.82);
@@ -414,7 +414,7 @@ useLiveSyncRefresh({
 .panel-head h3 {
   margin: 4px 0 0;
   font-size: 18px;
-  color: #173854;
+  color: var(--ink);
 }
 
 .priority-list,
@@ -433,7 +433,7 @@ useLiveSyncRefresh({
 .action-item {
   width: 100%;
   text-align: left;
-  border: 1px solid rgba(208, 223, 234, 0.9);
+  border: 1px solid var(--border-soft);
   background: rgba(248, 251, 254, 0.9);
   border-radius: 16px;
   padding: 14px;
@@ -445,21 +445,21 @@ useLiveSyncRefresh({
 .workflow-item:hover,
 .action-item:hover {
   transform: translateY(-1px);
-  border-color: rgba(27, 107, 207, 0.24);
+  border-color: rgba(var(--primary-rgb), 0.24);
   background: rgba(255, 255, 255, 0.96);
 }
 
 .priority-label {
   display: block;
   font-size: 12px;
-  color: #6f8ba2;
+  color: var(--muted);
 }
 
 .priority-value {
   display: block;
   margin-top: 8px;
   font-size: 26px;
-  color: #173854;
+  color: var(--ink);
 }
 
 .workflow-item,
@@ -480,7 +480,7 @@ useLiveSyncRefresh({
   margin-bottom: 10px;
   font-size: 13px;
   font-weight: 700;
-  color: #5b7891;
+  color: var(--muted);
 }
 
 .list-item {
@@ -492,11 +492,11 @@ useLiveSyncRefresh({
 
 .title {
   font-weight: 600;
-  color: #173854;
+  color: var(--ink);
 }
 
 .meta {
-  color: #71879b;
+  color: var(--muted);
   font-size: 12px;
 }
 

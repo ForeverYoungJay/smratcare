@@ -1,8 +1,28 @@
 <template>
   <div class="login-page">
-    <div class="login-card">
+    <div class="login-shell">
+      <aside class="login-hero">
+        <div class="login-hero__brand">
+          <img :src="brandLogoUrl" alt="龟峰颐养中心" class="login-hero__logo" />
+          <div>
+            <div class="login-hero__org">龟峰颐养中心</div>
+            <div class="login-hero__platform">智养云 · 运营管理平台</div>
+          </div>
+        </div>
+        <h1 class="login-hero__slogan">照护、健康、安全、经营，一体化管理</h1>
+        <p class="login-hero__desc">围绕长者全生命周期，把入住、护理、医疗、安全、家属服务与经营数据收拢在同一平台。</p>
+        <ul class="login-hero__features">
+          <li><span>护</span>长者全生命周期与护理执行闭环</li>
+          <li><span>安</span>生命体征与安全事件实时预警</li>
+          <li><span>亲</span>家属服务、探访与关怀协同</li>
+          <li><span>营</span>床位、收费与经营一屏掌握</li>
+        </ul>
+      </aside>
+      <div class="login-card">
       <div class="brand">
-        <div class="logo">智</div>
+        <div class="logo">
+          <img :src="brandLogoUrl" alt="龟峰颐养中心logo" class="logo-image" />
+        </div>
         <div>
           <div class="title">智养云运营中台</div>
           <div class="subtitle">智慧养老管理平台</div>
@@ -41,6 +61,7 @@
           </div>
         </div>
       </details>
+      </div>
     </div>
   </div>
 </template>
@@ -49,6 +70,7 @@
 import { message } from 'ant-design-vue'
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import brandLogoUrl from '../assets/guifeng-logo.png'
 import { login } from '../api/auth'
 import { useUserStore } from '../stores/user'
 
@@ -118,9 +140,32 @@ const demoAccounts = [
   }
 ] as const
 
+function normalizeRedirectPath(path?: string | null) {
+  const raw = String(path || '').trim()
+  if (!raw.startsWith('/')) return ''
+  if (raw === '/login') return ''
+  if (raw.startsWith('/login?')) {
+    const query = raw.split('?')[1] || ''
+    const params = new URLSearchParams(query)
+    return normalizeRedirectPath(params.get('redirect'))
+  }
+  return raw
+}
+
 function fillDemo(username: string) {
   form.username = username
   form.password = '123456'
+}
+
+function normalizeRoleList(roles: string[]) {
+  return roles.map((role) => String(role || '').trim().toUpperCase()).filter(Boolean)
+}
+
+function resolvePostLoginPath(roles: string[]) {
+  const normalized = normalizeRoleList(roles)
+  const hasManageRole = normalized.some((role) => ['ADMIN', 'SYS_ADMIN', 'DIRECTOR'].includes(role))
+  const hasEmployeeRole = normalized.some((role) => role.endsWith('_EMPLOYEE') || role.endsWith('_MINISTER'))
+  return hasEmployeeRole && !hasManageRole ? '/workbench/overview' : '/portal'
 }
 
 async function onSubmit() {
@@ -128,9 +173,11 @@ async function onSubmit() {
   try {
     const res = await login(form)
     userStore.setAuth(res)
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect.trim() : ''
-    const nextPath = redirect.startsWith('/') ? redirect : '/portal'
+    const redirect = normalizeRedirectPath(typeof route.query.redirect === 'string' ? route.query.redirect : '')
+    const fallbackPath = resolvePostLoginPath(res.roles || [])
+    const nextPath = redirect || fallbackPath
     await router.replace(nextPath)
+    message.success(nextPath.startsWith('/workbench') ? '登录成功，已进入个人工作台' : '登录成功')
   } catch (error: any) {
     const status = Number(error?.response?.status || 0)
     const backendMsg = String(error?.response?.data?.message || error?.response?.data?.msg || error?.message || '')
@@ -175,48 +222,166 @@ function goEnterpriseHome() {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  background-image: url('../assets/home-login.jpg');
+  padding: 24px;
+  background-image:
+    linear-gradient(135deg, rgba(24, 92, 78, 0.82) 0%, rgba(33, 112, 95, 0.66) 46%, rgba(46, 138, 114, 0.5) 100%),
+    url('../assets/home-login.jpg');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
 }
 
+.login-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 56px;
+  width: 100%;
+  max-width: 960px;
+}
+
+.login-hero {
+  flex: 1 1 0;
+  max-width: 460px;
+  color: #ffffff;
+}
+
+.login-hero__brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 30px;
+}
+
+.login-hero__logo {
+  width: 54px;
+  height: 54px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.18);
+  object-fit: contain;
+}
+
+.login-hero__org {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.login-hero__platform {
+  margin-top: 2px;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.login-hero__slogan {
+  margin: 0 0 14px;
+  font-size: 30px;
+  line-height: 1.3;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.login-hero__desc {
+  margin: 0 0 28px;
+  max-width: 420px;
+  font-size: 14px;
+  line-height: 1.85;
+  opacity: 0.9;
+}
+
+.login-hero__features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.login-hero__features li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.login-hero__features li span {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .login-card {
-  width: 360px;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(148, 163, 184, 0.4);
+  flex: none;
+  width: 380px;
+  max-width: 100%;
+  background: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: 16px;
   padding: 32px;
-  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12);
-  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 32px rgba(16, 46, 39, 0.28);
+}
+
+@media (max-width: 880px) {
+  .login-shell {
+    gap: 0;
+  }
+
+  .login-hero {
+    display: none;
+  }
+}
+
+.login-card :deep(.ant-btn) {
+  height: 40px;
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 6px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border-soft, #edefe9);
+}
+
+.brand + .ant-form,
+.brand + form {
+  margin-top: 18px;
 }
 
 .logo {
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #1677ff, #22d3ee);
-  color: #0f172a;
-  font-weight: 700;
   display: grid;
   place-items: center;
+  background: var(--primary-soft, #e8f3ef);
+  border: 1px solid rgba(33, 112, 95, 0.18);
+}
+
+.logo-image {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
 }
 
 .title {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink, #22332e);
 }
 
 .subtitle {
   font-size: 12px;
-  color: var(--muted);
+  color: var(--muted, #5c6f69);
 }
 
 .tips {
@@ -230,21 +395,21 @@ function goEnterpriseHome() {
   margin-top: 14px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: rgba(241, 245, 249, 0.85);
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: #f7f8f4;
+  border: 1px solid var(--border, #e4e7e0);
 }
 
 .demo-panel summary {
   cursor: pointer;
   font-size: 12px;
-  color: #334155;
+  color: var(--ink-soft, #3c4f48);
   font-weight: 600;
 }
 
 .demo-help {
   margin: 8px 0 10px;
   font-size: 12px;
-  color: #64748b;
+  color: var(--muted, #5c6f69);
 }
 
 .demo-groups {
@@ -257,7 +422,7 @@ function goEnterpriseHome() {
 
 .demo-group-title {
   font-size: 12px;
-  color: #0f172a;
+  color: var(--ink, #22332e);
   margin-bottom: 6px;
 }
 
@@ -268,16 +433,16 @@ function goEnterpriseHome() {
 }
 
 .demo-user {
-  border: 1px solid rgba(59, 130, 246, 0.35);
-  background: rgba(219, 234, 254, 0.65);
-  color: #1e3a8a;
+  border: 1px solid rgba(33, 112, 95, 0.28);
   border-radius: 999px;
+  background: #e8f3ef;
+  color: #185c4e;
   padding: 3px 9px;
   font-size: 12px;
   cursor: pointer;
 }
 
 .demo-user:hover {
-  background: rgba(191, 219, 254, 0.9);
+  background: #dcede6;
 }
 </style>

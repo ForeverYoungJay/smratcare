@@ -23,6 +23,8 @@
     <view class="attendance-meta detail" wx:if="{{attendance.checkInTime || attendance.checkOutTime}}">
       上班 {{attendance.checkInTime || '-'}} · 下班 {{attendance.checkOutTime || '-'}}
     </view>
+    <view class="attendance-feedback success-text" wx:if="{{punchSuccess}}">{{punchSuccess}}</view>
+    <view class="attendance-feedback error-text" wx:if="{{punchError}}">{{punchError}}</view>
     <view class="punch-grid">
       <block wx:for="{{punchActions}}" wx:key="action">
         <button class="punch-btn" loading="{{punching}}" data-action="{{item.action}}" bindtap="punch">{{item.label}}</button>
@@ -31,6 +33,7 @@
   </view>
 
   <view class="surface panel" wx:if="{{!loading && !loadError}}">
+    <view class="state-title" wx:if="{{!schedule.length}}">暂无排班记录</view>
     <block wx:for="{{schedule}}" wx:key="date">
       <view class="schedule-row">
         <view class="date-chip">{{item.date}}</view>

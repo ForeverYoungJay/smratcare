@@ -14,9 +14,12 @@
         :mobile="isMobileViewport"
         :open-keys="openKeys"
         :selected-keys="selectedKeys"
+        :can-toggle-scope="canToggleMenuScope"
+        :show-all-menu="menuShowAll"
         @mouseleave="handleSidebarMouseLeave"
         @menu-click="onMenuClick"
         @open-change="onOpenChange"
+        @toggle-menu-scope="toggleMenuScope"
       />
     </template>
 
@@ -62,32 +65,6 @@
       </GlobalHeader>
     </template>
 
-    <template #utility>
-      <UtilityBar :summary-text="utilitySummaryText">
-        <a-badge status="processing" text="系统运行中" />
-        <a-dropdown trigger="click">
-          <a-tag :color="presenceStatus.color" class="presence-tag">{{ presenceStatus.label }}</a-tag>
-          <template #overlay>
-            <a-menu>
-              <a-menu-item @click="setPresenceTraining(2)">外出培训 2 小时</a-menu-item>
-              <a-menu-item @click="setPresenceTraining(4)">外出培训 4 小时</a-menu-item>
-              <a-menu-item @click="clearPresenceTraining">结束培训状态</a-menu-item>
-              <a-menu-item @click="toggleDnd">{{ quickChatDnd ? '关闭免打扰' : '开启免打扰' }}</a-menu-item>
-            </a-menu>
-          </template>
-        </a-dropdown>
-        <a-tag v-if="quickChatDnd" color="red">免打扰</a-tag>
-        <a-badge :count="quickChatUnreadCount" size="small">
-          <a-button size="small" @click="openQuickChat">快捷聊天</a-button>
-        </a-badge>
-        <a-badge :count="quickChatTodoPendingCount" size="small">
-          <a-button size="small" @click="openQuickChatTodoDrawer">聊天待办</a-button>
-        </a-badge>
-        <a-tag v-if="quickChatPressureTag" :color="quickChatPressureTag.color">{{ quickChatPressureTag.text }}</a-tag>
-        <a-button size="small" @click="openHeaderSettings">个人设置</a-button>
-      </UtilityBar>
-    </template>
-
     <template #tabs>
       <div ref="routeTabsWrapRef">
         <RouteTabsBar
@@ -109,6 +86,28 @@
               <a-menu-item @click="closeOtherTabs">关闭其他</a-menu-item>
               <a-menu-item @click="closeAllTabs">关闭全部</a-menu-item>
             </a-menu>
+          </template>
+          <template #extra>
+            <a-badge status="processing" text="系统运行中" />
+            <a-dropdown trigger="click">
+              <a-tag :color="presenceStatus.color" class="presence-tag">{{ presenceStatus.label }}</a-tag>
+              <template #overlay>
+                <a-menu>
+                  <a-menu-item @click="setPresenceTraining(2)">外出培训 2 小时</a-menu-item>
+                  <a-menu-item @click="setPresenceTraining(4)">外出培训 4 小时</a-menu-item>
+                  <a-menu-item @click="clearPresenceTraining">结束培训状态</a-menu-item>
+                  <a-menu-item @click="toggleDnd">{{ quickChatDnd ? '关闭免打扰' : '开启免打扰' }}</a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
+            <a-tag v-if="quickChatDnd" color="red">免打扰</a-tag>
+            <a-badge :count="quickChatUnreadCount" size="small">
+              <a-button size="small" @click="openQuickChat">快捷聊天</a-button>
+            </a-badge>
+            <a-badge :count="quickChatTodoPendingCount" size="small">
+              <a-button size="small" @click="openQuickChatTodoDrawer">聊天待办</a-button>
+            </a-badge>
+            <a-tag v-if="quickChatPressureTag" :color="quickChatPressureTag.color">{{ quickChatPressureTag.text }}</a-tag>
           </template>
         </RouteTabsBar>
       </div>
@@ -232,7 +231,7 @@
       <div class="quick-chat-top-actions">
         <div class="quick-chat-overview">
           <div class="quick-chat-overview-copy">
-            <div class="quick-chat-overline">Quick Collaboration</div>
+            <div class="quick-chat-overline">快捷协作</div>
             <strong>快捷聊天工作台</strong>
             <span>已读、会话待办、成员工作状态放在同一条操作视线里。</span>
           </div>
@@ -856,7 +855,7 @@ import type { UploadProps } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
-import { getMenuTree } from './menu'
+import { getMenuTree, isFocusedEmployeeRole } from './menu'
 import { getMe } from '../api/auth'
 import { getStaffPage } from '../api/rbac'
 import { updateStaff } from '../api/staff'
@@ -874,7 +873,6 @@ import GlobalSearchPalette, { type SearchPaletteItem } from './components/Global
 import PrimarySider from './components/PrimarySider.vue'
 import QuickChatDrawer from './components/QuickChatDrawer.vue'
 import RouteTabsBar from './components/RouteTabsBar.vue'
-import UtilityBar from './components/UtilityBar.vue'
 import { buildGroupedMenuItems } from './navigation'
 import { loadRecentVisits, saveRecentVisit, type RecentVisitItem } from '../utils/recentVisits'
 
@@ -903,7 +901,27 @@ const siderCollapsed = computed(() => {
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-const openKeys = ref<string[]>([])
+
+// 侧栏展开状态跨会话记忆
+const SIDER_OPEN_KEYS_STORAGE = 'smartcare.sider.openKeys'
+
+function loadPersistedOpenKeys(): string[] {
+  try {
+    const raw = localStorage.getItem(SIDER_OPEN_KEYS_STORAGE)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed.filter((key) => typeof key === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function persistOpenKeys(keys: string[]) {
+  try {
+    localStorage.setItem(SIDER_OPEN_KEYS_STORAGE, JSON.stringify(keys.slice(-16)))
+  } catch {}
+}
+
+const openKeys = ref<string[]>(loadPersistedOpenKeys())
 const routeTabsWrapRef = ref<HTMLElement | null>(null)
 const routeTabs = ref<Array<{ key: string; path: string; title: string; closable: boolean }>>([])
 const activeTabKey = ref('')
@@ -1614,9 +1632,18 @@ const quickChatSyncConflictDesc = computed(() => {
   return `本地更新时间 ${localText}，云端更新时间 ${remoteText}。请先确认同步策略。`
 })
 
+const menuShowAll = ref(localStorage.getItem('menu-show-all') === '1')
+const canToggleMenuScope = computed(() => isFocusedEmployeeRole(userStore.roles || []))
+
+function toggleMenuScope() {
+  menuShowAll.value = !menuShowAll.value
+  localStorage.setItem('menu-show-all', menuShowAll.value ? '1' : '0')
+}
+
 const filteredMenu = computed(() => {
   const roles = userStore.roles || []
-  return getMenuTree(roles, userStore.pagePermissions || [])
+  // 按角色收敛默认导航：一线员工/部长默认只看与岗位相关的模块（可手动“显示全部”）；管理员/院长始终全量。
+  return getMenuTree(roles, userStore.pagePermissions || [], { focused: !menuShowAll.value })
 })
 
 function renderMenuLabel(label: string) {
@@ -1642,7 +1669,28 @@ const menuItems = computed(() => {
   return buildGroupedMenuItems(filteredMenu.value)
 })
 
-const selectedKeys = computed(() => [route.path])
+// 详情/编辑等未出现在菜单里的深层页面，也按最长前缀高亮所属菜单项
+const menuSelectablePaths = computed(() => {
+  const paths: string[] = []
+  const walk = (items: any[]) => {
+    for (const item of items || []) {
+      if (item.path) paths.push(String(item.path))
+      if (item.children?.length) walk(item.children)
+    }
+  }
+  walk(filteredMenu.value)
+  return paths
+})
+
+const selectedKeys = computed(() => {
+  const path = route.path
+  let best = ''
+  for (const candidate of menuSelectablePaths.value) {
+    if (candidate.length <= best.length) continue
+    if (path === candidate || path.startsWith(`${candidate}/`)) best = candidate
+  }
+  return [best || path]
+})
 const currentRouteTabKey = computed(() => normalizeTabKey(route.path || route.fullPath) || route.fullPath)
 const aliveViewMax = computed(() => Math.min(Math.max(routeTabs.value.length, 4), MAX_ALIVE_VIEW_CACHE))
 const viewRenderKey = computed(() => `${currentRouteTabKey.value}::${tabRefreshSeeds[currentRouteTabKey.value] || 0}`)
@@ -1656,14 +1704,19 @@ const searchPageItems = computed<SearchPaletteItem[]>(() => {
     items.flatMap((item) => {
       const title = String(item.label || '')
       const nextParents = [...parents, title]
+      const breadcrumb = nextParents.join(' / ')
+      const desc = String(item.desc || '')
+      const aliasText = Array.isArray(item.aliases) ? item.aliases.join(' ') : ''
+      const keywords = `${title} ${desc} ${breadcrumb} ${aliasText}`.trim()
       if (item.children?.length) {
         const parentEntry: SearchPaletteItem[] = item.path
           ? [{
               key: String(item.path || item.key),
               title,
-              description: nextParents.join(' / '),
+              description: desc || breadcrumb,
               group: '一级模块',
-              path: String(item.path || item.key)
+              path: String(item.path || item.key),
+              keywords
             }]
           : []
         return [...parentEntry, ...collect(item.children, nextParents)]
@@ -1671,15 +1724,16 @@ const searchPageItems = computed<SearchPaletteItem[]>(() => {
       return [{
         key: String(item.path || item.key),
         title,
-        description: nextParents.join(' / '),
+        description: desc || breadcrumb,
         group: parents.length > 0 ? parents[0] : '页面',
-        path: String(item.path || item.key)
+        path: String(item.path || item.key),
+        keywords
       }]
     })
   const keyword = globalSearchKeyword.value.trim().toLowerCase()
   const list = collect(filteredMenu.value)
   if (!keyword) return list.slice(0, 16)
-  return list.filter((item) => `${item.title} ${item.description}`.toLowerCase().includes(keyword)).slice(0, 16)
+  return list.filter((item) => `${item.title} ${item.description} ${item.keywords || ''}`.toLowerCase().includes(keyword)).slice(0, 16)
 })
 const searchActionItems = computed<SearchPaletteItem[]>(() => {
   const items: SearchPaletteItem[] = [
@@ -1705,11 +1759,6 @@ const searchRecentItems = computed<SearchPaletteItem[]>(() => {
   if (!keyword) return base.slice(0, 8)
   return base.filter((item) => `${item.title} ${item.description}`.toLowerCase().includes(keyword)).slice(0, 8)
 })
-const utilitySummaryText = computed(() => {
-  const unreadText = quickChatUnreadCount.value > 0 ? `未读会话 ${quickChatUnreadCount.value}` : '会话清爽'
-  return `系统运行中 · ${unreadText} · 聊天待办 ${quickChatTodoPendingCount.value}`
-})
-
 const breadcrumbs = computed(() => {
   const titles = route.matched
     .map((r) => r.meta?.title as string | undefined)
@@ -1818,12 +1867,7 @@ watch(
     syncRouteTab(route.path, fullPath)
     recordRecentVisit(route.path)
     const path = route.path
-    const trail = findMenuTrail(path)
-    if (trail.length > 1) {
-      openKeys.value = trail.slice(0, trail.length - 1).map((t) => t.key)
-    } else {
-      openKeys.value = []
-    }
+    syncOpenKeysForRoute(path)
   },
   { immediate: true }
 )
@@ -2180,6 +2224,7 @@ function restoreRouteTabs() {
 function onOpenChange(keys: string[]) {
   const previousKeys = [...openKeys.value]
   openKeys.value = keys
+  persistOpenKeys(keys)
   const addedKey = keys.find((key) => !previousKeys.includes(key))
   if (!addedKey) return
   const isTopLevel = filteredMenu.value.some((item) => item.key === addedKey)
@@ -2224,6 +2269,14 @@ function findMenuTrail(path: string) {
     return []
   }
   return walk(filteredMenu.value)
+}
+
+function syncOpenKeysForRoute(path: string) {
+  const trail = findMenuTrail(path)
+  if (trail.length <= 1) return
+  const routeOpenKeys = trail.slice(0, trail.length - 1).map((item) => item.key)
+  openKeys.value = Array.from(new Set([...openKeys.value, ...routeOpenKeys]))
+  persistOpenKeys(openKeys.value)
 }
 
 function resolveMenuPathByKey(key: string, items: any[]): string | null {
@@ -5679,8 +5732,8 @@ function onQuickChatStorageChange(event: StorageEvent) {
 .app-layout {
   height: 100vh;
   background:
-    radial-gradient(900px 320px at 100% 0%, rgba(19, 108, 181, 0.06), transparent 46%),
-    linear-gradient(180deg, #f7fbfd 0%, var(--bg) 32%, #f1f6fa 100%);
+    linear-gradient(180deg, rgba(33, 112, 95, 0.03) 0%, rgba(33, 112, 95, 0) 200px),
+    var(--bg);
   overflow: hidden;
 }
 
@@ -5703,20 +5756,19 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .app-sider {
-  background:
-    linear-gradient(180deg, rgba(250, 252, 253, 0.98) 0%, rgba(239, 246, 251, 0.98) 56%, rgba(233, 241, 247, 0.98) 100%);
-  border-right: 1px solid #d7e4ee;
+  background: #fcfcfa;
+  border-right: 1px solid var(--border-soft);
   height: 100vh;
   position: sticky;
   top: 0;
   left: 0;
-  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.5), 10px 0 30px rgba(18, 49, 77, 0.04);
+  box-shadow: 1px 0 2px rgba(34, 51, 46, 0.04);
   z-index: 121;
   transition: all 0.22s ease;
 }
 
 .app-sider.is-peek-open {
-  box-shadow: 0 12px 36px rgba(23, 56, 84, 0.16), inset -1px 0 0 rgba(255, 255, 255, 0.5);
+  box-shadow: 0 6px 16px rgba(34, 51, 46, 0.12);
 }
 
 .app-sider.is-manual-collapsed:not(.is-peek-open) {
@@ -5736,11 +5788,9 @@ function onQuickChatStorageChange(event: StorageEvent) {
   align-items: center;
   gap: 12px;
   padding: 20px 18px 18px;
-  color: #12314d;
-  border-bottom: 1px solid #e7eff5;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(247, 250, 252, 0.8) 100%);
-  backdrop-filter: blur(14px);
+  color: var(--ink);
+  border-bottom: 1px solid var(--border-soft);
+  background: #ffffff;
 }
 
 .sider-toggle-btn {
@@ -5750,11 +5800,11 @@ function onQuickChatStorageChange(event: StorageEvent) {
 .logo {
   width: 48px;
   height: 48px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  background: var(--primary-soft);
   display: grid;
   place-items: center;
-  box-shadow: 0 10px 22px rgba(18, 49, 77, 0.12);
+  box-shadow: var(--shadow-xs);
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -5773,7 +5823,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .subtitle {
   font-size: 12px;
-  color: #7b97ae;
+  color: var(--muted-2);
   letter-spacing: 0.04em;
 }
 
@@ -5789,16 +5839,16 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .side-menu :deep(.ant-menu) {
   background: transparent !important;
-  color: #4f6f89 !important;
+  color: var(--muted) !important;
 }
 
 .side-menu :deep(.ant-menu-sub) {
-  background: rgba(247, 251, 254, 0.92) !important;
+  background: var(--surface-3) !important;
 }
 
 .side-menu .ant-menu-item,
 .side-menu .ant-menu-submenu-title {
-  border-radius: 14px;
+  border-radius: 10px;
   margin: 3px 12px;
   height: auto;
   min-height: 48px;
@@ -5807,26 +5857,26 @@ function onQuickChatStorageChange(event: StorageEvent) {
   line-height: 1.35;
   padding-top: 10px;
   padding-bottom: 10px;
-  color: #4f6f89 !important;
+  color: var(--muted) !important;
   font-weight: 600;
 }
 
 .side-menu .ant-menu-item:hover,
 .side-menu .ant-menu-submenu-title:hover {
-  color: #173854 !important;
-  background: #edf7fb !important;
+  color: var(--ink) !important;
+  background: var(--bg-2) !important;
 }
 
 .side-menu :deep(.ant-menu-submenu-selected > .ant-menu-submenu-title),
 .side-menu :deep(.ant-menu-submenu-open > .ant-menu-submenu-title) {
-  color: #173854 !important;
+  color: var(--primary-strong) !important;
 }
 
 .side-menu .ant-menu-item-selected,
 .side-menu :deep(.ant-menu-submenu-selected .ant-menu-item-selected) {
-  background: linear-gradient(90deg, rgba(19, 108, 181, 0.14) 0%, rgba(95, 187, 212, 0.2) 100%) !important;
-  box-shadow: inset 0 0 0 1px rgba(19, 108, 181, 0.12), 0 6px 14px rgba(19, 108, 181, 0.08);
-  color: #173854 !important;
+  background: var(--primary-soft) !important;
+  box-shadow: inset 3px 0 0 0 var(--primary);
+  color: var(--primary-strong) !important;
   font-weight: 700;
 }
 
@@ -5871,15 +5921,15 @@ function onQuickChatStorageChange(event: StorageEvent) {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: linear-gradient(120deg, rgba(255, 255, 255, 0.92) 0%, rgba(246, 251, 255, 0.88) 100%);
-  backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-soft);
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 24px;
   min-height: 72px;
-  box-shadow: 0 8px 24px rgba(18, 49, 77, 0.05);
+  box-shadow: var(--shadow-xs);
 }
 
 .header-left {
@@ -5927,9 +5977,9 @@ function onQuickChatStorageChange(event: StorageEvent) {
   padding: 6px 12px;
   font-size: 12px;
   border-radius: 999px;
-  color: #0f5b99;
-  background: rgba(19, 108, 181, 0.12);
-  border: 1px solid rgba(19, 108, 181, 0.12);
+  color: var(--primary-strong);
+  background: var(--primary-soft);
+  border: 1px solid rgba(var(--primary-rgb), 0.14);
 }
 
 .system-name {
@@ -5951,8 +6001,8 @@ function onQuickChatStorageChange(event: StorageEvent) {
   gap: 8px;
   padding: 4px 10px 4px 4px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.76);
-  border: 1px solid rgba(216, 229, 239, 0.9);
+  background: #ffffff;
+  border: 1px solid var(--border);
 }
 
 .system-status {
@@ -6020,7 +6070,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
 .tab-tools-btn {
   margin-bottom: 6px;
   background: #ffffff;
-  border-color: rgba(195, 217, 231, 0.9);
+  border-color: var(--border);
 }
 
 .route-tab-title {
@@ -6040,9 +6090,9 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .route-tab-over {
-  background: rgba(27, 102, 214, 0.12);
+  background: rgba(var(--primary-rgb), 0.12);
   border-radius: 6px;
-  box-shadow: inset 0 0 0 1px rgba(27, 102, 214, 0.24);
+  box-shadow: inset 0 0 0 1px rgba(var(--primary-rgb), 0.24);
 }
 
 .tab-context-menu {
@@ -6050,9 +6100,9 @@ function onQuickChatStorageChange(event: StorageEvent) {
   z-index: 1200;
   min-width: 140px;
   background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
 }
 
 .app-content {
@@ -6090,11 +6140,9 @@ function onQuickChatStorageChange(event: StorageEvent) {
   justify-content: space-between;
   gap: 14px;
   padding: 12px 16px;
-  border: 1px solid rgba(191, 219, 254, 0.66);
-  border-radius: 16px;
-  background:
-    radial-gradient(circle at top right, rgba(96, 165, 250, 0.18), transparent 30%),
-    linear-gradient(180deg, rgba(248, 251, 255, 0.98) 0%, rgba(238, 246, 255, 0.94) 100%);
+  border: 1px solid rgba(var(--primary-rgb), 0.16);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, var(--primary-soft) 100%);
 }
 
 .quick-chat-overline {
@@ -6132,8 +6180,8 @@ function onQuickChatStorageChange(event: StorageEvent) {
 .quick-chat-overview-pill {
   padding: 7px 10px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid var(--border-soft);
 }
 
 .quick-chat-overview-pill span {
@@ -6189,22 +6237,21 @@ function onQuickChatStorageChange(event: StorageEvent) {
   display: flex;
   flex-direction: column;
   padding: 14px;
-  background:
-    linear-gradient(180deg, rgba(249, 251, 255, 0.98) 0%, rgba(243, 247, 252, 0.98) 100%);
+  background: var(--surface-2);
 }
 
 .quick-chat-room-list {
-  border: 1px solid rgba(226, 232, 240, 0.9);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: #ffffff;
   overflow: auto;
   max-height: 100%;
-  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.06);
+  box-shadow: var(--shadow-xs);
 }
 
 .quick-chat-room-search {
   padding: 12px 12px 8px;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.92);
+  border-bottom: 1px solid var(--border-soft);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -6390,7 +6437,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .quick-chat-room-item.active {
-  background: rgba(37, 99, 235, 0.08);
+  background: rgba(var(--primary-rgb), 0.08);
 }
 
 .quick-chat-room-item:hover {
@@ -6398,23 +6445,19 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .quick-chat-room-item.active .quick-chat-room-card {
-  border-color: rgba(96, 165, 250, 0.68);
-  background:
-    radial-gradient(circle at top right, rgba(191, 219, 254, 0.4), transparent 40%),
-    linear-gradient(180deg, rgba(239, 246, 255, 0.96) 0%, rgba(255, 255, 255, 0.98) 100%);
+  border-color: rgba(var(--primary-rgb), 0.4);
+  background: linear-gradient(180deg, var(--primary-soft) 0%, #ffffff 100%);
 }
 
 .quick-chat-main {
-  border: 1px solid rgba(214, 226, 240, 0.92);
-  border-radius: 24px;
-  background:
-    radial-gradient(circle at top, rgba(219, 234, 254, 0.22), transparent 34%),
-    rgba(255, 255, 255, 0.98);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #ffffff;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   min-height: 0;
-  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.08);
+  box-shadow: var(--shadow-md);
 }
 
 .quick-chat-notice {
@@ -6451,8 +6494,8 @@ function onQuickChatStorageChange(event: StorageEvent) {
   flex-wrap: wrap;
   gap: 12px;
   padding: 16px 18px 14px;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.88);
-  background: linear-gradient(180deg, rgba(248, 251, 255, 0.98) 0%, rgba(255, 255, 255, 0.98) 100%);
+  border-bottom: 1px solid var(--border-soft);
+  background: #ffffff;
 }
 
 .quick-chat-header-main {
@@ -6486,30 +6529,28 @@ function onQuickChatStorageChange(event: StorageEvent) {
   min-height: 320px;
   padding: 18px 18px 14px;
   overflow-y: auto;
-  background:
-    radial-gradient(circle at top, rgba(191, 219, 254, 0.3), transparent 34%),
-    linear-gradient(180deg, rgba(244, 248, 255, 0.88) 0%, #fff 100%);
+  background: linear-gradient(180deg, var(--surface-3) 0%, #fff 100%);
 }
 
 .quick-chat-message {
   margin-bottom: 12px;
   max-width: min(820px, 92%);
   background: rgba(255, 255, 255, 0.98);
-  border: 1px solid rgba(219, 229, 240, 0.96);
-  border-radius: 18px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
   padding: 12px 14px 10px;
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.06);
+  box-shadow: var(--shadow-xs);
 }
 
 .quick-chat-message-focus {
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.36);
+  box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.36);
   transition: box-shadow 0.24s ease;
 }
 
 .quick-chat-message.self {
   margin-left: auto;
-  background: linear-gradient(180deg, rgba(229, 240, 255, 0.98) 0%, rgba(245, 249, 255, 0.98) 100%);
-  border-color: rgba(96, 165, 250, 0.42);
+  background: linear-gradient(180deg, var(--primary-soft) 0%, #f4faf7 100%);
+  border-color: rgba(var(--primary-rgb), 0.28);
 }
 
 .quick-chat-message-meta {
@@ -6541,7 +6582,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
 .quick-chat-recall-btn {
   padding-inline: 0 !important;
   height: auto !important;
-  color: #3b82f6;
+  color: var(--primary);
 }
 
 .quick-chat-recalled {
@@ -6592,9 +6633,9 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .quick-chat-input {
-  border-top: 1px solid rgba(226, 232, 240, 0.88);
+  border-top: 1px solid var(--border-soft);
   padding: 14px 18px 16px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(247, 250, 255, 0.96) 100%);
+  background: #ffffff;
 }
 
 .quick-chat-input :deep(.ant-input) {

@@ -24,7 +24,17 @@
       </view>
     </scroll-view>
 
-    <block wx:for="{{list}}" wx:key="id">
+    <view class="surface state-card" wx:if="{{loading}}">
+      <view class="state-title">正在加载消息</view>
+    </view>
+
+    <view class="surface state-card" wx:if="{{!loading && loadError}}">
+      <view class="state-title">消息加载失败</view>
+      <view class="section-subtitle">{{loadError}}</view>
+      <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
+    </view>
+
+    <block wx:for="{{list}}" wx:key="id" wx:if="{{!loading && !loadError}}">
       <view class="msg-item" data-id="{{item.id}}" bindtap="goDetail">
         <view class="left">
           <view class="badge-row">
@@ -44,6 +54,15 @@
       </view>
     </block>
 
-    <view class="list-empty" wx:if="{{!list.length}}">{{emptyText}}</view>
+    <view class="surface state-card" wx:if="{{!loading && !loadError && loadingMore}}">
+      <view class="section-subtitle">正在加载更多消息...</view>
+    </view>
+
+    <view class="surface state-card" wx:elif="{{!loading && !loadError && hasMore && list.length}}">
+      <view class="section-subtitle">已加载 {{list.length}} 条消息</view>
+      <button class="ghost-btn retry-btn" bindtap="loadMore">继续加载</button>
+    </view>
+
+    <view class="list-empty" wx:if="{{!loading && !loadError && !list.length}}">{{emptyText}}</view>
   </view>
 </view>

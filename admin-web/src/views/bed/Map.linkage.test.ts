@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import BedMap from './Map.vue'
 import { emitLiveSync, inferLiveSyncTopics } from '../../utils/liveSync'
 
-const getBedMap = vi.fn()
-const getBaseConfigItemList = vi.fn()
+const getBedMap = vi.hoisted(() => vi.fn())
+const getBaseConfigItemList = vi.hoisted(() => vi.fn())
 
 vi.mock('../../api/bed', () => ({
   getBedMap
@@ -20,7 +20,14 @@ vi.mock('../../api/elder', () => ({
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({
-    push: vi.fn()
+    push: vi.fn(),
+    replace: vi.fn()
+  }),
+  useRoute: () => ({
+    query: {},
+    params: {},
+    path: '/logistics/assets/room-state-map',
+    fullPath: '/logistics/assets/room-state-map'
   })
 }))
 

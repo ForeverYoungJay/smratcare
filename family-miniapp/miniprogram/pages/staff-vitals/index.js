@@ -96,6 +96,9 @@ Page({
     loading: false,
     submitting: false,
     loadError: '',
+    submitError: '',
+    submitSuccess: '',
+    lastRecordSummary: '',
     records: [],
     dataTypeOptions,
     statusFilters,
@@ -133,7 +136,11 @@ Page({
   },
   onInput(e) {
     const field = e.currentTarget.dataset.field;
-    this.setData({ [field]: e.detail.value });
+    this.setData({
+      [field]: e.detail.value,
+      submitError: '',
+      submitSuccess: ''
+    });
     if (field === 'dataValue') this.refreshAbnormalFlag(e.detail.value);
   },
   onTypeChange(e) {
@@ -144,7 +151,9 @@ Page({
       unit: meta.unit,
       placeholder: meta.placeholder,
       dataValue: '',
-      abnormalFlag: 0
+      abnormalFlag: 0,
+      submitError: '',
+      submitSuccess: ''
     });
   },
   onDateChange(e) {
@@ -152,7 +161,9 @@ Page({
     const measuredTime = this.data.measuredTime || '00:00';
     this.setData({
       measuredDate,
-      measuredAt: `${measuredDate} ${measuredTime}:00`
+      measuredAt: `${measuredDate} ${measuredTime}:00`,
+      submitError: '',
+      submitSuccess: ''
     });
   },
   onTimeChange(e) {
@@ -160,11 +171,13 @@ Page({
     const measuredDate = this.data.measuredDate || nowText().slice(0, 10);
     this.setData({
       measuredTime,
-      measuredAt: `${measuredDate} ${measuredTime}:00`
+      measuredAt: `${measuredDate} ${measuredTime}:00`,
+      submitError: '',
+      submitSuccess: ''
     });
   },
   switchAbnormal(e) {
-    this.setData({ activeAbnormal: e.currentTarget.dataset.value || '' });
+    this.setData({ activeAbnormal: e.currentTarget.dataset.value || '', loadError: '' });
     this.loadData();
   },
   searchRecords() {
@@ -176,7 +189,11 @@ Page({
     this.setData({ abnormalFlag: recommendAbnormalFlag(dataType, value) });
   },
   toggleAbnormal() {
-    this.setData({ abnormalFlag: this.data.abnormalFlag ? 0 : 1 });
+    this.setData({
+      abnormalFlag: this.data.abnormalFlag ? 0 : 1,
+      submitError: '',
+      submitSuccess: ''
+    });
   },
   validateForm() {
     if (!this.data.elderName.trim()) return '请填写老人姓名';
@@ -191,28 +208,35 @@ Page({
       return;
     }
     const dataType = this.data.dataTypeOptions[this.data.dataTypeIndex].value;
-    this.setData({ submitting: true });
+    this.setData({ submitting: true, submitError: '', submitSuccess: '' });
     try {
+      const elderName = this.data.elderName.trim();
+      const dataTypeMeta = this.data.dataTypeOptions[this.data.dataTypeIndex];
+      const dataValue = this.data.dataValue.trim();
       await submitStaffVitalRecord({
-        elderName: this.data.elderName.trim(),
+        elderName,
         dataType,
-        dataValue: this.data.dataValue.trim(),
+        dataValue,
         measuredAt: normalizeMeasuredAt(this.data.measuredAt),
         abnormalFlag: this.data.abnormalFlag,
         remark: this.data.remark.trim(),
         source: 'staff-mobile'
       });
+      const timestamp = nowText();
       wx.showToast({ title: '体征已补录', icon: 'success' });
       this.setData({
         dataValue: '',
         remark: '',
-        measuredAt: nowText(),
-        ...splitDateTime(nowText()),
+        measuredAt: timestamp,
+        ...splitDateTime(timestamp),
         abnormalFlag: 0,
-        keyword: this.data.elderName.trim()
+        keyword: elderName,
+        submitSuccess: '体征补录已提交，可在健康数据台账继续查看。',
+        lastRecordSummary: `${elderName} · ${dataTypeMeta.label} · ${dataValue}`
       });
       this.loadData();
     } catch (error) {
+      this.setData({ submitError: error.message || '补录失败，请稍后重试' });
       wx.showToast({ title: error.message || '补录失败', icon: 'none' });
     } finally {
       this.setData({ submitting: false });

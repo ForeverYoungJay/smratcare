@@ -64,10 +64,10 @@
           </a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="openLogs(record)">查看流水</a-button>
-            <a-button type="link" @click="openConfig(record)">账户设置</a-button>
-          </a-space>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="openLogs(record)">查看流水</a-button>
+            <a-button type="link" size="small" @click="openConfig(record)">账户设置</a-button>
+          </div>
         </template>
       </template>
     </DataTable>

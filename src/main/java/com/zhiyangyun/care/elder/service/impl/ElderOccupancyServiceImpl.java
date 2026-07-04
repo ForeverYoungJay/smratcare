@@ -68,14 +68,13 @@ public class ElderOccupancyServiceImpl implements ElderOccupancyService {
             .eq(ElderBedRelation::getElderId, elderId)
             .eq(ElderBedRelation::getActiveFlag, 1)
             .last("FOR UPDATE"));
-    Set<Long> bedIdsToRelease = new LinkedHashSet<>();
-    if (elder.getBedId() != null) {
-      bedIdsToRelease.add(elder.getBedId());
-    }
+    Set<Long> relationBackedBedIds = new LinkedHashSet<>();
     activeRelations.stream()
         .map(ElderBedRelation::getBedId)
         .filter(Objects::nonNull)
-        .forEach(bedIdsToRelease::add);
+        .forEach(relationBackedBedIds::add);
+
+    Set<Long> wholeRoomLockedBedIds = new LinkedHashSet<>();
     bedMapper.selectList(
             Wrappers.lambdaQuery(Bed.class)
                 .eq(Bed::getIsDeleted, 0)
@@ -87,7 +86,17 @@ public class ElderOccupancyServiceImpl implements ElderOccupancyService {
         .stream()
         .map(Bed::getId)
         .filter(Objects::nonNull)
-        .forEach(bedIdsToRelease::add);
+        .forEach(wholeRoomLockedBedIds::add);
+
+    Set<Long> legacyFallbackBedIds = new LinkedHashSet<>();
+    if (relationBackedBedIds.isEmpty() && elder.getBedId() != null) {
+      legacyFallbackBedIds.add(elder.getBedId());
+    }
+
+    Set<Long> bedIdsToRelease = new LinkedHashSet<>();
+    bedIdsToRelease.addAll(relationBackedBedIds);
+    bedIdsToRelease.addAll(wholeRoomLockedBedIds);
+    bedIdsToRelease.addAll(legacyFallbackBedIds);
 
     int closedRelations = relationMapper.update(
         null,
@@ -102,7 +111,7 @@ public class ElderOccupancyServiceImpl implements ElderOccupancyService {
             .set(reason != null && !reason.isBlank(), ElderBedRelation::getRemark, reason));
     result.setClosedRelationCount(closedRelations);
 
-    Long previousBedId = elder.getBedId();
+    Long previousBedId = relationBackedBedIds.isEmpty() ? elder.getBedId() : relationBackedBedIds.iterator().next();
     if (previousBedId == null && !bedIdsToRelease.isEmpty()) {
       previousBedId = bedIdsToRelease.iterator().next();
     }
@@ -121,7 +130,12 @@ public class ElderOccupancyServiceImpl implements ElderOccupancyService {
                 .eq(tenantId != null, Bed::getTenantId, tenantId)
                 .eq(orgId != null, Bed::getOrgId, orgId)
                 .last("LIMIT 1 FOR UPDATE"));
-        if (bed != null && (Objects.equals(bed.getElderId(), elderId) || bed.getElderId() == null)) {
+        if (shouldReleaseBed(
+            bed,
+            elderId,
+            relationBackedBedIds.contains(bedId),
+            wholeRoomLockedBedIds.contains(bedId),
+            legacyFallbackBedIds.contains(bedId))) {
           bed.setElderId(null);
           bed.setStatus(BedStatus.AVAILABLE);
           bed.setOccupancySource(null);
@@ -148,7 +162,12 @@ public class ElderOccupancyServiceImpl implements ElderOccupancyService {
               .eq(tenantId != null, Bed::getTenantId, tenantId)
               .eq(orgId != null, Bed::getOrgId, orgId)
               .last("LIMIT 1 FOR UPDATE"));
-      if (bed != null && (Objects.equals(bed.getElderId(), elderId) || bed.getElderId() == null)) {
+      if (shouldReleaseBed(
+          bed,
+          elderId,
+          relationBackedBedIds.contains(previousBedId),
+          wholeRoomLockedBedIds.contains(previousBedId),
+          legacyFallbackBedIds.contains(previousBedId))) {
         bed.setElderId(null);
         bed.setStatus(BedStatus.AVAILABLE);
         bed.setOccupancySource(null);
@@ -166,5 +185,23 @@ public class ElderOccupancyServiceImpl implements ElderOccupancyService {
     }
 
     return result;
+  }
+
+  private boolean shouldReleaseBed(
+      Bed bed,
+      Long elderId,
+      boolean relationBacked,
+      boolean wholeRoomLocked,
+      boolean legacyFallback) {
+    if (bed == null) {
+      return false;
+    }
+    if (relationBacked || wholeRoomLocked) {
+      return true;
+    }
+    if (Objects.equals(bed.getElderId(), elderId)) {
+      return true;
+    }
+    return legacyFallback && bed.getElderId() == null;
   }
 }

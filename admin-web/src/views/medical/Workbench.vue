@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="医护照护工作台" subTitle="Medical & Care 一体化管理" mode="showcase" kicker="核心业务">
+  <PageContainer title="医护照护工作台" subTitle="护理、医疗、健康与用药一体化管理" mode="showcase" kicker="核心业务">
     <template #meta>
       <span class="soft-pill">业务日期 {{ summary.snapshotDate || '-' }}</span>
       <span class="soft-pill">风险等级 {{ riskLevelLabel }}</span>
@@ -311,7 +311,7 @@ const riskProgressGradient = computed(() => {
     return { '0%': '#fa8c16', '100%': '#d46b08' }
   }
   if (riskIndex.value >= 30) {
-    return { '0%': '#1677ff', '100%': '#0958d9' }
+    return { '0%': '#3d7fa6', '100%': '#33698a' }
   }
   return { '0%': '#52c41a', '100%': '#389e0d' }
 })
@@ -613,8 +613,8 @@ watch(
 
 <style scoped>
 .filter-panel {
-  border: 1px solid #e0ecff;
-  background: linear-gradient(130deg, #f6fbff 0%, #f2f8ff 45%, #f9fdff 100%);
+  border: 1px solid var(--border);
+  background: linear-gradient(130deg, var(--surface-2) 0%, var(--surface-3) 45%, var(--surface-2) 100%);
 }
 
 .filter-head {
@@ -631,15 +631,15 @@ watch(
 
 .hero-panel {
   overflow: hidden;
-  border: 1px solid #d9ebff;
+  border: 1px solid var(--border);
   background:
-    radial-gradient(150% 110% at 0% 0%, rgba(22, 119, 255, 0.09) 0%, rgba(22, 119, 255, 0) 58%),
-    linear-gradient(140deg, #f8fcff 0%, #eef6ff 42%, #f8fdff 100%);
+    radial-gradient(150% 110% at 0% 0%, rgba(var(--primary-rgb), 0.09) 0%, rgba(var(--primary-rgb), 0) 58%),
+    linear-gradient(140deg, var(--surface-2) 0%, var(--surface-3) 42%, var(--surface-2) 100%);
 }
 
 .hero-title {
   font-size: 15px;
-  color: #1f2937;
+  color: var(--ink);
   font-weight: 600;
 }
 
@@ -655,18 +655,18 @@ watch(
   font-size: 42px;
   line-height: 1;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ink);
 }
 
 .hero-subline {
   margin-top: 8px;
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .metric-tile {
   border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.24);
+  border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.8);
   padding: 10px;
   min-height: 94px;
@@ -674,7 +674,7 @@ watch(
 }
 
 .metric-label {
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -682,14 +682,14 @@ watch(
   margin-top: 6px;
   font-size: 24px;
   line-height: 1.1;
-  color: #0f172a;
+  color: var(--ink);
   font-weight: 700;
 }
 
 .metric-hint {
   margin-top: 6px;
   font-size: 12px;
-  color: #475569;
+  color: var(--ink-soft);
 }
 
 .card-click {
@@ -697,18 +697,18 @@ watch(
 }
 
 .card-panel {
-  border: 1px solid #edf2f7;
+  border: 1px solid var(--border-soft);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .card-panel:hover {
   transform: translateY(-2px);
-  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+  box-shadow: var(--shadow-md);
 }
 
 .line {
   margin-bottom: 6px;
-  color: #334155;
+  color: var(--ink-soft);
   font-size: 13px;
 }
 

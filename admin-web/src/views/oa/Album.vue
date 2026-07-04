@@ -1,5 +1,11 @@
 <template>
   <PageContainer title="相册管理" subTitle="活动照片与影像资料管理">
+    <template #extra>
+      <a-space wrap>
+        <a-button type="primary" @click="openEdit()">新增相册</a-button>
+      </a-space>
+    </template>
+
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="相册标题/备注" allow-clear />
@@ -16,21 +22,27 @@
           style="width: 220px"
         />
       </a-form-item>
+      <a-form-item label="相册类型">
+        <a-select v-model:value="query.albumScope" allow-clear style="width: 160px" :options="albumScopeOptions" />
+      </a-form-item>
       <a-form-item label="状态">
         <a-select v-model:value="query.status" allow-clear style="width: 160px" :options="statusOptions" />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openEdit()">新增相册</a-button>
-        <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
-        <a-button :disabled="!canPublishSingle" @click="publishSelected">发布</a-button>
-        <a-button :disabled="!canArchiveSingle" @click="archiveSelected">归档</a-button>
-        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" @click="batchPublish">批量发布</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" @click="batchArchive">批量归档</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
-        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
-      </template>
     </SearchForm>
+
+    <div v-if="selectedRowKeys.length" class="selection-bar">
+      <span class="selection-bar__count">已勾选 {{ selectedRowKeys.length }} 条</span>
+      <template v-if="selectedRowKeys.length === 1">
+        <a-button size="small" @click="editSelected">编辑</a-button>
+        <a-button size="small" :disabled="!canPublishSingle" @click="publishSelected">发布</a-button>
+        <a-button size="small" :disabled="!canArchiveSingle" @click="archiveSelected">归档</a-button>
+        <a-button size="small" danger @click="removeSelected">删除</a-button>
+      </template>
+      <a-button size="small" @click="batchPublish">批量发布</a-button>
+      <a-button size="small" @click="batchArchive">批量归档</a-button>
+      <a-button size="small" danger @click="batchRemove">批量删除</a-button>
+      <a-button size="small" type="text" class="selection-bar__clear" @click="selectedRowKeys = []">取消选择</a-button>
+    </div>
 
     <DataTable
       rowKey="id"
@@ -48,6 +60,12 @@
         </template>
         <template v-else-if="column.key === 'status'">
           <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
+        </template>
+        <template v-else-if="column.key === 'albumScope'">
+          <a-tag :color="record.albumScope === 'PERSONAL' ? 'purple' : 'green'">{{ albumScopeText(record.albumScope) }}</a-tag>
+        </template>
+        <template v-else-if="column.key === 'elderId'">
+          <span>{{ record.albumScope === 'PERSONAL' ? findElderName(record.elderId) || record.elderId || '-' : '全体可见' }}</span>
         </template>
       </template>
     </DataTable>
@@ -69,6 +87,32 @@
                 v-model:value="form.folderName"
                 :options="folderOptions"
                 placeholder="例如：2026 春季活动"
+              />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item label="相册类型" required>
+              <a-radio-group v-model:value="form.albumScope">
+                <a-radio-button value="PERSONAL">个人相册</a-radio-button>
+                <a-radio-button value="GROUP">集体活动相册</a-radio-button>
+              </a-radio-group>
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="所属老人" :required="form.albumScope === 'PERSONAL'">
+              <a-select
+                v-model:value="form.elderId"
+                :disabled="form.albumScope !== 'PERSONAL'"
+                :options="elderOptions"
+                :loading="elderLoading"
+                show-search
+                allow-clear
+                placeholder="选择个人相册所属老人"
+                :filter-option="false"
+                @search="searchElders"
+                @focus="() => !elderOptions.length && searchElders('')"
               />
             </a-form-item>
           </a-col>
@@ -126,17 +170,29 @@ import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { createAlbum, deleteAlbum, getAlbumFolders, getAlbumPage, updateAlbum, uploadOaFile } from '../../api/oa'
 import type { OaAlbum, PageResult } from '../../types'
+import { useElderOptions } from '../../composables/useElderOptions'
 
 const loading = ref(false)
 const saving = ref(false)
 const rows = ref<OaAlbum[]>([])
 const selectedRowKeys = ref<string[]>([])
-const query = reactive({ keyword: '', category: '', folderName: '', status: undefined as string | undefined, pageNo: 1, pageSize: 10 })
+const query = reactive({
+  keyword: '',
+  category: '',
+  folderName: '',
+  albumScope: undefined as string | undefined,
+  status: undefined as string | undefined,
+  pageNo: 1,
+  pageSize: 10
+})
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
+const { elderOptions, elderLoading, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 80 })
 
 const columns = [
   { title: '封面', dataIndex: 'coverUrl', key: 'coverUrl', width: 90 },
   { title: '相册标题', dataIndex: 'title', key: 'title', width: 220 },
+  { title: '相册类型', dataIndex: 'albumScope', key: 'albumScope', width: 130 },
+  { title: '可见对象', dataIndex: 'elderId', key: 'elderId', width: 150 },
   { title: '分类', dataIndex: 'category', key: 'category', width: 140 },
   { title: '照片夹', dataIndex: 'folderName', key: 'folderName', width: 160 },
   { title: '照片数量', dataIndex: 'photoCount', key: 'photoCount', width: 100 },
@@ -149,11 +205,15 @@ const statusOptions = [
   { label: '已发布', value: 'PUBLISHED' },
   { label: '已归档', value: 'ARCHIVED' }
 ]
+const albumScopeOptions = [
+  { label: '个人相册', value: 'PERSONAL' },
+  { label: '集体活动相册', value: 'GROUP' }
+]
 const folderOptions = ref<Array<{ value: string }>>([])
 
 const editOpen = ref(false)
 const shootDate = ref<Dayjs | undefined>()
-const form = reactive<Partial<OaAlbum>>({ status: 'DRAFT', photoCount: 0, category: '', folderName: '' })
+const form = reactive<Partial<OaAlbum>>({ status: 'DRAFT', photoCount: 0, category: '', folderName: '', albumScope: 'GROUP' })
 const uploading = ref(false)
 const photoFiles = ref<Array<{ name: string; url: string }>>([])
 const rowSelection = computed(() => ({
@@ -179,6 +239,10 @@ function statusColor(status?: string) {
   return 'orange'
 }
 
+function albumScopeText(scope?: string) {
+  return scope === 'PERSONAL' ? '个人相册' : '集体活动相册'
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -188,10 +252,14 @@ async function fetchData() {
       return {
         ...item,
         id: String(item.id),
+        albumScope: item.albumScope === 'PERSONAL' ? 'PERSONAL' : 'GROUP',
         coverUrl: item.coverUrl || parsed[0]?.url || '',
         photoCount: Math.max(Number(item.photoCount || 0), parsed.length)
       }
     })
+    rows.value
+      .filter((item) => item.albumScope === 'PERSONAL' && item.elderId)
+      .forEach((item) => ensureSelectedElder(item.elderId))
     pagination.total = res.total || res.list.length
     selectedRowKeys.value = []
   } finally {
@@ -220,6 +288,7 @@ function onReset() {
   query.keyword = ''
   query.category = ''
   query.folderName = ''
+  query.albumScope = undefined
   query.status = undefined
   query.pageNo = 1
   pagination.current = 1
@@ -227,7 +296,24 @@ function onReset() {
 }
 
 function openEdit(record?: OaAlbum) {
-  Object.assign(form, record || { status: 'DRAFT', photoCount: 0, title: '', category: '', folderName: '', coverUrl: '', remark: '', photosJson: '' })
+  Object.assign(form, record || {
+    status: 'DRAFT',
+    photoCount: 0,
+    title: '',
+    category: '',
+    folderName: '',
+    albumScope: 'GROUP',
+    elderId: undefined,
+    coverUrl: '',
+    remark: '',
+    photosJson: ''
+  })
+  form.albumScope = form.albumScope === 'PERSONAL' ? 'PERSONAL' : 'GROUP'
+  if (form.albumScope !== 'PERSONAL') {
+    form.elderId = undefined
+  } else if (form.elderId) {
+    ensureSelectedElder(form.elderId)
+  }
   const parsed = parseAlbumPhotos(form.photosJson, form.remark)
   form.remark = parseRemarkText(form.remark)
   photoFiles.value = parsed
@@ -242,10 +328,16 @@ function openEdit(record?: OaAlbum) {
 }
 
 async function submit() {
+  if (form.albumScope === 'PERSONAL' && !form.elderId) {
+    message.warning('个人相册请选择所属老人')
+    return
+  }
   saving.value = true
   try {
     const payload = {
       ...form,
+      albumScope: form.albumScope === 'PERSONAL' ? 'PERSONAL' : 'GROUP',
+      elderId: form.albumScope === 'PERSONAL' ? form.elderId : undefined,
       coverUrl: form.coverUrl || photoFiles.value[0]?.url,
       photosJson: JSON.stringify(photoFiles.value),
       photoCount: Math.max(Number(form.photoCount || 0), photoFiles.value.length),
@@ -470,11 +562,6 @@ fetchFolderOptions()
 </script>
 
 <style scoped>
-.selection-tip {
-  color: rgba(0, 0, 0, 0.45);
-  font-size: 12px;
-}
-
 .photo-list {
   margin-top: 8px;
   display: flex;
@@ -488,7 +575,7 @@ fetchFolderOptions()
   justify-content: space-between;
   gap: 8px;
   padding: 4px 8px;
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--border-soft);
   border-radius: 6px;
 }
 </style>

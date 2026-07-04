@@ -10,6 +10,7 @@ public class InventoryOutboundSheetResponse {
   private String outboundNo;
   private String receiverName;
   private Long elderId;
+  private String elderName;
   private String contractNo;
   private String applyDept;
   private Long operatorStaffId;

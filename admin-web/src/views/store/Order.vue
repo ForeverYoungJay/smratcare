@@ -40,7 +40,7 @@
       <vxe-table
         border
         stripe
-        show-overflow
+        show-overflow="title"
         height="520"
         :loading="loading"
         :data="rows"
@@ -60,20 +60,23 @@
           </template>
         </vxe-column>
         <vxe-column field="createTime" title="下单时间" width="180" />
-        <vxe-column title="操作" width="260" fixed="right">
+        <vxe-column title="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <a-space>
-              <a @click="openDetail(row)">详情</a>
-              <a @click="goStockByOrder(row)">查库存</a>
-              <a
-                @click="handleFulfill(row)"
-                :style="{ color: isFulfillDisabled(row) ? '#999' : '' }"
-              >
-                标记出库
-              </a>
-              <a @click="handleCancel(row)">取消</a>
-              <a @click="handleRefund(row)">退款</a>
-            </a-space>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="openDetail(row)">详情</a-button>
+              <a-button type="link" size="small" @click="handleFulfill(row)" :disabled="isFulfillDisabled(row)">标记出库</a-button>
+              <a-dropdown trigger="click">
+                <a-button type="link" size="small">更多 <DownOutlined /></a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item key="stock" @click="goStockByOrder(row)">查库存</a-menu-item>
+                    <a-menu-item key="cancel" :disabled="isCancelDisabled(row)" @click="handleCancel(row)">取消</a-menu-item>
+                    <a-menu-divider />
+                    <a-menu-item key="refund" danger :disabled="isRefundDisabled(row)" @click="handleRefund(row)">退款</a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
+            </div>
           </template>
         </vxe-column>
       </vxe-table>
@@ -110,10 +113,10 @@
               <a-list-item>
                 <div class="item-line">
                   <span>{{ item.productName || item.productId }} × {{ item.quantity }}</span>
-                  <a-space>
-                    <a @click="goStockByItem(item)">查库存</a>
-                    <a @click="createPurchaseByItem(item)">发起采购</a>
-                  </a-space>
+                  <div class="row-action-links">
+                    <a-button type="link" size="small" @click="goStockByItem(item)">查库存</a-button>
+                    <a-button type="link" size="small" @click="createPurchaseByItem(item)">发起采购</a-button>
+                  </div>
                 </div>
               </a-list-item>
             </template>
@@ -166,6 +169,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
+import { DownOutlined } from '@ant-design/icons-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { getBaseConfigItemList } from '../../api/baseConfig'

@@ -1,5 +1,5 @@
 import request, { fetchPage } from '../utils/request'
-import type { SmartAlert, SmartAlertSummary, SmartDevice, SmartDeviceEventRequest } from '../types'
+import type { SmartAlert, SmartAlertDispatch, SmartAlertRule, SmartAlertSummary, SmartDevice, SmartDeviceEventRequest } from '../types'
 
 export function getSmartDevicePage(params: {
   pageNo?: number
@@ -31,6 +31,10 @@ export function getSmartAlertSummary() {
   return request.get<SmartAlertSummary>('/api/smart-care/alerts/summary')
 }
 
+export function refreshDerivedSmartAlerts() {
+  return request.post<SmartAlertSummary>('/api/smart-care/alerts/derived-health/refresh')
+}
+
 export function getSmartAlertPage(params: {
   pageNo?: number
   pageSize?: number
@@ -48,4 +52,65 @@ export function acknowledgeSmartAlert(id: string | number) {
 
 export function resolveSmartAlert(id: string | number, data: { resolutionNote?: string; notifyFamily?: boolean }) {
   return request.put<SmartAlert>(`/api/smart-care/alerts/${id}/resolve`, data)
+}
+
+// ===== 场景规则引擎 =====
+export function getSmartRulePage(params: {
+  pageNo?: number
+  pageSize?: number
+  eventType?: string
+  enabled?: number
+}) {
+  return fetchPage<SmartAlertRule>('/api/smart/rules/page', params)
+}
+
+export function createSmartRule(data: Partial<SmartAlertRule>) {
+  return request.post<SmartAlertRule>('/api/smart/rules', data)
+}
+
+export function updateSmartRule(id: string | number, data: Partial<SmartAlertRule>) {
+  return request.put<SmartAlertRule>(`/api/smart/rules/${id}`, data)
+}
+
+export function setSmartRuleEnabled(id: string | number, enabled: boolean) {
+  return request.put(`/api/smart/rules/${id}/enabled`, null, { params: { enabled } })
+}
+
+export function deleteSmartRule(id: string | number) {
+  return request.delete(`/api/smart/rules/${id}`)
+}
+
+// ===== 告警派单闭环 =====
+export function getSmartDispatchPage(params: {
+  pageNo?: number
+  pageSize?: number
+  status?: string
+  level?: string
+  assigneeId?: string | number
+}) {
+  return fetchPage<SmartAlertDispatch>('/api/smart/dispatch/page', params)
+}
+
+export function autoSmartDispatch() {
+  return request.post<number>('/api/smart/dispatch/auto')
+}
+
+export function assignSmartDispatch(data: { dispatchId: string | number; assigneeId?: string | number; assigneeName?: string }) {
+  return request.post<SmartAlertDispatch>('/api/smart/dispatch/assign', data)
+}
+
+export function respondSmartDispatch(id: string | number) {
+  return request.post<SmartAlertDispatch>(`/api/smart/dispatch/${id}/respond`)
+}
+
+export function onsiteSmartDispatch(id: string | number) {
+  return request.post<SmartAlertDispatch>(`/api/smart/dispatch/${id}/onsite`)
+}
+
+export function handleSmartDispatch(data: { dispatchId: string | number; note?: string; incidentId?: string | number }) {
+  return request.post<SmartAlertDispatch>('/api/smart/dispatch/handle', data)
+}
+
+export function reviewSmartDispatch(data: { dispatchId: string | number; note?: string }) {
+  return request.post<SmartAlertDispatch>('/api/smart/dispatch/review', data)
 }

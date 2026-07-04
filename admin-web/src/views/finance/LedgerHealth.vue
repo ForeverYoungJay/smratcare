@@ -30,7 +30,7 @@
       />
 
       <a-card class="card-elevated" :bordered="false">
-        <vxe-table border stripe show-overflow :loading="loading" :data="data?.issues || []" height="560">
+        <vxe-table border stripe show-overflow="title" :loading="loading" :data="data?.issues || []" height="560">
           <vxe-column field="issueTypeLabel" title="异常类型" width="180">
             <template #default="{ row }"><a-tag color="red">{{ row.issueTypeLabel }}</a-tag></template>
           </vxe-column>
@@ -44,10 +44,10 @@
           <vxe-column field="detail" title="异常描述" min-width="260" />
           <vxe-column title="操作" width="180" fixed="right">
             <template #default="{ row }">
-              <a-space>
-                <a-button v-if="row.billId" type="link" @click="go(`/finance/bill/${row.billId}`)">查看账单</a-button>
-                <a-button type="link" @click="go('/finance/reconcile/center?filter=unmatched')">去处理</a-button>
-              </a-space>
+              <div class="row-action-links">
+                <a-button v-if="row.billId" type="link" size="small" @click="go(`/finance/bill/${row.billId}`)">查看账单</a-button>
+                <a-button type="link" size="small" @click="go('/finance/reconcile/center?filter=unmatched')">去处理</a-button>
+              </div>
             </template>
           </vxe-column>
         </vxe-table>

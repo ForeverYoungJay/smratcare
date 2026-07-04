@@ -33,6 +33,8 @@ export interface InventoryLogItem {
   refAdjustmentId?: Id
   outType?: 'SALE' | 'CONSUME'
   receiverName?: string
+  elderId?: Id
+  elderName?: string
   remark?: string
   createTime?: string
 }
@@ -81,6 +83,8 @@ export interface InventoryOutboundRequest {
   batchId?: Id
   quantity: number
   receiverName?: string
+  elderId?: Id
+  elderName?: string
   outboundNo?: string
   reason?: string
 }
@@ -128,6 +132,7 @@ export interface InventoryOutboundSheet {
   outboundNo: string
   receiverName: string
   elderId?: Id
+  elderName?: string
   contractNo?: string
   applyDept?: string
   operatorStaffId?: Id

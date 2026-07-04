@@ -16,12 +16,12 @@
         <a-button :disabled="!selectedSingleRecord || !canPublishSelected" @click="publishSelected">发布</a-button>
         <a-button :disabled="!selectedSingleRecord || !canExpireSelected" @click="expireSelected">设为过期</a-button>
         <a-button :disabled="!selectedSingleRecord || !canArchiveSelected" @click="archiveSelected">归档</a-button>
-        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
         <a-button :disabled="selectedPublishIds.length === 0" @click="batchPublish">批量发布</a-button>
         <a-button :disabled="selectedExpireIds.length === 0" @click="batchExpire">批量过期</a-button>
         <a-button :disabled="selectedArchiveIds.length === 0" @click="batchArchive">批量归档</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
         <a-button @click="downloadExport">导出CSV</a-button>
+        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
         <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，批量状态流转按当前状态自动过滤</span>
       </template>
     </SearchForm>
@@ -471,13 +471,13 @@ fetchData()
 
 <style scoped>
 .selection-tip {
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--muted);
   font-size: 12px;
 }
 
 .upload-hint {
   margin-top: 8px;
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--muted);
   font-size: 12px;
 }
 </style>

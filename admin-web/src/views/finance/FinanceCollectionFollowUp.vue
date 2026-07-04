@@ -3,7 +3,7 @@
     <div class="follow-shell">
       <a-card class="follow-hero card-elevated" :bordered="false">
         <div>
-          <div class="follow-hero__eyebrow">Collection Follow-up</div>
+          <div class="follow-hero__eyebrow">催缴跟进</div>
           <h2>把欠费、低余额和续约临界放进同一张跟进清单。</h2>
           <p>每位长者只保留一行，优先看谁最需要今天联系，而不是按账单散落处理。</p>
         </div>
@@ -47,7 +47,7 @@
         </a-row>
 
         <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-          <vxe-table border stripe show-overflow :loading="loading" :data="rows" height="620">
+          <vxe-table border stripe show-overflow="title" :loading="loading" :data="rows" height="620">
             <vxe-column field="elderName" title="长者" width="140" />
             <vxe-column field="oldestBillMonth" title="起始账期" width="110" />
             <vxe-column field="latestBillMonth" title="最近账期" width="110" />
@@ -91,11 +91,11 @@
             <vxe-column field="suggestion" title="建议动作" min-width="240" />
             <vxe-column title="操作" width="170" fixed="right">
               <template #default="{ row }">
-                <a-space>
-                  <a-button type="link" @click="go(row.actionPath || '/finance/bills/in-resident')">{{ row.actionLabel || '查看账单' }}</a-button>
-                  <a-button type="link" @click="openFollowModal(row)">跟进</a-button>
-                  <a-button v-if="row.primaryBillId" type="link" @click="go(`/finance/bill/${row.primaryBillId}`)">详情</a-button>
-                </a-space>
+                <div class="row-action-links">
+                  <a-button type="link" size="small" @click="go(row.actionPath || '/finance/bills/in-resident')">{{ row.actionLabel || '查看账单' }}</a-button>
+                  <a-button type="link" size="small" @click="openFollowModal(row)">跟进</a-button>
+                  <a-button v-if="row.primaryBillId" type="link" size="small" @click="go(`/finance/bill/${row.primaryBillId}`)">详情</a-button>
+                </div>
               </template>
             </vxe-column>
           </vxe-table>

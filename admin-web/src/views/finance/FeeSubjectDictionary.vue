@@ -24,7 +24,7 @@
     <input ref="importInputRef" type="file" accept=".csv,text/csv" style="display: none" @change="onImportFileChange" />
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <vxe-table ref="tableRef" border stripe show-overflow :loading="loading" :data="filteredRows" height="560">
+      <vxe-table ref="tableRef" border stripe show-overflow="title" :loading="loading" :data="filteredRows" height="560">
         <vxe-column type="checkbox" width="50" />
         <vxe-column field="configKey" title="科目键" min-width="260" />
         <vxe-column field="remark" title="科目名称" min-width="160" />

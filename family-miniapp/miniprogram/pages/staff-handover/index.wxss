@@ -3,6 +3,18 @@
   margin-top: 20rpx;
 }
 
+.inline-state {
+  margin-top: 18rpx;
+}
+
+.success-state {
+  background: #E8F3EF;
+}
+
+.error-state {
+  background: #fff3f2;
+}
+
 .handover-input {
   width: 100%;
   min-height: 190rpx;
@@ -11,7 +23,7 @@
   padding: 18rpx;
   border-radius: 16rpx;
   background: #f5f7fa;
-  color: #182430;
+  color: #22332E;
   font-size: 25rpx;
 }
 
@@ -31,7 +43,7 @@
 }
 
 .handover-title {
-  color: #182430;
+  color: #22332E;
   font-size: 27rpx;
   font-weight: 900;
 }

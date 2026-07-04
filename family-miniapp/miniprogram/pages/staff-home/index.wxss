@@ -1,22 +1,89 @@
+/* ===== 员工工作台 · 高效清晰 ===== */
+
+/* 顶栏：品牌渐变头部 */
 .home-head {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 16rpx;
-  margin: 6rpx 0 22rpx;
+  margin: 0 0 22rpx;
+  padding: 30rpx 28rpx;
+  border-radius: var(--radius-card);
+  background: linear-gradient(135deg, #21705F, #2E8A72);
+  box-shadow: 0 8rpx 24rpx rgba(33, 112, 95, 0.24);
+}
+
+.home-head .section-title {
+  color: #ffffff;
+  font-size: 40rpx;
+  font-weight: 800;
+}
+
+.home-head .section-subtitle {
+  margin-top: 6rpx;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 25rpx;
+}
+
+/* 头部状态徽章：在渐变底上保持醒目 */
+.home-head .pill {
+  min-height: 48rpx;
+  padding: 0 20rpx;
+  font-size: 23rpx;
+  font-weight: 800;
+}
+
+.home-head .pill-normal {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border: 1rpx solid rgba(255, 255, 255, 0.35);
+}
+
+.home-head .pill-warning {
+  background: #FBF0E2;
+  color: #B27221;
+}
+
+.home-head .pill-danger {
+  background: #C9504B;
+  color: #ffffff;
 }
 
 .retry-btn {
   margin-top: 20rpx;
 }
 
+/* 部分数据未同步提示：warning 浅底深字 */
+.warning-card {
+  margin-bottom: 18rpx;
+  padding: 22rpx 24rpx;
+  background: #FBF0E2;
+  border: 1rpx solid rgba(222, 155, 61, 0.45);
+}
+
+.warning-title {
+  color: #B27221;
+  font-size: 25rpx;
+  font-weight: 800;
+}
+
+.warning-text {
+  margin-top: 8rpx;
+  color: #B27221;
+  font-size: 23rpx;
+  line-height: 1.5;
+}
+
+/* 今日作战视图 */
 .battle-card {
   padding: 28rpx;
-  background: linear-gradient(135deg, rgba(36, 107, 95, 0.14), rgba(255, 255, 255, 0) 60%), #ffffff;
+  background: linear-gradient(135deg, rgba(33, 112, 95, 0.12), rgba(255, 255, 255, 0) 60%), var(--card);
+  border-color: rgba(33, 112, 95, 0.22);
 }
 
 .battle-card.danger {
-  background: linear-gradient(135deg, rgba(180, 35, 24, 0.13), rgba(255, 255, 255, 0) 58%), #ffffff;
+  background: linear-gradient(135deg, rgba(201, 80, 75, 0.14), rgba(255, 255, 255, 0) 58%), var(--card);
+  border-color: rgba(201, 80, 75, 0.4);
 }
 
 .battle-head {
@@ -27,33 +94,53 @@
 }
 
 .battle-kicker {
-  color: #60716b;
+  color: var(--muted);
   font-size: 22rpx;
-  font-weight: 850;
+  font-weight: 700;
+  letter-spacing: 2rpx;
+}
+
+.battle-card.danger .battle-kicker {
+  color: var(--danger);
 }
 
 .battle-title {
   margin-top: 8rpx;
-  color: #17231f;
+  color: var(--ink);
   font-size: 32rpx;
-  font-weight: 950;
+  font-weight: 800;
   line-height: 1.32;
 }
 
 .battle-meta {
   margin-top: 8rpx;
-  color: #6f7f79;
-  font-size: 23rpx;
+  color: var(--muted);
+  font-size: 24rpx;
 }
 
+/* 立即处理按钮：大而易点 */
 .battle-action {
   flex: none;
-  padding: 12rpx 18rpx;
+  display: inline-flex;
+  align-items: center;
+  min-height: 64rpx;
+  padding: 0 26rpx;
   border-radius: 999rpx;
-  background: #246b5f;
+  background: linear-gradient(135deg, #21705F, #2E8A72);
   color: #ffffff;
-  font-size: 22rpx;
-  font-weight: 900;
+  font-size: 24rpx;
+  font-weight: 800;
+  box-shadow: 0 6rpx 16rpx rgba(33, 112, 95, 0.28);
+}
+
+.battle-card.danger .battle-action {
+  background: var(--danger);
+  box-shadow: 0 6rpx 16rpx rgba(201, 80, 75, 0.3);
+}
+
+.battle-action:active {
+  transform: translateY(2rpx);
+  opacity: 0.9;
 }
 
 .battle-grid {
@@ -64,10 +151,15 @@
 }
 
 .battle-cell {
-  min-height: 126rpx;
-  padding: 16rpx 12rpx;
-  border-radius: 18rpx;
-  background: rgba(244, 248, 247, 0.92);
+  min-height: 132rpx;
+  padding: 18rpx 14rpx;
+  border-radius: var(--radius-ctl);
+  background: var(--brand-soft);
+  border: 1rpx solid rgba(33, 112, 95, 0.12);
+}
+
+.battle-cell:active {
+  opacity: 0.85;
 }
 
 .battle-cell text,
@@ -77,30 +169,32 @@
 }
 
 .battle-cell text {
-  color: #697a74;
-  font-size: 21rpx;
-  font-weight: 850;
+  color: var(--muted);
+  font-size: 22rpx;
+  font-weight: 700;
 }
 
+/* 待办统计数字：大而醒目 */
 .battle-value {
   margin-top: 10rpx;
-  color: #152420;
-  font-size: 31rpx;
-  font-weight: 950;
+  color: var(--brand-deep);
+  font-size: 40rpx;
+  font-weight: 900;
   line-height: 1;
 }
 
 .battle-note {
   margin-top: 10rpx;
-  color: #7b8b85;
+  color: var(--faint);
   font-size: 20rpx;
-  line-height: 1.25;
+  line-height: 1.3;
 }
 
+/* 现场压力指数 */
 .index-card {
   margin-top: 18rpx;
   padding: 26rpx;
-  background: linear-gradient(135deg, rgba(31, 95, 139, 0.13), rgba(255, 255, 255, 0) 52%), #ffffff;
+  background: linear-gradient(135deg, rgba(61, 127, 166, 0.12), rgba(255, 255, 255, 0) 52%), var(--card);
 }
 
 .index-main {
@@ -110,14 +204,15 @@
 }
 
 .index-main text {
-  color: #62717f;
-  font-size: 25rpx;
-  font-weight: 800;
+  color: var(--muted);
+  font-size: 26rpx;
+  font-weight: 700;
 }
 
 .index-main strong {
-  color: #162536;
-  font-size: 58rpx;
+  color: var(--info);
+  font-size: 60rpx;
+  font-weight: 900;
   line-height: 1;
 }
 
@@ -129,12 +224,13 @@
 
 .notice-line {
   padding: 14rpx 16rpx;
-  border-radius: 12rpx;
-  background: #f3f6f9;
-  color: #43515f;
-  font-size: 23rpx;
+  border-radius: var(--radius-ctl);
+  background: #EDF4F9;
+  color: var(--muted);
+  font-size: 24rpx;
 }
 
+/* 任务分组统计磁贴 */
 .task-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -143,34 +239,70 @@
 }
 
 .task-tile {
-  min-height: 164rpx;
-  padding: 20rpx;
+  min-height: 168rpx;
+  padding: 22rpx;
+}
+
+.task-tile:active {
+  transform: translateY(2rpx);
+  opacity: 0.9;
 }
 
 .task-title,
 .task-hint {
   display: block;
-  color: #64717e;
-  font-size: 23rpx;
+  color: var(--muted);
+  font-size: 24rpx;
 }
 
+.task-title {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.task-hint {
+  color: var(--faint);
+  font-size: 22rpx;
+}
+
+/* 统计数字：大号、按状态着色 */
 .task-count {
   display: block;
-  margin: 12rpx 0 6rpx;
-  color: #20744d;
-  font-size: 46rpx;
+  margin: 14rpx 0 8rpx;
+  color: var(--brand);
+  font-size: 52rpx;
   font-weight: 900;
   line-height: 1;
 }
 
 .task-count.warning {
-  color: #9a6400;
+  color: var(--warning);
 }
 
 .task-count.danger {
-  color: #bd2e1f;
+  color: var(--danger);
 }
 
+/* 面板通用 */
+.panel {
+  margin-top: 18rpx;
+  padding: 26rpx;
+}
+
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.link {
+  color: var(--brand);
+  font-size: 25rpx;
+  font-weight: 700;
+}
+
+/* 常用工作：快捷入口大而易点 */
 .quick-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -179,11 +311,17 @@
 }
 
 .quick-entry {
-  min-height: 116rpx;
-  padding: 18rpx 10rpx;
-  border-radius: 18rpx;
-  background: #f4f8f7;
+  min-height: 132rpx;
+  padding: 22rpx 10rpx;
+  border-radius: var(--radius-ctl);
+  background: var(--brand-soft);
+  border: 1rpx solid rgba(33, 112, 95, 0.12);
   text-align: center;
+}
+
+.quick-entry:active {
+  background: rgba(33, 112, 95, 0.16);
+  transform: translateY(2rpx);
 }
 
 .quick-title,
@@ -192,28 +330,33 @@
 }
 
 .quick-title {
-  color: #1d3b34;
+  color: var(--brand-deep);
   font-size: 27rpx;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .quick-desc {
   margin-top: 8rpx;
-  color: #74847f;
+  color: var(--muted);
   font-size: 21rpx;
 }
 
+/* 马上要处理列表 */
 .task-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16rpx;
-  padding: 18rpx 0;
-  border-top: 1rpx solid #edf1f5;
+  padding: 20rpx 0;
+  border-top: 1rpx solid var(--border);
 }
 
 .task-row:first-of-type {
   border-top: 0;
+}
+
+.task-row:active {
+  opacity: 0.8;
 }
 
 .task-row-main {
@@ -227,24 +370,32 @@
 }
 
 .row-title {
-  color: #182430;
-  font-size: 27rpx;
-  font-weight: 850;
+  color: var(--ink);
+  font-size: 28rpx;
+  font-weight: 700;
 }
 
 .row-meta {
   margin-top: 6rpx;
-  color: #73808c;
-  font-size: 22rpx;
+  color: var(--faint);
+  font-size: 23rpx;
 }
 
+/* 行内操作：品牌色胶囊按钮，易点 */
 .row-action {
-  color: #1f5f8b;
-  font-size: 23rpx;
-  font-weight: 850;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 56rpx;
+  padding: 0 22rpx;
+  border-radius: 999rpx;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 24rpx;
+  font-weight: 800;
   white-space: nowrap;
 }
 
 .staff-nav {
-  margin-top: 18rpx;
+  margin-top: 22rpx;
 }

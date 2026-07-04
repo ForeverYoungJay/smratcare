@@ -18,6 +18,20 @@
             style="width: 220px"
           />
         </a-form-item>
+        <a-form-item label="长者">
+          <a-select
+            v-model:value="query.elderId"
+            :options="elderSelectOptions"
+            allow-clear
+            show-search
+            :filter-option="false"
+            :loading="elderLoading"
+            option-filter-prop="label"
+            style="width: 220px"
+            @search="searchElders"
+            @focus="() => searchElders('')"
+          />
+        </a-form-item>
         <a-form-item label="业务域">
           <a-select v-model:value="query.businessDomain" allow-clear style="width: 140px" :options="businessDomainOptions" />
         </a-form-item>
@@ -53,7 +67,7 @@
       <vxe-table
         border
         stripe
-        show-overflow
+        show-overflow="title"
         height="460"
         :loading="loading"
         :data="filteredRows"
@@ -71,6 +85,9 @@
         </vxe-column>
         <vxe-column field="changeQty" title="出库数量" width="120" />
         <vxe-column field="receiverName" title="领取人" width="120" />
+        <vxe-column field="elderName" title="老人姓名" width="120">
+          <template #default="{ row }">{{ resolveLogElderName(row) }}</template>
+        </vxe-column>
         <vxe-column field="outType" title="类型" width="120">
           <template #default="{ row }">
             <a-tag :color="row.outType === 'SALE' ? 'blue' : 'purple'">
@@ -82,7 +99,9 @@
         <vxe-column field="remark" title="备注" min-width="160" />
         <vxe-column title="操作" width="120" fixed="right">
           <template #default="{ row }">
-            <a @click="openDetail(row)">详情</a>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="openDetail(row)">详情</a-button>
+            </div>
           </template>
         </vxe-column>
       </vxe-table>
@@ -116,6 +135,12 @@
           </a-space>
         </a-form-item>
       </a-form>
+      <a-row :gutter="12" class="sheet-summary">
+        <a-col :span="6"><a-statistic title="关联长者领用单" :value="sheetSummary.elderLinkedCount" /></a-col>
+        <a-col :span="6"><a-statistic title="耗材领用数量" :value="sheetSummary.consumableQty" /></a-col>
+        <a-col :span="6"><a-statistic title="待确认领用单" :value="sheetSummary.draftCount" /></a-col>
+        <a-col :span="6"><a-statistic title="已确认领用单" :value="sheetSummary.confirmedCount" /></a-col>
+      </a-row>
       <a-space style="margin-bottom: 8px" wrap>
         <a-button :disabled="selectedSheetRowKeys.length !== 1" @click="openSelectedSheetDetail">详情</a-button>
         <a-button :disabled="selectedSheetRowKeys.length === 0" @click="printSelectedSheets">打印领取单</a-button>
@@ -172,6 +197,7 @@
           {{ detail?.outType === 'SALE' ? '销售' : '领用' }}
         </a-descriptions-item>
         <a-descriptions-item label="领取人">{{ detail?.receiverName || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="老人姓名">{{ resolveLogElderName(detail) }}</a-descriptions-item>
         <a-descriptions-item label="出库时间">{{ detail?.createTime }}</a-descriptions-item>
         <a-descriptions-item label="订单ID">{{ detail?.refOrderId || '-' }}</a-descriptions-item>
         <a-descriptions-item label="备注">{{ detail?.remark || '-' }}</a-descriptions-item>
@@ -438,6 +464,7 @@ const sheetForm = reactive<{
 const query = reactive({
   outType: undefined as 'SALE' | 'CONSUME' | undefined,
   productId: undefined as Id | undefined,
+  elderId: undefined as Id | undefined,
   businessDomain: undefined as string | undefined,
   itemType: undefined as string | undefined,
   range: undefined as any,
@@ -498,6 +525,26 @@ const summaryStats = computed(() => {
     else if (itemType === 'FOOD') result.foodQty += qty
     else if (itemType === 'SERVICE') result.serviceQty += qty
     else result.consumableQty += qty
+  }
+  return result
+})
+const sheetSummary = computed(() => {
+  const result = {
+    elderLinkedCount: 0,
+    consumableQty: 0,
+    draftCount: 0,
+    confirmedCount: 0
+  }
+  for (const sheet of sheets.value) {
+    if (sheet.elderId || sheet.elderName) result.elderLinkedCount += 1
+    if (sheet.status === 'CONFIRMED') result.confirmedCount += 1
+    else result.draftCount += 1
+    for (const item of sheet.items || []) {
+      const product = productById.value.get(String(item.productId))
+      if (!product || product.itemType === 'CONSUMABLE') {
+        result.consumableQty += Number(item.quantity || 0)
+      }
+    }
   }
   return result
 })
@@ -577,6 +624,7 @@ async function fetchData() {
       pageNo: query.pageNo,
       pageSize: query.pageSize,
       productId: query.productId,
+      elderId: query.elderId,
       outType: query.outType,
       dateFrom: query.range?.[0]?.format?.('YYYY-MM-DD'),
       dateTo: query.range?.[1]?.format?.('YYYY-MM-DD')
@@ -609,6 +657,7 @@ async function fetchSheetData() {
 function reset() {
   query.outType = undefined
   query.productId = undefined
+  query.elderId = undefined
   query.businessDomain = undefined
   query.itemType = undefined
   query.range = undefined
@@ -1359,6 +1408,10 @@ function resolveSheetElderName(sheet?: Pick<InventoryOutboundSheet, 'elderName'>
   return String(sheet?.elderName || '').trim() || '未命名长者'
 }
 
+function resolveLogElderName(row?: Pick<InventoryLogItem, 'elderName' | 'receiverName'> | null) {
+  return String(row?.elderName || row?.receiverName || '').trim() || '-'
+}
+
 function safeHtml(value: unknown) {
   const text = value === null || value === undefined ? '' : String(value)
   return text
@@ -1388,10 +1441,12 @@ function applyRouteFilters() {
   const routeQuery = route.query || {}
   const outTypeRaw = Array.isArray(routeQuery.outType) ? routeQuery.outType[0] : routeQuery.outType
   const productIdRaw = Array.isArray(routeQuery.productId) ? routeQuery.productId[0] : routeQuery.productId
+  const elderIdRaw = Array.isArray(routeQuery.elderId) ? routeQuery.elderId[0] : routeQuery.elderId
   const domainRaw = Array.isArray(routeQuery.businessDomain) ? routeQuery.businessDomain[0] : routeQuery.businessDomain
   const itemTypeRaw = Array.isArray(routeQuery.itemType) ? routeQuery.itemType[0] : routeQuery.itemType
   if (outTypeRaw === 'SALE' || outTypeRaw === 'CONSUME') query.outType = outTypeRaw
   query.productId = normalizeId(productIdRaw)
+  query.elderId = normalizeId(elderIdRaw)
   if (typeof domainRaw === 'string' && domainRaw) query.businessDomain = domainRaw
   if (typeof itemTypeRaw === 'string' && itemTypeRaw) query.itemType = itemTypeRaw
   const openCreateRaw = Array.isArray(routeQuery.openCreate) ? routeQuery.openCreate[0] : routeQuery.openCreate
@@ -1424,5 +1479,9 @@ onMounted(async () => {
   display: flex;
   justify-content: flex-end;
   margin-bottom: 8px;
+}
+
+.sheet-summary {
+  margin-bottom: 12px;
 }
 </style>

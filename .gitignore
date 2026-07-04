@@ -12,3 +12,7 @@ output/qa/*.png
 .idea
 *.iml
 *.log
+
+# JVM attach artifacts & Maven partial-download markers
+.attach_pid*
+*.lastUpdated

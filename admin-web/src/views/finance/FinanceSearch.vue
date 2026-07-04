@@ -2,7 +2,7 @@
   <PageContainer title="财务搜索" subTitle="统一检索长者、账单、收款流水与合同">
     <a-card class="search-hero card-elevated" :bordered="false">
       <div>
-        <div class="search-hero__eyebrow">Finance Search</div>
+        <div class="search-hero__eyebrow">财务搜索</div>
         <h2>先搜，再决定去哪个业务页。</h2>
         <p>适合按长者、账单号、收据号、外部流水号或合同号快速定位财务对象。</p>
       </div>
@@ -159,8 +159,8 @@ onMounted(() => {
   gap: 18px;
   grid-template-columns: 1fr 1fr;
   background:
-    radial-gradient(circle at top left, rgba(14, 165, 233, 0.22), transparent 34%),
-    linear-gradient(135deg, #0f172a 0%, #1e3a8a 46%, #0f766e 100%);
+    radial-gradient(circle at top left, rgba(var(--info-rgb), 0.22), transparent 34%),
+    linear-gradient(135deg, var(--ink) 0%, var(--primary-strong) 46%, var(--primary) 100%);
   color: #fff;
 }
 

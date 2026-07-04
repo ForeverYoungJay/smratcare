@@ -392,10 +392,10 @@ const archiveLevelColor = computed(() => {
   return 'red'
 })
 const archiveProgressColor = computed(() => {
-  if (archiveLevelText.value === '完整') return '#16a34a'
-  if (archiveLevelText.value === '高') return '#2563eb'
-  if (archiveLevelText.value === '中') return '#d97706'
-  return '#dc2626'
+  if (archiveLevelText.value === '完整') return 'var(--success)'
+  if (archiveLevelText.value === '高') return 'var(--info)'
+  if (archiveLevelText.value === '中') return 'var(--warning)'
+  return 'var(--danger)'
 })
 function applyFilters() {
   searchSnapshot.type = filters.type
@@ -826,7 +826,7 @@ useLiveSyncRefresh({
   margin-top: 12px;
   padding: 10px;
   border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
+  border: 1px solid var(--border);
   background: linear-gradient(130deg, rgba(248, 250, 252, 0.9) 0%, rgba(241, 245, 249, 0.8) 100%);
 }
 
@@ -835,14 +835,14 @@ useLiveSyncRefresh({
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: #334155;
+  color: var(--ink-soft);
   font-size: 12px;
   font-weight: 600;
 }
 
 .archive-generated-time {
   margin-top: 8px;
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 

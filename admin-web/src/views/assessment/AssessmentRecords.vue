@@ -305,13 +305,14 @@
             {{ record.score ?? '-' }}
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-space>
-              <a-button v-if="pageConfig.actions.includes('assign')" type="link" @click="assignRecord(record)">指派</a-button>
-              <a-button v-if="pageConfig.actions.includes('edit')" type="link" @click="openForm(record)">编辑</a-button>
-              <a-button v-if="pageConfig.actions.includes('view')" type="link" @click="openForm(record, true)">查看</a-button>
+            <div class="row-action-links">
+              <a-button v-if="pageConfig.actions.includes('assign')" type="link" size="small" @click="assignRecord(record)">指派</a-button>
+              <a-button v-if="pageConfig.actions.includes('edit')" type="link" size="small" @click="openForm(record)">编辑</a-button>
+              <a-button v-if="pageConfig.actions.includes('view')" type="link" size="small" @click="openForm(record, true)">查看</a-button>
               <a-button
                 v-if="record.status === 'COMPLETED' || record.status === 'ARCHIVED'"
                 type="link"
+                size="small"
                 @click="printReport(record)"
               >
                 打印报告
@@ -319,12 +320,13 @@
               <a-button
                 v-if="pageConfig.actions.includes('delete') && canDeleteAssessment"
                 type="link"
+                size="small"
                 danger
                 @click="remove(record.id)"
               >
                 删除
               </a-button>
-            </a-space>
+            </div>
           </template>
           <template v-else>
             {{ displayCell(record, column.dataIndex) }}
@@ -430,7 +432,7 @@
               <a-space direction="vertical" style="width: 100%">
                 <a-card v-for="item in group.items" :key="item.id" size="small">
                   <div style="font-weight: 600; margin-bottom: 6px;">{{ item.id }}. {{ item.title }}</div>
-                  <div style="color: rgba(0,0,0,0.65); margin-bottom: 8px;">指标说明：{{ item.description }}</div>
+                  <div style="color: var(--muted); margin-bottom: 8px;">指标说明：{{ item.description }}</div>
                   <a-select
                     :data-admission-item-id="item.id"
                     v-model:value="admissionScores[item.id]"
@@ -455,7 +457,7 @@
                       @pressEnter="onAdmissionScoreFilled(item.id, admissionScores[item.id])"
                     />
                   </div>
-                  <div style="color: rgba(0,0,0,0.6); font-size: 12px;">
+                  <div style="color: var(--muted); font-size: 12px;">
                     可选分值：
                     <span v-for="(opt, idx) in item.options" :key="`${item.id}-hint-${idx}`">
                       {{ opt.score }}分{{ idx < item.options.length - 1 ? ' / ' : '' }}
@@ -470,7 +472,7 @@
                 <a-col :span="8">90分制总分：{{ admissionTotalScore }}</a-col>
                 <a-col :span="8">能力等级：{{ admissionLevelText }}</a-col>
               </a-row>
-              <div style="margin-top: 8px; color: rgba(0,0,0,0.65);">
+              <div style="margin-top: 8px; color: var(--muted);">
                 等级规则：0级(90)，1级(66-89)，2级(46-65)，3级(30-45)，4级(0-29)
               </div>
             </a-card>
@@ -2956,22 +2958,22 @@ useLiveSyncRefresh({
 }
 
 .hint {
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--muted);
   font-size: 12px;
 }
 
 :deep(.row-batch-updated > td) {
-  background: #f6ffed !important;
+  background: rgba(var(--success-rgb), 0.08) !important;
 }
 
 :deep(.ant-table-selection-column .ant-checkbox .ant-checkbox-inner) {
   background: #fff;
-  border-color: #8c8c8c;
+  border-color: var(--border-strong);
 }
 
 :deep(.ant-table-selection-column .ant-checkbox-checked .ant-checkbox-inner) {
-  background: #1677ff;
-  border-color: #1677ff;
+  background: var(--primary);
+  border-color: var(--primary);
 }
 
 :deep(.ant-table-selection-column .ant-checkbox-checked .ant-checkbox-inner::after) {

@@ -1,18 +1,18 @@
 .card { padding: 24rpx; }
 .action { margin-top: 14rpx; }
-.template-title { margin-top: 18rpx; font-size: 25rpx; font-weight: 700; color: #182420; }
+.template-title { margin-top: 18rpx; font-size: 25rpx; font-weight: 700; color: #22332E; }
 .template-row { margin-top: 10rpx; display: flex; gap: 10rpx; flex-wrap: wrap; }
-.template { padding: 8rpx 14rpx; border-radius: 999rpx; background: #edf6f2; color: #246b5f; font-size: 22rpx; }
-.media-panel { margin-top: 10rpx; padding: 12rpx; border: 1rpx solid #e2e8f0; border-radius: 10rpx; background: #f7faf8; }
+.template { padding: 8rpx 14rpx; border-radius: 999rpx; background: #E8F3EF; color: #21705F; font-size: 22rpx; }
+.media-panel { margin-top: 10rpx; padding: 12rpx; border: 1rpx solid #e2e8f0; border-radius: 10rpx; background: #FAFAF7; }
 .media-info { display: flex; align-items: center; justify-content: space-between; gap: 10rpx; }
-.media-name { font-size: 23rpx; color: #182420; }
-.media-type { font-size: 21rpx; color: #71807a; }
-.media-empty { font-size: 22rpx; color: #71807a; }
+.media-name { font-size: 23rpx; color: #22332E; }
+.media-type { font-size: 21rpx; color: #5C6F69; }
+.media-empty { font-size: 22rpx; color: #5C6F69; }
 .media-action-row { margin-top: 10rpx; display: flex; gap: 10rpx; flex-wrap: wrap; }
 .media-btn { height: 60rpx; line-height: 60rpx; font-size: 22rpx; padding: 0 18rpx; }
-.moment { margin-top: 12rpx; padding: 12rpx; border-radius: 10rpx; background: #f7faf8; border: 1rpx solid #edf2ef; }
-.name { font-size: 25rpx; color: #16231f; font-weight: 700; }
-.time { margin-top: 4rpx; font-size: 22rpx; color: #71807a; }
+.moment { margin-top: 12rpx; padding: 12rpx; border-radius: 10rpx; background: #FAFAF7; border: 1rpx solid #E4E7E0; }
+.name { font-size: 25rpx; color: #22332E; font-weight: 700; }
+.time { margin-top: 4rpx; font-size: 22rpx; color: #5C6F69; }
 .desc { margin-top: 6rpx; font-size: 23rpx; color: #34443f; }
 .moment-image,
 .moment-video {

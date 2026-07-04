@@ -42,7 +42,7 @@
         <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="高风险金额" :value="highRiskAmount" suffix="元" :precision="2" /></a-card></a-col>
       </a-row>
       <a-card class="card-elevated" :bordered="false">
-        <vxe-table border stripe show-overflow :loading="loading" :data="filteredRows" height="560">
+        <vxe-table border stripe show-overflow="title" :loading="loading" :data="filteredRows" height="560">
           <vxe-column field="occurredAt" title="发生时间" width="180" />
           <vxe-column field="exceptionTypeLabel" title="异常类型" width="180">
             <template #default="{ row }">
@@ -62,10 +62,10 @@
           <vxe-column field="suggestion" title="处理建议" min-width="220" />
           <vxe-column title="操作" width="180" fixed="right">
             <template #default="{ row }">
-              <a-space>
-                <a-button v-if="row.billId" type="link" @click="go(`/finance/bill/${row.billId}`)">查看账单</a-button>
-                <a-button type="link" @click="go('/finance/payments/register?from=reconcile_exception')">去处理</a-button>
-              </a-space>
+              <div class="row-action-links">
+                <a-button v-if="row.billId" type="link" size="small" @click="go(`/finance/bill/${row.billId}`)">查看账单</a-button>
+                <a-button type="link" size="small" @click="go('/finance/payments/register?from=reconcile_exception')">去处理</a-button>
+              </div>
             </template>
           </vxe-column>
         </vxe-table>

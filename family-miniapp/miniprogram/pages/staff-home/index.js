@@ -5,6 +5,90 @@ const {
   getStaffTodoSummary,
   getIncidents
 } = require('../../services/staff');
+const { requestSubscribeOncePerDay } = require('../../utils/subscribe');
+
+// 角色分类：护理 / 医护 / 后勤；识别不出时返回 all（显示全部入口兜底）。
+function roleCategory(roles = [], roleText = '') {
+  const joined = `${roles.map((item) => String(item || '').toUpperCase()).join(',')},${String(roleText || '')}`;
+  if (joined.indexOf('NURSING') >= 0 || joined.indexOf('护理') >= 0) return 'nursing';
+  if (joined.indexOf('MEDICAL') >= 0 || joined.indexOf('DOCTOR') >= 0 || joined.indexOf('NURSE') >= 0
+    || joined.indexOf('医') >= 0 || joined.indexOf('药师') >= 0) return 'medical';
+  if (joined.indexOf('LOGISTICS') >= 0 || joined.indexOf('后勤') >= 0) return 'logistics';
+  return 'all';
+}
+
+// 各角色优先靠前的快捷入口（按 route 匹配），以及与本职无关、需要隐藏的入口。
+const ROLE_QUICK_ENTRY_RULES = {
+  nursing: {
+    priority: [
+      '/pages/staff-care-execution/index',
+      '/pages/staff-vitals/index',
+      '/pages/staff-handover/index'
+    ],
+    hidden: [
+      '/pages/staff-repairs/index',
+      '/pages/staff-material/index'
+    ]
+  },
+  medical: {
+    priority: [
+      '/pages/staff-clinical/index?mode=MEDICATION',
+      '/pages/staff-clinical/index?mode=INSPECTION',
+      '/pages/staff-vitals/index'
+    ],
+    hidden: [
+      '/pages/staff-repairs/index',
+      '/pages/staff-meals/index',
+      '/pages/staff-material/index'
+    ]
+  },
+  logistics: {
+    priority: [
+      '/pages/staff-repairs/index',
+      '/pages/staff-meals/index',
+      '/pages/staff-material/index'
+    ],
+    hidden: [
+      '/pages/staff-care-execution/index',
+      '/pages/staff-vitals/index',
+      '/pages/staff-clinical/index?mode=MEDICATION',
+      '/pages/staff-clinical/index?mode=INSPECTION'
+    ]
+  }
+};
+
+function personalizeQuickEntries(entries = [], category = 'all') {
+  const rules = ROLE_QUICK_ENTRY_RULES[category];
+  if (!rules || !Array.isArray(entries) || !entries.length) return entries || [];
+  const visible = entries.filter((item) => rules.hidden.indexOf(item.route) < 0);
+  const prioritized = [];
+  rules.priority.forEach((route) => {
+    const found = visible.find((item) => item.route === route);
+    if (found) prioritized.push(found);
+  });
+  const rest = visible.filter((item) => rules.priority.indexOf(item.route) < 0);
+  return prioritized.concat(rest);
+}
+
+function canUseMockFallback() {
+  const app = getApp();
+  return !!(app
+    && app.globalData
+    && app.globalData.useMockFallback
+    && typeof app.isLocalDevEnvironment === 'function'
+    && app.isLocalDevEnvironment());
+}
+
+async function loadOptional(requester, fallbackValue, label, warnings) {
+  try {
+    return await requester();
+  } catch (error) {
+    if (!canUseMockFallback() && warnings) {
+      warnings.push(`${label}同步失败`);
+    }
+    return typeof fallbackValue === 'function' ? fallbackValue() : fallbackValue;
+  }
+}
 
 function levelText(level) {
   if (level === 'CRITICAL') return '紧急';
@@ -94,6 +178,7 @@ Page({
       actionHint: '查看全部待办',
       riskTone: 'normal'
     },
+    partialWarning: '',
     levelText: '平稳',
     levelClass: 'pill-normal'
   },
@@ -102,23 +187,31 @@ Page({
   },
   onShow() {
     getApp().ensureLogin();
+    // 首页每天最多自动请求一次订阅授权；模板 ID 未配置时静默跳过，失败不阻塞业务。
+    requestSubscribeOncePerDay(['taskOverdue', 'noticePublish']);
   },
   onPullDownRefresh() {
     this.loadData(true);
   },
   async loadData(fromPullDown = false) {
-    this.setData({ loading: true, loadError: '' });
+    this.setData({ loading: true, loadError: '', partialWarning: '' });
     try {
       const dashboard = await getStaffDashboard();
+      const app = getApp();
+      const staffUser = (app && app.globalData && app.globalData.staffUser) || {};
+      const category = roleCategory(staffUser.roles || [], dashboard.roleText || '');
+      dashboard.quickEntries = personalizeQuickEntries(dashboard.quickEntries, category);
+      const warnings = [];
       const [tasks, attendance, todoSummary, incidents] = await Promise.all([
-        getTaskList().catch(() => dashboard.tasks || []),
-        getAttendanceOverview().catch(() => ({})),
-        getStaffTodoSummary({ mineOnly: true }).catch(() => ({})),
-        getIncidents({}).catch(() => [])
+        loadOptional(() => getTaskList(), () => dashboard.tasks || [], '待办任务', warnings),
+        loadOptional(() => getAttendanceOverview(), {}, '考勤状态', warnings),
+        loadOptional(() => getStaffTodoSummary({ mineOnly: true }), {}, 'OA待办', warnings),
+        loadOptional(() => getIncidents({}), [], '异常事件', warnings)
       ]);
       this.setData({
         dashboard,
         battle: buildBattle(dashboard, tasks, attendance, todoSummary, incidents),
+        partialWarning: warnings.length ? `部分实时数据未完成同步：${warnings.join('、')}。当前先展示已获取到的内容。` : '',
         levelText: levelText(dashboard.mobileLevel),
         levelClass: levelClass(dashboard.mobileLevel)
       });

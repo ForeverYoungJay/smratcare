@@ -683,11 +683,11 @@ restoreDraft()
 <style scoped>
 .hint {
   margin-top: 8px;
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--muted);
   font-size: 12px;
 }
 
 :deep(.schedule-row-warning) {
-  background: #fffbe6 !important;
+  background: rgba(var(--warning-rgb), 0.08) !important;
 }
 </style>

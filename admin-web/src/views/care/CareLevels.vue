@@ -23,10 +23,10 @@
             <a-tag :color="record.enabled === 1 ? 'green' : 'default'">{{ record.enabled === 1 ? '启用' : '停用' }}</a-tag>
           </template>
           <template v-else-if="column.key === 'actions'">
-            <a-space>
-              <a @click="openModal(record)">编辑</a>
-              <a class="danger-text" @click="remove(record.id)">删除</a>
-            </a-space>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="openModal(record)">编辑</a-button>
+              <a-button type="link" size="small" danger @click="remove(record.id)">删除</a-button>
+            </div>
           </template>
         </template>
       </a-table>
@@ -195,5 +195,5 @@ load()
 </script>
 
 <style scoped>
-.danger-text { color: #ef4444; }
+.danger-text { color: var(--danger); }
 </style>

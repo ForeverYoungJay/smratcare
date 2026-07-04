@@ -47,7 +47,7 @@ defineEmits<{
 }
 
 .app-shell__content {
-  padding: 14px 20px 24px;
+  padding: 16px 24px 28px;
   background: transparent;
 }
 

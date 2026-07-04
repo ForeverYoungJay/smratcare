@@ -110,10 +110,10 @@
                     <span class="queue-title">{{ item.taskTitle || '-' }}</span>
                   </a-space>
                   <span class="queue-meta">{{ item.riskReason || '常规待办' }}</span>
-                  <a-space>
+                  <div class="row-action-links">
                     <a-button type="link" size="small" @click="goDetail(item)">去处理</a-button>
                     <a-button type="link" size="small" @click="goResident(item)">长者视图</a-button>
-                  </a-space>
+                  </div>
                 </a-space>
               </a-list-item>
             </template>
@@ -159,10 +159,10 @@
           <span class="risk-reason">{{ record.riskReason || '-' }}</span>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="goDetail(record)">处理</a-button>
-            <a-button type="link" @click="goResident(record)">长者视图</a-button>
-          </a-space>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="goDetail(record)">处理</a-button>
+            <a-button type="link" size="small" @click="goResident(record)">长者视图</a-button>
+          </div>
         </template>
       </template>
     </DataTable>
@@ -710,20 +710,20 @@ watch(
 <style scoped>
 .resident-context {
   margin-bottom: 12px;
-  border: 1px solid #d5ebff;
-  background: linear-gradient(130deg, #f5fbff 0%, #ebf5ff 100%);
+  border: 1px solid var(--border);
+  background: linear-gradient(130deg, var(--surface) 0%, var(--primary-soft) 100%);
 }
 
 .task-hero {
-  border: 1px solid #d4e6ff;
+  border: 1px solid var(--border);
   background:
-    radial-gradient(130% 110% at 100% 0%, rgba(39, 121, 255, 0.18) 0%, rgba(39, 121, 255, 0) 58%),
-    linear-gradient(132deg, #f7fbff 0%, #edf5ff 45%, #f8fbff 100%);
+    radial-gradient(130% 110% at 100% 0%, rgba(var(--primary-rgb), 0.18) 0%, rgba(var(--primary-rgb), 0) 58%),
+    linear-gradient(132deg, var(--surface) 0%, var(--surface-2) 45%, var(--surface) 100%);
 }
 
 .task-hero__title {
   font-size: 14px;
-  color: #1f2f45;
+  color: var(--ink);
   font-weight: 600;
 }
 
@@ -739,25 +739,25 @@ watch(
   font-size: 38px;
   line-height: 1;
   font-weight: 700;
-  color: #0f1f34;
+  color: var(--ink);
 }
 
 .task-hero__meta {
   margin-top: 8px;
   font-size: 12px;
-  color: #5f7087;
+  color: var(--muted);
 }
 
 .metric-tile {
   border-radius: 10px;
-  border: 1px solid #dce9ff;
+  border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.86);
   padding: 10px;
 }
 
 .metric-tile__label {
   font-size: 12px;
-  color: #66798e;
+  color: var(--muted);
 }
 
 .metric-tile__value {
@@ -765,13 +765,13 @@ watch(
   font-size: 24px;
   line-height: 1;
   font-weight: 700;
-  color: #10243f;
+  color: var(--ink);
 }
 
 .metric-tile__hint {
   margin-top: 6px;
   font-size: 11px;
-  color: #73849b;
+  color: var(--muted-2);
 }
 
 .action-queue {
@@ -780,25 +780,25 @@ watch(
 
 .queue-title {
   font-weight: 600;
-  color: #15243d;
+  color: var(--ink);
 }
 
 .queue-meta {
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .risk-reason {
-  color: #4b5563;
+  color: var(--muted);
   font-size: 12px;
 }
 
 :deep(.task-row-danger > td) {
-  background: #fff1f0 !important;
+  background: rgba(var(--danger-rgb), 0.08) !important;
 }
 
 :deep(.task-row-warning > td) {
-  background: #fff7e6 !important;
+  background: rgba(var(--warning-rgb), 0.1) !important;
 }
 
 @media (max-width: 992px) {

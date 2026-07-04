@@ -4,19 +4,19 @@
       <a-space wrap size="small">
         <span class="soft-pill">业务分区：{{ visibleSections.length }}</span>
         <span class="soft-pill">可达动作：{{ visibleActionCount }}</span>
-        <span class="selection-pill">合同预警：{{ summary.contractExpiringCount || 0 }}</span>
+        <span :class="(summary.contractExpiringCount || 0) > 0 ? 'selection-pill' : 'soft-pill'">合同预警：{{ summary.contractExpiringCount || 0 }}</span>
         <span class="soft-pill">考勤异常：{{ summary.attendanceAbnormalCount || 0 }}</span>
       </a-space>
     </template>
 
     <section class="hero-shell card-elevated">
       <div class="hero-main">
-        <div class="hero-kicker">Human Resources</div>
-        <h2>人资入口回到“业务中心”，不再伪装成工作台。</h2>
-        <p>这里是人力资源业务导航页，集中承接招聘、档案、考勤、费用和绩效激励。个人事项已经回到工作台。</p>
+        <div class="hero-kicker">人力资源概览</div>
+        <h2>招聘、档案、考勤、绩效与激励，集中在这里管理。</h2>
+        <p>人力资源业务导航页：统一进入招聘、员工档案、考勤班组、费用与绩效激励；个人事项请在工作台处理。</p>
         <a-space wrap>
-          <a-button type="primary" @click="openFirstAvailable(['/hr/profile/basic', '/hr/profile/social-security-reminders'])">进入员工档案</a-button>
-          <a-button @click="openPath('/hr/attendance/schemes')">进入考勤与班组</a-button>
+          <a-button type="primary" @click="openFirstAvailable(archiveEntryPaths)">进入员工档案</a-button>
+          <a-button @click="openFirstAvailable(attendanceEntryPaths)">进入考勤与班组</a-button>
           <a-button @click="openPath('/workbench')">返回工作台</a-button>
         </a-space>
       </div>
@@ -25,7 +25,7 @@
           <span>在职人数</span>
           <strong>{{ summary.onJobCount || 0 }}</strong>
         </div>
-        <div class="metric-box metric-box--warning">
+        <div class="metric-box" :class="{ 'metric-box--warning': (summary.contractExpiringCount || 0) > 0 }">
           <span>合同到期预警</span>
           <strong>{{ summary.contractExpiringCount || 0 }}</strong>
         </div>
@@ -46,7 +46,7 @@
         <strong>{{ summary.birthdayTodayCount || 0 }} / {{ summary.birthdayUpcomingCount || 0 }}</strong>
         <small>今日 / 7天内</small>
       </div>
-      <div class="summary-pill card-elevated" @click="openPath('/hr/development/records')">
+      <div class="summary-pill card-elevated" @click="openFirstAvailable(trainingEntryPaths)">
         <span>今日培训</span>
         <strong>{{ summary.todayTrainingCount || 0 }}</strong>
         <small>待执行培训安排</small>
@@ -56,7 +56,7 @@
         <strong>{{ summary.birthdayTodoCount || 0 }}</strong>
         <small>关联 OA 协同待办</small>
       </div>
-      <div class="summary-pill card-elevated" @click="openPath('/hr/profile/contract-reminders')">
+      <div class="summary-pill card-elevated" @click="openFirstAvailable(contractEntryPaths)">
         <span>合同预警</span>
         <strong>{{ summary.contractExpiringCount || 0 }}</strong>
         <small>临近到期员工合同</small>
@@ -128,6 +128,11 @@ const summary = reactive({
   birthdayUpcomingCount: 0,
   birthdayTodoCount: 0
 })
+
+const archiveEntryPaths = ['/hr/profile/basic', '/hr/profile/social-security-reminders']
+const attendanceEntryPaths = ['/hr/attendance/schemes', '/workbench/attendance', '/oa/attendance-leave']
+const trainingEntryPaths = ['/hr/development/records', '/workbench/reports', '/oa/work-report']
+const contractEntryPaths = ['/hr/profile/contract-reminders', '/hr/profile/social-security-reminders']
 
 const sections = computed<HrSection[]>(() => [
   {
@@ -240,8 +245,8 @@ useLiveSyncRefresh({
   gap: 18px;
   padding: 24px;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(245, 250, 255, 0.92)),
-    radial-gradient(circle at top right, rgba(84, 150, 225, 0.18), transparent 38%);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(var(--primary-rgb), 0.05)),
+    radial-gradient(circle at top right, rgba(var(--primary-rgb), 0.18), transparent 38%);
 }
 
 .hero-kicker,
@@ -275,7 +280,7 @@ useLiveSyncRefresh({
 .metric-box {
   padding: 16px 18px;
   border-radius: 18px;
-  background: rgba(13, 49, 83, 0.92);
+  background: var(--ink);
   color: rgba(255, 255, 255, 0.72);
 }
 
@@ -288,11 +293,11 @@ useLiveSyncRefresh({
 }
 
 .metric-box--warning {
-  background: rgba(99, 74, 20, 0.9);
+  background: rgba(var(--warning-rgb), 0.9);
 }
 
 .metric-box--accent {
-  background: linear-gradient(135deg, rgba(31, 143, 190, 0.95), rgba(100, 192, 226, 0.96));
+  background: linear-gradient(135deg, rgba(var(--primary-rgb), 0.95), rgba(var(--primary-rgb), 0.7));
 }
 
 .summary-rail {
@@ -357,7 +362,7 @@ useLiveSyncRefresh({
 .action-link {
   width: 100%;
   padding: 14px 16px;
-  border: 1px solid rgba(16, 55, 88, 0.1);
+  border: 1px solid var(--border);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.86);
   text-align: left;
@@ -367,8 +372,8 @@ useLiveSyncRefresh({
 
 .action-link:hover {
   transform: translateY(-1px);
-  border-color: rgba(31, 143, 190, 0.26);
-  box-shadow: 0 12px 28px rgba(44, 104, 152, 0.12);
+  border-color: rgba(var(--primary-rgb), 0.26);
+  box-shadow: var(--shadow-md);
 }
 
 .action-link span {

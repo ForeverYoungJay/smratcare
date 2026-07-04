@@ -29,6 +29,7 @@
   <view class="surface empty-card" wx:if="{{!loading && !loadError && incidents.length === 0}}">
     <view class="state-title">暂无异常记录</view>
     <view class="section-subtitle">发生跌倒、用药、设备、餐食等异常后，可在这里追踪处理状态。</view>
+    <view class="section-subtitle" wx:if="{{lastFilterSummary}}">当前筛选：{{lastFilterSummary}}</view>
   </view>
 
   <view wx:if="{{!loading && !loadError && incidents.length}}">
@@ -59,5 +60,9 @@
         </view>
       </view>
     </block>
+    <view class="list-footer">
+      <text wx:if="{{hasMore}}">上拉加载更多</text>
+      <text wx:else>没有更多了</text>
+    </view>
   </view>
 </view>

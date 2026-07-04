@@ -1,5 +1,22 @@
 <template>
   <PageContainer title="老人信息统计" subTitle="老人结构、护理等级与状态分布">
+    <template #extra>
+      <a-space>
+        <a-button type="primary" @click="loadData">刷新</a-button>
+        <a-button @click="exportSummary">导出汇总</a-button>
+        <a-dropdown>
+          <a-button>更多 ▾</a-button>
+          <template #overlay>
+            <a-menu>
+              <a-menu-item @click="openColumnSetting">列设置</a-menu-item>
+              <a-menu-item @click="printCurrent">打印当前列</a-menu-item>
+              <a-menu-divider />
+              <a-menu-item @click="reset">重置</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+      </a-space>
+    </template>
     <a-card class="card-elevated" :bordered="false" style="margin-bottom: 16px;">
       <a-form layout="inline">
         <a-form-item label="机构ID">
@@ -19,15 +36,6 @@
         </a-form-item>
         <a-form-item label="打印备注">
           <a-input v-model:value="query.printRemark" allow-clear placeholder="例如：月度画像版" style="width: 180px" />
-        </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="loadData">刷新</a-button>
-            <a-button @click="exportSummary">导出汇总</a-button>
-            <a-button @click="openColumnSetting">列设置</a-button>
-            <a-button @click="printCurrent">打印当前列</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
         </a-form-item>
       </a-form>
     </a-card>
@@ -121,7 +129,7 @@
     </a-row>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="画像明细">
-      <vxe-table border stripe show-overflow :data="displayRows" height="300">
+      <vxe-table border stripe show-overflow="title" :data="displayRows" height="300">
         <vxe-column field="section" title="维度" width="120" />
         <vxe-column field="name" title="项" min-width="180" />
         <vxe-column field="count" title="人数" width="120" />
@@ -364,7 +372,7 @@ async function loadData() {
       series: [{ type: 'pie', radius: ['36%', '66%'], data: toPieData(data.genderDistribution || []) }]
     })
     setAgeOption(toBarOption(data.ageDistribution || [], '#13c2c2'))
-    setCareLevelOption(toBarOption(data.careLevelDistribution || [], '#1677ff'))
+    setCareLevelOption(toBarOption(data.careLevelDistribution || [], '#3d7fa6'))
     setStatusOption({
       tooltip: { trigger: 'item' },
       legend: { bottom: 0 },
@@ -456,8 +464,8 @@ onMounted(loadData)
   border-radius: 18px;
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(245, 248, 252, 0.96)),
-    radial-gradient(circle at top right, rgba(22, 119, 255, 0.1), transparent 48%);
-  border: 1px solid rgba(15, 23, 42, 0.08);
+    radial-gradient(circle at top right, rgba(var(--primary-rgb), 0.1), transparent 48%);
+  border: 1px solid var(--border-soft);
 }
 
 .segment-label {
@@ -465,20 +473,20 @@ onMounted(loadData)
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(15, 23, 42, 0.5);
+  color: var(--muted);
 }
 
 .segment-value {
   margin-top: 10px;
   font-size: 24px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ink);
 }
 
 .segment-detail {
   margin-top: 8px;
   font-size: 12px;
   line-height: 1.6;
-  color: rgba(15, 23, 42, 0.66);
+  color: var(--muted);
 }
 </style>

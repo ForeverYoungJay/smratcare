@@ -76,11 +76,16 @@ Page({
     statusClass: 'status-default',
     contactPhone: '',
     contactName: '',
-    loading: false
+    loading: false,
+    loadError: '',
+    notFound: false
   },
   onLoad(query) {
     const outTradeNo = decodeURIComponent(query.outTradeNo || '');
-    this.setData({ outTradeNo });
+    this.setData({
+      outTradeNo,
+      loadError: outTradeNo ? '' : '缺少充值订单号，请从缴费记录重新进入。'
+    });
   },
   async onShow() {
     getApp().ensureLogin();
@@ -88,26 +93,54 @@ Page({
   },
   async loadOrder(withLoading = false) {
     if (!this.data.outTradeNo) {
+      this.setData({
+        order: null,
+        timeline: [],
+        statusClass: 'status-default',
+        notFound: true
+      });
       return;
     }
     if (withLoading) {
       wx.showLoading({ title: '加载中', mask: true });
     }
-    this.setData({ loading: true });
+    this.setData({ loading: true, loadError: '', notFound: false });
     try {
-      const [order, contacts] = await Promise.all([
-        getRechargeOrder(this.data.outTradeNo),
-        getEmergencyContacts()
-      ]);
+      const order = await getRechargeOrder(this.data.outTradeNo);
+      const contactsResult = await Promise.allSettled([getEmergencyContacts()]);
+      const contacts = contactsResult[0] && contactsResult[0].status === 'fulfilled'
+        ? contactsResult[0].value
+        : [];
       const fallbackContact = (contacts || []).find((item) => (item.role || '').includes('护士'))
         || (contacts || [])[0]
         || null;
+      if (!order || !order.outTradeNo) {
+        this.setData({
+          order: null,
+          timeline: [],
+          statusClass: 'status-default',
+          contactPhone: fallbackContact ? fallbackContact.phone : '',
+          contactName: fallbackContact ? fallbackContact.name : '责任护士',
+          notFound: true,
+          loadError: '未找到充值订单，请核对订单号或返回缴费页重新查询。'
+        });
+        return;
+      }
       this.setData({
-        order: order || null,
+        order,
         timeline: buildTimeline(order),
-        statusClass: resolveStatusClass(order ? order.status : ''),
+        statusClass: resolveStatusClass(order.status),
         contactPhone: fallbackContact ? fallbackContact.phone : '',
-        contactName: fallbackContact ? fallbackContact.name : '责任护士'
+        contactName: fallbackContact ? fallbackContact.name : '责任护士',
+        notFound: false
+      });
+    } catch (error) {
+      this.setData({
+        order: null,
+        timeline: [],
+        statusClass: 'status-default',
+        notFound: false,
+        loadError: error.message || '充值订单加载失败，请稍后重试'
       });
     } finally {
       if (withLoading) {
@@ -118,11 +151,18 @@ Page({
   },
   async refreshOrder() {
     await this.loadOrder(true);
+    if (this.data.loadError) {
+      wx.showToast({ title: '刷新失败，请稍后重试', icon: 'none' });
+      return;
+    }
     if (!this.data.order) {
       wx.showToast({ title: '订单不存在', icon: 'none' });
       return;
     }
     wx.showToast({ title: '状态已刷新', icon: 'none' });
+  },
+  retryLoad() {
+    this.loadOrder(true);
   },
   copyOrderNo() {
     if (!this.data.outTradeNo) {
@@ -141,6 +181,23 @@ Page({
     wx.makePhoneCall({
       phoneNumber: this.data.contactPhone
     });
+  },
+  retryRecharge() {
+    const order = this.data.order;
+    if (!order) {
+      return;
+    }
+    const amount = Number(order.amount || 0);
+    const amountQuery = Number.isFinite(amount) && amount > 0
+      ? `?amount=${encodeURIComponent(amount)}`
+      : '';
+    const pages = getCurrentPages();
+    const hasPaymentInStack = pages.some((page) => page.route === 'pages/payment/index');
+    if (hasPaymentInStack) {
+      wx.navigateBack();
+      return;
+    }
+    wx.navigateTo({ url: `/pages/payment/index${amountQuery}` });
   },
   backToPayment() {
     const pages = getCurrentPages();

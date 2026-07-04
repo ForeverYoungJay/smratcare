@@ -84,6 +84,8 @@ export interface OaAlbum {
   title: string
   category?: string
   folderName?: string
+  albumScope?: 'PERSONAL' | 'GROUP' | string
+  elderId?: string | number
   coverUrl?: string
   photosJson?: string
   photoCount?: number
@@ -354,5 +356,6 @@ export interface OaSuggestion {
   contact?: string
   status?: string
   createTime?: string
+  updateTime?: string
 }
 import type { Id } from './common'

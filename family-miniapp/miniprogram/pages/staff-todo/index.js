@@ -32,6 +32,7 @@ function normalizeTodo(item) {
 Page({
   data: {
     loading: false,
+    loadingMore: false,
     operatingId: '',
     loadError: '',
     activeStatus: 'OPEN',
@@ -39,6 +40,9 @@ Page({
     keyword: '',
     summary: {},
     todos: [],
+    pageNo: 1,
+    pageSize: 20,
+    hasMore: false,
     statusFilters: [
       { label: '待处理', value: 'OPEN' },
       { label: '已完成', value: 'DONE' },
@@ -53,43 +57,68 @@ Page({
   },
   onShow() {
     getApp().ensureLogin();
-    this.loadData();
+    this.loadData({ reset: true });
   },
-  async loadData() {
-    this.setData({ loading: true, loadError: '' });
+  async onPullDownRefresh() {
+    try {
+      await this.loadData({ reset: true });
+    } finally {
+      wx.stopPullDownRefresh();
+    }
+  },
+  async loadData(options = {}) {
+    const reset = options.reset !== false;
+    const nextPageNo = reset ? 1 : Number(this.data.pageNo || 1) + 1;
+    const statePatch = reset
+      ? { loading: true, loadError: '', pageNo: 1 }
+      : { loadingMore: true, loadError: '' };
+    this.setData(statePatch);
     try {
       const filter = {
         status: this.data.activeStatus,
         sourceType: this.data.activeSource,
-        keyword: this.data.keyword.trim()
+        keyword: this.data.keyword.trim(),
+        pageNo: nextPageNo,
+        pageSize: this.data.pageSize
       };
       const [summary, todos] = await Promise.all([
-        getStaffTodoSummary({ mineOnly: true }),
+        getStaffTodoSummary(filter),
         getStaffTodos(filter)
       ]);
+      const normalized = (todos || []).map(normalizeTodo);
+      const merged = reset ? normalized : this.data.todos.concat(normalized);
       this.setData({
         summary: summary || {},
-        todos: (todos || []).map(normalizeTodo)
+        todos: merged,
+        pageNo: nextPageNo,
+        hasMore: normalized.length >= this.data.pageSize
       });
     } catch (error) {
-      this.setData({ loadError: error.message || '待办加载失败' });
+      this.setData({ loadError: error.message || (reset ? '待办加载失败' : '更多待办加载失败，请稍后重试') });
     } finally {
-      this.setData({ loading: false });
+      this.setData({ loading: false, loadingMore: false });
     }
   },
   switchStatus(e) {
     this.setData({ activeStatus: e.currentTarget.dataset.value || '' });
-    this.loadData();
+    this.loadData({ reset: true });
   },
   switchSource(e) {
     this.setData({ activeSource: e.currentTarget.dataset.value || '' });
-    this.loadData();
+    this.loadData({ reset: true });
   },
   onKeywordInput(e) {
     this.setData({ keyword: e.detail.value });
   },
   searchTodos() {
-    this.loadData();
+    this.loadData({ reset: true });
+  },
+  loadMore() {
+    if (this.data.loading || this.data.loadingMore || !this.data.hasMore) return;
+    this.loadData({ reset: false });
+  },
+  onReachBottom() {
+    this.loadMore();
   },
   goApproval() {
     wx.navigateTo({ url: '/pages/staff-approval/index' });
@@ -101,7 +130,7 @@ Page({
     try {
       await completeStaffTodo(id);
       wx.showToast({ title: '已完成待办', icon: 'success' });
-      this.loadData();
+      this.loadData({ reset: true });
     } catch (error) {
       wx.showToast({ title: error.message || '操作失败', icon: 'none' });
     } finally {

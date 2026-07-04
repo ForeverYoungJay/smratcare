@@ -3,8 +3,7 @@ const {
   registerFamily,
   resetFamilyPassword,
   sendFamilySmsCode,
-  getFamilyAuthBootstrap,
-  bindWechatNotifyOpenId
+  getFamilyAuthBootstrap
 } = require('../../services/family');
 const { staffLogin } = require('../../services/staff');
 const { setAuth } = require('../../utils/auth');
@@ -288,7 +287,7 @@ Page({
       app.globalData.staffUser = null;
       app.globalData.selectedElderId = null;
       setAuth(loginResp.token, app.globalData.familyUser);
-      this.bindWechatNotifyOpenId();
+      app.ensureWechatNotifyBind(true);
       wx.reLaunch({ url: '/pages/home/index' });
     } catch (error) {
       wx.showToast({ title: error.message || '操作失败，请稍后重试', icon: 'none' });
@@ -329,23 +328,5 @@ Page({
     } finally {
       this.setData({ loading: false });
     }
-  },
-  bindWechatNotifyOpenId() {
-    wx.login({
-      success: async (loginRes) => {
-        const code = loginRes && loginRes.code ? String(loginRes.code).trim() : '';
-        if (!code) {
-          return;
-        }
-        try {
-          await bindWechatNotifyOpenId({ loginCode: code });
-        } catch (error) {
-          // openId 绑定失败不阻断登录流程
-        }
-      },
-      fail: () => {
-        // 忽略微信登录失败，避免影响主流程
-      }
-    });
   }
 });

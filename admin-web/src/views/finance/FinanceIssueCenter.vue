@@ -3,7 +3,7 @@
     <div class="issue-shell">
       <a-card class="issue-hero card-elevated" :bordered="false">
         <div>
-          <div class="issue-hero__eyebrow">Issue Control</div>
+          <div class="issue-hero__eyebrow">异常处置</div>
           <h2>把分散在多个菜单里的财务异常压平到一个队列里。</h2>
           <p>按风险和来源聚焦处理，减少“先找问题在哪个页面”的切换成本。</p>
         </div>
@@ -48,7 +48,7 @@
         </a-row>
 
         <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-          <vxe-table border stripe show-overflow :loading="loading" :data="rows" height="620">
+          <vxe-table border stripe show-overflow="title" :loading="loading" :data="rows" height="620">
             <vxe-column field="occurredAt" title="发生时间" width="180" />
             <vxe-column field="sourceModuleLabel" title="来源模块" width="130">
               <template #default="{ row }">
@@ -85,11 +85,11 @@
             <vxe-column field="suggestion" title="处理建议" min-width="240" />
             <vxe-column title="操作" width="180" fixed="right">
               <template #default="{ row }">
-                <a-space>
-                  <a-button type="link" @click="go(row.actionPath || '/finance/reconcile/center')">{{ row.actionLabel || '去处理' }}</a-button>
-                  <a-button type="link" @click="openHandleModal(row)">留痕</a-button>
-                  <a-button v-if="row.billId" type="link" @click="go(`/finance/bill/${row.billId}`)">账单</a-button>
-                </a-space>
+                <div class="row-action-links">
+                  <a-button type="link" size="small" @click="go(row.actionPath || '/finance/reconcile/center')">{{ row.actionLabel || '去处理' }}</a-button>
+                  <a-button type="link" size="small" @click="openHandleModal(row)">留痕</a-button>
+                  <a-button v-if="row.billId" type="link" size="small" @click="go(`/finance/bill/${row.billId}`)">账单</a-button>
+                </div>
               </template>
             </vxe-column>
           </vxe-table>
@@ -307,17 +307,12 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-.issue-shell {
-  --issue-ink: #0f172a;
-  --issue-red: #b42318;
-}
-
 .issue-hero {
   display: grid;
   gap: 18px;
   grid-template-columns: 1.1fr 1fr;
   background:
-    linear-gradient(120deg, rgba(180, 35, 24, 0.9), rgba(15, 23, 42, 0.96)),
+    linear-gradient(120deg, rgba(var(--danger-rgb), 0.9), rgba(15, 23, 42, 0.96)),
     linear-gradient(180deg, #fff, #fff);
   color: #fff;
 }

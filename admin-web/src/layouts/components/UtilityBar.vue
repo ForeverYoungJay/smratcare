@@ -21,12 +21,11 @@ defineProps<{
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  min-height: 30px;
-  padding: 3px 16px;
-  border-bottom: 1px solid rgba(212, 225, 234, 0.72);
-  background:
-    linear-gradient(180deg, rgba(243, 248, 252, 0.72), rgba(240, 247, 251, 0.5));
+  gap: 10px;
+  min-height: 36px;
+  padding: 4px 16px;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface-2);
 }
 
 .utility-bar__summary {
@@ -38,15 +37,15 @@ defineProps<{
 
 .utility-bar__label {
   color: var(--muted-2);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.1em;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   white-space: nowrap;
 }
 
 .utility-bar__summary strong {
   color: var(--ink-soft);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   min-width: 0;
   white-space: nowrap;
@@ -63,14 +62,14 @@ defineProps<{
 }
 
 .utility-bar__actions :deep(.ant-btn) {
-  height: 26px;
-  border-radius: 9px;
-  font-size: 10px;
+  height: 30px;
+  border-radius: 8px;
+  font-size: 12px;
 }
 
 .utility-bar__actions :deep(.ant-tag),
 .utility-bar__actions :deep(.ant-badge-status-text) {
-  font-size: 10px;
+  font-size: 12px;
 }
 
 @media (max-width: 992px) {

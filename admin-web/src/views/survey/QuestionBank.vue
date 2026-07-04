@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="问卷题库" subTitle="题库维护与题型管理">
+    <template #extra>
+      <a-button type="primary" @click="openForm()">新增题目</a-button>
+    </template>
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="关键字">
@@ -32,13 +35,12 @@
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <div class="table-actions">
         <a-space>
-          <a-button type="primary" @click="openForm()">新增题目</a-button>
           <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
           <a-button :disabled="!canEnableSingle" @click="enableSelected">启用</a-button>
           <a-button :disabled="!canDisableSingle" @click="disableSelected">停用</a-button>
-          <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
           <a-button :disabled="selectedRowKeys.length === 0" @click="batchEnable">批量启用</a-button>
           <a-button :disabled="selectedRowKeys.length === 0" @click="batchDisable">批量停用</a-button>
+          <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
           <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
           <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
         </a-space>
@@ -375,7 +377,7 @@ onMounted(fetchData)
   margin-bottom: 12px;
 }
 .selection-tip {
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--muted);
   font-size: 12px;
 }
 </style>

@@ -20,6 +20,9 @@ public class HealthArchive {
   private String allergyHistory;
   private String chronicDisease;
   private String medicalHistory;
+  private String recentMedicalVisit;
+  private String checkReportSummary;
+  private String rehabilitationRecord;
   private String emergencyContact;
   private String emergencyPhone;
   private String remark;

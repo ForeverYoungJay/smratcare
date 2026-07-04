@@ -1,7 +1,13 @@
 <view class="container">
   <view class="surface card">
     <view class="section-title">护理日志</view>
-    <block wx:for="{{days}}" wx:key="date" wx:for-item="day">
+    <view wx:if="{{loading}}" class="list-empty">护理日志加载中...</view>
+    <view wx:if="{{!loading && loadError}}" class="error-box">
+      <view class="error-text">{{loadError}}</view>
+      <button class="ghost-btn retry-btn" bindtap="retryLoad">重新加载</button>
+    </view>
+    <view wx:if="{{!loading && !loadError && days.length === 0}}" class="list-empty">暂无护理日志记录</view>
+    <block wx:if="{{!loading && !loadError}}" wx:for="{{days}}" wx:key="date" wx:for-item="day">
       <view class="day-block">
         <view class="day">{{day.date}}</view>
         <block wx:for="{{day.items}}" wx:key="time" wx:for-item="log" wx:for-index="logIndex">

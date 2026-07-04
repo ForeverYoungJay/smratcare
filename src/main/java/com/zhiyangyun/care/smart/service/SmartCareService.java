@@ -20,6 +20,8 @@ public interface SmartCareService {
 
   SmartAlertSummaryResponse summary();
 
+  SmartAlertSummaryResponse refreshDerivedHealthAlerts();
+
   IPage<SmartAlert> pageAlerts(int pageNo, int pageSize, String status, String level, Long elderId, String keyword);
 
   SmartAlert acknowledgeAlert(Long id);

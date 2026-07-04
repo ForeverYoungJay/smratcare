@@ -1,0 +1,4 @@
+ALTER TABLE inventory_log ADD COLUMN IF NOT EXISTS receiver_name VARCHAR(64);
+ALTER TABLE inventory_log ADD COLUMN IF NOT EXISTS outbound_no VARCHAR(64);
+ALTER TABLE inventory_log ADD COLUMN IF NOT EXISTS elder_id BIGINT;
+ALTER TABLE inventory_log ADD COLUMN IF NOT EXISTS elder_name VARCHAR(64);

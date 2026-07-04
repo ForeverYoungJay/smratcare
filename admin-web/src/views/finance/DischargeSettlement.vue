@@ -53,21 +53,22 @@
           <a-tag :color="riskColor(record)">{{ riskText(record) }}</a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" :disabled="record.frontdeskApproved === 1" @click="approveFrontdesk(record)">
+          <div class="row-action-links">
+            <a-button type="link" size="small" :disabled="record.frontdeskApproved === 1" @click="approveFrontdesk(record)">
               前台签字
             </a-button>
-            <a-button type="link" :disabled="record.nursingApproved === 1" @click="approveNursing(record)">
+            <a-button type="link" size="small" :disabled="record.nursingApproved === 1" @click="approveNursing(record)">
               护理部签字
             </a-button>
             <a-button
               type="link"
+              size="small"
               :disabled="record.frontdeskApproved !== 1 || record.nursingApproved !== 1 || record.financeRefunded === 1"
               @click="confirmSettlement(record)"
             >
               财务退款
             </a-button>
-          </a-space>
+          </div>
         </template>
       </template>
     </DataTable>

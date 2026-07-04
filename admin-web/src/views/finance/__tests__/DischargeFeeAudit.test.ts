@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import DischargeFeeAudit from '../DischargeFeeAudit.vue'
 
-const getDischargeFeeAuditPage = vi.fn().mockResolvedValue({ list: [], total: 0, pageNo: 1, pageSize: 10 })
-const reviewDischargeFeeAudit = vi.fn().mockResolvedValue(null)
+const getDischargeFeeAuditPage = vi.hoisted(() => vi.fn().mockResolvedValue({ list: [], total: 0, pageNo: 1, pageSize: 10 }))
+const reviewDischargeFeeAudit = vi.hoisted(() => vi.fn().mockResolvedValue(null))
 
 vi.mock('../../../api/financeFee', () => ({
   getDischargeFeeAuditPage,
@@ -19,12 +19,12 @@ vi.mock('../../../api/baseConfig', () => ({
   getBaseConfigItemList: vi.fn().mockResolvedValue([])
 }))
 
-const message = {
+const message = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
   warning: vi.fn()
-}
-const modalConfirm = vi.fn()
+}))
+const modalConfirm = vi.hoisted(() => vi.fn())
 
 vi.mock('ant-design-vue', () => ({
   message,

@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="问卷模板" subTitle="模板配置与发布">
+    <template #extra>
+      <a-button type="primary" @click="openForm()">新增模板</a-button>
+    </template>
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="关键字">
@@ -32,7 +35,6 @@
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <div class="table-actions">
         <a-space>
-          <a-button type="primary" @click="openForm()">新增模板</a-button>
           <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
           <a-button :disabled="!selectedSingleRecord" @click="configQuestionsSelected">配置题目</a-button>
           <a-button :disabled="!selectedSingleRecord" @click="openQrSelected">二维码</a-button>
@@ -42,9 +44,9 @@
           <a-button :disabled="!selectedSingleRecord" @click="openPerformanceSelected">绩效榜</a-button>
           <a-button :disabled="!canPublishSingle" @click="publishSelected">发布</a-button>
           <a-button :disabled="!canDisableSingle" @click="disableSelected">停用</a-button>
-          <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
           <a-button :disabled="selectedRowKeys.length === 0" @click="batchPublish">批量发布</a-button>
           <a-button :disabled="selectedRowKeys.length === 0" @click="batchDisable">批量停用</a-button>
+          <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
           <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
           <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
         </a-space>
@@ -793,11 +795,11 @@ onMounted(async () => {
 }
 .publish-tip {
   margin-bottom: 10px;
-  color: rgba(0, 0, 0, 0.65);
+  color: var(--muted);
   font-size: 12px;
 }
 .selection-tip {
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--muted);
   font-size: 12px;
 }
 .question-toolbar {
@@ -807,7 +809,7 @@ onMounted(async () => {
   margin-bottom: 12px;
 }
 .hint {
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--muted);
 }
 .sync-msg {
   max-width: 180px;
@@ -816,6 +818,6 @@ onMounted(async () => {
   width: 280px;
   height: 280px;
   border-radius: 8px;
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--border);
 }
 </style>

@@ -1,4 +1,10 @@
 <view class="container">
+  <view class="surface panel error-panel" wx:if="{{loadError}}">
+    <view class="section-title">链路能力状态暂时不可用</view>
+    <view class="section-subtitle">{{loadError}}</view>
+    <button class="primary-btn retry-btn" bindtap="refreshStatus">重新加载</button>
+  </view>
+
   <view class="surface panel" wx:if="{{status}}">
     <view class="section-title">链路能力状态</view>
     <view class="section-subtitle">短信验证码、微信通知、微信支付、安全设置与旧接口下线进度</view>
@@ -29,9 +35,10 @@
     </view>
   </view>
 
-  <view class="surface panel">
+  <view class="surface panel" wx:if="{{!loadError || items.length}}">
     <view class="card-title">能力明细</view>
     <view wx:if="{{loading}}" class="list-empty">正在刷新能力状态...</view>
+    <view wx:if="{{!loading && !items.length}}" class="list-empty">当前没有可展示的能力明细</view>
     <block wx:for="{{items}}" wx:key="code">
       <view class="item">
         <view class="item-head">

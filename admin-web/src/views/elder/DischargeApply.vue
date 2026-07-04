@@ -44,9 +44,9 @@
       <a-space style="margin-bottom: 12px" wrap>
         <a-tag color="blue">已选 {{ selectedRowKeys.length }} 条</a-tag>
         <a-button :disabled="!canReviewSelected" @click="reviewSelected('APPROVED')">审核</a-button>
-        <a-button danger :disabled="!canReviewSelected" @click="reviewSelected('REJECTED')">驳回</a-button>
         <a-button :disabled="!canOpenFinanceAuditSelected" @click="openSelectedFinanceAudit">退住费用审核</a-button>
         <a-button :disabled="!canOpenSettlementSelected" @click="openSelectedSettlement">退院结算</a-button>
+        <a-button danger :disabled="!canReviewSelected" @click="reviewSelected('REJECTED')">驳回</a-button>
         <a-button danger :disabled="selectedRowKeys.length === 0" @click="deleteSelected">删除</a-button>
       </a-space>
       <a-table
@@ -72,12 +72,20 @@
             <span v-else>-</span>
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-space wrap>
-              <a-button type="link" :disabled="record.status !== 'PENDING'" @click="openReview(record, 'APPROVED')">审核</a-button>
-              <a-button type="link" danger :disabled="record.status !== 'PENDING'" @click="openReview(record, 'REJECTED')">驳回</a-button>
-              <a-button type="link" :disabled="record.status !== 'APPROVED'" @click="goToDischargeFeeAudit(record)">费用审核</a-button>
-              <a-button type="link" :disabled="record.status !== 'APPROVED'" @click="goToDischargeSettlement(record)">退院结算</a-button>
-            </a-space>
+            <div class="row-action-links">
+              <a-button type="link" size="small" :disabled="record.status !== 'PENDING'" @click="openReview(record, 'APPROVED')">审核</a-button>
+              <a-dropdown trigger="click">
+                <a-button type="link" size="small">更多 <DownOutlined /></a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item key="fee" :disabled="record.status !== 'APPROVED'" @click="goToDischargeFeeAudit(record)">费用审核</a-menu-item>
+                    <a-menu-item key="settlement" :disabled="record.status !== 'APPROVED'" @click="goToDischargeSettlement(record)">退院结算</a-menu-item>
+                    <a-menu-divider />
+                    <a-menu-item key="reject" danger :disabled="record.status !== 'PENDING'" @click="openReview(record, 'REJECTED')">驳回</a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
+            </div>
           </template>
         </template>
       </a-table>
@@ -160,6 +168,7 @@ import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
+import { DownOutlined } from '@ant-design/icons-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { uploadElderFile } from '../../api/elder'
 import { useElderOptions } from '../../composables/useElderOptions'
@@ -505,7 +514,7 @@ onMounted(async () => {
 
 .required-label::before {
   content: "*";
-  color: #ff4d4f;
+  color: var(--danger);
   margin-right: 4px;
   font-weight: 700;
 }

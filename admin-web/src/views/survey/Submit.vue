@@ -365,7 +365,7 @@ onMounted(async () => {
   font-weight: 600;
 }
 .template-desc {
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--muted);
   margin-top: 4px;
 }
 .question-list {
@@ -376,7 +376,7 @@ onMounted(async () => {
 .question-item {
   padding: 16px;
   border-radius: 12px;
-  background: rgba(148, 163, 184, 0.08);
+  background: var(--surface-3);
 }
 .question-title {
   display: flex;
@@ -389,8 +389,8 @@ onMounted(async () => {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: rgba(14, 165, 233, 0.2);
-  color: #0ea5e9;
+  background: rgba(var(--info-rgb), 0.2);
+  color: var(--info);
   display: grid;
   place-items: center;
   font-size: 12px;

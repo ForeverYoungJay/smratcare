@@ -1,5 +1,23 @@
 <template>
   <PageContainer title="入住统计" subTitle="按月份查看入住与离院趋势">
+    <template #extra>
+      <a-space>
+        <a-button type="primary" @click="loadData">刷新</a-button>
+        <a-button @click="exportSummary">导出汇总</a-button>
+        <a-dropdown>
+          <a-button>更多 ▾</a-button>
+          <template #overlay>
+            <a-menu>
+              <a-menu-item @click="openColumnSetting">列设置</a-menu-item>
+              <a-menu-item :disabled="!displayRows.length" @click="printCurrent">打印当前列</a-menu-item>
+              <a-menu-item :disabled="!query.monthKeyword.trim() || !displayRows.length" @click="printSpecificMonth">打印指定月份</a-menu-item>
+              <a-menu-divider />
+              <a-menu-item @click="reset">重置</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+      </a-space>
+    </template>
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline">
         <a-form-item label="起始月份">
@@ -24,16 +42,6 @@
             <a-button size="small" @click="setThisMonth">本月</a-button>
           </a-space>
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="loadData">刷新</a-button>
-            <a-button @click="exportSummary">导出汇总</a-button>
-            <a-button @click="openColumnSetting">列设置</a-button>
-            <a-button :disabled="!displayRows.length" @click="printCurrent">打印当前列</a-button>
-            <a-button :disabled="!query.monthKeyword.trim() || !displayRows.length" @click="printSpecificMonth">打印指定月份</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
       </a-form>
       <StatsMetaHint
         scope-text="入住统计（按月，净增长=入住-离院）"
@@ -55,6 +63,10 @@
     />
 
     <StatsInsightDeck :items="visibleInsightItems" />
+
+    <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="入住/离院趋势">
+      <div ref="trendRef" style="height: 320px;"></div>
+    </a-card>
 
     <StatsCommandCenter
       page-key="stats-check-in-command"
@@ -106,12 +118,8 @@
       </a-col>
     </a-row>
 
-    <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="入住/离院趋势">
-      <div ref="trendRef" style="height: 320px;"></div>
-    </a-card>
-
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="月度明细">
-      <vxe-table border stripe show-overflow :data="displayRows" height="300">
+      <vxe-table border stripe show-overflow="title" :data="displayRows" height="300">
         <vxe-column field="month" title="月份" width="140" />
         <vxe-column field="admissions" title="入住" width="120" />
         <vxe-column field="discharges" title="离院" width="120" />

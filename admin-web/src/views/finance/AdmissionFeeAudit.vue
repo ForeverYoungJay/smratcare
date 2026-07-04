@@ -18,10 +18,10 @@
           <a-tag :color="record.status === 'APPROVED' ? 'green' : record.status === 'REJECTED' ? 'red' : 'orange'">{{ record.status }}</a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" :disabled="record.status !== 'PENDING'" @click="review(record, 'APPROVED')">通过</a-button>
-            <a-button type="link" danger :disabled="record.status !== 'PENDING'" @click="review(record, 'REJECTED')">驳回</a-button>
-          </a-space>
+          <div class="row-action-links">
+            <a-button type="link" size="small" :disabled="record.status !== 'PENDING'" @click="review(record, 'APPROVED')">通过</a-button>
+            <a-button type="link" size="small" danger :disabled="record.status !== 'PENDING'" @click="review(record, 'REJECTED')">驳回</a-button>
+          </div>
         </template>
       </template>
     </DataTable>

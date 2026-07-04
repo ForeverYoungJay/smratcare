@@ -64,12 +64,12 @@
           <div class="group-remark">{{ record.remark || '暂无班组备注，建议补充排班习惯或服务侧重点。' }}</div>
 
           <div class="group-actions">
-            <a-space wrap>
-              <a @click="openModal(record)">编辑小组</a>
-              <a @click="openProfileDrawer(record)">一键编辑优点/特长</a>
-              <a @click="openPrintDrawer(record)">快捷打印</a>
-              <a class="danger-text" @click="remove(record.id)">删除</a>
-            </a-space>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="openModal(record)">编辑小组</a-button>
+              <a-button type="link" size="small" @click="openProfileDrawer(record)">一键编辑优点/特长</a-button>
+              <a-button type="link" size="small" @click="openPrintDrawer(record)">快捷打印</a-button>
+              <a-button type="link" size="small" danger @click="remove(record.id)">删除</a-button>
+            </div>
           </div>
         </a-card>
       </div>
@@ -570,11 +570,11 @@ load()
 <style scoped>
 .group-shell {
   --care-cream: #f5efe7;
-  --care-ink: #33261b;
-  --care-muted: #7f6a53;
+  --care-ink: var(--ink);
+  --care-muted: var(--muted);
   --care-line: #e6d7c7;
-  --care-accent: #3f7ad8;
-  --care-accent-soft: rgba(63, 122, 216, 0.12);
+  --care-accent: var(--primary);
+  --care-accent-soft: rgba(var(--primary-rgb), 0.12);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -594,7 +594,7 @@ load()
 
 .eyebrow {
   margin: 0 0 8px;
-  color: #8b6b49;
+  color: var(--muted-2);
   font-size: 12px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -729,7 +729,7 @@ load()
 }
 
 .danger-text {
-  color: #d84f4f;
+  color: var(--danger);
 }
 
 .batch-toolbar,
@@ -796,7 +796,7 @@ load()
 }
 
 .paper-mark {
-  color: #8b6b49;
+  color: var(--muted-2);
   font-size: 13px;
   margin-bottom: 6px;
 }

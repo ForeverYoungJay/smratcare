@@ -87,7 +87,7 @@
         </a-space>
         <div style="margin-top: 8px">
           <a-tag color="blue">任务视角参数</a-tag>
-          <span style="color: #64748b">{{ summaryWindowHint }}</span>
+          <span style="color: var(--muted)">{{ summaryWindowHint }}</span>
         </div>
         <div class="refresh-hint">最近刷新：{{ lastLoadedAt || '-' }}</div>
       </a-card>
@@ -187,11 +187,11 @@
                 <a-tag :color="deliveryStatusColor(record)">{{ deliveryStatusLabel(record) }}</a-tag>
               </template>
               <template v-if="column.key === 'action'">
-                <a-space>
-                  <a-button type="link" :disabled="record.status === 'DELIVERED'" @click="finishDelivery(record)">送达</a-button>
-                  <a-button type="link" danger :disabled="record.status === 'FAILED'" @click="markDeliveryFailed(record)">失败</a-button>
-                  <a-button type="link" :disabled="record.status === 'DELIVERED'" @click="redispatchDelivery(record)">重派</a-button>
-                </a-space>
+                <div class="row-action-links">
+                  <a-button type="link" size="small" :disabled="record.status === 'DELIVERED'" @click="finishDelivery(record)">送达</a-button>
+                  <a-button type="link" size="small" :disabled="record.status === 'DELIVERED'" @click="redispatchDelivery(record)">重派</a-button>
+                  <a-button type="link" size="small" danger :disabled="record.status === 'FAILED'" @click="markDeliveryFailed(record)">失败</a-button>
+                </div>
               </template>
             </template>
           </a-table>
@@ -1339,34 +1339,34 @@ watch(autoRefresh, () => {
 }
 
 .task-summary-card {
-  border: 1px solid #e9edf5;
+  border: 1px solid var(--border-soft);
   border-radius: 12px;
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
 
 .task-control-card {
   margin-bottom: 12px;
-  border: 1px solid #e6f0ff;
+  border: 1px solid var(--border-soft);
   border-radius: 12px;
   background: linear-gradient(90deg, #f8fcff 0%, #ffffff 45%, #fffaf5 100%);
 }
 
 .refresh-hint {
   margin-top: 6px;
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .metric-value {
   font-size: 24px;
   font-weight: 600;
-  color: #1d2939;
+  color: var(--ink);
   line-height: 1.4;
 }
 
 .metric-line {
   margin-top: 4px;
-  color: #475467;
+  color: var(--muted);
 }
 
 .duty-dense :deep(.ant-card-body) {

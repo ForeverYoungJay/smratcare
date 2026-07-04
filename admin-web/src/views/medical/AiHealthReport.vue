@@ -28,11 +28,11 @@
           <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="openDetail(record)">详情</a-button>
-            <a-button type="link" @click="publish(record)" :disabled="record.status === 'PUBLISHED'">发布</a-button>
-            <a-button type="link" @click="generateTasks(record)">生成任务</a-button>
-          </a-space>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="openDetail(record)">详情</a-button>
+            <a-button type="link" size="small" @click="publish(record)" :disabled="record.status === 'PUBLISHED'">发布</a-button>
+            <a-button type="link" size="small" @click="generateTasks(record)">生成任务</a-button>
+          </div>
         </template>
       </template>
     </DataTable>
@@ -296,6 +296,6 @@ loadReports()
 
 <style scoped>
 :deep(.ai-row-warning) {
-  background: #fffbe6 !important;
+  background: rgba(var(--warning-rgb), 0.08) !important;
 }
 </style>

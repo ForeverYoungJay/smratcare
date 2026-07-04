@@ -457,7 +457,7 @@ watch(
 
 <style scoped>
 .bucket-head {
-  color: #64748b;
+  color: var(--muted);
   font-size: 13px;
 }
 .bucket-score {
@@ -467,7 +467,7 @@ watch(
   margin: 8px 0 4px;
 }
 .bucket-sub {
-  color: #94a3b8;
+  color: var(--muted-2);
   font-size: 12px;
 }
 </style>

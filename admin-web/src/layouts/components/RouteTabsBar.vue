@@ -40,6 +40,10 @@
         <slot name="tab-tools-overlay" />
       </template>
     </a-dropdown>
+
+    <div v-if="$slots.extra" class="route-tabs-bar__extra">
+      <slot name="extra" />
+    </div>
   </div>
 </template>
 
@@ -71,7 +75,7 @@ function onEdit(targetKey: string | MouseEvent, action: 'add' | 'remove') {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 2px 20px 0;
+  padding: 6px 20px 4px;
 }
 
 .route-tabs-bar__tabs {
@@ -79,30 +83,62 @@ function onEdit(targetKey: string | MouseEvent, action: 'add' | 'remove') {
   flex: 1;
 }
 
+.route-tabs-bar__extra {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
 .route-tabs-bar__tabs :deep(.ant-tabs-nav) {
   margin-bottom: 0;
 }
 
 .route-tabs-bar__tabs :deep(.ant-tabs-tab) {
-  min-height: 30px;
-  padding: 0 10px !important;
-  border: 1px solid rgba(214, 225, 232, 0.9) !important;
-  border-radius: 10px 10px 0 0 !important;
-  background: rgba(247, 251, 253, 0.72) !important;
+  min-height: 32px;
+  margin-top: 2px;
+  padding: 0 13px !important;
+  border: 1px solid var(--border-soft) !important;
+  border-radius: 999px !important;
+  background: var(--surface-3) !important;
   transition: all 0.2s ease;
 }
 
+.route-tabs-bar__tabs :deep(.ant-tabs-tab + .ant-tabs-tab) {
+  margin-left: 6px;
+}
+
+.route-tabs-bar__tabs :deep(.ant-tabs-tab:hover) {
+  border-color: rgba(var(--primary-rgb), 0.24) !important;
+}
+
 .route-tabs-bar__tabs :deep(.ant-tabs-tab-active) {
-  background: rgba(255, 255, 255, 0.96) !important;
-  box-shadow: 0 8px 16px rgba(21, 63, 97, 0.06);
+  border-color: rgba(var(--primary-rgb), 0.28) !important;
+  background: var(--primary-soft) !important;
+  box-shadow: none;
+}
+
+.route-tabs-bar__tabs :deep(.ant-tabs-tab-active .route-tabs-bar__title) {
+  color: var(--primary-strong);
+}
+
+.route-tabs-bar__tabs :deep(.ant-tabs-ink-bar) {
+  display: none;
 }
 
 .route-tabs-bar__title {
   display: inline-flex;
   align-items: center;
   min-width: 0;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 600;
+}
+
+.route-tabs-bar__tabs :deep(.ant-tabs-tab .ant-tabs-tab-remove) {
+  margin-left: 2px;
+  padding: 2px;
+  font-size: 11px;
 }
 
 .route-tabs-bar__title.is-over {
@@ -111,9 +147,10 @@ function onEdit(targetKey: string | MouseEvent, action: 'add' | 'remove') {
 
 .route-tabs-bar__tools {
   height: 30px;
-  border-radius: 10px;
-  border-color: rgba(207, 220, 230, 0.9);
-  background: rgba(255, 255, 255, 0.9);
+  border-radius: 999px !important;
+  border-color: var(--border);
+  background: #ffffff;
+  font-size: 12px;
 }
 
 @media (max-width: 992px) {

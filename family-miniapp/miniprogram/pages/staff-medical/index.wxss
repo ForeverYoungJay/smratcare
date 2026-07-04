@@ -1,12 +1,62 @@
-.quick-actions {
+.summary-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14rpx;
+  gap: 12rpx;
+  margin-top: 18rpx;
+}
+
+.summary-card {
+  padding: 20rpx 12rpx;
+  text-align: center;
+}
+
+.summary-card text,
+.summary-card strong {
+  display: block;
+}
+
+.summary-card text {
+  color: #73808c;
+  font-size: 22rpx;
+  font-weight: 800;
+}
+
+.summary-card strong {
+  margin-top: 8rpx;
+  color: #21705F;
+  font-size: 38rpx;
+  font-weight: 900;
+}
+
+.mode-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12rpx;
   margin: 18rpx 0;
 }
 
-.quick-btn {
-  width: 100%;
+.mode-tab {
+  padding: 18rpx 0;
+  border-radius: 18rpx;
+  background: #f0f4f2;
+  color: #60716b;
+  text-align: center;
+  font-size: 26rpx;
+  font-weight: 850;
+}
+
+.mode-tab.active {
+  background: #21705F;
+  color: #ffffff;
+}
+
+.state-card {
+  margin-top: 22rpx;
+  padding: 34rpx;
+}
+
+.retry-btn {
+  margin-top: 20rpx;
 }
 
 .work-row {
@@ -17,6 +67,6 @@
   border-top: 1rpx solid #edf1f5;
 }
 .work-row:first-of-type { border-top: 0; }
-.work-title { color: #182430; font-size: 28rpx; font-weight: 900; }
+.work-title { color: #22332E; font-size: 28rpx; font-weight: 900; }
 .work-meta { margin-top: 8rpx; color: #73808c; font-size: 23rpx; }
-.work-action { color: #1f5f8b; font-size: 24rpx; font-weight: 900; white-space: nowrap; }
+.work-action { color: #3D7FA6; font-size: 24rpx; font-weight: 900; white-space: nowrap; }

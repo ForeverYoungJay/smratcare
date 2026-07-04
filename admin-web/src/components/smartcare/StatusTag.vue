@@ -1,16 +1,34 @@
 <template>
   <span class="status-tag" :class="`status-tag--${tone}`">
-    <span class="status-tag__dot"></span>
+    <span class="status-tag__icon" aria-hidden="true">{{ toneIcon }}</span>
     {{ text }}
   </span>
 </template>
 
 <script setup lang="ts">
-withDefaults(defineProps<{
+import { computed } from 'vue'
+
+const props = withDefaults(defineProps<{
   text: string
   tone?: 'normal' | 'pending' | 'warning' | 'danger' | 'offline'
 }>(), {
   tone: 'normal'
+})
+
+// 除颜色外再用一个形状符号区分状态，便于色弱用户与打印场景识别。
+const toneIcon = computed(() => {
+  switch (props.tone) {
+    case 'danger':
+      return '✕'
+    case 'warning':
+      return '!'
+    case 'pending':
+      return '◔'
+    case 'offline':
+      return '·'
+    default:
+      return '✓'
+  }
 })
 </script>
 
@@ -26,11 +44,18 @@ withDefaults(defineProps<{
   border: 1px solid transparent;
 }
 
-.status-tag__dot {
-  width: 8px;
-  height: 8px;
+.status-tag__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: currentColor;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
 }
 
 .status-tag--normal {

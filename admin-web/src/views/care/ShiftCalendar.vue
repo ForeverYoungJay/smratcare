@@ -50,11 +50,11 @@
           <a-tag color="cyan">{{ record.sourceTemplateName || '手工排班' }}</a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a v-if="canManageSchedule" @click="openEdit(record)">编辑</a>
-            <a v-if="canRequestSwap(record)" @click="openSwap(record)">申请换班</a>
-            <a v-if="canManageSchedule" @click="remove(record)" style="color: #ff4d4f">删除</a>
-          </a-space>
+          <div class="row-action-links">
+            <a-button v-if="canManageSchedule" type="link" size="small" @click="openEdit(record)">编辑</a-button>
+            <a-button v-if="canRequestSwap(record)" type="link" size="small" @click="openSwap(record)">申请换班</a-button>
+            <a-button v-if="canManageSchedule" type="link" size="small" danger @click="remove(record)">删除</a-button>
+          </div>
         </template>
       </template>
     </DataTable>
@@ -79,11 +79,11 @@
             </a-tag>
           </template>
           <template v-else-if="column.key === 'actions'">
-            <a-space>
-              <a v-if="canConfirmSwap(record)" @click="decideSwap(record, true)">同意</a>
-              <a v-if="canConfirmSwap(record)" style="color: #ff4d4f" @click="decideSwap(record, false)">拒绝</a>
-              <a v-if="record.approvalId" @click="openApproval(record)">查看审批</a>
-            </a-space>
+            <div class="row-action-links">
+              <a-button v-if="canConfirmSwap(record)" type="link" size="small" @click="decideSwap(record, true)">同意</a-button>
+              <a-button v-if="record.approvalId" type="link" size="small" @click="openApproval(record)">查看审批</a-button>
+              <a-button v-if="canConfirmSwap(record)" type="link" size="small" danger @click="decideSwap(record, false)">拒绝</a-button>
+            </div>
           </template>
         </template>
       </a-table>

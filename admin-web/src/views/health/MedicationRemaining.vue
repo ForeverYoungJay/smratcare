@@ -150,6 +150,6 @@ fetchData()
 
 <style scoped>
 :deep(.row-warning > td) {
-  background: #fff7e6 !important;
+  background: rgba(var(--warning-rgb), 0.1) !important;
 }
 </style>

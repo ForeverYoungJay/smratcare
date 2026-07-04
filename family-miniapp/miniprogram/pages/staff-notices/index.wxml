@@ -35,6 +35,13 @@
         <view class="notice-preview">{{item.preview}}</view>
       </view>
     </block>
+    <view class="surface state-card" wx:if="{{loadingMore}}">
+      <view class="section-subtitle">正在加载更多公告...</view>
+    </view>
+    <view class="surface state-card" wx:elif="{{hasMore}}">
+      <view class="section-subtitle">已加载 {{notices.length}} 条公告</view>
+      <button class="ghost-btn retry-btn" bindtap="loadMore">继续加载</button>
+    </view>
   </view>
 
   <view class="detail-mask" wx:if="{{activeNotice}}" catchtap="closeDetail">

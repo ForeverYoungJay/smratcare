@@ -1,11 +1,11 @@
 .scan-card {
   margin-top: 22rpx;
   padding: 28rpx;
-  background: linear-gradient(135deg, rgba(36, 107, 95, 0.14), rgba(255, 255, 255, 0) 62%), #ffffff;
+  background: linear-gradient(135deg, rgba(33, 112, 95, 0.14), rgba(255, 255, 255, 0) 62%), #ffffff;
 }
 
 .scan-title {
-  color: #182430;
+  color: #22332E;
   font-size: 32rpx;
   font-weight: 900;
 }
@@ -27,9 +27,19 @@
 }
 
 .scan-result {
-  color: #246b5f;
+  color: #21705F;
   font-size: 24rpx;
   font-weight: 850;
+}
+
+.success-text {
+  margin-top: 12rpx;
+  color: #21705F;
+}
+
+.error-text {
+  margin-top: 12rpx;
+  color: #C9504B;
 }
 
 .point-row {
@@ -46,7 +56,7 @@
 }
 
 .point-title {
-  color: #182430;
+  color: #22332E;
   font-size: 27rpx;
   font-weight: 900;
 }
@@ -64,5 +74,5 @@
 }
 
 .point-status.done {
-  color: #247455;
+  color: #21705F;
 }

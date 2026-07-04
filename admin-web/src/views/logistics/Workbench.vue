@@ -280,7 +280,7 @@ const riskProgressGradient = computed(() => {
     return { '0%': '#fa8c16', '100%': '#d46b08' }
   }
   if (riskIndex.value >= 30) {
-    return { '0%': '#1677ff', '100%': '#0958d9' }
+    return { '0%': '#3d7fa6', '100%': '#33698a' }
   }
   return { '0%': '#52c41a', '100%': '#389e0d' }
 })
@@ -756,12 +756,12 @@ onUnmounted(() => {
 
 <style scoped>
 .filter-panel {
-  border: 1px solid #e6f4ff;
+  border: 1px solid var(--border-soft);
   background: linear-gradient(120deg, #f8fbff 0%, #f2f8ff 42%, #f9fcff 100%);
 }
 
 .refresh-meta {
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -779,15 +779,15 @@ onUnmounted(() => {
 
 .workbench-hero {
   overflow: hidden;
-  border: 1px solid #e6f4ff;
+  border: 1px solid var(--border-soft);
   background:
-    radial-gradient(160% 120% at 0% 0%, rgba(22, 119, 255, 0.08) 0%, rgba(22, 119, 255, 0) 60%),
+    radial-gradient(160% 120% at 0% 0%, rgba(var(--primary-rgb), 0.08) 0%, rgba(var(--primary-rgb), 0) 60%),
     linear-gradient(135deg, #f8fbff 0%, #f0f7ff 40%, #f7fcff 100%);
 }
 
 .hero-title {
   font-size: 15px;
-  color: #1f2937;
+  color: var(--ink);
   font-weight: 600;
   letter-spacing: 0.3px;
 }
@@ -804,18 +804,18 @@ onUnmounted(() => {
   font-size: 42px;
   line-height: 1;
   font-weight: 700;
-  color: #111827;
+  color: var(--ink);
 }
 
 .hero-subline {
   margin-top: 8px;
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .hero-metric-tile {
   border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.24);
+  border: 1px solid var(--border-soft);
   background: rgba(255, 255, 255, 0.78);
   padding: 10px;
   min-height: 94px;
@@ -823,7 +823,7 @@ onUnmounted(() => {
 }
 
 .tile-label {
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -831,31 +831,31 @@ onUnmounted(() => {
   margin-top: 6px;
   font-size: 24px;
   line-height: 1.1;
-  color: #0f172a;
+  color: var(--ink);
   font-weight: 700;
 }
 
 .tile-hint {
   margin-top: 6px;
   font-size: 12px;
-  color: #475569;
+  color: var(--muted);
 }
 
 .line-item {
   margin-top: 6px;
-  color: #334155;
+  color: var(--muted);
   font-size: 13px;
   line-height: 1.65;
 }
 
 .card-panel {
-  border: 1px solid #f1f5f9;
+  border: 1px solid var(--border-soft);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .card-panel:hover {
   transform: translateY(-2px);
-  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+  box-shadow: var(--shadow-md);
 }
 
 .card-duty :deep(.ant-card-head) {

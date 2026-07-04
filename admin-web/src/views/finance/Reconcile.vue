@@ -70,7 +70,7 @@
         />
       </a-card>
       <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="当日异常明细（分级）">
-        <vxe-table border stripe show-overflow :data="filteredExceptions" height="260">
+        <vxe-table border stripe show-overflow="title" :data="filteredExceptions" height="260">
           <vxe-column field="occurredAt" title="发生时间" width="180" />
           <vxe-column field="exceptionTypeLabel" title="异常类型" width="180" />
           <vxe-column field="elderName" title="长者" width="130" />
@@ -83,10 +83,10 @@
           <vxe-column field="detail" title="异常描述" min-width="220" />
           <vxe-column title="操作" width="180" fixed="right">
             <template #default="{ row }">
-              <a-space>
-                <a-button type="link" @click="go(`/finance/bill/${row.billId}`)" v-if="row.billId">查看账单</a-button>
-                <a-button type="link" @click="go(`/finance/reconcile/issue-center?date=${dayjs(query.date).format('YYYY-MM-DD')}&sourceModule=RECONCILE`)">去处理</a-button>
-              </a-space>
+              <div class="row-action-links">
+                <a-button type="link" size="small" @click="go(`/finance/bill/${row.billId}`)" v-if="row.billId">查看账单</a-button>
+                <a-button type="link" size="small" @click="go(`/finance/reconcile/issue-center?date=${dayjs(query.date).format('YYYY-MM-DD')}&sourceModule=RECONCILE`)">去处理</a-button>
+              </div>
             </template>
           </vxe-column>
         </vxe-table>
@@ -111,7 +111,7 @@
         </a-form-item>
       </a-form>
 
-      <vxe-table border stripe show-overflow :data="history" height="320" :loading="historyLoading">
+      <vxe-table border stripe show-overflow="title" :data="history" height="320" :loading="historyLoading">
         <vxe-column field="reconcileDate" title="对账日期" width="140">
           <template #default="{ row }">
             <span>{{ row.reconcileDate || row.date }}</span>

@@ -11,10 +11,15 @@
         </view>
       </block>
     </view>
-    <view class="empty" wx:if="{{list.length === 0}}">
+    <view class="empty" wx:if="{{loading}}">相册加载中...</view>
+    <view class="error-box" wx:if="{{!loading && loadError}}">
+      <view class="error-text">{{loadError}}</view>
+      <button class="ghost-btn retry-btn" bindtap="retryLoad">重新加载</button>
+    </view>
+    <view class="empty" wx:if="{{!loading && !loadError && list.length === 0}}">
       {{activeScope === 'PERSONAL' ? '暂无个人相册' : '暂无集体活动相册'}}
     </view>
-    <block wx:for="{{list}}" wx:key="id">
+    <block wx:if="{{!loading && !loadError}}" wx:for="{{list}}" wx:key="id">
       <view class="item">
         <video
           wx:if="{{item.isVideo && item.resolvedMediaUrl}}"

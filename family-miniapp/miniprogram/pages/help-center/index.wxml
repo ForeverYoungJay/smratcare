@@ -5,6 +5,7 @@
       <view class="support-title">机构服务信息</view>
       <view class="support-text">{{supportInfo.organizationName}}</view>
       <view class="support-text">客服热线：{{supportInfo.supportPhone}} · {{supportInfo.supportHours}}</view>
+      <view class="support-text" wx:if="{{serviceEmail}}">客服邮箱：{{serviceEmail}}</view>
       <view class="support-text">服务协议：{{complianceInfo.serviceAgreementVersion}} · 隐私说明：{{complianceInfo.privacyPolicyVersion}}</view>
       <view class="support-text">数据用途：{{complianceInfo.dataUsageSummary}}</view>
     </view>
@@ -25,7 +26,7 @@
     </block>
 
     <button class="primary-btn action" bindtap="callService">联系在线客服</button>
-    <button class="ghost-btn action" bindtap="copySupportEmail">复制客服邮箱</button>
+    <button class="ghost-btn action" bindtap="copySupportEmail">{{serviceEmail ? '复制客服邮箱' : '联系客服渠道'}}</button>
     <button class="ghost-btn action" bindtap="goFeedback">提交建议反馈</button>
   </view>
 </view>

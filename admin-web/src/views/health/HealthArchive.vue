@@ -63,13 +63,14 @@
           <span v-else class="disease-empty">未维护</span>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="openDiseaseDrawer(record)">基础疾病</a-button>
-            <a-button type="link" @click="openEdit(record)">编辑</a-button>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="openDiseaseDrawer(record)">基础疾病</a-button>
+            <a-button type="link" size="small" @click="goHealthRecords(record)">健康记录</a-button>
+            <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
             <a-popconfirm title="确认删除该记录吗？" ok-text="确认" cancel-text="取消" @confirm="remove(record)">
-              <a-button type="link" danger>删除</a-button>
+              <a-button type="link" size="small" danger>删除</a-button>
             </a-popconfirm>
-          </a-space>
+          </div>
         </template>
       </template>
     </DataTable>
@@ -108,6 +109,15 @@
         </a-form-item>
         <a-form-item label="过敏史"><a-input v-model:value="form.allergyHistory" /></a-form-item>
         <a-form-item label="既往病史"><a-textarea v-model:value="form.medicalHistory" :rows="3" /></a-form-item>
+        <a-form-item label="最近就医记录">
+          <a-textarea v-model:value="form.recentMedicalVisit" :rows="2" placeholder="记录就医机构、诊断、医嘱建议、复诊安排" />
+        </a-form-item>
+        <a-form-item label="检查报告摘要">
+          <a-textarea v-model:value="form.checkReportSummary" :rows="2" placeholder="记录检查项目、报告结论、异常指标和附件归档位置" />
+        </a-form-item>
+        <a-form-item label="康复计划/记录">
+          <a-textarea v-model:value="form.rehabilitationRecord" :rows="2" placeholder="记录康复目标、训练项目、频次、阶段效果和注意事项" />
+        </a-form-item>
         <a-row :gutter="16">
           <a-col :span="12"><a-form-item label="紧急联系人"><a-input v-model:value="form.emergencyContact" /></a-form-item></a-col>
           <a-col :span="12"><a-form-item label="联系电话"><a-input v-model:value="form.emergencyPhone" /></a-form-item></a-col>
@@ -163,6 +173,9 @@ const columns = [
   { title: '血型', dataIndex: 'bloodType', key: 'bloodType', width: 100 },
   { title: '慢病补充说明', dataIndex: 'chronicDisease', key: 'chronicDisease', width: 150 },
   { title: '过敏史', dataIndex: 'allergyHistory', key: 'allergyHistory', width: 180 },
+  { title: '就医记录', dataIndex: 'recentMedicalVisit', key: 'recentMedicalVisit', width: 180 },
+  { title: '检查报告', dataIndex: 'checkReportSummary', key: 'checkReportSummary', width: 180 },
+  { title: '康复记录', dataIndex: 'rehabilitationRecord', key: 'rehabilitationRecord', width: 180 },
   { title: '紧急联系人', dataIndex: 'emergencyContact', key: 'emergencyContact', width: 120 },
   { title: '联系电话', dataIndex: 'emergencyPhone', key: 'emergencyPhone', width: 140 },
   { title: '操作', key: 'action', width: 180 }
@@ -184,6 +197,9 @@ const form = reactive({
   allergyHistory: '',
   chronicDisease: '',
   medicalHistory: '',
+  recentMedicalVisit: '',
+  checkReportSummary: '',
+  rehabilitationRecord: '',
   emergencyContact: '',
   emergencyPhone: '',
   remark: ''
@@ -241,6 +257,9 @@ function openCreate() {
   form.allergyHistory = ''
   form.chronicDisease = ''
   form.medicalHistory = ''
+  form.recentMedicalVisit = ''
+  form.checkReportSummary = ''
+  form.rehabilitationRecord = ''
   form.emergencyContact = ''
   form.emergencyPhone = ''
   form.remark = ''
@@ -260,6 +279,9 @@ function openEdit(record: HealthArchive) {
   form.allergyHistory = record.allergyHistory || ''
   form.chronicDisease = record.chronicDisease || ''
   form.medicalHistory = record.medicalHistory || ''
+  form.recentMedicalVisit = record.recentMedicalVisit || ''
+  form.checkReportSummary = record.checkReportSummary || ''
+  form.rehabilitationRecord = record.rehabilitationRecord || ''
   form.emergencyContact = record.emergencyContact || ''
   form.emergencyPhone = record.emergencyPhone || ''
   form.remark = record.remark || ''
@@ -303,6 +325,9 @@ async function submit() {
       allergyHistory: form.allergyHistory,
       chronicDisease: form.chronicDisease,
       medicalHistory: form.medicalHistory,
+      recentMedicalVisit: form.recentMedicalVisit,
+      checkReportSummary: form.checkReportSummary,
+      rehabilitationRecord: form.rehabilitationRecord,
       emergencyContact: form.emergencyContact,
       emergencyPhone: form.emergencyPhone,
       remark: form.remark
@@ -361,8 +386,20 @@ function goMedicalDiseaseManager() {
   router.push('/medical-care/basic-diseases')
 }
 
+function goHealthRecords(record: HealthArchive) {
+  router.push({
+    path: '/health/management/data',
+    query: {
+      elderId: record.elderId,
+      residentName: record.elderName || ''
+    }
+  })
+}
+
 function resolveRowClassName(record: HealthArchive) {
-  if (!record.emergencyContact || !record.emergencyPhone) return 'health-row-warning'
+  const missingContact = !record.emergencyContact || !record.emergencyPhone
+  const missingMedicalArchive = !record.recentMedicalVisit || !record.checkReportSummary || !record.rehabilitationRecord
+  if (missingContact || missingMedicalArchive) return 'health-row-warning'
   return ''
 }
 
@@ -430,10 +467,10 @@ watch(
 
 <style scoped>
 :deep(.health-row-warning > td) {
-  background: #fff7e6 !important;
+  background: rgba(var(--warning-rgb), 0.12) !important;
 }
 
 .disease-empty {
-  color: #94a3b8;
+  color: var(--muted-2);
 }
 </style>

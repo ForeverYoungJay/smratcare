@@ -319,6 +319,6 @@ watch(
 
 <style scoped>
 :deep(.selected-contract-row > td) {
-  background: #e6f7ff !important;
+  background: var(--primary-soft) !important;
 }
 </style>

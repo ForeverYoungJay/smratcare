@@ -552,7 +552,7 @@ useLiveSyncRefresh({
 
 <style scoped>
 .attendance-hero {
-  background: linear-gradient(135deg, #0f766e 0%, #0ea5e9 52%, #1d4ed8 100%);
+  background: linear-gradient(135deg, #0f766e 0%, #0ea5e9 52%, #33698a 100%);
   color: #fff;
   border-radius: 16px;
   box-shadow: 0 14px 30px rgba(2, 12, 27, 0.18);
@@ -604,7 +604,7 @@ useLiveSyncRefresh({
 }
 
 .metric-card :deep(.ant-statistic-title) {
-  color: rgba(15, 23, 42, 0.72);
+  color: var(--muted);
 }
 
 .metric-card :deep(.ant-statistic-content) {
@@ -637,7 +637,7 @@ useLiveSyncRefresh({
 }
 
 .muted {
-  color: #8c8c8c;
+  color: var(--muted);
 }
 
 .today-line {
@@ -647,10 +647,10 @@ useLiveSyncRefresh({
 }
 
 .attendance-table :deep(.ant-table-thead > tr > th) {
-  background: #f5f7ff;
+  background: var(--surface-2);
 }
 
 .attendance-table :deep(.ant-table-tbody > tr:hover > td) {
-  background: #f8fafc;
+  background: var(--surface-2);
 }
 </style>

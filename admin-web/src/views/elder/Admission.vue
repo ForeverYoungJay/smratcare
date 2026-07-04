@@ -4,9 +4,8 @@
       <div class="admission-form-head">
         <div>
           <h3>办理入住</h3>
-          <p>将高频字段压缩到一屏完成，减少录入时的上下切换。</p>
+          <p>分床、押金账户、合同信息与二维码一步办理完成。</p>
         </div>
-        <a-button type="primary" :loading="submitting || submitChecklistLoading" @click="openSubmitConfirm">提交入住办理</a-button>
       </div>
       <a-alert
         v-if="lifecycleContext.active"
@@ -121,6 +120,16 @@
           </a-col>
         </a-row>
       </a-form>
+      <div class="admission-form-footer">
+        <a-button
+          type="primary"
+          size="large"
+          :loading="submitting || submitChecklistLoading"
+          @click="openSubmitConfirm"
+        >
+          提交入住办理
+        </a-button>
+      </div>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
@@ -247,7 +256,7 @@
               <a-space>
                 <a-button type="link" style="padding: 0" @click="jumpToChecklist(item.key)">• {{ item.label }}</a-button>
                 <a-tag :color="item.ready ? 'green' : 'red'">{{ item.ready ? '已完善' : '待完善' }}</a-tag>
-                <span style="color: #8c8c8c">{{ item.note }}</span>
+                <span style="color: var(--muted)">{{ item.note }}</span>
               </a-space>
             </a-list-item>
           </template>
@@ -1170,12 +1179,21 @@ onMounted(async () => {
 
 .admission-form-head p {
   margin: 4px 0 0;
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .admission-compact-form :deep(.ant-form-item) {
   margin-bottom: 10px;
+}
+
+.admission-form-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border, rgba(0, 0, 0, 0.06));
 }
 
 .compact-form-item :deep(.ant-form-item-label) {
@@ -1184,7 +1202,7 @@ onMounted(async () => {
 
 .compact-inline-tip {
   margin-top: 6px;
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -1204,33 +1222,33 @@ onMounted(async () => {
 }
 
 .admission-summary-title {
-  color: #0f172a;
+  color: var(--ink);
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.2px;
 }
 
 .admission-summary-meta {
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .admission-summary-tile {
   border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.24);
+  border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.8);
   padding: 10px;
   min-height: 88px;
 }
 
 .admission-summary-label {
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .admission-summary-value {
   margin-top: 6px;
-  color: #0f172a;
+  color: var(--ink);
   font-size: 24px;
   line-height: 1.1;
   font-weight: 700;
@@ -1238,7 +1256,7 @@ onMounted(async () => {
 
 .admission-summary-hint {
   margin-top: 6px;
-  color: #475569;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -1246,7 +1264,7 @@ onMounted(async () => {
   margin-top: 14px;
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
+  border: 1px solid var(--border);
   background: linear-gradient(130deg, rgba(255, 255, 255, 0.95) 0%, rgba(241, 245, 249, 0.84) 100%);
 }
 
@@ -1262,7 +1280,7 @@ onMounted(async () => {
 .admission-distribution-title {
   font-size: 13px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--ink);
 }
 
 .admission-distribution-list {
@@ -1275,7 +1293,7 @@ onMounted(async () => {
   padding: 8px 10px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  border: 1px solid var(--border);
 }
 
 .admission-distribution-row {
@@ -1287,20 +1305,20 @@ onMounted(async () => {
 }
 
 .admission-distribution-label {
-  color: #334155;
+  color: var(--ink-soft);
   font-size: 12px;
   font-weight: 500;
 }
 
 .admission-distribution-meta {
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .admission-distribution-track {
   height: 8px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.2);
+  background: var(--border-strong);
   overflow: hidden;
 }
 
@@ -1308,7 +1326,7 @@ onMounted(async () => {
   height: 100%;
   min-width: 4px;
   border-radius: inherit;
-  background: linear-gradient(90deg, #1677ff 0%, #36cfc9 100%);
+  background: linear-gradient(90deg, #3d7fa6 0%, #36cfc9 100%);
   transition: width 0.35s ease;
 }
 </style>

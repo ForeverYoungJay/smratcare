@@ -29,7 +29,7 @@
       </div>
 
       <vxe-toolbar custom export></vxe-toolbar>
-      <vxe-table border stripe show-overflow height="520" :loading="loading" :data="rows" :column-config="{ resizable: true }">
+      <vxe-table border stripe show-overflow="title" height="520" :loading="loading" :data="rows" :column-config="{ resizable: true }">
         <vxe-column field="categoryCode" title="分类编码" width="180" />
         <vxe-column field="categoryName" title="分类名称" min-width="180" />
         <vxe-column field="remark" title="备注" min-width="200" />
@@ -40,11 +40,11 @@
         </vxe-column>
         <vxe-column title="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <a-space>
-              <a @click="openEdit(row)">编辑</a>
-              <a @click="toggleStatus(row)">{{ row.status === 1 ? '停用' : '启用' }}</a>
-              <a style="color: #ff4d4f" @click="remove(row)">删除</a>
-            </a-space>
+            <div class="row-action-links">
+              <a-button type="link" size="small" @click="openEdit(row)">编辑</a-button>
+              <a-button type="link" size="small" @click="toggleStatus(row)">{{ row.status === 1 ? '停用' : '启用' }}</a-button>
+              <a-button type="link" size="small" danger @click="remove(row)">删除</a-button>
+            </div>
           </template>
         </vxe-column>
       </vxe-table>

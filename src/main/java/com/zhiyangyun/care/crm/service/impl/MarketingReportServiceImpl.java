@@ -23,6 +23,7 @@ import com.zhiyangyun.care.crm.service.CrmTraceService;
 import com.zhiyangyun.care.crm.service.MarketingReportService;
 import com.zhiyangyun.care.elder.entity.Bed;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
+import com.zhiyangyun.care.elder.service.ElderOccupancyReadService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -54,6 +55,7 @@ public class MarketingReportServiceImpl implements MarketingReportService {
   private final CrmCallbackPlanMapper callbackPlanMapper;
   private final CrmContractMapper crmContractMapper;
   private final BedMapper bedMapper;
+  private final ElderOccupancyReadService elderOccupancyReadService;
   private final CrmMarketingPlanMapper marketingPlanMapper;
   private final CrmTraceService crmTraceService;
 
@@ -62,12 +64,14 @@ public class MarketingReportServiceImpl implements MarketingReportService {
       CrmCallbackPlanMapper callbackPlanMapper,
       CrmContractMapper crmContractMapper,
       BedMapper bedMapper,
+      ElderOccupancyReadService elderOccupancyReadService,
       CrmMarketingPlanMapper marketingPlanMapper,
       CrmTraceService crmTraceService) {
     this.crmLeadMapper = crmLeadMapper;
     this.callbackPlanMapper = callbackPlanMapper;
     this.crmContractMapper = crmContractMapper;
     this.bedMapper = bedMapper;
+    this.elderOccupancyReadService = elderOccupancyReadService;
     this.marketingPlanMapper = marketingPlanMapper;
     this.crmTraceService = crmTraceService;
   }
@@ -778,6 +782,10 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     List<Bed> beds = bedMapper.selectList(Wrappers.lambdaQuery(Bed.class)
         .eq(Bed::getIsDeleted, 0)
         .eq(tenantId != null, Bed::getTenantId, tenantId));
+    Set<Long> occupiedBedIds = elderOccupancyReadService.buildOccupiedBedMapByElderId(tenantId, beds).values().stream()
+        .map(Bed::getId)
+        .filter(Objects::nonNull)
+        .collect(Collectors.toSet());
     List<CrmMarketingPlan> plans = marketingPlanMapper.selectList(Wrappers.lambdaQuery(CrmMarketingPlan.class)
         .eq(CrmMarketingPlan::getIsDeleted, 0)
         .eq(tenantId != null, CrmMarketingPlan::getOrgId, tenantId));
@@ -804,7 +812,7 @@ public class MarketingReportServiceImpl implements MarketingReportService {
         .count());
 
     response.getBedSales().setEmptyCount(beds.stream()
-        .filter(this::isSellableEmptyBed)
+        .filter(bed -> isSellableEmptyBed(bed, occupiedBedIds))
         .count());
     response.getBedSales().setLockCount(beds.stream()
         .filter(bed -> "RESERVATION".equalsIgnoreCase(blankToNull(bed.getOccupancySource())))
@@ -814,7 +822,7 @@ public class MarketingReportServiceImpl implements MarketingReportService {
             || FLOW_PENDING_SIGN.equals(blankToNull(contract.getFlowStage())))
         .count());
     response.getBedSales().setPremiumEmptyCount(beds.stream()
-        .filter(this::isSellableEmptyBed)
+        .filter(bed -> isSellableEmptyBed(bed, occupiedBedIds))
         .filter(bed -> {
           String bedType = blankToNull(bed.getBedType());
           return bedType != null && (bedType.contains("高") || bedType.toLowerCase(Locale.ROOT).contains("premium") || bedType.toLowerCase(Locale.ROOT).contains("vip"));
@@ -926,17 +934,17 @@ public class MarketingReportServiceImpl implements MarketingReportService {
 
   @Override
   public MarketingLeadEntrySummaryResponse leadEntrySummary(
-      Long tenantId, String mode, String keyword, String consultantName, String consultantPhone,
+      Long tenantId, Long currentStaffId, boolean adminView, String mode, String keyword, String consultantName, String consultantPhone,
       String elderName, String elderPhone, String consultDateFrom, String consultDateTo, String consultType,
       String mediaChannel, String infoSource, String customerTag, String marketerName) {
     String normalizedMode = normalizeMode(mode);
     LocalDate today = LocalDate.now();
 
     long total = crmLeadMapper.selectCount(buildLeadEntryWrapper(
-        tenantId, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
+        tenantId, currentStaffId, adminView, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
         consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName));
     List<CrmLead> leads = crmLeadMapper.selectList(buildLeadEntryWrapper(
-        tenantId, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
+        tenantId, currentStaffId, adminView, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
         consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName));
     long consultCount = leads.stream().filter(this::isConsultLead).count();
     long intentCount = leads.stream().filter(this::isIntentLead).count();
@@ -1085,11 +1093,11 @@ public class MarketingReportServiceImpl implements MarketingReportService {
         || FLOW_SIGNED.equalsIgnoreCase(flowStage);
   }
 
-  private boolean isSellableEmptyBed(Bed bed) {
+  private boolean isSellableEmptyBed(Bed bed, Set<Long> occupiedBedIds) {
     if (bed == null || Integer.valueOf(1).equals(bed.getIsDeleted())) {
       return false;
     }
-    if (bed.getElderId() != null) {
+    if ((occupiedBedIds != null && occupiedBedIds.contains(bed.getId())) || bed.getElderId() != null) {
       return false;
     }
     if ("RESERVATION".equalsIgnoreCase(blankToNull(bed.getOccupancySource()))
@@ -1234,7 +1242,7 @@ public class MarketingReportServiceImpl implements MarketingReportService {
   }
 
   private LambdaQueryWrapper<CrmLead> buildLeadEntryWrapper(
-      Long tenantId, String keyword, Integer status, String consultantName, String consultantPhone,
+      Long tenantId, Long currentStaffId, boolean adminView, String keyword, Integer status, String consultantName, String consultantPhone,
       String elderName, String elderPhone, String consultDateFrom, String consultDateTo, String consultType,
       String mediaChannel, String infoSource, String customerTag, String marketerName) {
     LambdaQueryWrapper<CrmLead> wrapper = Wrappers.lambdaQuery(CrmLead.class)
@@ -1249,6 +1257,14 @@ public class MarketingReportServiceImpl implements MarketingReportService {
         .eq(mediaChannel != null && !mediaChannel.isBlank(), CrmLead::getMediaChannel, mediaChannel)
         .eq(infoSource != null && !infoSource.isBlank(), CrmLead::getInfoSource, infoSource)
         .eq(customerTag != null && !customerTag.isBlank(), CrmLead::getCustomerTag, customerTag);
+    if (!adminView) {
+      if (currentStaffId == null) {
+        wrapper.eq(CrmLead::getId, -1L);
+      } else {
+        wrapper.and(w -> w.eq(CrmLead::getOwnerStaffId, currentStaffId)
+            .or(x -> x.isNull(CrmLead::getOwnerStaffId).eq(CrmLead::getCreatedBy, currentStaffId)));
+      }
+    }
     if (marketerName != null && !marketerName.isBlank()) {
       wrapper.and(w -> w.like(CrmLead::getOwnerStaffName, marketerName)
           .or()

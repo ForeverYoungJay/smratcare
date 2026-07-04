@@ -5,6 +5,7 @@ import type {
   CareTaskTemplate,
   CareTaskAssignRequest,
   CareTaskBatchAssignRequest,
+  CareTaskExceptionResolveRequest,
   CareTaskReviewRequest,
   CareTaskCreateRequest,
   CareTaskSummary,
@@ -45,6 +46,10 @@ export function assignTaskBatch(data: CareTaskBatchAssignRequest) {
 
 export function reviewTask(data: CareTaskReviewRequest) {
   return request.post<void>('/api/care/tasks/review', data)
+}
+
+export function resolveCareTaskException(data: CareTaskExceptionResolveRequest) {
+  return request.post<void>('/api/care/tasks/exception/resolve', data)
 }
 
 export function createTask(data: CareTaskCreateRequest) {

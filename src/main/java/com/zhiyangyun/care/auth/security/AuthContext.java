@@ -105,15 +105,18 @@ public class AuthContext {
     }
     Map<?, ?> details = extractDetails(authentication);
     if (details != null) {
-      Object grantedRoleCodes = details.get("grantedRoleCodes");
-      List<String> granted = normalizeRoleCodes(grantedRoleCodes);
-      if (!granted.isEmpty()) {
-        return granted;
-      }
+      // 优先使用真实角色（roleCodes）：grantedRoleCodes 可能包含按 URI 页面权限
+      // 临时提升的兼容 ADMIN（见 JwtAuthenticationFilter#shouldElevateToAdmin），
+      // 该提升仅用于 Spring Security 授权，不应放大 hasRole/isAdmin 的数据范围判断。
       Object roleCodes = details.get("roleCodes");
       List<String> normalized = normalizeRoleCodes(roleCodes);
       if (!normalized.isEmpty()) {
         return normalized;
+      }
+      Object grantedRoleCodes = details.get("grantedRoleCodes");
+      List<String> granted = normalizeRoleCodes(grantedRoleCodes);
+      if (!granted.isEmpty()) {
+        return granted;
       }
     }
     if (authentication.getAuthorities() == null) {

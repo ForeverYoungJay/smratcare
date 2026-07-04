@@ -89,15 +89,26 @@ export function hasExplicitPageAccess(pagePermissions: string[], path: string): 
   })
 }
 
+const GENERIC_ROUTE_ROLES = new Set(['ADMIN', 'STAFF', 'MANAGER'])
+
+function hasSpecificRouteRoles(required: string[]): boolean {
+  return (required || []).some((role) => role && !GENERIC_ROUTE_ROLES.has(role))
+}
+
 export function canAccessPath(roles: string[], required: string[], path: string, pagePermissions: string[] = []): boolean {
   if (normalizePath(path) === '/403') {
     return true
   }
-  if ((pagePermissions || []).length > 0) {
-    return hasExplicitPageAccess(pagePermissions, path)
-  }
   const inferredRequired = (required || []).length > 0 ? required : moduleRolesByPath(normalizePath(path))
-  return hasRouteAccess(roles, inferredRequired, path)
+  const routeAllowed = hasRouteAccess(roles, inferredRequired, path)
+  if ((pagePermissions || []).length > 0) {
+    const pageAllowed = hasExplicitPageAccess(pagePermissions, path)
+    if (!pageAllowed) {
+      return false
+    }
+    return hasSpecificRouteRoles(inferredRequired) ? routeAllowed : pageAllowed || routeAllowed
+  }
+  return routeAllowed
 }
 
 export function resolveRouteAccess(router: Router, roles: string[], path: string, pagePermissions: string[] = []): RouteAccessResult {

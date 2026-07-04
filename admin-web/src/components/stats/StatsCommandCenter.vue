@@ -2,7 +2,7 @@
   <a-card class="stats-command-center" :bordered="false">
     <div class="command-header">
       <div>
-        <div class="command-kicker">Action Center</div>
+        <div class="command-kicker">行动中心</div>
         <div class="command-title">{{ title }}</div>
         <div class="command-summary">{{ summaryText }}</div>
       </div>

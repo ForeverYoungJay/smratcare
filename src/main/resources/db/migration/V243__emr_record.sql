@@ -1,0 +1,25 @@
+-- 电子病历（入院/病程/诊断/检查记录）
+CREATE TABLE IF NOT EXISTS emr_record (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NULL,
+  org_id BIGINT NOT NULL,
+  elder_id BIGINT NOT NULL,
+  record_type VARCHAR(24) NOT NULL DEFAULT 'PROGRESS',
+  visit_date DATE NULL,
+  chief_complaint VARCHAR(500) NULL,
+  present_illness VARCHAR(1000) NULL,
+  past_history VARCHAR(1000) NULL,
+  physical_exam VARCHAR(1000) NULL,
+  diagnosis VARCHAR(500) NULL,
+  treatment_plan VARCHAR(1000) NULL,
+  doctor_id BIGINT NULL,
+  doctor_name VARCHAR(60) NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
+  remark VARCHAR(500) NULL,
+  created_by BIGINT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0,
+  KEY idx_emr_elder (org_id, elder_id, visit_date),
+  KEY idx_emr_type (org_id, record_type, status)
+);

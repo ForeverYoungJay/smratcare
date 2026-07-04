@@ -162,15 +162,15 @@ onMounted(load)
 
 <style scoped>
 .risk-hero {
-  border: 1px solid #dcecff;
+  border: 1px solid var(--border);
   background:
-    radial-gradient(140% 120% at 0% 0%, rgba(22, 119, 255, 0.1) 0%, rgba(22, 119, 255, 0) 56%),
+    radial-gradient(140% 120% at 0% 0%, rgba(var(--primary-rgb), 0.1) 0%, rgba(var(--primary-rgb), 0) 56%),
     linear-gradient(135deg, #f7fbff 0%, #eef6ff 42%, #f8fcff 100%);
 }
 
 .risk-title {
   font-size: 14px;
-  color: #1f2937;
+  color: var(--ink);
   font-weight: 600;
 }
 
@@ -186,12 +186,12 @@ onMounted(load)
   font-size: 38px;
   line-height: 1;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ink);
 }
 
 .risk-subline {
   margin-top: 8px;
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 </style>

@@ -31,12 +31,12 @@
           </a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a @click="openDrawer(record)">编辑</a>
-            <a @click="openDetail(record)">详情</a>
-            <a @click="openAssign(record)">分配床位</a>
-            <a @click="openUnbind(record)">解绑床位</a>
-          </a-space>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="openDetail(record)">详情</a-button>
+            <a-button type="link" size="small" @click="openDrawer(record)">编辑</a-button>
+            <a-button type="link" size="small" @click="openAssign(record)">分配床位</a-button>
+            <a-button type="link" size="small" danger @click="openUnbind(record)">解绑床位</a-button>
+          </div>
         </template>
       </template>
     </DataTable>

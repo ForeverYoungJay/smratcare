@@ -2,6 +2,11 @@
   <view class="section-title">我的考勤</view>
   <view class="section-subtitle">查看本月出勤、异常和每日打卡记录</view>
 
+  <view class="quick-actions">
+    <button class="ghost-btn quick-btn" bindtap="goSchedule">去打卡 / 排班</button>
+    <button class="ghost-btn quick-btn" bindtap="goApproval">请假 / 调班申请</button>
+  </view>
+
   <picker mode="date" fields="month" value="{{month || overview.month}}" bindchange="onMonthChange">
     <view class="month-picker">月份：{{month || overview.month || '当前月'}}</view>
   </picker>
@@ -46,6 +51,7 @@
 
     <view class="surface panel">
       <view class="panel-title">每日记录</view>
+      <view class="section-subtitle" wx:if="{{!overview.days || overview.days.length === 0}}">当前月份暂无考勤记录</view>
       <block wx:for="{{overview.days}}" wx:key="date">
         <view class="day-row">
           <view class="day-date">

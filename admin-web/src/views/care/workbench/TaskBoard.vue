@@ -177,6 +177,6 @@ watch(
   font-size: 12px;
 }
 :deep(.task-row-focus > td) {
-  background: #e6f4ff !important;
+  background: var(--primary-soft) !important;
 }
 </style>

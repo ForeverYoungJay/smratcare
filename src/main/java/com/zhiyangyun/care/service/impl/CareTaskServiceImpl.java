@@ -145,7 +145,7 @@ public class CareTaskServiceImpl implements CareTaskService {
         .distinct()
         .toList();
     Map<Long, StaffAccount> staffMap = staffIds.isEmpty()
-        ? Map.of()
+        ? new HashMap<>()
         : staffMapper.selectList(Wrappers.lambdaQuery(StaffAccount.class)
             .in(StaffAccount::getId, staffIds)
             .eq(StaffAccount::getIsDeleted, 0))
@@ -204,7 +204,7 @@ public class CareTaskServiceImpl implements CareTaskService {
         .distinct()
         .toList();
     Map<Long, StaffAccount> staffMap = staffIds.isEmpty()
-        ? Map.of()
+        ? new HashMap<>()
         : staffMapper.selectList(Wrappers.lambdaQuery(StaffAccount.class)
             .in(StaffAccount::getId, staffIds)
             .eq(StaffAccount::getIsDeleted, 0))
@@ -257,7 +257,7 @@ public class CareTaskServiceImpl implements CareTaskService {
         .distinct()
         .toList();
     Map<Long, Bed> bedMap = bedIds.isEmpty()
-        ? Map.of()
+        ? new HashMap<>()
         : bedMapper.selectBatchIds(bedIds)
             .stream()
             .collect(Collectors.toMap(Bed::getId, Function.identity()));
@@ -268,7 +268,7 @@ public class CareTaskServiceImpl implements CareTaskService {
         .distinct()
         .toList();
     Map<Long, Room> roomMap = roomIds.isEmpty()
-        ? Map.of()
+        ? new HashMap<>()
         : roomMapper.selectBatchIds(roomIds)
             .stream()
             .collect(Collectors.toMap(Room::getId, Function.identity()));
@@ -279,7 +279,7 @@ public class CareTaskServiceImpl implements CareTaskService {
         .distinct()
         .toList();
     Map<Long, ElderProfile> elderMap = elderIds.isEmpty()
-        ? Map.of()
+        ? new HashMap<>()
         : elderMapper.selectBatchIds(elderIds)
             .stream()
             .collect(Collectors.toMap(ElderProfile::getId, Function.identity()));
@@ -298,7 +298,7 @@ public class CareTaskServiceImpl implements CareTaskService {
         .distinct()
         .toList();
     Map<Long, StaffAccount> staffMap = staffIds.isEmpty()
-        ? Map.of()
+        ? new HashMap<>()
         : staffMapper.selectList(Wrappers.lambdaQuery(StaffAccount.class)
             .in(StaffAccount::getId, staffIds)
             .eq(StaffAccount::getIsDeleted, 0))
@@ -486,6 +486,43 @@ public class CareTaskServiceImpl implements CareTaskService {
         staffPointsService.awardForReview(task.getOrgId(), staffId, taskDailyId, reviewPoints, "任务评价积分");
       }
     }
+  }
+
+  @Override
+  public void resolveException(Long tenantId, Long taskDailyId, Long staffId, Integer score, String resolution,
+      Long reviewerId, String reviewerName, LocalDateTime reviewTime) {
+    CareTaskDaily task = dailyMapper.selectById(taskDailyId);
+    if (task == null || Integer.valueOf(1).equals(task.getIsDeleted())) {
+      throw new IllegalArgumentException("护理任务不存在");
+    }
+    if (tenantId != null && !tenantId.equals(task.getTenantId()) && !tenantId.equals(task.getOrgId())) {
+      throw new IllegalArgumentException("无权限处理该护理任务");
+    }
+    if (!TaskStatus.EXCEPTION.name().equals(task.getStatus())) {
+      throw new IllegalStateException("仅异常任务可执行异常处理闭环");
+    }
+    Long targetStaffId = staffId != null && staffId > 0 ? staffId : task.getAssignedStaffId();
+    if (targetStaffId == null || targetStaffId <= 0) {
+      throw new IllegalArgumentException("请选择处理护工");
+    }
+    String normalizedResolution = resolution == null || resolution.isBlank()
+        ? "异常已复核处理，任务关闭。"
+        : resolution.trim();
+    reviewTask(
+        tenantId,
+        taskDailyId,
+        targetStaffId,
+        score == null ? 5 : score,
+        "[异常处理] " + normalizedResolution,
+        "EXCEPTION_RESOLVE",
+        reviewerId,
+        reviewerName,
+        reviewTime);
+
+    CareTaskDaily update = new CareTaskDaily();
+    update.setId(taskDailyId);
+    update.setStatus(TaskStatus.DONE.name());
+    dailyMapper.updateById(update);
   }
 
   @Override

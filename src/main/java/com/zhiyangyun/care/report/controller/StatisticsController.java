@@ -8,9 +8,7 @@ import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.bill.entity.BillMonthly;
 import com.zhiyangyun.care.bill.mapper.BillMonthlyMapper;
 import com.zhiyangyun.care.elder.entity.Bed;
-import com.zhiyangyun.care.elder.entity.ElderBedRelation;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
-import com.zhiyangyun.care.elder.mapper.ElderBedRelationMapper;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderAdmission;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderDischarge;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
@@ -18,6 +16,7 @@ import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.model.ElderLifecycleStatus;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeMapper;
+import com.zhiyangyun.care.elder.service.ElderOccupancyReadService;
 import com.zhiyangyun.care.report.mapper.StatisticsFlowReportMapper;
 import com.zhiyangyun.care.report.model.FlowReportRow;
 import com.zhiyangyun.care.store.entity.StoreOrder;
@@ -64,7 +63,7 @@ public class StatisticsController {
   private final ElderAdmissionMapper admissionMapper;
   private final ElderDischargeMapper dischargeMapper;
   private final ElderMapper elderMapper;
-  private final ElderBedRelationMapper elderBedRelationMapper;
+  private final ElderOccupancyReadService elderOccupancyReadService;
   private final BillMonthlyMapper billMonthlyMapper;
   private final StoreOrderMapper storeOrderMapper;
   private final BedMapper bedMapper;
@@ -75,7 +74,7 @@ public class StatisticsController {
       ElderAdmissionMapper admissionMapper,
       ElderDischargeMapper dischargeMapper,
       ElderMapper elderMapper,
-      ElderBedRelationMapper elderBedRelationMapper,
+      ElderOccupancyReadService elderOccupancyReadService,
       BillMonthlyMapper billMonthlyMapper,
       StoreOrderMapper storeOrderMapper,
       BedMapper bedMapper,
@@ -84,7 +83,7 @@ public class StatisticsController {
     this.admissionMapper = admissionMapper;
     this.dischargeMapper = dischargeMapper;
     this.elderMapper = elderMapper;
-    this.elderBedRelationMapper = elderBedRelationMapper;
+    this.elderOccupancyReadService = elderOccupancyReadService;
     this.billMonthlyMapper = billMonthlyMapper;
     this.storeOrderMapper = storeOrderMapper;
     this.bedMapper = bedMapper;
@@ -481,10 +480,7 @@ public class StatisticsController {
 
     long total = beds.size();
     java.util.Set<Long> inHospitalElderIds = resolveInHospitalElderIds(scopedOrgId);
-    java.util.Set<Long> relationOccupiedBedIds = resolveRelationOccupiedBedIds(scopedOrgId, beds, inHospitalElderIds);
-    long occupied = beds.stream()
-        .filter(item -> isBedOccupiedByInHospitalResident(item, inHospitalElderIds, relationOccupiedBedIds))
-        .count();
+    long occupied = elderOccupancyReadService.countOccupiedBedsByElderIds(scopedOrgId, beds, inHospitalElderIds);
     long maintenance = beds.stream().filter(item -> item.getStatus() != null && item.getStatus() == 3).count();
     long available = total - occupied - maintenance;
     if (available < 0) {
@@ -513,41 +509,6 @@ public class StatisticsController {
         .map(ElderProfile::getId)
         .filter(Objects::nonNull)
         .collect(Collectors.toSet());
-  }
-
-  private java.util.Set<Long> resolveRelationOccupiedBedIds(Long orgId, List<Bed> beds, java.util.Set<Long> inHospitalElderIds) {
-    if (beds == null || beds.isEmpty() || inHospitalElderIds.isEmpty()) {
-      return java.util.Set.of();
-    }
-    List<Long> bedIds = beds.stream()
-        .map(Bed::getId)
-        .filter(Objects::nonNull)
-        .toList();
-    if (bedIds.isEmpty()) {
-      return java.util.Set.of();
-    }
-    return elderBedRelationMapper.selectList(
-            Wrappers.lambdaQuery(ElderBedRelation.class)
-                .select(ElderBedRelation::getBedId)
-                .eq(ElderBedRelation::getIsDeleted, 0)
-                .eq(orgId != null, ElderBedRelation::getOrgId, orgId)
-                .eq(ElderBedRelation::getActiveFlag, 1)
-                .in(ElderBedRelation::getBedId, bedIds)
-                .in(ElderBedRelation::getElderId, inHospitalElderIds))
-        .stream()
-        .map(ElderBedRelation::getBedId)
-        .filter(Objects::nonNull)
-        .collect(Collectors.toSet());
-  }
-
-  private boolean isBedOccupiedByInHospitalResident(Bed bed, java.util.Set<Long> inHospitalElderIds, java.util.Set<Long> relationOccupiedBedIds) {
-    if (bed == null) {
-      return false;
-    }
-    if (bed.getId() != null && relationOccupiedBedIds.contains(bed.getId())) {
-      return true;
-    }
-    return bed.getElderId() != null && inHospitalElderIds.contains(bed.getElderId());
   }
 
   @GetMapping(value = "/org/bed-usage/export", produces = "text/csv;charset=UTF-8")

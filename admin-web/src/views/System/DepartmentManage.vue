@@ -56,14 +56,20 @@
           </a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="openHrProfile(record)">档案中心</a-button>
-            <a-button type="link" @click="openAccountAccess(record)">账号设置</a-button>
-            <a-button type="link" @click="openDrawer(record)">编辑</a-button>
-            <a-popconfirm title="确认删除该部门吗？" ok-text="确认" cancel-text="取消" @confirm="remove(record)">
-              <a-button type="link" danger>删除</a-button>
-            </a-popconfirm>
-          </a-space>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="openDrawer(record)">编辑</a-button>
+            <a-button type="link" size="small" @click="openHrProfile(record)">档案中心</a-button>
+            <a-dropdown trigger="click">
+              <a-button type="link" size="small">更多 <DownOutlined /></a-button>
+              <template #overlay>
+                <a-menu>
+                  <a-menu-item key="account" @click="openAccountAccess(record)">账号设置</a-menu-item>
+                  <a-menu-divider />
+                  <a-menu-item key="delete" danger @click="confirmRemove(record)">删除</a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
+          </div>
         </template>
       </template>
     </DataTable>
@@ -90,7 +96,8 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
+import { DownOutlined } from '@ant-design/icons-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -184,6 +191,16 @@ async function submit() {
   } finally {
     saving.value = false
   }
+}
+
+function confirmRemove(record: DepartmentItem) {
+  Modal.confirm({
+    title: '确认删除该部门吗？',
+    okText: '确认',
+    cancelText: '取消',
+    okButtonProps: { danger: true },
+    onOk: () => remove(record)
+  })
 }
 
 async function remove(record: DepartmentItem) {

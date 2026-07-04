@@ -19,9 +19,9 @@
 .textarea-line {
   width: 100%;
   border-radius: 14rpx;
-  border: 1rpx solid #d9e3df;
+  border: 1rpx solid #D7DED8;
   background: #ffffff;
-  color: #182420;
+  color: #22332E;
   font-size: 25rpx;
 }
 
@@ -69,7 +69,7 @@
 }
 
 .filter.active {
-  background: #246b5f;
+  background: #21705F;
   color: #ffffff;
 }
 
@@ -94,7 +94,7 @@
 }
 
 .suggestion-title {
-  color: #182430;
+  color: #22332E;
   font-size: 30rpx;
   font-weight: 900;
 }
@@ -110,8 +110,8 @@
   height: 46rpx;
   padding: 0 16rpx;
   border-radius: 999rpx;
-  background: #fff2d9;
-  color: #9a5b05;
+  background: #FBF0E2;
+  color: #B27221;
   font-size: 21rpx;
   font-weight: 900;
   line-height: 46rpx;
@@ -119,12 +119,12 @@
 
 .status-PROCESSING {
   background: #eef6ff;
-  color: #255a91;
+  color: #3D7FA6;
 }
 
 .status-DONE {
-  background: #e5f5ef;
-  color: #16704f;
+  background: #E8F3EF;
+  color: #21705F;
 }
 
 .status-CLOSED {
@@ -148,7 +148,7 @@
 }
 
 .reply-label {
-  color: #246b5f;
+  color: #21705F;
   font-size: 22rpx;
   font-weight: 900;
 }

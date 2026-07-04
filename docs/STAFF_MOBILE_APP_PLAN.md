@@ -149,3 +149,21 @@
 - 员工可在移动端提交工作日报，记录完成事项、风险和下一班计划
 - 员工可阅读院内通知公告，确保制度、培训和运营消息触达
 - 员工可提交一线建议反馈，并在移动端查看待处理、处理中和已处理状态
+
+## 2026-07 完善批次
+
+### 后端
+
+- 待办按身份/角色隔离：`staffMobileTasks` 依据当前员工角色限定可见模块（护理类→护理+送餐、医护类→用药+巡检、后勤类→维修+送餐），admin 或未知角色可见全部；护理任务额外按 `assignedStaffId` 过滤（本人 + 未分配池）。用药/巡检/维修/送餐实体暂无分配人外键，保持机构级过滤并留注释
+- demo 兜底数据受配置开关 `zhiyangyun.staff-mobile.demo-fallback`（默认 false）控制，生产环境空列表即返回空，任务详情不存在时返回 400
+- 提交回执前在班校验：`zhiyangyun.staff-mobile.require-on-duty`（默认 false）开启后未打上班卡拒绝提交；关闭时仅在回执备注前追加 `[未打卡提交]` 标记
+- 超时提醒：`StaffMobileOverdueReminderScheduler` 每 15 分钟扫描今日超时护理/用药任务，为负责员工生成 OA 待办（当天去重），并经 `StaffSubscribeMessageSender` 预留微信订阅消息发送点（当前为日志实现）
+
+### 小程序员工端
+
+- staff-care / staff-medical / staff-logistics / staff-attendance 从导航壳补齐为带统计、Tab 与快捷入口的工作台页
+- staff-tasks / staff-meals / staff-repairs / staff-incidents / staff-receipts / staff-todo 统一下拉刷新与分页（接口分页或前端分批渲染）
+- 弱网能力：`utils/offline-queue.js` 提交失败离线暂存、网络恢复自动重放（覆盖五类任务回执、异常上报、交接）；`utils/form-draft.js` 闭环页表单草稿自动保存/恢复；证据上传失败自动重试 2 次（1s/3s）
+- staff-clinical 用药三查七对改为强制逐项勾选后方可提交；staff-repairs 改为到场确认→处理登记→拍照验收三步状态机，故障类型固定枚举
+- staff-home 按角色（护理/医护/后勤）差异化快捷入口与默认任务模块，未知角色显示全部
+- 订阅消息：`utils/subscribe.js`，模板 ID 在 `app.js` globalData.subscribeTemplates 配置（申请模板后填入即生效），staff-home 每日首次进入与审批提交前请求授权

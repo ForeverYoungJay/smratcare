@@ -2,18 +2,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import MonthlyAllocation from '../MonthlyAllocation.vue'
 
-const createMonthlyAllocation = vi.fn().mockResolvedValue(null)
+const createMonthlyAllocation = vi.hoisted(() => vi.fn().mockResolvedValue(null))
 
 vi.mock('../../../api/financeFee', () => ({
   getMonthlyAllocationPage: vi.fn().mockResolvedValue({ list: [], total: 0, pageNo: 1, pageSize: 10 }),
   createMonthlyAllocation
 }))
 
-const message = {
+const message = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
   warning: vi.fn()
-}
+}))
 
 vi.mock('ant-design-vue', () => ({
   message

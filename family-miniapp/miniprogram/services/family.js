@@ -426,6 +426,13 @@ async function toggleAutoPay(enable, authorizeConfirmed = false, options = {}) {
 
 async function rechargeBalance(amount, options = {}) {
   const elderId = resolveOptionElderId(options);
+  const method = options.method || '微信支付';
+  const remark = options.remark || '家属端在线充值';
+  const app = getApp();
+  if (String(method).toUpperCase() === 'MANUAL_FALLBACK'
+    && (!app || typeof app.canUseManualRechargeFallback !== 'function' || !app.canUseManualRechargeFallback())) {
+    throw new Error('当前环境不允许人工充值回退，请改用正式支付链路');
+  }
   return withFallback(
     async () => request({
       url: '/api/family/payment/recharge',
@@ -433,8 +440,8 @@ async function rechargeBalance(amount, options = {}) {
       data: {
         elderId,
         amount,
-        method: options.method || '微信支付',
-        remark: options.remark || '家属端在线充值'
+        method,
+        remark
       }
     }),
     () => mock.rechargeBalance(amount)
@@ -690,6 +697,14 @@ async function updateNotificationSettings(payload) {
       data: payload
     }),
     () => mock.updateNotificationSettings(payload)
+  );
+}
+
+async function getNotifyLogs(pageNo = 1, pageSize = 20, options = {}) {
+  const status = options.status || '';
+  return withFallback(
+    async () => request({ url: '/api/family/notify-logs', data: { pageNo, pageSize, status } }),
+    () => mock.getNotifyLogs(pageNo, pageSize, status)
   );
 }
 
@@ -951,6 +966,7 @@ module.exports = {
   getFestivalTemplates,
   addAffectionMoment,
   getNotificationSettings,
+  getNotifyLogs,
   updateNotificationSettings,
   getSecuritySettings,
   updateSecuritySettings,

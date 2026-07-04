@@ -1,5 +1,5 @@
 .card { padding: 24rpx; }
-.item { margin-top: 14rpx; padding: 14rpx; background: #f7faf8; border-radius: 12rpx; border: 1rpx solid #edf2ef; }
+.item { margin-top: 14rpx; padding: 14rpx; background: #FAFAF7; border-radius: 12rpx; border: 1rpx solid #E4E7E0; }
 .line { margin-top: 8rpx; display: flex; justify-content: space-between; gap: 20rpx; }
-.label { width: 140rpx; font-size: 22rpx; color: #71807a; }
-.value { flex: 1; font-size: 23rpx; color: #182420; text-align: right; }
+.label { width: 140rpx; font-size: 22rpx; color: #5C6F69; }
+.value { flex: 1; font-size: 23rpx; color: #22332E; text-align: right; }

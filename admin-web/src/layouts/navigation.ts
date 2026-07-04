@@ -10,6 +10,7 @@ import {
   FireOutlined,
   HomeOutlined,
   MedicineBoxOutlined,
+  SafetyCertificateOutlined,
   SettingOutlined,
   TeamOutlined,
   ToolOutlined
@@ -31,14 +32,16 @@ type NavMeta = {
   pinned?: boolean
 }
 
-const routeNavMeta: Record<string, NavMeta> = {
+export const routeNavMeta: Record<string, NavMeta> = {
   '/portal': { section: 'core', order: 10, pinned: true },
+  '/function-map': { section: 'core', order: 15, pinned: true },
   '/workbench': { section: 'core', order: 20, pinned: true },
   '/elder': { section: 'core', order: 30, pinned: true },
   '/medical-care': { section: 'core', order: 40, pinned: true },
   '/marketing': { section: 'operations', order: 50, pinned: true },
   '/finance': { section: 'operations', order: 60, pinned: true },
   '/stats': { section: 'operations', order: 70, pinned: true },
+  '/ltci': { section: 'operations', order: 75, pinned: true },
   '/logistics': { section: 'assurance', order: 80, pinned: true },
   '/fire': { section: 'assurance', order: 90, pinned: true },
   '/oa': { section: 'assurance', order: 100, pinned: true },
@@ -58,6 +61,7 @@ const iconRegistry = {
   ToolOutlined,
   DatabaseOutlined,
   SettingOutlined,
+  SafetyCertificateOutlined,
   SafetyOutlined: FireOutlined,
   FundProjectionScreenOutlined: AlertOutlined
 } as const
@@ -82,7 +86,7 @@ function mapMenuNode(item: MenuItem): ItemType {
     key: item.path || item.key,
     icon: resolveIconNode(item.icon),
     label: item.label,
-    title: item.label,
+    title: item.desc ? `${item.label} — ${item.desc}` : item.label,
     children: item.children?.map(mapMenuNode)
   }
 }

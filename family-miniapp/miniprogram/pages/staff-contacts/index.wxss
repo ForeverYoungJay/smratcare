@@ -9,9 +9,9 @@
   height: 72rpx;
   padding: 0 18rpx;
   border-radius: 14rpx;
-  border: 1rpx solid #d9e3df;
+  border: 1rpx solid #D7DED8;
   background: #ffffff;
-  color: #182420;
+  color: #22332E;
   font-size: 24rpx;
 }
 
@@ -41,7 +41,7 @@
   width: 78rpx;
   height: 78rpx;
   border-radius: 24rpx;
-  background: linear-gradient(135deg, #246b5f, #1f5f8b);
+  background: linear-gradient(135deg, #21705F, #3D7FA6);
   color: #ffffff;
   font-size: 32rpx;
   font-weight: 900;
@@ -55,14 +55,14 @@
 }
 
 .contact-name {
-  color: #182430;
+  color: #22332E;
   font-size: 30rpx;
   font-weight: 900;
 }
 
 .contact-meta {
   margin-top: 8rpx;
-  color: #71807a;
+  color: #5C6F69;
   font-size: 22rpx;
   line-height: 1.45;
 }

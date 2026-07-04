@@ -46,11 +46,23 @@ function resolveAxiosErrorMessage(error: any) {
   return resolveErrorMessage(error?.response?.data, rawMessage || '请求失败')
 }
 
+function normalizeRedirectPath(path?: string | null) {
+  const raw = String(path || '').trim()
+  if (!raw.startsWith('/')) return '/portal'
+  if (raw === '/login') return '/portal'
+  if (raw.startsWith('/login?')) {
+    const query = raw.split('?')[1] || ''
+    const params = new URLSearchParams(query)
+    return normalizeRedirectPath(params.get('redirect'))
+  }
+  return raw
+}
+
 function resolveLoginRedirect(fullPath: string) {
   return {
     path: '/login',
     query: {
-      redirect: fullPath || '/portal'
+      redirect: normalizeRedirectPath(fullPath)
     }
   }
 }

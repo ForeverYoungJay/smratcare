@@ -27,7 +27,7 @@
       <a-col :xs="24" :xl="8">
         <a-card class="card-elevated" :bordered="false" title="费用科目字典">
           <a-space direction="vertical" style="width: 100%">
-            <span style="color: #64748b;">管理房费/护理费/医护费/水电电视网络等科目</span>
+            <span style="color: var(--muted);">管理房费/护理费/医护费/水电电视网络等科目</span>
             <a-button type="primary" @click="go('/finance/allocation/subjects')">进入维护</a-button>
           </a-space>
         </a-card>
@@ -35,7 +35,7 @@
       <a-col :xs="24" :xl="8">
         <a-card class="card-elevated" :bordered="false" title="缴费渠道与收款账户">
           <a-space direction="vertical" style="width: 100%">
-            <span style="color: #64748b;">管理渠道启停、收款户名与账户号</span>
+            <span style="color: var(--muted);">管理渠道启停、收款户名与账户号</span>
             <a-button type="primary" @click="go('/finance/config/payment-channels')">进入维护</a-button>
           </a-space>
         </a-card>
@@ -43,7 +43,7 @@
       <a-col :xs="24" :xl="8">
         <a-card class="card-elevated" :bordered="false" title="权限与审批流配置">
           <a-space direction="vertical" style="width: 100%">
-            <span style="color: #64748b;">配置减免/退款/冲正审批角色与审批级数</span>
+            <span style="color: var(--muted);">配置减免/退款/冲正审批角色与审批级数</span>
             <a-button type="primary" @click="go('/finance/config/approval-flow')">进入维护</a-button>
           </a-space>
         </a-card>
@@ -60,7 +60,7 @@
       </a-col>
       <a-col :xs="24" :xl="16">
         <a-card class="card-elevated" :bordered="false" title="近期主数据配置">
-          <vxe-table border stripe show-overflow :loading="loading" :data="overview?.recentConfigs || []" height="360">
+          <vxe-table border stripe show-overflow="title" :loading="loading" :data="overview?.recentConfigs || []" height="360">
             <vxe-column field="configKey" title="配置键" min-width="240" />
             <vxe-column field="valueText" title="配置值" width="130" />
             <vxe-column field="effectiveMonth" title="生效月份" width="120" />
@@ -76,7 +76,7 @@
     </a-row>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="配置快照（月度版本）">
-      <vxe-table border stripe show-overflow :loading="loading" :data="snapshots" height="260">
+      <vxe-table border stripe show-overflow="title" :loading="loading" :data="snapshots" height="260">
         <vxe-column field="effectiveMonth" title="月份" width="140" />
         <vxe-column field="configCount" title="配置数" width="120" />
         <vxe-column field="latestUpdateTime" title="最近更新时间" min-width="200" />
@@ -99,7 +99,7 @@
       <a-space v-if="impactPreview?.riskTips?.length" wrap style="margin-top: 12px;">
         <a-tag v-for="tip in impactPreview.riskTips" :key="tip" color="orange">{{ tip }}</a-tag>
       </a-space>
-      <vxe-table v-if="impactPreview" border stripe show-overflow :data="impactPreview.impactedItems || []" height="260" style="margin-top: 12px;">
+      <vxe-table v-if="impactPreview" border stripe show-overflow="title" :data="impactPreview.impactedItems || []" height="260" style="margin-top: 12px;">
         <vxe-column field="configKey" title="配置键" min-width="260" />
         <vxe-column field="moduleLabel" title="影响模块" width="180" />
         <vxe-column field="affectedCount" title="影响数量" width="120" />

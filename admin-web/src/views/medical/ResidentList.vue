@@ -32,13 +32,20 @@
           <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="openDiseaseDrawer(record)">基础疾病</a-button>
-            <a-button type="link" @click="go(`/elder/resident-360?residentId=${record.id}&from=medicalCare`)">长者总览</a-button>
-            <a-button type="link" @click="go(`/medical-care/assessment/tcm?residentId=${record.id}&from=residentList`)">中医评估</a-button>
-            <a-button type="link" @click="go(`/medical-care/assessment/cvd?residentId=${record.id}&from=residentList`)">心血管评估</a-button>
-            <a-button type="link" @click="go(`/medical-care/inspection?residentId=${record.id}&from=residentList`)">健康巡检</a-button>
-          </a-space>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="openDiseaseDrawer(record)">基础疾病</a-button>
+            <a-button type="link" size="small" @click="go(`/elder/resident-360?residentId=${record.id}&from=medicalCare`)">长者总览</a-button>
+            <a-dropdown trigger="click">
+              <a-button type="link" size="small">更多 <DownOutlined /></a-button>
+              <template #overlay>
+                <a-menu>
+                  <a-menu-item key="tcm" @click="go(`/medical-care/assessment/tcm?residentId=${record.id}&from=residentList`)">中医评估</a-menu-item>
+                  <a-menu-item key="cvd" @click="go(`/medical-care/assessment/cvd?residentId=${record.id}&from=residentList`)">心血管评估</a-menu-item>
+                  <a-menu-item key="inspection" @click="go(`/medical-care/inspection?residentId=${record.id}&from=residentList`)">健康巡检</a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
+          </div>
         </template>
       </template>
     </DataTable>
@@ -56,6 +63,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+import { DownOutlined } from '@ant-design/icons-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'

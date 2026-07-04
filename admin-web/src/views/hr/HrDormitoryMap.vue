@@ -765,8 +765,8 @@ onMounted(() => {
   padding: 20px 24px;
   border-radius: 24px;
   background:
-    radial-gradient(circle at top left, rgba(96, 165, 250, 0.18), transparent 30%),
-    linear-gradient(135deg, #0f172a 0%, #172554 56%, #1d4ed8 100%);
+    radial-gradient(circle at top left, rgba(var(--primary-rgb), 0.18), transparent 30%),
+    linear-gradient(135deg, var(--ink) 0%, var(--primary-strong) 56%, var(--primary) 100%);
   color: #f8fafc;
 }
 
@@ -802,7 +802,7 @@ onMounted(() => {
 }
 
 .matrix-tip {
-  color: #64748b;
+  color: var(--muted);
   font-size: 13px;
 }
 
@@ -819,22 +819,22 @@ onMounted(() => {
 }
 
 .tower-building {
-  border: 1px solid #dbe7f3;
+  border: 1px solid var(--border);
   border-radius: 22px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.05);
+  background: linear-gradient(180deg, #ffffff 0%, var(--surface-3) 100%);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
 
 .tower-building.active {
-  border-color: #3b82f6;
-  box-shadow: 0 18px 36px rgba(59, 130, 246, 0.14);
+  border-color: var(--info);
+  box-shadow: 0 18px 36px rgba(var(--info-rgb), 0.14);
 }
 
 .tower-building-head {
   width: 100%;
   border: 0;
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  background: linear-gradient(135deg, var(--primary-soft) 0%, var(--primary-soft-2) 100%);
   padding: 16px 18px;
   text-align: left;
   display: flex;
@@ -846,13 +846,13 @@ onMounted(() => {
 .building-name {
   font-size: 20px;
   font-weight: 700;
-  color: #12314d;
+  color: var(--ink);
 }
 
 .building-kpi,
 .building-trend {
   margin-top: 4px;
-  color: #5f7b95;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -872,21 +872,21 @@ onMounted(() => {
 }
 
 .tower-floor.active .tower-floor-badge {
-  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+  background: linear-gradient(180deg, var(--info) 0%, var(--primary) 100%);
   color: #fff;
 }
 
 .tower-floor-badge {
   border: 0;
   border-radius: 18px;
-  background: linear-gradient(180deg, #e2e8f0 0%, #cbd5e1 100%);
+  background: linear-gradient(180deg, var(--border) 0%, var(--border-strong) 100%);
   padding: 14px 10px;
   display: flex;
   flex-direction: column;
   gap: 4px;
   align-items: center;
   cursor: pointer;
-  color: #1e293b;
+  color: var(--ink);
 }
 
 .tower-floor-content {
@@ -895,7 +895,7 @@ onMounted(() => {
 }
 
 .room-cube {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
   border-radius: 18px;
   background: #fff;
   padding: 14px;
@@ -911,12 +911,12 @@ onMounted(() => {
 .room-title {
   font-weight: 700;
   font-size: 16px;
-  color: #0f172a;
+  color: var(--ink);
 }
 
 .room-function-name,
 .room-meta {
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -963,29 +963,29 @@ onMounted(() => {
 }
 
 .bed-pill.is-occupied {
-  background: linear-gradient(180deg, #dcfce7 0%, #bbf7d0 100%);
-  color: #166534;
+  background: linear-gradient(180deg, rgba(var(--success-rgb), 0.22) 0%, rgba(var(--success-rgb), 0.32) 100%);
+  color: var(--success);
 }
 
 .bed-pill.is-empty {
-  background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
-  color: #475569;
+  background: linear-gradient(180deg, var(--surface-3) 0%, var(--border) 100%);
+  color: var(--muted);
 }
 
 .bed-pill.is-conflict {
-  background: linear-gradient(180deg, #fee2e2 0%, #fecaca 100%);
-  color: #b91c1c;
+  background: linear-gradient(180deg, rgba(var(--danger-rgb), 0.16) 0%, rgba(var(--danger-rgb), 0.26) 100%);
+  color: var(--danger);
 }
 
 .room-unassigned {
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px dashed #e2e8f0;
+  border-top: 1px dashed var(--border);
 }
 
 .unassigned-label {
   font-size: 12px;
-  color: #92400e;
+  color: var(--warning);
   margin-bottom: 8px;
 }
 
@@ -999,8 +999,8 @@ onMounted(() => {
   border: 0;
   border-radius: 999px;
   padding: 7px 12px;
-  background: #ffedd5;
-  color: #9a3412;
+  background: var(--accent-soft);
+  color: var(--warning);
   cursor: pointer;
 }
 
@@ -1011,7 +1011,7 @@ onMounted(() => {
   margin-bottom: 12px;
   padding: 12px 14px;
   border-radius: 14px;
-  background: #f8fafc;
+  background: var(--surface-3);
 }
 
 @media (max-width: 960px) {

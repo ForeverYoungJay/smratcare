@@ -31,5 +31,6 @@ describe('EnterpriseHome', () => {
 
     expect(wrapper.text()).toContain('弋阳养老院')
     expect(wrapper.text()).toContain('预约参观')
+    expect(wrapper.text()).toContain('快速预约初评')
   })
 })

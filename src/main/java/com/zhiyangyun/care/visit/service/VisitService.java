@@ -5,6 +5,7 @@ import com.zhiyangyun.care.visit.model.VisitBookingResponse;
 import com.zhiyangyun.care.visit.model.VisitCheckInRequest;
 import com.zhiyangyun.care.visit.model.VisitCheckInResponse;
 import com.zhiyangyun.care.visit.model.VisitPrintTicketResponse;
+import java.time.LocalDate;
 import java.util.List;
 
 public interface VisitService {
@@ -13,6 +14,8 @@ public interface VisitService {
   List<VisitBookingResponse> listByFamily(Long orgId, Long familyUserId);
 
   List<VisitBookingResponse> todayList(Long orgId);
+
+  List<VisitBookingResponse> listBookings(Long orgId, Long elderId, Integer status, LocalDate fromDate, LocalDate toDate);
 
   VisitCheckInResponse checkIn(VisitCheckInRequest request, Long guardStaffId);
 

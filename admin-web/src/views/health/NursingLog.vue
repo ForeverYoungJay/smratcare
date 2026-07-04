@@ -65,16 +65,16 @@
           <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
         </template>
         <template v-else-if="column.key === 'sourceInspectionId'">
-          <a v-if="record.sourceInspectionId" @click="goInspection(record.sourceInspectionId)">#{{ record.sourceInspectionId }}</a>
+          <a-button v-if="record.sourceInspectionId" type="link" size="small" @click="goInspection(record.sourceInspectionId)">#{{ record.sourceInspectionId }}</a-button>
           <span v-else>-</span>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="openEdit(record)">编辑</a-button>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
             <a-popconfirm title="确认删除该记录吗？" ok-text="确认" cancel-text="取消" @confirm="remove(record)">
-              <a-button type="link" danger>删除</a-button>
+              <a-button type="link" size="small" danger>删除</a-button>
             </a-popconfirm>
-          </a-space>
+          </div>
         </template>
       </template>
     </DataTable>
@@ -185,6 +185,7 @@ const columns = [
 
 const editOpen = ref(false)
 const saving = ref(false)
+const lastAutoOpenLogKey = ref('')
 const { elderOptions, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
 const inspectionOptions = ref<{ label: string; value: Id }[]>([])
 const currentStaffName = computed(() => {
@@ -238,6 +239,7 @@ async function fetchData() {
     summary.closedCount = summaryRes.closedCount || 0
     summary.linkedInspectionCount = summaryRes.linkedInspectionCount || 0
     summary.logTypeStats = summaryRes.logTypeStats || []
+    autoOpenLogFromRoute()
   } catch (error) {
     message.error(resolveHealthError(error, '加载护理日志失败'))
     rows.value = []
@@ -275,18 +277,19 @@ function onReset() {
 function openCreate() {
   const residentId = normalizeResidentId(route.query as Record<string, unknown>)
   const residentName = typeof route.query.residentName === 'string' ? route.query.residentName : ''
+  const sourceInspectionId = normalizeId(route.query.sourceInspectionId ?? route.query.inspectionId)
   form.id = undefined
   form.elderId = residentId
   form.elderName = residentName
   ensureSelectedElder(form.elderId, residentName)
-  form.sourceInspectionId = undefined
+  form.sourceInspectionId = sourceInspectionId
   form.logTime = dayjs()
-  form.logType = 'ROUTINE'
+  form.logType = sourceInspectionId ? 'INSPECTION_FOLLOW_UP' : 'ROUTINE'
   form.content = ''
   form.staffName = currentStaffName.value
   form.status = 'PENDING'
   form.remark = ''
-  void loadInspectionOptions(form.elderId)
+  void loadInspectionOptions(form.elderId, sourceInspectionId)
   editOpen.value = true
 }
 
@@ -310,6 +313,28 @@ function onElderChange(elderId?: Id) {
   form.elderName = findElderName(elderId)
   form.sourceInspectionId = undefined
   void loadInspectionOptions(elderId)
+}
+
+function activeSourceInspectionId() {
+  return normalizeId(route.query.sourceInspectionId ?? route.query.inspectionId)
+}
+
+function autoOpenLogFromRoute() {
+  const sourceInspectionId = activeSourceInspectionId()
+  if (!sourceInspectionId) {
+    return
+  }
+  const autoOpenKey = String(sourceInspectionId)
+  if (lastAutoOpenLogKey.value === autoOpenKey) {
+    return
+  }
+  const matched = rows.value.find((item) => String(item.sourceInspectionId || '') === autoOpenKey)
+  if (matched) {
+    openEdit(matched)
+  } else {
+    openCreate()
+  }
+  lastAutoOpenLogKey.value = autoOpenKey
 }
 
 async function loadInspectionOptions(elderId?: Id, selectedInspectionId?: Id) {
@@ -537,6 +562,7 @@ syncMedicalAlertRules().catch(() => {})
 watch(
   () => [route.query.residentId, route.query.elderId, route.query.sourceInspectionId, route.query.inspectionId],
   () => {
+    lastAutoOpenLogKey.value = ''
     query.pageNo = 1
     pagination.current = 1
     fetchData()
@@ -560,9 +586,9 @@ watch(
   margin-bottom: 12px;
 }
 :deep(.health-row-warning > td) {
-  background: #fff7e6 !important;
+  background: rgba(var(--warning-rgb), 0.1) !important;
 }
 .context-card {
-  background: #f0f9ff;
+  background: var(--primary-soft);
 }
 </style>

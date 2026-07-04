@@ -24,12 +24,12 @@
           </a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="openDrawer(record)">编辑</a-button>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="openDrawer(record)">编辑</a-button>
             <a-popconfirm title="确认删除该机构吗？" ok-text="确认" cancel-text="取消" @confirm="remove(record)">
-              <a-button type="link" danger>删除</a-button>
+              <a-button type="link" size="small" danger>删除</a-button>
             </a-popconfirm>
-          </a-space>
+          </div>
         </template>
       </template>
     </DataTable>

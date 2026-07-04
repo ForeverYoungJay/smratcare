@@ -26,8 +26,9 @@ Usage:
   ./scripts/project_self_check.sh [--skip-frontend] [--skip-flyway]
 
 Description:
-  1) Flyway 本地脚本版本冲突检查
-  2) 前端导航路由检查
+  1) 运行时版本检查（Node / Java / Maven / Docker Compose）
+  2) Flyway 本地脚本版本冲突检查
+  3) 前端导航路由检查
 
 Notes:
   - 不依赖 docker，可先做快速静态自检。
@@ -45,15 +46,18 @@ done
 
 echo "[INFO] Project self check started at $(date '+%Y-%m-%d %H:%M:%S')"
 
+echo "[CHECK 1/3] 运行时版本要求"
+bash ./scripts/check_runtime_requirements.sh
+
 if [[ "$WITH_FLYWAY" -eq 1 ]]; then
-  echo "[CHECK 1/2] Flyway 版本号冲突"
+  echo "[CHECK 2/3] Flyway 版本号冲突"
   bash ./scripts/check_flyway_versions.sh
 else
   echo "[SKIP] Flyway check skipped"
 fi
 
 if [[ "$WITH_FRONTEND" -eq 1 ]]; then
-  echo "[CHECK 2/2] 前端导航路由检查"
+  echo "[CHECK 3/3] 前端导航路由检查"
   (
     cd admin-web
     npm run -s check:navigation

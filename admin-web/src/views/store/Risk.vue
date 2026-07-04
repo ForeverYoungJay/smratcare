@@ -262,7 +262,7 @@ function removeCurrentDisease() {
   cursor: pointer;
 }
 .disease-item.active {
-  background: rgba(24, 144, 255, 0.08);
+  background: rgba(var(--primary-rgb), 0.08);
 }
 .tag-group {
   display: flex;
@@ -271,9 +271,9 @@ function removeCurrentDisease() {
 }
 .tag-block {
   padding: 12px;
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fafafa;
+  background: var(--surface-2);
 }
 .tag-title {
   font-weight: 600;

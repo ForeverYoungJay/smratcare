@@ -33,6 +33,10 @@ export function createOuting(data: OutingCreateRequest) {
   return request.post<OutingItem>('/api/elder/lifecycle/outing', data)
 }
 
+export function approveOuting(id: Id) {
+  return request.put<OutingItem>(`/api/elder/lifecycle/outing/${id}/approve`, {})
+}
+
 export function returnOuting(id: Id, data: OutingReturnRequest) {
   return request.put<OutingItem>(`/api/elder/lifecycle/outing/${id}/return`, data)
 }

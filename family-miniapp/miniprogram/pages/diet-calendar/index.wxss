@@ -1,6 +1,6 @@
 .card { padding: 24rpx; }
-.item { margin-top: 14rpx; background: #f7faf8; border-radius: 12rpx; border: 1rpx solid #edf2ef; padding: 14rpx; }
-.date { font-size: 26rpx; color: #16231f; font-weight: 700; }
+.item { margin-top: 14rpx; background: #FAFAF7; border-radius: 12rpx; border: 1rpx solid #E4E7E0; padding: 14rpx; }
+.date { font-size: 26rpx; color: #22332E; font-weight: 700; }
 .review { margin-top: 8rpx; font-size: 22rpx; color: #52615c; }
 .meal { margin-top: 6rpx; font-size: 23rpx; color: #34443f; }
 .photo-empty { margin-top: 8rpx; font-size: 21rpx; color: #94a3b8; }

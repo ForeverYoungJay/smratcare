@@ -104,74 +104,75 @@ flattenTree(pagePermissionTree, pagePermissionFlat)
 const pageTitleMap = new Map(pagePermissionFlat.map((item) => [item.path, item.title]))
 const knownPagePaths = new Set(pagePermissionFlat.map((item) => item.path))
 
-const commonPersonalPaths = ['/portal', '/workbench', '/workbench/overview', '/workbench/todo', '/workbench/my-info', '/workbench/attendance', '/workbench/schedule', '/workbench/reports', '/workbench/approvals']
+const employeePersonalPaths = ['/workbench', '/workbench/overview', '/workbench/todo', '/workbench/my-info', '/workbench/attendance', '/workbench/schedule', '/workbench/reports', '/workbench/approvals']
+const managerPersonalPaths = ['/portal', ...employeePersonalPaths]
 const allKnownPagePaths = pagePermissionFlat.map((item) => item.path)
 
 export const ROLE_PAGE_PRESETS: Record<string, RolePagePreset> = {
   NURSING_MINISTER: {
     label: '护理部长',
     description: '首页、医护健康服务、长者管理、护理审批、工作总结、基础数据配置',
-    paths: [...commonPersonalPaths, '/medical-care', '/elder', '/oa/approval', '/base-config']
+    paths: [...managerPersonalPaths, '/medical-care', '/elder', '/oa/approval', '/base-config']
   },
   NURSING_EMPLOYEE: {
     label: '护理生活管家',
     description: '个人首页、我的信息、医护健康服务中心、我的待办和快捷发起',
-    paths: [...commonPersonalPaths, '/medical-care', '/oa/approval']
+    paths: [...employeePersonalPaths, '/medical-care', '/oa/approval']
   },
   HR_MINISTER: {
     label: '行政人事部部长',
     description: '工作台、人力资源、行政管理、统计分析、官网配置、角色管理、基础配置',
-    paths: [...commonPersonalPaths, '/hr', '/oa', '/stats', '/system/site-config', '/system/role', '/base-config']
+    paths: [...managerPersonalPaths, '/hr', '/oa', '/stats', '/system/site-config', '/system/role', '/base-config']
   },
   HR_EMPLOYEE: {
     label: '行政人事部员工',
     description: '工作台、行政协同、人资总览与社保提醒，不包含账号权限和系统设置',
-    paths: [...commonPersonalPaths, '/hr/overview', '/hr/profile/social-security-reminders', '/oa']
+    paths: [...employeePersonalPaths, '/hr/overview', '/hr/profile/social-security-reminders', '/oa']
   },
   LOGISTICS_MINISTER: {
     label: '后勤主管',
     description: '后勤保障和消防安全管理',
-    paths: [...commonPersonalPaths, '/logistics', '/fire']
+    paths: [...managerPersonalPaths, '/logistics', '/fire']
   },
   LOGISTICS_EMPLOYEE: {
     label: '后勤员工',
     description: '后勤保障日常工作',
-    paths: [...commonPersonalPaths, '/logistics']
+    paths: [...employeePersonalPaths, '/logistics']
   },
   GUARD: {
     label: '消防员工',
     description: '仅消防安全管理',
-    paths: [...commonPersonalPaths, '/fire']
+    paths: [...employeePersonalPaths, '/fire']
   },
   MEDICAL_MINISTER: {
     label: '医务部长',
     description: '医护健康服务、长者管理、相关审批与工作总结',
-    paths: [...commonPersonalPaths, '/medical-care', '/elder', '/oa/approval']
+    paths: [...managerPersonalPaths, '/medical-care', '/elder', '/oa/approval']
   },
   MEDICAL_EMPLOYEE: {
     label: '医务员工',
     description: '医护健康服务与长者相关工作',
-    paths: [...commonPersonalPaths, '/medical-care', '/elder']
+    paths: [...employeePersonalPaths, '/medical-care', '/elder']
   },
   FINANCE_MINISTER: {
     label: '财务部长',
     description: '财务管理、费用审批、统计分析',
-    paths: [...commonPersonalPaths, '/finance', '/oa/approval', '/stats']
+    paths: [...managerPersonalPaths, '/finance', '/oa/approval', '/stats']
   },
   FINANCE_EMPLOYEE: {
     label: '财务员工',
     description: '财务工作和相关审批',
-    paths: [...commonPersonalPaths, '/finance', '/oa/approval']
+    paths: [...employeePersonalPaths, '/finance', '/oa/approval']
   },
   MARKETING_MINISTER: {
     label: '营销部长',
     description: '营销中心、统计和工作总结',
-    paths: [...commonPersonalPaths, '/marketing', '/stats']
+    paths: [...managerPersonalPaths, '/marketing', '/stats']
   },
   MARKETING_EMPLOYEE: {
     label: '营销员工',
     description: '营销中心与个人工作台',
-    paths: [...commonPersonalPaths, '/marketing']
+    paths: [...employeePersonalPaths, '/marketing']
   },
   ADMIN: {
     label: '管理员',
@@ -214,9 +215,6 @@ export function normalizePagePermissions(paths: Array<string | null | undefined>
       return
     }
     normalized.add(normalizedPath)
-    if (normalizedPath === '/workbench' || normalizedPath === '/workbench/overview') {
-      normalized.add('/portal')
-    }
   })
   return Array.from(normalized)
 }

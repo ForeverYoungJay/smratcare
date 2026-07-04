@@ -1,5 +1,14 @@
 <template>
   <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
+    <template #extra>
+      <a-space wrap>
+        <a-button @click="exportSupervisorAnomalies">导出异常</a-button>
+        <a-button :type="showSupervisorAnomaliesOnly ? 'primary' : 'default'" @click="toggleSupervisorAnomalyView">
+          监管异常 {{ supervisorAnomalies.length }}
+        </a-button>
+        <a-button type="primary" v-permission="accountManagerRoles" @click="goToProfileBasicCreate()">新增员工主档</a-button>
+      </a-space>
+    </template>
     <template #stats>
       <div class="staff-overview">
         <div class="staff-overview-item">
@@ -48,13 +57,6 @@
           placeholder="选择角色"
         />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" v-permission="accountManagerRoles" @click="goToProfileBasicCreate()">新增员工主档</a-button>
-        <a-button :type="showSupervisorAnomaliesOnly ? 'primary' : 'default'" @click="toggleSupervisorAnomalyView">
-          监管异常 {{ supervisorAnomalies.length }}
-        </a-button>
-        <a-button @click="exportSupervisorAnomalies">导出异常</a-button>
-      </template>
     </SearchForm>
 
     <section class="staff-focus-strip">
@@ -107,40 +109,49 @@
           <a-tag v-else color="green">正常</a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a v-permission="accountManagerRoles" @click="openDrawer(record)">编辑</a>
-            <a
+          <div class="row-action-links">
+            <a-button type="link" size="small" v-permission="accountManagerRoles" @click="openDrawer(record)">编辑</a-button>
+            <a-button
+              type="link"
+              size="small"
               v-if="supervisorAnomalyMap.get(String(record.id))"
               v-permission="accountManagerRoles"
               @click="openDrawerWithRecommendation(record)"
             >
               推荐修复
-            </a>
-            <a v-permission="credentialViewerRoles" @click="openCredential(record.id)">查看密码</a>
-            <a v-permission="credentialViewerRoles" @click="openCredential(record.id, true)">打印账号密码</a>
-            <a
-              v-if="record.status === 1 && !isReservedRoleCodeList(record.roleCodes)"
-              v-permission="accountManagerRoles"
-              @click="toggleStaffLock(record, true)"
-            >
-              一键锁定
-            </a>
-            <a
-              v-else-if="record.status !== 1 && !isReservedRoleCodeList(record.roleCodes)"
-              v-permission="accountManagerRoles"
-              @click="toggleStaffLock(record, false)"
-            >
-              解除锁定
-            </a>
-            <a
+            </a-button>
+            <a-button type="link" size="small" v-permission="credentialViewerRoles" @click="openCredential(record.id)">查看密码</a-button>
+            <a-button type="link" size="small" v-permission="credentialViewerRoles" @click="openCredential(record.id, true)">打印账号密码</a-button>
+            <a-button
+              type="link"
+              size="small"
               v-if="!isReservedRoleCodeList(record.roleCodes)"
               v-permission="accountManagerRoles"
               @click="openRole(record)"
             >
               分配角色
-            </a>
-            <a-tag v-else color="gold">系统保留角色</a-tag>
-          </a-space>
+            </a-button>
+            <a-tag v-if="isReservedRoleCodeList(record.roleCodes)" color="gold">系统保留角色</a-tag>
+            <a-button
+              type="link"
+              size="small"
+              danger
+              v-if="record.status === 1 && !isReservedRoleCodeList(record.roleCodes)"
+              v-permission="accountManagerRoles"
+              @click="toggleStaffLock(record, true)"
+            >
+              一键锁定
+            </a-button>
+            <a-button
+              type="link"
+              size="small"
+              v-else-if="record.status !== 1 && !isReservedRoleCodeList(record.roleCodes)"
+              v-permission="accountManagerRoles"
+              @click="toggleStaffLock(record, false)"
+            >
+              解除锁定
+            </a-button>
+          </div>
         </template>
       </template>
     </DataTable>
@@ -943,21 +954,21 @@ useLiveSyncRefresh({
 .staff-overview-item {
   padding: 14px 16px;
   border-radius: 16px;
-  border: 1px solid rgba(208, 223, 234, 0.9);
+  border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.78);
 }
 
 .staff-overview-item span {
   display: block;
   font-size: 12px;
-  color: #71879b;
+  color: var(--muted);
 }
 
 .staff-overview-item strong {
   display: block;
   margin-top: 8px;
   font-size: 24px;
-  color: #173854;
+  color: var(--ink);
 }
 
 .staff-focus-strip {
@@ -969,46 +980,46 @@ useLiveSyncRefresh({
 .focus-item {
   padding: 14px 16px;
   border-radius: 18px;
-  border: 1px solid rgba(240, 165, 74, 0.28);
+  border: 1px solid rgba(var(--warning-rgb), 0.28);
   background: rgba(255, 249, 239, 0.92);
   cursor: pointer;
 }
 
 .focus-item--info {
   cursor: default;
-  border-color: rgba(27, 107, 207, 0.2);
+  border-color: rgba(var(--info-rgb), 0.2);
   background: rgba(243, 248, 255, 0.92);
 }
 
 .focus-item.active {
-  border-color: rgba(222, 91, 99, 0.34);
+  border-color: rgba(var(--danger-rgb), 0.34);
   background: rgba(255, 243, 243, 0.94);
 }
 
 .focus-label {
   display: block;
   font-size: 12px;
-  color: #7c8d99;
+  color: var(--muted);
 }
 
 .focus-value {
   display: block;
   margin-top: 6px;
   font-size: 20px;
-  color: #173854;
+  color: var(--ink);
 }
 
 .focus-item small {
   display: block;
   margin-top: 4px;
-  color: #6f879a;
+  color: var(--muted);
   line-height: 1.5;
 }
 
 .form-rule-tip {
   margin-bottom: 6px;
   font-size: 12px;
-  color: #72879a;
+  color: var(--muted);
 }
 
 .identity-shell {
@@ -1016,7 +1027,7 @@ useLiveSyncRefresh({
   padding: 14px;
   border-radius: 16px;
   background: rgba(247, 250, 253, 0.96);
-  border: 1px solid rgba(208, 223, 234, 0.88);
+  border: 1px solid var(--border);
 }
 
 .identity-head {
@@ -1029,7 +1040,7 @@ useLiveSyncRefresh({
 .identity-title {
   font-size: 14px;
   font-weight: 600;
-  color: #173854;
+  color: var(--ink);
 }
 
 .credential-actions {
@@ -1039,7 +1050,7 @@ useLiveSyncRefresh({
 }
 
 .credential-empty {
-  color: #72879a;
+  color: var(--muted);
 }
 
 @media (max-width: 992px) {

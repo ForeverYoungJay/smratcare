@@ -2,12 +2,31 @@ const { getCareLogs } = require('../../services/family');
 
 Page({
   data: {
-    days: []
+    days: [],
+    loading: false,
+    loadError: ''
   },
   async onShow() {
     getApp().ensureLogin();
-    const days = await getCareLogs();
-    this.setData({ days: days || [] });
+    await this.loadData();
+  },
+  async onPullDownRefresh() {
+    await this.loadData();
+    wx.stopPullDownRefresh();
+  },
+  async loadData() {
+    this.setData({ loading: true, loadError: '' });
+    try {
+      const days = await getCareLogs();
+      this.setData({ days: days || [] });
+    } catch (error) {
+      this.setData({ days: [], loadError: error.message || '护理日志加载失败，请检查网络后重试' });
+    } finally {
+      this.setData({ loading: false });
+    }
+  },
+  retryLoad() {
+    this.loadData();
   },
   previewPhoto(e) {
     const day = e.currentTarget.dataset.day;

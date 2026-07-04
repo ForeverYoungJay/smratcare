@@ -2,11 +2,23 @@ import type { Router } from 'vue-router'
 import { getPagePermissions, getRoles, getToken } from '../utils/auth'
 import { resolveRouteAccess } from '../utils/routeAccess'
 
+function normalizeRedirectPath(path?: string | null) {
+  const raw = String(path || '').trim()
+  if (!raw.startsWith('/')) return '/portal'
+  if (raw === '/login') return '/portal'
+  if (raw.startsWith('/login?')) {
+    const query = raw.split('?')[1] || ''
+    const params = new URLSearchParams(query)
+    return normalizeRedirectPath(params.get('redirect'))
+  }
+  return raw
+}
+
 function resolveLoginRedirectTarget(fullPath: string) {
   return {
     path: '/login',
     query: {
-      redirect: fullPath || '/portal'
+      redirect: normalizeRedirectPath(fullPath)
     }
   }
 }
@@ -23,7 +35,7 @@ export function setupPermission(router: Router) {
 
     if (to.path === '/login' && token) {
       const redirect = typeof to.query.redirect === 'string' ? to.query.redirect : ''
-      next(redirect || '/portal')
+      next(normalizeRedirectPath(redirect))
       return
     }
 

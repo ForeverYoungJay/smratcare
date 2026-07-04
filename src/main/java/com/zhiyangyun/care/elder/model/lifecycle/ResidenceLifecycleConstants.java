@@ -5,6 +5,8 @@ public final class ResidenceLifecycleConstants {
 
   public static final String OUTING_OUT = "OUT";
   public static final String OUTING_RETURNED = "RETURNED";
+  public static final String OUTING_APPLIED = "APPLIED";
+  public static final String OUTING_CANCELLED = "CANCELLED";
   public static final String MEDICAL_OUTING_OUT = "OUT";
   public static final String MEDICAL_OUTING_RETURNED = "RETURNED";
 

@@ -9,9 +9,9 @@
   height: 72rpx;
   padding: 0 18rpx;
   border-radius: 14rpx;
-  border: 1rpx solid #d9e3df;
+  border: 1rpx solid #D7DED8;
   background: #ffffff;
-  color: #182420;
+  color: #22332E;
   font-size: 24rpx;
 }
 
@@ -40,7 +40,7 @@
 }
 
 .notice-title {
-  color: #182430;
+  color: #22332E;
   font-size: 30rpx;
   font-weight: 900;
 }
@@ -56,8 +56,8 @@
   height: 46rpx;
   padding: 0 16rpx;
   border-radius: 999rpx;
-  background: #e5f5ef;
-  color: #16704f;
+  background: #E8F3EF;
+  color: #21705F;
   font-size: 21rpx;
   font-weight: 900;
   line-height: 46rpx;
@@ -87,7 +87,7 @@
 }
 
 .detail-title {
-  color: #182430;
+  color: #22332E;
   font-size: 34rpx;
   font-weight: 900;
   line-height: 1.35;

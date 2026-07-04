@@ -1,31 +1,55 @@
 <view class="container">
   <view class="section-title">医护工作</view>
   <view class="section-subtitle">查房、用药确认和异常巡检闭环</view>
-  <view class="quick-actions">
-    <button class="ghost-btn quick-btn" bindtap="goMedication">用药确认</button>
-    <button class="ghost-btn quick-btn" bindtap="goInspection">巡检复核</button>
+
+  <view class="summary-grid">
+    <view class="surface summary-card" bindtap="goMedication">
+      <text>今日用药待办</text>
+      <strong>{{medicationPending}}</strong>
+    </view>
+    <view class="surface summary-card" bindtap="goInspection">
+      <text>今日巡检待办</text>
+      <strong>{{inspectionPending}}</strong>
+    </view>
   </view>
 
-  <view class="surface panel">
+  <view class="mode-tabs">
+    <view class="mode-tab {{activeTab === 'MEDICATION' ? 'active' : ''}}" data-tab="MEDICATION" bindtap="switchTab">用药确认</view>
+    <view class="mode-tab {{activeTab === 'INSPECTION' ? 'active' : ''}}" data-tab="INSPECTION" bindtap="switchTab">巡检复核</view>
+  </view>
+
+  <view class="surface state-card" wx:if="{{loading}}">
+    <view class="state-title">正在加载医护任务</view>
+  </view>
+
+  <view class="surface state-card" wx:if="{{!loading && loadError}}">
+    <view class="state-title">医护任务加载失败</view>
+    <view class="section-subtitle">{{loadError}}</view>
+    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
+  </view>
+
+  <view class="surface panel" wx:if="{{!loading && !loadError && activeTab === 'MEDICATION'}}">
     <view class="panel-title">用药确认</view>
+    <view class="section-subtitle" wx:if="{{medicationTasks.length === 0}}">暂无用药确认任务。</view>
     <block wx:for="{{medicationTasks}}" wx:key="id">
       <view class="work-row" data-id="{{item.id}}" bindtap="openMedication">
         <view>
           <view class="work-title">{{item.title}}</view>
-          <view class="work-meta">{{item.resident}} · {{item.room}} · {{item.time}}</view>
+          <view class="work-meta">{{item.resident}} · {{item.room}} · {{item.time}} · {{item.status}}</view>
         </view>
         <text class="work-action">{{item.actionText}}</text>
       </view>
     </block>
   </view>
 
-  <view class="surface panel">
-    <view class="panel-title">异常巡检</view>
+  <view class="surface panel" wx:if="{{!loading && !loadError && activeTab === 'INSPECTION'}}">
+    <view class="panel-title">巡检复核</view>
+    <view class="section-subtitle" wx:if="{{inspectionTasks.length === 0}}">暂无巡检复核任务。</view>
     <block wx:for="{{inspectionTasks}}" wx:key="id">
       <view class="work-row" data-id="{{item.id}}" bindtap="openInspection">
         <view>
           <view class="work-title">{{item.title}}</view>
-          <view class="work-meta">{{item.resident}} · {{item.room}} · {{item.time}}</view>
+          <view class="work-meta">{{item.resident}} · {{item.room}} · {{item.time}} · {{item.status}}</view>
         </view>
         <text class="work-action">{{item.actionText}}</text>
       </view>

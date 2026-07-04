@@ -1,5 +1,12 @@
 <template>
   <PageContainer title="健康巡检" subTitle="日常巡检项目与整改闭环">
+    <template #extra>
+      <a-space wrap>
+        <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
+        <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
+        <a-button type="primary" @click="openCreate">新增巡检</a-button>
+      </a-space>
+    </template>
     <a-row :gutter="16" class="summary-row">
       <a-col :xs="24" :md="6"><a-card :bordered="false"><a-statistic title="巡检总数" :value="summary.totalCount" /></a-card></a-col>
       <a-col :xs="24" :md="6"><a-card :bordered="false"><a-statistic title="异常数" :value="summary.abnormalCount" /></a-card></a-col>
@@ -71,13 +78,6 @@
       <a-form-item label="日期">
         <a-range-picker v-model:value="query.inspectionRange" style="width: 280px" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
-          <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
-          <a-button type="primary" @click="openCreate">新增巡检</a-button>
-        </a-space>
-      </template>
     </SearchForm>
 
     <DataTable
@@ -96,7 +96,7 @@
         <template v-else-if="column.key === 'attachmentCount'">
           <a-space v-if="resolveAttachmentFiles(record.attachmentUrls).length">
             <a-tag color="blue">{{ resolveAttachmentFiles(record.attachmentUrls).length }} 张</a-tag>
-            <a @click="previewPhotos(resolveAttachmentFiles(record.attachmentUrls))">查看</a>
+            <a-button type="link" size="small" @click="previewPhotos(resolveAttachmentFiles(record.attachmentUrls))">查看</a-button>
           </a-space>
           <span v-else>-</span>
         </template>
@@ -130,13 +130,13 @@
           </div>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="goNursingLogs(record)">护理日志</a-button>
-            <a-button type="link" @click="openEdit(record)">编辑</a-button>
+          <div class="row-action-links">
+            <a-button type="link" size="small" @click="goNursingLogs(record)">护理日志</a-button>
+            <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
             <a-popconfirm title="确认删除该记录吗？" ok-text="确认" cancel-text="取消" @confirm="remove(record)">
-              <a-button type="link" danger>删除</a-button>
+              <a-button type="link" size="small" danger>删除</a-button>
             </a-popconfirm>
-          </a-space>
+          </div>
         </template>
       </template>
     </DataTable>
@@ -421,6 +421,7 @@ const columns = [
 
 const editOpen = ref(false)
 const saving = ref(false)
+const lastAutoOpenInspectionKey = ref('')
 const { elderOptions, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
 const form = reactive({
   id: undefined as Id | undefined,
@@ -641,6 +642,7 @@ async function fetchData() {
     summary.closedCount = summaryRes.closedCount || 0
     summary.linkedLogCount = summaryRes.linkedLogCount || 0
     summary.statusStats = summaryRes.statusStats || []
+    autoOpenInspectionFromRoute()
   } catch (error) {
     message.error(resolveHealthError(error, '加载健康巡检失败'))
     rows.value = []
@@ -710,6 +712,23 @@ function openEdit(record: HealthInspection) {
   form.remark = record.remark || ''
   formPhotoFiles.value = resolveAttachmentFiles(record.attachmentUrls)
   editOpen.value = true
+}
+
+function autoOpenInspectionFromRoute() {
+  const inspectionId = activeInspectionId.value
+  if (!inspectionId) {
+    return
+  }
+  const autoOpenKey = String(inspectionId)
+  if (lastAutoOpenInspectionKey.value === autoOpenKey) {
+    return
+  }
+  const matched = rows.value.find((item) => String(item.id || '') === autoOpenKey)
+  if (!matched) {
+    return
+  }
+  openEdit(matched)
+  lastAutoOpenInspectionKey.value = autoOpenKey
 }
 
 function remarkKey(id?: Id) {
@@ -1213,6 +1232,7 @@ syncMedicalAlertRules().catch(() => {})
 watch(
   () => [route.query.residentId, route.query.elderId, route.query.inspectionId],
   () => {
+    lastAutoOpenInspectionKey.value = ''
     query.pageNo = 1
     pagination.current = 1
     fetchData()
@@ -1243,16 +1263,16 @@ watch(
   margin-bottom: 12px;
 }
 :deep(.health-row-danger > td) {
-  background: #fff1f0 !important;
+  background: rgba(var(--danger-rgb), 0.07) !important;
 }
 :deep(.health-row-warning > td) {
-  background: #fff7e6 !important;
+  background: rgba(var(--warning-rgb), 0.1) !important;
 }
 :deep(.health-row-focus > td) {
-  background: #e6f4ff !important;
+  background: rgba(var(--info-rgb), 0.1) !important;
 }
 .context-card {
-  background: #f0f9ff;
+  background: var(--primary-soft);
 }
 .remark-cell {
   display: flex;

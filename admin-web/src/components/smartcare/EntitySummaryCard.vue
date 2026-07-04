@@ -46,8 +46,8 @@ defineEmits<{
   place-items: center;
   width: 52px;
   height: 52px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, rgba(19, 108, 181, 0.16), rgba(30, 138, 143, 0.12));
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(33, 112, 95, 0.14), rgba(46, 138, 114, 0.1));
   color: var(--primary-strong);
   font-size: 18px;
   font-weight: 800;

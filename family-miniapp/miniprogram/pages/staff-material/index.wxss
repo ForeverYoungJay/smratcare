@@ -3,6 +3,18 @@
   padding: 26rpx;
 }
 
+.inline-state {
+  margin-bottom: 18rpx;
+}
+
+.success-state {
+  background: #E8F3EF;
+}
+
+.error-state {
+  background: #fff3f2;
+}
+
 .field {
   margin-top: 22rpx;
 }
@@ -25,9 +37,9 @@
 .textarea-line {
   width: 100%;
   border-radius: 14rpx;
-  border: 1rpx solid #d9e3df;
+  border: 1rpx solid #D7DED8;
   background: #ffffff;
-  color: #182420;
+  color: #22332E;
   font-size: 25rpx;
 }
 
@@ -70,7 +82,7 @@
 }
 
 .material-title {
-  color: #182430;
+  color: #22332E;
   font-size: 30rpx;
   font-weight: 900;
 }
@@ -86,21 +98,21 @@
   height: 46rpx;
   padding: 0 16rpx;
   border-radius: 999rpx;
-  background: #fff2d9;
-  color: #9a5b05;
+  background: #FBF0E2;
+  color: #B27221;
   font-size: 21rpx;
   font-weight: 900;
   line-height: 46rpx;
 }
 
 .status-pill.success {
-  background: #e5f5ef;
-  color: #16704f;
+  background: #E8F3EF;
+  color: #21705F;
 }
 
 .status-pill.danger {
-  background: #fde8e5;
-  color: #b42318;
+  background: #F9E7E6;
+  color: #C9504B;
 }
 
 .tag-row {

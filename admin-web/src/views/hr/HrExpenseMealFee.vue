@@ -570,7 +570,7 @@ onMounted(() => {
 .staff-cell span,
 .plan-cell span,
 .sub-line {
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -601,7 +601,7 @@ onMounted(() => {
 }
 
 :deep(.hr-row-warning) {
-  background: #fff7ed !important;
+  background: rgba(var(--warning-rgb), 0.08) !important;
 }
 
 @media (max-width: 1100px) {

@@ -16,7 +16,7 @@
   margin-top: 20rpx;
   padding: 18rpx;
   border-radius: 16rpx;
-  background: #edf6f2;
+  background: #E8F3EF;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -30,7 +30,7 @@
 
 .guard-title {
   font-size: 26rpx;
-  color: #1f5f55;
+  color: #185C4E;
   font-weight: 900;
 }
 
@@ -53,18 +53,18 @@
   align-items: center;
   justify-content: space-between;
   gap: 20rpx;
-  border-bottom: 1rpx solid #edf2ef;
+  border-bottom: 1rpx solid #E4E7E0;
   color: #34443f;
   font-size: 24rpx;
 }
 
 .line text:first-child {
-  color: #71807a;
+  color: #5C6F69;
 }
 
 .line text:last-child {
   font-weight: 800;
-  color: #182420;
+  color: #22332E;
 }
 
 .line:last-child {
@@ -72,7 +72,7 @@
 }
 
 .warn {
-  color: #9a5b05 !important;
+  color: #B27221 !important;
 }
 
 .switch-line {
@@ -88,7 +88,7 @@
   width: 220rpx;
   height: 56rpx;
   padding: 0 14rpx;
-  border: 1rpx solid #d9e3df;
+  border: 1rpx solid #D7DED8;
   border-radius: 12rpx;
   background: #ffffff;
   text-align: right;
@@ -103,7 +103,7 @@
   display: block;
   margin-bottom: 10rpx;
   font-size: 22rpx;
-  color: #71807a;
+  color: #5C6F69;
 }
 
 .preset-list {
@@ -116,7 +116,7 @@
 .filter-chip {
   padding: 9rpx 18rpx;
   border-radius: 999rpx;
-  border: 1rpx solid #d9e3df;
+  border: 1rpx solid #D7DED8;
   background: #ffffff;
   color: #52615c;
   font-size: 23rpx;
@@ -124,8 +124,8 @@
 
 .preset-chip-active,
 .filter-chip-active {
-  background: #246b5f;
-  border-color: #246b5f;
+  background: #21705F;
+  border-color: #21705F;
   color: #ffffff;
   font-weight: 900;
 }
@@ -135,14 +135,14 @@
   padding: 14rpx 16rpx;
   border-radius: 14rpx;
   background: #eef6ff;
-  color: #255a91;
+  color: #3D7FA6;
   font-size: 23rpx;
   font-weight: 800;
 }
 
 .tip-text {
   margin-top: 10rpx;
-  color: #71807a;
+  color: #5C6F69;
   font-size: 22rpx;
   line-height: 1.55;
 }
@@ -153,6 +153,10 @@
   border-radius: 16rpx;
   background: #fff7e8;
   border: 1rpx solid #f3d29b;
+}
+
+.warn-box.subtle {
+  margin-top: 16rpx;
 }
 
 .warn-title {
@@ -186,8 +190,8 @@
   margin-top: 12rpx;
   padding: 16rpx;
   border-radius: 16rpx;
-  background: #f7faf8;
-  border: 1rpx solid #edf2ef;
+  background: #FAFAF7;
+  border: 1rpx solid #E4E7E0;
 }
 
 .order-top {
@@ -215,7 +219,7 @@
 
 .order-status {
   font-size: 22rpx;
-  color: #16704f;
+  color: #21705F;
   font-weight: 900;
 }
 
@@ -227,6 +231,6 @@
 .order-sub {
   margin-top: 7rpx;
   font-size: 22rpx;
-  color: #71807a;
+  color: #5C6F69;
   line-height: 1.45;
 }

@@ -26,9 +26,12 @@ import com.zhiyangyun.care.elder.mapper.FamilyUserMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderMedicalOutingRecordMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderOutingRecordMapper;
+import com.zhiyangyun.care.elder.model.lifecycle.ResidenceLifecycleConstants;
 import com.zhiyangyun.care.family.config.FamilyPortalProperties;
+import com.zhiyangyun.care.family.entity.FamilyNotifyLog;
 import com.zhiyangyun.care.family.entity.FamilyPortalState;
 import com.zhiyangyun.care.family.entity.FamilyRechargeOrder;
+import com.zhiyangyun.care.family.mapper.FamilyNotifyLogMapper;
 import com.zhiyangyun.care.family.mapper.FamilyPortalStateMapper;
 import com.zhiyangyun.care.family.mapper.FamilyRechargeOrderMapper;
 import com.zhiyangyun.care.family.model.FamilyNotifyCommand;
@@ -136,6 +139,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
   private static final DateTimeFormatter DATETIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
   private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ISO_DATE;
   private static final DateTimeFormatter HHMM_FMT = DateTimeFormatter.ofPattern("HH:mm");
+  private static final DateTimeFormatter MMDD_HHMM_FMT = DateTimeFormatter.ofPattern("MM-dd HH:mm");
   private static final Pattern URL_PATTERN = Pattern.compile("https?://[^\\s,;]+", Pattern.CASE_INSENSITIVE);
 
   private static final String METRIC_BP = "BP";
@@ -195,6 +199,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
   private final OrgMapper orgMapper;
   private final FamilyPortalStateMapper familyPortalStateMapper;
   private final FamilyRechargeOrderMapper familyRechargeOrderMapper;
+  private final FamilyNotifyLogMapper familyNotifyLogMapper;
   private final FamilyPortalProperties familyPortalProperties;
   private final FamilyWechatNotifyService familyWechatNotifyService;
   private final PasswordEncoder passwordEncoder;
@@ -235,6 +240,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
       OrgMapper orgMapper,
       FamilyPortalStateMapper familyPortalStateMapper,
       FamilyRechargeOrderMapper familyRechargeOrderMapper,
+      FamilyNotifyLogMapper familyNotifyLogMapper,
       FamilyPortalProperties familyPortalProperties,
       FamilyWechatNotifyService familyWechatNotifyService,
       PasswordEncoder passwordEncoder,
@@ -270,6 +276,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     this.orgMapper = orgMapper;
     this.familyPortalStateMapper = familyPortalStateMapper;
     this.familyRechargeOrderMapper = familyRechargeOrderMapper;
+    this.familyNotifyLogMapper = familyNotifyLogMapper;
     this.familyPortalProperties = familyPortalProperties;
     this.familyWechatNotifyService = familyWechatNotifyService;
     this.passwordEncoder = passwordEncoder;
@@ -330,6 +337,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     List<FamilyPortalModels.MealSummary> mealDays = listMealCalendar(orgId);
     response.setMeal(mealDays.isEmpty() ? defaultMealSummary() : mealDays.get(0));
     response.setNotices(listMessages(orgId, familyUserId, 1, 3));
+    response.setCareTimeline(buildCareTimeline(orgId, familyUserId, targetElderId));
     response.setFocusEvents(buildFocusEvents(response));
     return response;
   }
@@ -859,14 +867,26 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
   }
 
   @Override
-  public List<FamilyPortalModels.ActivityAlbumItem> listActivityAlbums(Long orgId, Long familyUserId, int pageNo, int pageSize) {
+  public List<FamilyPortalModels.ActivityAlbumItem> listActivityAlbums(Long orgId, Long familyUserId, int pageNo, int pageSize,
+      String scope) {
     Set<Long> liked = loadLongSetState(orgId, familyUserId, STATE_ALBUM_LIKE);
-    String elderName = resolvePrimaryElderName(orgId, extractElderIds(listBoundRelations(orgId, familyUserId)));
+    List<Long> boundElderIds = ensureBoundElderIds(extractElderIds(listBoundRelations(orgId, familyUserId)));
+    Map<Long, ElderProfile> elderMap = loadElderMap(orgId, boundElderIds);
+    String normalizedScope = normalizeAlbumScope(scope);
 
     Page<OaAlbum> page = oaAlbumMapper.selectPage(new Page<>(pageNo, pageSize),
         Wrappers.lambdaQuery(OaAlbum.class)
             .eq(OaAlbum::getIsDeleted, 0)
             .eq(OaAlbum::getOrgId, orgId)
+            .eq(OaAlbum::getStatus, "PUBLISHED")
+            .and("PERSONAL".equals(normalizedScope),
+                w -> w.eq(OaAlbum::getAlbumScope, "PERSONAL").in(OaAlbum::getElderId, boundElderIds))
+            .and("GROUP".equals(normalizedScope),
+                w -> w.ne(OaAlbum::getAlbumScope, "PERSONAL").or().isNull(OaAlbum::getAlbumScope))
+            .and("ALL".equals(normalizedScope),
+                w -> w.ne(OaAlbum::getAlbumScope, "PERSONAL")
+                    .or().isNull(OaAlbum::getAlbumScope)
+                    .or(q -> q.eq(OaAlbum::getAlbumScope, "PERSONAL").in(OaAlbum::getElderId, boundElderIds)))
             .orderByDesc(OaAlbum::getShootDate)
             .orderByDesc(OaAlbum::getUpdateTime));
 
@@ -877,7 +897,8 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
       item.setTitle(defaultText(album.getTitle(), "院内活动纪实"));
       LocalDate shootDate = album.getShootDate();
       item.setDate(shootDate == null ? formatFriendlyDateTime(album.getUpdateTime()) : shootDate.format(DATE_FMT));
-      item.setElderName(elderName);
+      item.setAlbumScope(resolveAlbumScope(album));
+      item.setElderName(resolveAlbumElderName(album, elderMap));
       item.setDescription(defaultText(album.getRemark(), defaultText(album.getCategory(), "活动记录")));
       item.setMediaType(resolveAlbumMediaType(album));
       item.setCoverText((album.getPhotoCount() == null ? 0 : album.getPhotoCount()) + " 张照片");
@@ -894,6 +915,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
 
   @Override
   public FamilyPortalModels.ActivityAlbumItem toggleAlbumLike(Long orgId, Long familyUserId, Long albumId) {
+    ensureFamilyAlbumVisible(orgId, familyUserId, albumId);
     Set<Long> liked = loadLongSetState(orgId, familyUserId, STATE_ALBUM_LIKE);
     if (liked.contains(albumId)) {
       removeState(orgId, familyUserId, STATE_ALBUM_LIKE, String.valueOf(albumId));
@@ -901,7 +923,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
       upsertState(orgId, familyUserId, STATE_ALBUM_LIKE, String.valueOf(albumId),
           Map.of("albumId", albumId, "liked", true));
     }
-    return listActivityAlbums(orgId, familyUserId, 1, 50).stream()
+    return listActivityAlbums(orgId, familyUserId, 1, 50, null).stream()
         .filter(item -> Objects.equals(item.getId(), albumId))
         .findFirst()
         .orElse(null);
@@ -913,6 +935,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     if (albumId == null || albumId <= 0) {
       return List.of();
     }
+    ensureFamilyAlbumVisible(orgId, familyUserId, albumId);
     FamilyUser familyUser = familyUserMapper.selectById(familyUserId);
     String myName = familyUser == null
         ? "家属"
@@ -946,6 +969,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     if (albumId == null || albumId <= 0) {
       throw new IllegalArgumentException("活动相册不存在");
     }
+    ensureFamilyAlbumVisible(orgId, familyUserId, albumId);
     String content = defaultText(request == null ? null : request.getContent(), "");
     if (content.isBlank()) {
       throw new IllegalArgumentException("评论内容不能为空");
@@ -992,16 +1016,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
             .last("LIMIT 30"));
 
     for (ElderOutingRecord record : outings) {
-      FamilyPortalModels.OutingRecordItem item = new FamilyPortalModels.OutingRecordItem();
-      item.setId(record.getId());
-      item.setElderName(defaultText(record.getElderName(), "未命名老人"));
-      item.setStartTime(record.getOutingDate() == null ? "" : record.getOutingDate().format(DATE_FMT));
-      item.setReason(defaultText(record.getReason(), "外出"));
-      item.setCompanion(defaultText(record.getCompanion(), "护理人员"));
-      item.setDestination("院外活动");
-      item.setReturnTime(record.getActualReturnTime() == null ? "待返院" : record.getActualReturnTime().format(DATETIME_FMT));
-      item.setStatus("OUT".equalsIgnoreCase(record.getStatus()) ? "外出中" : "已返院");
-      items.add(item);
+      items.add(toFamilyOutingRecordItem(record));
     }
 
     List<ElderMedicalOutingRecord> medicalOutings = elderMedicalOutingRecordMapper.selectList(
@@ -1023,11 +1038,135 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
       item.setDestination(defaultText(record.getHospitalName(), "医院") + " " + defaultText(record.getDepartment(), ""));
       item.setReturnTime(record.getActualReturnTime() == null ? "待返院" : record.getActualReturnTime().format(DATETIME_FMT));
       item.setStatus("OUT".equalsIgnoreCase(record.getStatus()) ? "外出中" : "已返院");
+      item.setApplicationStatus(record.getStatus());
+      item.setCanCancel(false);
+      item.setCanResubmit(false);
       items.add(item);
     }
 
     items.sort(Comparator.comparing(FamilyPortalModels.OutingRecordItem::getStartTime, Comparator.nullsLast(String::compareTo)).reversed());
     return items;
+  }
+
+  @Override
+  @Transactional
+  public FamilyPortalModels.OutingRecordItem createOutingApplication(Long orgId, Long familyUserId,
+      FamilyPortalModels.OutingApplicationRequest request) {
+    if (request == null) {
+      throw new IllegalArgumentException("外出申请不能为空");
+    }
+    List<Long> elderIds = ensureBoundElderIds(extractElderIds(listBoundRelations(orgId, familyUserId)));
+    Long targetElderId = resolveTargetElderId(elderIds, request.getElderId());
+    ElderProfile elder = elderMapper.selectOne(Wrappers.lambdaQuery(ElderProfile.class)
+        .eq(ElderProfile::getIsDeleted, 0)
+        .eq(ElderProfile::getOrgId, orgId)
+        .eq(ElderProfile::getId, targetElderId));
+    if (elder == null) {
+      throw new IllegalArgumentException("老人信息不存在");
+    }
+    long blockedCount = elderOutingRecordMapper.selectCount(Wrappers.lambdaQuery(ElderOutingRecord.class)
+        .eq(ElderOutingRecord::getIsDeleted, 0)
+        .eq(ElderOutingRecord::getOrgId, orgId)
+        .eq(ElderOutingRecord::getElderId, targetElderId)
+        .in(ElderOutingRecord::getStatus, List.of(
+            ResidenceLifecycleConstants.OUTING_APPLIED,
+            ResidenceLifecycleConstants.OUTING_OUT)));
+    if (blockedCount > 0) {
+      throw new IllegalStateException("该老人已有待审批或外出中的记录");
+    }
+
+    ElderOutingRecord record = new ElderOutingRecord();
+    record.setTenantId(orgId);
+    record.setOrgId(orgId);
+    record.setElderId(targetElderId);
+    record.setElderName(defaultText(elder.getFullName(), "老人"));
+    record.setOutingDate(request.getOutingDate());
+    record.setExpectedReturnTime(request.getExpectedReturnTime());
+    record.setCompanion(defaultText(request.getCompanion(), "家属陪同"));
+    record.setReason(request.getReason().trim());
+    record.setStatus(ResidenceLifecycleConstants.OUTING_APPLIED);
+    record.setRemark(buildFamilyOutingRemark(request.getDestination(), request.getRemark()));
+    record.setCreatedBy(familyUserId);
+    elderOutingRecordMapper.insert(record);
+    return toFamilyOutingRecordItem(record);
+  }
+
+  @Override
+  @Transactional
+  public FamilyPortalModels.OutingRecordItem cancelOutingApplication(Long orgId, Long familyUserId, Long applicationId) {
+    if (applicationId == null) {
+      throw new IllegalArgumentException("外出申请不存在");
+    }
+    List<Long> elderIds = ensureBoundElderIds(extractElderIds(listBoundRelations(orgId, familyUserId)));
+    ElderOutingRecord record = elderOutingRecordMapper.selectOne(Wrappers.lambdaQuery(ElderOutingRecord.class)
+        .eq(ElderOutingRecord::getIsDeleted, 0)
+        .eq(ElderOutingRecord::getOrgId, orgId)
+        .eq(ElderOutingRecord::getId, applicationId)
+        .in(ElderOutingRecord::getElderId, elderIds));
+    if (record == null) {
+      throw new IllegalArgumentException("外出申请不存在");
+    }
+    if (!ResidenceLifecycleConstants.OUTING_APPLIED.equals(record.getStatus())) {
+      throw new IllegalStateException("仅待审批申请可取消");
+    }
+    record.setStatus(ResidenceLifecycleConstants.OUTING_CANCELLED);
+    elderOutingRecordMapper.updateById(record);
+    return toFamilyOutingRecordItem(record);
+  }
+
+  private FamilyPortalModels.OutingRecordItem toFamilyOutingRecordItem(ElderOutingRecord record) {
+    FamilyPortalModels.OutingRecordItem item = new FamilyPortalModels.OutingRecordItem();
+    item.setId(record.getId());
+    item.setElderName(defaultText(record.getElderName(), "未命名老人"));
+    item.setStartTime(record.getOutingDate() == null ? "" : record.getOutingDate().format(DATE_FMT));
+    item.setReason(defaultText(record.getReason(), "外出"));
+    item.setCompanion(defaultText(record.getCompanion(), "护理人员"));
+    item.setDestination(resolveOutingDestination(record.getRemark()));
+    item.setReturnTime(record.getActualReturnTime() == null ? "待返院" : record.getActualReturnTime().format(DATETIME_FMT));
+    item.setApplicationStatus(record.getStatus());
+    item.setCanCancel(ResidenceLifecycleConstants.OUTING_APPLIED.equals(record.getStatus()));
+    item.setCanResubmit(ResidenceLifecycleConstants.OUTING_CANCELLED.equals(record.getStatus()));
+    item.setStatus(toFamilyOutingStatusText(record.getStatus()));
+    return item;
+  }
+
+  private String toFamilyOutingStatusText(String status) {
+    if (ResidenceLifecycleConstants.OUTING_APPLIED.equals(status)) {
+      return "待审批";
+    }
+    if (ResidenceLifecycleConstants.OUTING_CANCELLED.equals(status)) {
+      return "已取消";
+    }
+    if (ResidenceLifecycleConstants.OUTING_OUT.equals(status)) {
+      return "外出中";
+    }
+    return "已返院";
+  }
+
+  private String buildFamilyOutingRemark(String destination, String remark) {
+    List<String> parts = new ArrayList<>();
+    if (destination != null && !destination.isBlank()) {
+      parts.add("目的地：" + destination.trim());
+    }
+    if (remark != null && !remark.isBlank()) {
+      parts.add("家属备注：" + remark.trim());
+    }
+    return parts.isEmpty() ? "家属端提交外出申请" : String.join("；", parts);
+  }
+
+  private String resolveOutingDestination(String remark) {
+    if (remark == null || remark.isBlank()) {
+      return "院外活动";
+    }
+    String prefix = "目的地：";
+    int start = remark.indexOf(prefix);
+    if (start < 0) {
+      return "院外活动";
+    }
+    int valueStart = start + prefix.length();
+    int valueEnd = remark.indexOf("；", valueStart);
+    String value = valueEnd < 0 ? remark.substring(valueStart) : remark.substring(valueStart, valueEnd);
+    return defaultText(value, "院外活动");
   }
 
   @Override
@@ -1362,6 +1501,60 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     response.setOpenId(openId);
     response.setMessage("微信通知接收绑定成功");
     return response;
+  }
+
+  @Override
+  public List<FamilyPortalModels.NotifyLogItem> listNotifyLogs(Long orgId, Long familyUserId,
+      int pageNo, int pageSize, String status) {
+    String normalizedStatus = defaultText(status, null);
+    Page<FamilyNotifyLog> page = familyNotifyLogMapper.selectPage(
+        new Page<>(Math.max(pageNo, 1), Math.min(Math.max(pageSize, 1), 50)),
+        Wrappers.lambdaQuery(FamilyNotifyLog.class)
+            .eq(FamilyNotifyLog::getIsDeleted, 0)
+            .eq(FamilyNotifyLog::getOrgId, orgId)
+            .eq(FamilyNotifyLog::getFamilyUserId, familyUserId)
+            .eq(normalizedStatus != null, FamilyNotifyLog::getStatus,
+                normalizedStatus == null ? null : normalizedStatus.toUpperCase())
+            .orderByDesc(FamilyNotifyLog::getCreateTime));
+    return page.getRecords().stream().map(this::toNotifyLogItem).toList();
+  }
+
+  private FamilyPortalModels.NotifyLogItem toNotifyLogItem(FamilyNotifyLog log) {
+    FamilyPortalModels.NotifyLogItem item = new FamilyPortalModels.NotifyLogItem();
+    item.setId(log.getId());
+    item.setElderId(log.getElderId());
+    item.setEventType(defaultText(log.getEventType(), ""));
+    item.setEventTypeText(notifyEventTypeText(log.getEventType()));
+    item.setLevel(defaultText(log.getLevel(), "INFO"));
+    item.setTitle(defaultText(log.getTitle(), "服务通知"));
+    item.setContent(defaultText(log.getContent(), ""));
+    item.setStatus(defaultText(log.getStatus(), "PENDING"));
+    item.setStatusText(notifyStatusText(item.getStatus()));
+    item.setRetryCount(log.getRetryCount() == null ? 0 : log.getRetryCount());
+    item.setLastError(defaultText(log.getLastError(), ""));
+    item.setCreateTime(log.getCreateTime() == null ? "" : log.getCreateTime().format(DATETIME_FMT));
+    item.setUpdateTime(log.getUpdateTime() == null ? "" : log.getUpdateTime().format(DATETIME_FMT));
+    return item;
+  }
+
+  private String notifyStatusText(String status) {
+    if ("SUCCESS".equalsIgnoreCase(status)) return "已送达";
+    if ("FAILED".equalsIgnoreCase(status)) return "发送失败";
+    if ("SKIPPED".equalsIgnoreCase(status)) return "已跳过";
+    if ("PENDING".equalsIgnoreCase(status)) return "待发送";
+    return "处理中";
+  }
+
+  private String notifyEventTypeText(String eventType) {
+    String type = defaultText(eventType, "");
+    return switch (type.toUpperCase()) {
+      case "HEALTH_ALERT" -> "健康提醒";
+      case "PAYMENT_ALERT", "PAYMENT" -> "费用提醒";
+      case "ACTIVITY_ALERT", "ACTIVITY" -> "活动提醒";
+      case "URGENT_ALERT", "URGENT" -> "紧急通知";
+      case "RECHARGE" -> "充值通知";
+      default -> type.isEmpty() ? "服务通知" : type;
+    };
   }
 
   @Override
@@ -3982,6 +4175,138 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     return summary;
   }
 
+  private List<FamilyPortalModels.CareTimelineItem> buildCareTimeline(Long orgId, Long familyUserId, Long elderId) {
+    List<TimelineDraft> drafts = new ArrayList<>();
+    List<HealthNursingLog> nursingLogs = healthNursingLogMapper.selectList(
+        Wrappers.lambdaQuery(HealthNursingLog.class)
+            .eq(HealthNursingLog::getIsDeleted, 0)
+            .eq(HealthNursingLog::getOrgId, orgId)
+            .eq(HealthNursingLog::getElderId, elderId)
+            .orderByDesc(HealthNursingLog::getLogTime)
+            .last("LIMIT 5"));
+    for (HealthNursingLog log : nursingLogs) {
+      LocalDateTime eventTime = log.getLogTime() == null ? log.getCreateTime() : log.getLogTime();
+      drafts.add(timelineDraft(eventTime, "护理", defaultText(log.getLogType(), "护理记录"),
+          defaultText(log.getContent(), defaultText(log.getRemark(), "护理记录已更新")),
+          defaultText(log.getStatus(), "已记录"), "/pages/care-log/index"));
+    }
+
+    List<HealthDataRecord> healthRecords = healthDataRecordMapper.selectList(
+        Wrappers.lambdaQuery(HealthDataRecord.class)
+            .eq(HealthDataRecord::getIsDeleted, 0)
+            .eq(HealthDataRecord::getOrgId, orgId)
+            .eq(HealthDataRecord::getElderId, elderId)
+            .orderByDesc(HealthDataRecord::getMeasuredAt)
+            .last("LIMIT 5"));
+    for (HealthDataRecord record : healthRecords) {
+      LocalDateTime eventTime = record.getMeasuredAt() == null ? record.getCreateTime() : record.getMeasuredAt();
+      String status = Integer.valueOf(1).equals(record.getAbnormalFlag()) ? "需关注" : "正常";
+      drafts.add(timelineDraft(eventTime, "健康", defaultText(record.getDataType(), "健康指标"),
+          defaultText(record.getDataValue(), "--") + resolveMetricUnit(normalizeMetricType(record.getDataType())),
+          status, "/pages/health/index"));
+    }
+
+    List<FamilyPortalModels.ActivityAlbumItem> albums = listActivityAlbums(orgId, familyUserId, 1, 4, "ALL");
+    for (FamilyPortalModels.ActivityAlbumItem album : albums) {
+      LocalDateTime eventTime = parseDateAsTime(album.getDate());
+      drafts.add(timelineDraft(eventTime, "相册", defaultText(album.getTitle(), "活动相册"),
+          defaultText(album.getDescription(), defaultText(album.getCoverText(), "活动照片已更新")),
+          defaultText(album.getCoverText(), "已发布"), "/pages/activity-album/index"));
+    }
+
+    List<FamilyPortalModels.MessageItem> notices = listMessages(orgId, familyUserId, 1, 5).stream()
+        .filter(item -> item.getElderId() == null || Objects.equals(item.getElderId(), elderId))
+        .toList();
+    for (FamilyPortalModels.MessageItem notice : notices) {
+      drafts.add(timelineDraft(parseDateTimeAsTime(notice.getTime()), "提醒",
+          defaultText(notice.getTitle(), "机构提醒"), defaultText(notice.getContent(), "有新的机构提醒"),
+          Boolean.TRUE.equals(notice.getUnread()) ? "未读" : "已读",
+          notice.getId() == null ? "/pages/messages/index" : "/pages/message-detail/index?id=" + notice.getId()));
+    }
+
+    return drafts.stream()
+        .sorted((a, b) -> compareTimelineTime(b.eventTime, a.eventTime))
+        .limit(6)
+        .map(TimelineDraft::toItem)
+        .toList();
+  }
+
+  private TimelineDraft timelineDraft(LocalDateTime eventTime, String category, String title, String content,
+      String status, String linkPath) {
+    TimelineDraft draft = new TimelineDraft();
+    draft.eventTime = eventTime;
+    draft.category = category;
+    draft.title = title;
+    draft.content = content == null || content.length() <= 60 ? content : content.substring(0, 60) + "...";
+    draft.status = status;
+    draft.linkPath = linkPath;
+    return draft;
+  }
+
+  private int compareTimelineTime(LocalDateTime left, LocalDateTime right) {
+    if (left == null && right == null) {
+      return 0;
+    }
+    if (left == null) {
+      return -1;
+    }
+    if (right == null) {
+      return 1;
+    }
+    return left.compareTo(right);
+  }
+
+  private LocalDateTime parseDateAsTime(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    try {
+      return LocalDate.parse(value).atStartOfDay();
+    } catch (DateTimeParseException ignored) {
+      return parseDateTimeAsTime(value);
+    }
+  }
+
+  private LocalDateTime parseDateTimeAsTime(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    String text = value.trim();
+    try {
+      return LocalDateTime.parse(text);
+    } catch (DateTimeParseException ignored) {
+      try {
+        return LocalDateTime.parse(text, DATETIME_FMT);
+      } catch (DateTimeParseException ignoredAgain) {
+        try {
+          return LocalDate.parse(text).atStartOfDay();
+        } catch (DateTimeParseException ignoredDate) {
+          return null;
+        }
+      }
+    }
+  }
+
+  private static class TimelineDraft {
+    private LocalDateTime eventTime;
+    private String category;
+    private String title;
+    private String content;
+    private String status;
+    private String linkPath;
+
+    private FamilyPortalModels.CareTimelineItem toItem() {
+      FamilyPortalModels.CareTimelineItem item = new FamilyPortalModels.CareTimelineItem();
+      item.setTime(eventTime == null ? "--:--" : eventTime.format(MMDD_HHMM_FMT));
+      item.setCategory(category);
+      item.setTitle(title);
+      item.setContent(content);
+      item.setStatus(status);
+      item.setLinkPath(linkPath);
+      return item;
+    }
+  }
+
   private FamilyPortalModels.HealthMetric buildMetric(String name, String metricType, List<HealthDataRecord> records) {
     FamilyPortalModels.HealthMetric metric = new FamilyPortalModels.HealthMetric();
     metric.setName(name);
@@ -4429,6 +4754,51 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     return "photo";
   }
 
+  private void ensureFamilyAlbumVisible(Long orgId, Long familyUserId, Long albumId) {
+    if (albumId == null || albumId <= 0) {
+      throw new IllegalArgumentException("活动相册不存在");
+    }
+    List<Long> boundElderIds = ensureBoundElderIds(extractElderIds(listBoundRelations(orgId, familyUserId)));
+    Long count = oaAlbumMapper.selectCount(Wrappers.lambdaQuery(OaAlbum.class)
+        .eq(OaAlbum::getIsDeleted, 0)
+        .eq(OaAlbum::getOrgId, orgId)
+        .eq(OaAlbum::getId, albumId)
+        .eq(OaAlbum::getStatus, "PUBLISHED")
+        .and(w -> w.ne(OaAlbum::getAlbumScope, "PERSONAL")
+            .or().isNull(OaAlbum::getAlbumScope)
+            .or(q -> q.eq(OaAlbum::getAlbumScope, "PERSONAL").in(OaAlbum::getElderId, boundElderIds))));
+    if (count == null || count <= 0) {
+      throw new IllegalArgumentException("无权限查看该相册");
+    }
+  }
+
+  private String normalizeAlbumScope(String scope) {
+    String value = scope == null ? "" : scope.trim().toUpperCase(Locale.ROOT);
+    if ("PERSONAL".equals(value) || "PRIVATE".equals(value)) {
+      return "PERSONAL";
+    }
+    if ("GROUP".equals(value) || "PUBLIC".equals(value) || "ACTIVITY".equals(value)) {
+      return "GROUP";
+    }
+    return "ALL";
+  }
+
+  private String resolveAlbumScope(OaAlbum album) {
+    String value = album == null ? "" : defaultText(album.getAlbumScope(), "").trim().toUpperCase(Locale.ROOT);
+    return "PERSONAL".equals(value) ? "PERSONAL" : "GROUP";
+  }
+
+  private String resolveAlbumElderName(OaAlbum album, Map<Long, ElderProfile> elderMap) {
+    if ("PERSONAL".equals(resolveAlbumScope(album))) {
+      ElderProfile elder = album == null || elderMap == null ? null : elderMap.get(album.getElderId());
+      if (elder != null) {
+        return defaultText(elder.getFullName(), "个人相册");
+      }
+      return "个人相册";
+    }
+    return "全体长者";
+  }
+
   private String firstPhotoFromAlbum(OaAlbum album) {
     if (album == null) {
       return null;
@@ -4636,6 +5006,10 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
 
   private String stripFeedbackPrefix(String content) {
     String text = defaultText(content, "");
+    int replyIndex = text.indexOf("\n\n[处理反馈] ");
+    if (replyIndex >= 0) {
+      text = text.substring(0, replyIndex);
+    }
     if (text.contains("\n")) {
       return text.substring(text.indexOf('\n') + 1).trim();
     }
@@ -4643,6 +5017,14 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
   }
 
   private String resolveFeedbackReply(OaSuggestion suggestion) {
+    String content = defaultText(suggestion == null ? null : suggestion.getContent(), "");
+    int replyIndex = content.indexOf("\n\n[处理反馈] ");
+    if (replyIndex >= 0) {
+      String reply = content.substring(replyIndex + "\n\n[处理反馈] ".length()).trim();
+      if (!reply.isBlank()) {
+        return reply;
+      }
+    }
     String status = defaultText(suggestion == null ? null : suggestion.getStatus(), "PENDING");
     if ("DONE".equalsIgnoreCase(status) || "RESOLVED".equalsIgnoreCase(status)) {
       return "机构已处理完成，感谢您的反馈。";
