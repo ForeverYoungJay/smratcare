@@ -189,8 +189,21 @@ function getSchedule() {
   return schedule;
 }
 
+// 与后端 AttendanceServiceImpl.resolveNextPunchAction 保持一致：由今日状态推导下一步打卡动作。
+function nextPunchByStatus(status) {
+  if (status === 'NOT_CHECKED_IN') return { nextPunchAction: 'IN', nextPunchActionLabel: '上班打卡' };
+  if (status === 'ON_DUTY') return { nextPunchAction: 'OUT', nextPunchActionLabel: '下班打卡' };
+  if (status === 'LUNCH_BREAK') return { nextPunchAction: 'END_LUNCH', nextPunchActionLabel: '结束午休' };
+  if (status === 'OUTING') return { nextPunchAction: 'END_OUTING', nextPunchActionLabel: '外出结束' };
+  return { nextPunchAction: '', nextPunchActionLabel: '' };
+}
+
 function getAttendanceOverview(month = '') {
-  return { ...attendanceState, month: month || attendanceState.month };
+  return {
+    ...attendanceState,
+    ...nextPunchByStatus(attendanceState.todayStatus),
+    month: month || attendanceState.month
+  };
 }
 
 function punchAttendance(action) {

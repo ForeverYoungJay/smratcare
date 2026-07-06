@@ -3,6 +3,13 @@ const {
   submitStaffVitalRecord
 } = require('../../../services/staff');
 const { enqueue, isNetworkError } = require('../../../utils/offline-queue');
+const { saveDraft, loadDraft, clearDraft } = require('../../../utils/form-draft');
+
+const DRAFT_PAGE_KEY = 'staff-vitals';
+const DRAFT_FIELDS = [
+  'elderName', 'dataTypeIndex', 'dataValue', 'measuredAt',
+  'measuredDate', 'measuredTime', 'remark', 'abnormalFlag'
+];
 
 const dataTypeOptions = [
   { label: '血压 BP', value: 'BP', unit: 'mmHg', placeholder: '例如 120/80' },
@@ -111,16 +118,53 @@ Page({
     measuredAt: nowText(),
     measuredDate: nowText().slice(0, 10),
     measuredTime: nowText().slice(11, 16),
+    today: nowText().slice(0, 10),
     remark: '',
     abnormalFlag: 0,
     unit: dataTypeOptions[0].unit,
     placeholder: dataTypeOptions[0].placeholder
   },
+  onLoad() {
+    this.restoreFormDraft();
+  },
   onShow() {
     getApp().ensureLogin();
     this.loadData();
   },
-  async loadData() {
+  onPullDownRefresh() {
+    this.loadData(true);
+  },
+  onHide() {
+    this.saveFormDraft();
+  },
+  onUnload() {
+    this.saveFormDraft();
+  },
+  hasFormContent() {
+    return !!(this.data.elderName.trim() || this.data.dataValue.trim() || this.data.remark.trim());
+  },
+  saveFormDraft() {
+    if (!this.hasFormContent()) return;
+    const draft = {};
+    DRAFT_FIELDS.forEach((field) => { draft[field] = this.data[field]; });
+    saveDraft(DRAFT_PAGE_KEY, 'default', draft);
+  },
+  restoreFormDraft() {
+    if (this._draftRestored) return;
+    this._draftRestored = true;
+    const draft = loadDraft(DRAFT_PAGE_KEY, 'default');
+    if (!draft) return;
+    const patch = {};
+    DRAFT_FIELDS.forEach((field) => {
+      if (draft[field] !== undefined) patch[field] = draft[field];
+    });
+    const meta = this.data.dataTypeOptions[patch.dataTypeIndex || 0] || this.data.dataTypeOptions[0];
+    patch.unit = meta.unit;
+    patch.placeholder = meta.placeholder;
+    this.setData(patch);
+    wx.showToast({ title: '已恢复未提交草稿', icon: 'none' });
+  },
+  async loadData(fromPullDown = false) {
     this.setData({ loading: true, loadError: '' });
     try {
       const records = await getStaffVitalRecords({
@@ -133,6 +177,7 @@ Page({
       this.setData({ loadError: error.message || '体征记录加载失败' });
     } finally {
       this.setData({ loading: false });
+      if (fromPullDown) wx.stopPullDownRefresh();
     }
   },
   onInput(e) {
@@ -199,7 +244,12 @@ Page({
   validateForm() {
     if (!this.data.elderName.trim()) return '请填写老人姓名';
     const dataType = this.data.dataTypeOptions[this.data.dataTypeIndex].value;
-    return validateDataValue(dataType, this.data.dataValue);
+    const valueError = validateDataValue(dataType, this.data.dataValue);
+    if (valueError) return valueError;
+    if (normalizeMeasuredAt(this.data.measuredAt) > normalizeMeasuredAt(nowText())) {
+      return '采集时间不能晚于当前时间';
+    }
+    return '';
   },
   async submitRecord() {
     if (this.data.submitting) return;
@@ -224,6 +274,7 @@ Page({
         source: 'staff-mobile'
       };
       await submitStaffVitalRecord(payload);
+      clearDraft(DRAFT_PAGE_KEY, 'default');
       const timestamp = nowText();
       wx.showToast({ title: '体征已补录', icon: 'success' });
       this.setData({
@@ -251,6 +302,7 @@ Page({
           remark: this.data.remark.trim(),
           source: 'staff-mobile'
         });
+        clearDraft(DRAFT_PAGE_KEY, 'default');
         const timestamp = nowText();
         this.setData({
           dataValue: '',

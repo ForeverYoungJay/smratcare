@@ -17,6 +17,7 @@ import com.zhiyangyun.care.crm.model.ContractSystemLinkageSummary;
 import com.zhiyangyun.care.crm.service.ContractSignedLinkageService;
 import com.zhiyangyun.care.crm.service.CrmContractService;
 import com.zhiyangyun.care.crm.service.CrmTraceService;
+import com.zhiyangyun.care.common.web.PageGuard;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderAdmission;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
 import java.time.LocalDate;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -113,6 +115,7 @@ public class CrmContractServiceImpl implements CrmContractService {
         if (!isContractNoDuplicate(ex) || (requestedNo != null && !requestedNo.isBlank()) || attempt >= 5) {
           throw ex;
         }
+        backoffBeforeRetry(attempt);
       }
     }
     throw new IllegalStateException("合同编号生成失败，请重试");
@@ -178,6 +181,8 @@ public class CrmContractServiceImpl implements CrmContractService {
       Boolean overdueOnly,
       Boolean sortByOverdue,
       String currentOwnerDept) {
+    pageNo = PageGuard.pageNo(pageNo);
+    pageSize = PageGuard.pageSize(pageSize);
     var wrapper = Wrappers.lambdaQuery(CrmContract.class)
         .eq(CrmContract::getTenantId, tenantId)
         .eq(CrmContract::getIsDeleted, 0);
@@ -928,6 +933,19 @@ public class CrmContractServiceImpl implements CrmContractService {
       return isContractNoDuplicate(cause);
     }
     return false;
+  }
+
+  /**
+   * 采番冲突后的退避重试：随重试次数递增并叠加抖动，避免高并发下多个请求同拍重试造成的"惊群"与持续冲突。
+   */
+  private void backoffBeforeRetry(int attempt) {
+    long base = 10L * (attempt + 1);
+    long jitter = ThreadLocalRandom.current().nextLong(0, 15L);
+    try {
+      Thread.sleep(base + jitter);
+    } catch (InterruptedException ignored) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   private String resolveStatus(CrmContract contract) {

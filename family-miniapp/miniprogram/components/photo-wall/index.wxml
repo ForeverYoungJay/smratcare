@@ -1,0 +1,12 @@
+<view class="photo-wall">
+  <block wx:for="{{photos}}" wx:key="*this">
+    <view class="pw-item">
+      <image class="pw-img" mode="aspectFill" src="{{item}}" data-url="{{item}}" bindtap="previewPhoto" />
+      <view wx:if="{{!readonly}}" class="pw-del" catchtap="removePhoto" data-index="{{index}}">×</view>
+    </view>
+  </block>
+  <view wx:if="{{!readonly && photos.length < max}}" class="pw-add" hover-class="pw-add-hover" bindtap="choosePhoto">
+    <text class="pw-add-icon">＋</text>
+    <text class="pw-add-text">拍照留痕</text>
+  </view>
+</view>

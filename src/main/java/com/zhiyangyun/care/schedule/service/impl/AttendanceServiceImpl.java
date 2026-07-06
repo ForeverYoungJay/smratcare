@@ -243,6 +243,12 @@ public class AttendanceServiceImpl implements AttendanceService {
     TodayStatus todayStatus = resolveTodayStatus(targetStaffId, orgId);
     response.setTodayStatus(todayStatus.code());
     response.setTodayStatusLabel(todayStatus.label());
+    // 仅当查询的是本人考勤时提供“下一步打卡”建议，避免管理者查看他人时误操作。
+    if (currentStaffId != null && currentStaffId.equals(targetStaffId)) {
+      PunchSuggestion suggestion = resolveNextPunchAction(todayStatus.code());
+      response.setNextPunchAction(suggestion.action());
+      response.setNextPunchActionLabel(suggestion.label());
+    }
     response.setDays(days);
     return response;
   }
@@ -818,6 +824,28 @@ public class AttendanceServiceImpl implements AttendanceService {
     }
     return new TodayStatus("NOT_CHECKED_IN", "未打卡");
   }
+
+  // 根据今日考勤状态推导员工端工作台一键打卡应展示的下一步动作。
+  private PunchSuggestion resolveNextPunchAction(String todayStatusCode) {
+    if (todayStatusCode == null) {
+      return new PunchSuggestion(null, null);
+    }
+    switch (todayStatusCode) {
+      case "NOT_CHECKED_IN":
+        return new PunchSuggestion("IN", "上班打卡");
+      case "ON_DUTY":
+        return new PunchSuggestion("OUT", "下班打卡");
+      case "LUNCH_BREAK":
+        return new PunchSuggestion("END_LUNCH", "结束午休");
+      case "OUTING":
+        return new PunchSuggestion("END_OUTING", "外出结束");
+      default:
+        // OFF_DUTY / ON_LEAVE 等状态无需继续打卡。
+        return new PunchSuggestion(null, null);
+    }
+  }
+
+  private record PunchSuggestion(String action, String label) {}
 
   private record SeasonalWorkWindow(
       String seasonType,

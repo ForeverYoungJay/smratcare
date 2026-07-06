@@ -87,7 +87,14 @@ Page({
     actionTaken: '',
     remark: '',
     scanText: '',
-    photos: []
+    photos: [],
+    inspectionReady: false
+  },
+  refreshInspectionReady() {
+    if (this.data.mode !== 'INSPECTION') return;
+    const ready = !!(this.data.visited && this.data.vitalsChecked && this.data.synced
+      && this.data.vitalsSummary.trim() && this.data.actionTaken.trim());
+    if (ready !== this.data.inspectionReady) this.setData({ inspectionReady: ready });
   },
   onLoad(options = {}) {
     const mode = options.mode === 'INSPECTION' ? 'INSPECTION' : 'MEDICATION';
@@ -178,6 +185,7 @@ Page({
       patch.medAllChecked = restored.every((item) => item.checked);
     }
     this.setData(patch);
+    this.refreshInspectionReady();
     wx.showToast({ title: '已恢复未提交草稿', icon: 'none' });
   },
   switchMode(e) {
@@ -227,6 +235,7 @@ Page({
       remark: '',
       scanText: '',
       photos: [],
+      inspectionReady: false,
       submitError: '',
       submitSuccess: ''
     });
@@ -251,6 +260,7 @@ Page({
       submitError: '',
       submitSuccess: ''
     });
+    this.refreshInspectionReady();
     this.scheduleDraftSave();
   },
   onMedicationResultChange(e) {
@@ -275,6 +285,7 @@ Page({
       submitError: '',
       submitSuccess: ''
     });
+    this.refreshInspectionReady();
     this.scheduleDraftSave();
   },
   scanCode() {
@@ -289,18 +300,11 @@ Page({
       }
     });
   },
-  choosePhoto() {
-    wx.chooseImage({
-      count: 4,
-      sizeType: ['compressed'],
-      sourceType: ['camera', 'album'],
-      success: (res) => {
-        this.setData({
-          photos: this.data.photos.concat(res.tempFilePaths || []).slice(0, 8),
-          submitError: '',
-          submitSuccess: ''
-        });
-      }
+  onPhotosChange(e) {
+    this.setData({
+      photos: (e.detail && e.detail.photos) || [],
+      submitError: '',
+      submitSuccess: ''
     });
   },
   validateMedication() {

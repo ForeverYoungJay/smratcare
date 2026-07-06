@@ -3,7 +3,8 @@ const {
   getTaskList,
   getAttendanceOverview,
   getStaffTodoSummary,
-  getIncidents
+  getIncidents,
+  punchAttendance
 } = require('../../../services/staff');
 const { requestSubscribeOncePerDay } = require('../../../utils/subscribe');
 
@@ -151,6 +152,15 @@ function routeForTask(task = {}) {
   return task.id ? `/packageStaff/pages/staff-task-detail/index?id=${encodeURIComponent(task.id)}` : '/packageStaff/pages/staff-tasks/index';
 }
 
+function greetingText() {
+  const hour = new Date().getHours();
+  if (hour < 6) return '夜班辛苦';
+  if (hour < 11) return '早上好';
+  if (hour < 14) return '中午好';
+  if (hour < 18) return '下午好';
+  return '晚上好';
+}
+
 function attendanceText(status) {
   if (status === 'ON_DUTY') return '在岗';
   if (status === 'OFF_DUTY') return '已下班';
@@ -175,6 +185,8 @@ function buildBattle(dashboard = {}, tasks = [], attendance = {}, todoSummary = 
     shiftText: dashboard.shiftName || '今日班次待确认',
     attendanceText: attendance.todayStatusLabel || attendanceText(attendance.todayStatus),
     attendanceRoute: '/packageStaff/pages/staff-schedule/index',
+    nextPunchAction: attendance.nextPunchAction || '',
+    nextPunchActionLabel: attendance.nextPunchActionLabel || '',
     openTodoCount: todoSummary.openCount || 0,
     dueTodayCount: todoSummary.dueTodayCount || 0,
     overdueCount: todoSummary.overdueCount || 0,
@@ -191,6 +203,8 @@ Page({
   data: {
     loading: false,
     loadError: '',
+    punching: false,
+    greeting: greetingText(),
     dashboard: {
       generatedAt: '',
       staffName: '',
@@ -206,6 +220,8 @@ Page({
       shiftText: '今日班次待确认',
       attendanceText: '未打卡',
       attendanceRoute: '/packageStaff/pages/staff-schedule/index',
+      nextPunchAction: '',
+      nextPunchActionLabel: '',
       openTodoCount: 0,
       dueTodayCount: 0,
       overdueCount: 0,
@@ -225,6 +241,7 @@ Page({
   },
   onShow() {
     getApp().ensureLogin();
+    this.setData({ greeting: greetingText() });
     // 首页每天最多自动请求一次订阅授权；模板 ID 未配置时静默跳过，失败不阻塞业务。
     requestSubscribeOncePerDay(['taskOverdue', 'noticePublish']);
   },
@@ -263,5 +280,26 @@ Page({
   goPage(e) {
     const path = e.currentTarget.dataset.path;
     if (path) wx.navigateTo({ url: path });
+  },
+  // 工作台一键打卡：直接使用后端建议的下一步动作，打卡后刷新在岗状态，无需跳转到排班页。
+  async punch(e) {
+    if (this.data.punching) return;
+    const action = (e.currentTarget.dataset.action || '').trim();
+    if (!action) return;
+    this.setData({ punching: true });
+    try {
+      await punchAttendance(action);
+      wx.showToast({ title: '打卡成功', icon: 'success' });
+      const attendance = await getAttendanceOverview();
+      this.setData({
+        'battle.attendanceText': attendance.todayStatusLabel || attendanceText(attendance.todayStatus),
+        'battle.nextPunchAction': attendance.nextPunchAction || '',
+        'battle.nextPunchActionLabel': attendance.nextPunchActionLabel || ''
+      });
+    } catch (error) {
+      wx.showToast({ title: error.message || '打卡失败，请稍后重试', icon: 'none' });
+    } finally {
+      this.setData({ punching: false });
+    }
   }
 });

@@ -190,6 +190,28 @@
   line-height: 1.3;
 }
 
+/* 工作台一键打卡按钮：紧凑贴合在岗状态卡片，避免跳转排班页 */
+.punch-btn {
+  margin-top: 14rpx;
+  min-height: 56rpx;
+  line-height: 56rpx;
+  padding: 0 20rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #21705F, #2E8A72);
+  color: #ffffff;
+  font-size: 22rpx;
+  font-weight: 800;
+}
+
+.punch-btn::after {
+  border: none;
+}
+
+.punch-btn[disabled] {
+  opacity: 0.6;
+  color: #ffffff;
+}
+
 /* 现场压力指数 */
 .index-card {
   margin-top: 18rpx;

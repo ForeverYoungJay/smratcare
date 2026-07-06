@@ -7,6 +7,7 @@ import com.zhiyangyun.care.audit.service.AuditLogService;
 import com.zhiyangyun.care.auth.entity.StaffAccount;
 import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.common.web.PageGuard;
 import com.zhiyangyun.care.crm.entity.CrmContract;
 import com.zhiyangyun.care.crm.entity.CrmCallbackPlan;
 import com.zhiyangyun.care.crm.entity.CrmLead;
@@ -197,6 +198,8 @@ public class CrmLeadServiceImpl implements CrmLeadService {
                                      String infoSource, String marketerName, String followupStatus, String reservationChannel,
                                      String contractNo, String contractStatus, String flowStage, String currentOwnerDept, String mode, String callbackType,
                                      String followupDateFrom, String followupDateTo, Boolean followupDueOnly) {
+    pageNo = PageGuard.pageNo(pageNo);
+    pageSize = PageGuard.pageSize(pageSize);
     String normalizedMode = normalizeLeadMode(mode);
     var wrapper = Wrappers.lambdaQuery(CrmLead.class)
         .eq(CrmLead::getIsDeleted, 0)

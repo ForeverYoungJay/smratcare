@@ -1,8 +1,8 @@
 <view class="container">
   <view class="home-head">
     <view>
-      <view class="section-title">员工工作台</view>
-      <view class="section-subtitle">{{dashboard.staffName}} · {{dashboard.shiftName}}</view>
+      <view class="section-title">{{greeting}}，{{dashboard.staffName}}</view>
+      <view class="section-subtitle">{{dashboard.roleText}} · {{dashboard.shiftName}}</view>
     </view>
     <text class="pill {{levelClass}}">{{levelText}}</text>
   </view>
@@ -33,6 +33,13 @@
           <text>在岗状态</text>
           <view class="battle-value">{{battle.attendanceText}}</view>
           <view class="battle-note">{{battle.shiftText}}</view>
+          <button
+            wx:if="{{battle.nextPunchAction}}"
+            class="punch-btn"
+            loading="{{punching}}"
+            disabled="{{punching}}"
+            data-action="{{battle.nextPunchAction}}"
+            catchtap="punch">{{battle.nextPunchActionLabel}}</button>
         </view>
         <view class="battle-cell" data-path="/packageStaff/pages/staff-todo/index" bindtap="goPage">
           <text>待办</text>

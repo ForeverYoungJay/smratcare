@@ -82,7 +82,8 @@
     }
   },
   "usingComponents": {
-    "state-view": "/components/state-view/index"
+    "state-view": "/components/state-view/index",
+    "photo-wall": "/components/photo-wall/index"
   },
   "window": {
     "navigationBarTitleText": "智养云",

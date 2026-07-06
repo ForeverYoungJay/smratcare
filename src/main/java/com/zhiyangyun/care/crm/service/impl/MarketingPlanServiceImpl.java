@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhiyangyun.care.auth.entity.Department;
+import com.zhiyangyun.care.common.web.PageGuard;
 import com.zhiyangyun.care.auth.entity.StaffAccount;
 import com.zhiyangyun.care.auth.mapper.DepartmentMapper;
 import com.zhiyangyun.care.auth.mapper.StaffMapper;
@@ -88,7 +89,7 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
       String moduleType,
       String status,
       String keyword) {
-    Page<CrmMarketingPlan> page = new Page<>(pageNo, pageSize);
+    Page<CrmMarketingPlan> page = new Page<>(PageGuard.pageNo(pageNo), PageGuard.pageSize(pageSize));
     LambdaQueryWrapper<CrmMarketingPlan> query = baseQuery(orgId)
         .eq(StringUtils.hasText(moduleType), CrmMarketingPlan::getModuleType, normalizeModuleType(moduleType))
         .eq(StringUtils.hasText(status), CrmMarketingPlan::getStatus, normalizeStatus(status))

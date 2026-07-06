@@ -27,10 +27,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/crm/contracts")
 public class CrmContractController {
+  // 合同含长者身份证/联系方式等个人隐私。READ 仅开放给业务确有需要的角色：
+  //   - 营销：合同责任方；财务：结算对账；
+  //   - 医护/护理：入住办理与评估联动需查看关联合同（见 elder/assessment 前端）；
+  //   - 主任/管理员：管理与稽核。
+  // 与合同无关的 HR、后勤及泛化 STAFF 一律不再授予，避免隐私越权。
   private static final String CRM_CONTRACT_READ =
-      "hasAnyRole('STAFF','HR_EMPLOYEE','HR_MINISTER','MEDICAL_EMPLOYEE','MEDICAL_MINISTER',"
+      "hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER',"
           + "'NURSING_EMPLOYEE','NURSING_MINISTER','FINANCE_EMPLOYEE','FINANCE_MINISTER',"
-          + "'LOGISTICS_EMPLOYEE','LOGISTICS_MINISTER','MARKETING_EMPLOYEE','MARKETING_MINISTER',"
+          + "'MARKETING_EMPLOYEE','MARKETING_MINISTER',"
           + "'DIRECTOR','SYS_ADMIN','ADMIN')";
   private static final String CRM_CONTRACT_WRITE =
       "hasAnyRole('MARKETING_EMPLOYEE','MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')";

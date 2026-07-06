@@ -7,26 +7,19 @@
     <view class="mode-tab {{mode === 'INSPECTION' ? 'active' : ''}}" data-mode="INSPECTION" bindtap="switchMode">巡检复核</view>
   </view>
 
-  <view class="surface state-card" wx:if="{{loading}}">
-    <view class="state-title">正在加载{{config.moduleText}}任务</view>
-  </view>
-
-  <view class="surface state-card" wx:if="{{!loading && loadError}}">
-    <view class="state-title">任务加载失败</view>
-    <view class="section-subtitle">{{loadError}}</view>
-    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
-  </view>
-
-  <view class="surface empty-card" wx:if="{{!loading && !loadError && tasks.length === 0}}">
-    <view class="state-title">{{config.emptyText}}</view>
-    <view class="section-subtitle">任务生成后会出现在这里。</view>
-  </view>
+  <state-view
+    loading="{{loading}}"
+    error="{{loadError}}"
+    empty="{{!loading && !loadError && tasks.length === 0}}"
+    empty-text="{{config.emptyText}}"
+    empty-hint="任务生成后会出现在这里。"
+    bind:retry="loadData" />
 
   <view wx:if="{{!loading && !loadError && tasks.length}}">
     <view class="surface task-card">
       <view class="panel-title">{{config.moduleText}}任务</view>
       <block wx:for="{{tasks}}" wx:key="id">
-        <view class="clinical-row {{activeTaskId === item.id ? 'active' : ''}}" data-id="{{item.id}}" bindtap="selectTask">
+        <view class="clinical-row {{activeTaskId === item.id ? 'active' : ''}}" hover-class="clinical-row-hover" data-id="{{item.id}}" bindtap="selectTask">
           <view>
             <view class="clinical-title">{{item.title}}</view>
             <view class="clinical-meta">{{item.metaText}}</view>
@@ -87,16 +80,9 @@
         </view>
       </view>
 
-      <view class="tool-row">
-        <button class="tool-btn" bindtap="scanCode">扫码核验</button>
-        <button class="tool-btn" bindtap="choosePhoto">拍照留痕</button>
-      </view>
+      <button class="tool-btn tool-btn-full" hover-class="tool-btn-hover" bindtap="scanCode">扫码核验</button>
       <view class="scan-text" wx:if="{{scanText}}">扫码结果：{{scanText}}</view>
-      <view class="photo-grid" wx:if="{{photos.length}}">
-        <block wx:for="{{photos}}" wx:key="*this">
-          <image class="photo" mode="aspectFill" src="{{item}}" />
-        </block>
-      </view>
+      <photo-wall photos="{{photos}}" max="8" bind:change="onPhotosChange" />
 
       <view wx:if="{{mode === 'MEDICATION'}}">
         <view class="field-grid">
@@ -148,7 +134,7 @@
         <view class="field-label">补充备注</view>
         <textarea class="textarea-line small" value="{{remark}}" data-field="remark" bindinput="onInput" maxlength="500" placeholder="填写需要交接给下一班或主管的说明" />
       </view>
-      <button class="primary-btn submit-btn {{mode === 'MEDICATION' && !medAllChecked ? 'disabled' : ''}}" loading="{{submitting}}" bindtap="submitClinical">提交{{config.moduleText}}回执</button>
+      <button class="primary-btn submit-btn {{(mode === 'MEDICATION' && !medAllChecked) || (mode === 'INSPECTION' && !inspectionReady) ? 'disabled' : ''}}" loading="{{submitting}}" bindtap="submitClinical">提交{{config.moduleText}}回执</button>
     </view>
   </view>
 </view>
