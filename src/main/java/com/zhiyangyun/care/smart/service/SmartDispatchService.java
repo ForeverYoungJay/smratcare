@@ -1,6 +1,7 @@
 package com.zhiyangyun.care.smart.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.zhiyangyun.care.smart.entity.SmartAlert;
 import com.zhiyangyun.care.smart.entity.SmartAlertDispatch;
 import com.zhiyangyun.care.smart.model.SmartDispatchActionRequest;
 
@@ -9,6 +10,9 @@ public interface SmartDispatchService {
 
   /** 为开放的高危告警自动创建派单（供定时任务调用），返回新建条数。 */
   int autoDispatchOpenAlerts();
+
+  /** 为单条告警立即创建派单（供事件接入调用），自动指派当班护理员；已存在派单时返回已有记录。 */
+  SmartAlertDispatch createForAlert(SmartAlert alert, Long ruleId);
 
   /** 受理并指派处置人。 */
   SmartAlertDispatch assign(SmartDispatchActionRequest request);

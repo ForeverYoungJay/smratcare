@@ -17,12 +17,14 @@ import {
 } from '@ant-design/icons-vue'
 import type { MenuItem } from './menu'
 
-export type NavSectionKey = 'core' | 'operations' | 'assurance' | 'system'
+export type NavSectionKey = 'entry' | 'care' | 'operations' | 'compliance' | 'support' | 'system'
 
 export const NAV_SECTION_LABELS: Record<NavSectionKey, string> = {
-  core: '核心业务',
+  entry: '工作入口',
+  care: '长者服务',
   operations: '经营运营',
-  assurance: '机构保障',
+  compliance: '安全与监管',
+  support: '行政后勤',
   system: '系统配置'
 }
 
@@ -33,19 +35,19 @@ type NavMeta = {
 }
 
 export const routeNavMeta: Record<string, NavMeta> = {
-  '/portal': { section: 'core', order: 10, pinned: true },
-  '/function-map': { section: 'core', order: 15, pinned: true },
-  '/workbench': { section: 'core', order: 20, pinned: true },
-  '/elder': { section: 'core', order: 30, pinned: true },
-  '/medical-care': { section: 'core', order: 40, pinned: true },
+  '/portal': { section: 'entry', order: 10, pinned: true },
+  '/function-map': { section: 'entry', order: 15, pinned: true },
+  '/workbench': { section: 'entry', order: 20, pinned: true },
+  '/elder': { section: 'care', order: 30, pinned: true },
+  '/medical-care': { section: 'care', order: 40, pinned: true },
   '/marketing': { section: 'operations', order: 50, pinned: true },
   '/finance': { section: 'operations', order: 60, pinned: true },
   '/stats': { section: 'operations', order: 70, pinned: true },
-  '/ltci': { section: 'operations', order: 75, pinned: true },
-  '/logistics': { section: 'assurance', order: 80, pinned: true },
-  '/fire': { section: 'assurance', order: 90, pinned: true },
-  '/oa': { section: 'assurance', order: 100, pinned: true },
-  '/hr': { section: 'assurance', order: 110, pinned: true },
+  '/fire': { section: 'compliance', order: 80, pinned: true },
+  '/ltci': { section: 'compliance', order: 85, pinned: true },
+  '/logistics': { section: 'support', order: 90, pinned: true },
+  '/oa': { section: 'support', order: 100, pinned: true },
+  '/hr': { section: 'support', order: 110, pinned: true },
   '/base-config': { section: 'system', order: 120, pinned: true },
   '/system': { section: 'system', order: 130, pinned: true }
 }
@@ -96,13 +98,13 @@ export function buildGroupedMenuItems(items: MenuItem[]): ItemType[] {
   ;(Object.keys(NAV_SECTION_LABELS) as NavSectionKey[]).forEach((key) => grouped.set(key, []))
 
   const sortedItems = [...items].sort((left, right) => {
-    const leftMeta = routeNavMeta[normalizeMenuPath(left)] || { section: 'assurance' as NavSectionKey, order: 999 }
-    const rightMeta = routeNavMeta[normalizeMenuPath(right)] || { section: 'assurance' as NavSectionKey, order: 999 }
+    const leftMeta = routeNavMeta[normalizeMenuPath(left)] || { section: 'support' as NavSectionKey, order: 999 }
+    const rightMeta = routeNavMeta[normalizeMenuPath(right)] || { section: 'support' as NavSectionKey, order: 999 }
     return leftMeta.order - rightMeta.order
   })
 
   sortedItems.forEach((item) => {
-    const meta = routeNavMeta[normalizeMenuPath(item)] || { section: 'assurance' as NavSectionKey, order: 999 }
+    const meta = routeNavMeta[normalizeMenuPath(item)] || { section: 'support' as NavSectionKey, order: 999 }
     grouped.get(meta.section)?.push(item)
   })
 

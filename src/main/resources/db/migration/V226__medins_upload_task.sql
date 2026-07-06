@@ -1,0 +1,25 @@
+-- 医保上报任务（报文快照 + 回执内容 + 失败重试计数，模式对齐 gov_report_task）
+CREATE TABLE IF NOT EXISTS medins_upload_task (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NULL,
+  org_id BIGINT NOT NULL,
+  sheet_id BIGINT NOT NULL,
+  channel VARCHAR(32) NOT NULL,
+  biz_type VARCHAR(32) NOT NULL DEFAULT 'SETTLE_SHEET',
+  task_status VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+  payload_json JSON NULL,
+  payload_hash VARCHAR(80) NULL,
+  receipt_code VARCHAR(80) NULL,
+  receipt_json JSON NULL,
+  last_error VARCHAR(1000) NULL,
+  retry_count INT NOT NULL DEFAULT 0,
+  sent_at DATETIME NULL,
+  acked_at DATETIME NULL,
+  created_by BIGINT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0,
+  KEY idx_medins_task_sheet (sheet_id, task_status),
+  KEY idx_medins_task_org (org_id, channel, task_status),
+  KEY idx_medins_task_retry (task_status, retry_count)
+);

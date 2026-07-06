@@ -26,6 +26,11 @@ public class SmartDevice {
   private String onlineStatus;
   private LocalDateTime lastHeartbeatAt;
   private LocalDateTime lastEventAt;
+  /** 电量百分比 0-100。 */
+  private Integer batteryLevel;
+  /** 信号强度 0-100。 */
+  private Integer signalStrength;
+  private String firmwareVersion;
   private Integer enabled;
   private String remark;
   private Long createdBy;

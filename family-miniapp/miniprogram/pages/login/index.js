@@ -1,5 +1,6 @@
 const {
   familyLogin,
+  familyWechatLogin,
   registerFamily,
   resetFamilyPassword,
   sendFamilySmsCode,
@@ -20,6 +21,7 @@ Page({
   data: {
     loadingBootstrap: false,
     loading: false,
+    wechatLoading: false,
     sendingCode: false,
     countdown: 0,
     debugCodeHint: '',
@@ -70,7 +72,7 @@ Page({
       return;
     }
     if (app.globalData.token) {
-      wx.reLaunch({ url: app.globalData.userType === 'staff' ? '/pages/staff-home/index' : '/pages/home/index' });
+      wx.reLaunch({ url: app.globalData.userType === 'staff' ? '/packageStaff/pages/staff-home/index' : '/pages/home/index' });
       return;
     }
     if (app.globalData.localDevBypassLogin && app.isLocalDevEnvironment()) {
@@ -295,6 +297,71 @@ Page({
       this.setData({ loading: false });
     }
   },
+  wxLoginCode() {
+    return new Promise((resolve) => {
+      if (typeof wx.login !== 'function') {
+        resolve('');
+        return;
+      }
+      wx.login({
+        success: (res) => resolve((res && res.code) ? String(res.code).trim() : ''),
+        fail: () => resolve('')
+      });
+    });
+  },
+  async onWechatLogin(e) {
+    if (!getApp().assertRuntimeReady()) {
+      return;
+    }
+    if (this.data.wechatLoading || this.data.loading) {
+      return;
+    }
+    const detail = (e && e.detail) || {};
+    const phoneCode = detail.code ? String(detail.code).trim() : '';
+    if (!phoneCode) {
+      const errMsg = String(detail.errMsg || '').toLowerCase();
+      if (errMsg.indexOf('deny') === -1 && errMsg.indexOf('cancel') === -1) {
+        wx.showToast({ title: '未获取到微信手机号授权', icon: 'none' });
+      }
+      return;
+    }
+    this.setData({ wechatLoading: true });
+    try {
+      const loginCode = await this.wxLoginCode();
+      const loginResp = await familyWechatLogin({
+        orgId: Number(this.data.orgId) || 1,
+        phoneCode,
+        loginCode
+      });
+      if (!loginResp || !loginResp.token) {
+        throw new Error('登录响应缺少 token');
+      }
+      const app = getApp();
+      app.globalData.token = loginResp.token;
+      app.globalData.userType = 'family';
+      app.globalData.familyUser = {
+        userType: 'family',
+        familyUserId: loginResp.familyUserId,
+        orgId: loginResp.orgId || Number(this.data.orgId) || 1,
+        realName: loginResp.realName,
+        phone: loginResp.phone
+      };
+      app.globalData.staffUser = null;
+      app.globalData.selectedElderId = null;
+      setAuth(loginResp.token, app.globalData.familyUser);
+      app.ensureWechatNotifyBind(true);
+      if (loginResp.newAccount) {
+        wx.showToast({ title: '登录成功，请先绑定长者', icon: 'none' });
+        wx.reLaunch({ url: '/pages/bind/index' });
+      } else {
+        wx.reLaunch({ url: '/pages/home/index' });
+      }
+    } catch (error) {
+      wx.showToast({ title: error.message || '微信登录失败，请改用密码登录', icon: 'none' });
+    } finally {
+      this.setData({ wechatLoading: false });
+    }
+  },
   async submitStaffLogin() {
     const username = trimText(this.data.form.username);
     const password = trimText(this.data.form.staffPassword);
@@ -322,7 +389,7 @@ Page({
       app.globalData.familyUser = null;
       app.globalData.selectedElderId = null;
       setAuth(token, staffUser);
-      wx.reLaunch({ url: '/pages/staff-home/index' });
+      wx.reLaunch({ url: '/packageStaff/pages/staff-home/index' });
     } catch (error) {
       wx.showToast({ title: error.message || '员工登录失败', icon: 'none' });
     } finally {

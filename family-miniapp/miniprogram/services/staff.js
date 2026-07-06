@@ -625,20 +625,20 @@ async function submitPatrolScan(payload = {}) {
 }
 
 function routeForMetric(key) {
-  if (key === 'care') return '/pages/staff-care/index';
-  if (key === 'medication' || key === 'inspection') return '/pages/staff-medical/index';
-  if (key === 'maintenance' || key === 'meal' || key === 'cleaning') return '/pages/staff-logistics/index';
-  return '/pages/staff-tasks/index';
+  if (key === 'care') return '/packageStaff/pages/staff-care/index';
+  if (key === 'medication' || key === 'inspection') return '/packageStaff/pages/staff-medical/index';
+  if (key === 'maintenance' || key === 'meal' || key === 'cleaning') return '/packageStaff/pages/staff-logistics/index';
+  return '/packageStaff/pages/staff-tasks/index';
 }
 
 function routeForTask(task = {}) {
   const idParam = task.id ? `&id=${encodeURIComponent(task.id)}` : '';
-  if (task.module === 'CARE') return `/pages/staff-care-execution/index${task.id ? `?id=${encodeURIComponent(task.id)}` : ''}`;
-  if (task.module === 'MEDICATION') return `/pages/staff-clinical/index?mode=MEDICATION${idParam}`;
-  if (task.module === 'INSPECTION') return `/pages/staff-clinical/index?mode=INSPECTION${idParam}`;
-  if (task.module === 'LOGISTICS') return `/pages/staff-repairs/index${task.id ? `?id=${encodeURIComponent(task.id)}` : ''}`;
-  if (task.module === 'MEAL') return `/pages/staff-meals/index${task.id ? `?id=${encodeURIComponent(task.id)}` : ''}`;
-  return task.id ? `/pages/staff-task-detail/index?id=${encodeURIComponent(task.id)}` : '/pages/staff-tasks/index';
+  if (task.module === 'CARE') return `/packageStaff/pages/staff-care-execution/index${task.id ? `?id=${encodeURIComponent(task.id)}` : ''}`;
+  if (task.module === 'MEDICATION') return `/packageStaff/pages/staff-clinical/index?mode=MEDICATION${idParam}`;
+  if (task.module === 'INSPECTION') return `/packageStaff/pages/staff-clinical/index?mode=INSPECTION${idParam}`;
+  if (task.module === 'LOGISTICS') return `/packageStaff/pages/staff-repairs/index${task.id ? `?id=${encodeURIComponent(task.id)}` : ''}`;
+  if (task.module === 'MEAL') return `/packageStaff/pages/staff-meals/index${task.id ? `?id=${encodeURIComponent(task.id)}` : ''}`;
+  return task.id ? `/packageStaff/pages/staff-task-detail/index?id=${encodeURIComponent(task.id)}` : '/packageStaff/pages/staff-tasks/index';
 }
 
 function normalizeStaffTask(task = {}) {

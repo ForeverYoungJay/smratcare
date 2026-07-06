@@ -21,6 +21,7 @@ public class SmartAlertRuleRequest {
   private Integer durationSec;
   private String level;
   private String disabilityLevelScope;
+  private String careLevelScope;
   private Integer autoDispatch;
   private Integer notifyFamily;
   private Integer priority;

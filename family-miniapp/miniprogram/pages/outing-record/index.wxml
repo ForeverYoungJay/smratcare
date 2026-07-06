@@ -1,16 +1,71 @@
 <view class="container">
-  <view class="surface card">
-    <view class="section-title">外出记录</view>
-    <block wx:for="{{list}}" wx:key="id">
-      <view class="item">
-        <view class="line"><text class="label">老人</text><text class="value">{{item.elderName}}</text></view>
-        <view class="line"><text class="label">外出时间</text><text class="value">{{item.startTime}}</text></view>
-        <view class="line"><text class="label">外出原因</text><text class="value">{{item.reason}}</text></view>
-        <view class="line"><text class="label">陪同人员</text><text class="value">{{item.companion}}</text></view>
-        <view class="line"><text class="label">外出地点</text><text class="value">{{item.destination}}</text></view>
-        <view class="line"><text class="label">返回时间</text><text class="value">{{item.returnTime}}</text></view>
-        <view class="line"><text class="label">状态</text><text class="status">{{item.status}}</text></view>
+  <view class="page-head">
+    <view class="head-row">
+      <view>
+        <view class="section-title">外出记录</view>
+        <view class="section-subtitle">查看外出行程并可在线发起外出申请</view>
       </view>
-    </block>
+      <button class="apply-btn" bindtap="toggleForm">{{showForm ? '收起' : '发起申请'}}</button>
+    </view>
   </view>
+
+  <view class="form-card surface" wx:if="{{showForm}}">
+    <view class="form-title">发起外出申请</view>
+    <view class="field">
+      <text class="field-label">外出日期</text>
+      <picker mode="date" value="{{form.outingDate}}" bindchange="onOutingDate">
+        <view class="picker">{{form.outingDate || '请选择外出日期'}}</view>
+      </picker>
+    </view>
+    <view class="field">
+      <text class="field-label">外出事由</text>
+      <input class="input" value="{{form.reason}}" bindinput="onReasonInput" placeholder="如：回家探亲、复诊等" />
+    </view>
+    <view class="field">
+      <text class="field-label">外出目的地</text>
+      <input class="input" value="{{form.destination}}" bindinput="onDestinationInput" placeholder="选填" />
+    </view>
+    <view class="field">
+      <text class="field-label">陪同人员</text>
+      <input class="input" value="{{form.companion}}" bindinput="onCompanionInput" placeholder="选填" />
+    </view>
+    <view class="field">
+      <text class="field-label">预计归院</text>
+      <view class="picker-row">
+        <picker mode="date" value="{{form.returnDate}}" bindchange="onReturnDate">
+          <view class="picker">{{form.returnDate || '日期'}}</view>
+        </picker>
+        <picker mode="time" value="{{form.returnTime}}" bindchange="onReturnTime">
+          <view class="picker">{{form.returnTime || '时间'}}</view>
+        </picker>
+      </view>
+    </view>
+    <button class="primary-btn" loading="{{submitting}}" bindtap="submitApplication">提交申请</button>
+  </view>
+
+  <view class="state-card surface" wx:if="{{loadError}}">
+    <view class="state-title">加载失败</view>
+    <view class="muted">{{loadError}}</view>
+    <button class="ghost-btn state-btn" bindtap="retry">重新加载</button>
+  </view>
+
+  <view class="loading-tip" wx:elif="{{loading && list.length === 0}}">正在加载外出记录…</view>
+
+  <view class="list-empty" wx:elif="{{list.length === 0}}">暂无外出记录</view>
+
+  <block wx:else>
+    <view class="outing-card surface" wx:for="{{list}}" wx:key="id">
+      <view class="outing-top">
+        <view class="outing-title">{{item.elderName || '长者'}} · {{item.startTime || '外出'}}</view>
+        <view class="pill {{item.statusClass}}">{{item.applicationStatus || item.status || '记录'}}</view>
+      </view>
+      <view class="outing-line" wx:if="{{item.reason}}"><text class="k">事由</text><text class="v">{{item.reason}}</text></view>
+      <view class="outing-line" wx:if="{{item.destination}}"><text class="k">目的地</text><text class="v">{{item.destination}}</text></view>
+      <view class="outing-line" wx:if="{{item.companion}}"><text class="k">陪同</text><text class="v">{{item.companion}}</text></view>
+      <view class="outing-line" wx:if="{{item.returnTime}}"><text class="k">归院时间</text><text class="v">{{item.returnTime}}</text></view>
+      <view class="outing-foot" wx:if="{{item.canCancel}}">
+        <button class="cancel-btn" data-id="{{item.id}}" bindtap="cancelApplication">取消申请</button>
+      </view>
+    </view>
+  </block>
 </view>

@@ -1,0 +1,107 @@
+<view class="container">
+  <view class="home-head">
+    <view>
+      <view class="section-title">员工工作台</view>
+      <view class="section-subtitle">{{dashboard.staffName}} · {{dashboard.shiftName}}</view>
+    </view>
+    <text class="pill {{levelClass}}">{{levelText}}</text>
+  </view>
+
+  <state-view
+    loading="{{loading}}"
+    error="{{loadError}}"
+    skeleton-rows="{{5}}"
+    bind:retry="loadData" />
+
+  <view wx:if="{{!loading && !loadError}}">
+    <view class="surface warning-card" wx:if="{{partialWarning}}">
+      <view class="warning-title">部分数据暂未同步</view>
+      <view class="warning-text">{{partialWarning}}</view>
+    </view>
+
+    <view class="surface battle-card {{battle.riskTone}}">
+      <view class="battle-head">
+        <view>
+          <view class="battle-kicker">今日作战视图</view>
+          <view class="battle-title">{{battle.criticalTaskTitle}}</view>
+          <view class="battle-meta">{{battle.criticalTaskMeta}}</view>
+        </view>
+        <view class="battle-action" data-path="{{battle.criticalTaskRoute}}" bindtap="goPage">{{battle.actionHint}}</view>
+      </view>
+      <view class="battle-grid">
+        <view class="battle-cell" data-path="{{battle.attendanceRoute}}" bindtap="goPage">
+          <text>在岗状态</text>
+          <view class="battle-value">{{battle.attendanceText}}</view>
+          <view class="battle-note">{{battle.shiftText}}</view>
+        </view>
+        <view class="battle-cell" data-path="/packageStaff/pages/staff-todo/index" bindtap="goPage">
+          <text>待办</text>
+          <view class="battle-value">{{battle.openTodoCount}}</view>
+          <view class="battle-note">今日 {{battle.dueTodayCount}} · 超时 {{battle.overdueCount}}</view>
+        </view>
+        <view class="battle-cell" data-path="/packageStaff/pages/staff-incidents/index" bindtap="goPage">
+          <text>异常</text>
+          <view class="battle-value">{{battle.incidentOpenCount}}</view>
+          <view class="battle-note">待处理 / 跟进中</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="surface index-card">
+      <view class="index-main">
+        <text>现场压力指数</text>
+        <strong>{{dashboard.mobileIndex}}</strong>
+      </view>
+      <view class="notice-list">
+        <block wx:for="{{dashboard.notices}}" wx:key="*this">
+          <view class="notice-line">{{item}}</view>
+        </block>
+      </view>
+    </view>
+
+    <view class="task-grid">
+      <block wx:for="{{dashboard.taskGroups}}" wx:key="key">
+        <view class="surface task-tile" data-path="{{item.route}}" bindtap="goPage">
+          <text class="task-title">{{item.title}}</text>
+          <text class="task-count {{item.tone}}">{{item.count}}</text>
+          <text class="task-hint">待处理</text>
+        </view>
+      </block>
+    </view>
+
+    <view class="surface panel">
+      <view class="panel-head">
+        <text class="panel-title">常用工作</text>
+        <text class="section-subtitle">移动端现场闭环</text>
+      </view>
+      <view class="quick-grid">
+        <block wx:for="{{dashboard.quickEntries}}" wx:key="route">
+          <view class="quick-entry" data-path="{{item.route}}" bindtap="goPage">
+            <text class="quick-title">{{item.title}}</text>
+            <text class="quick-desc">{{item.desc}}</text>
+          </view>
+        </block>
+      </view>
+    </view>
+
+    <view class="surface panel">
+      <view class="panel-head">
+        <text class="panel-title">马上要处理</text>
+        <text class="link" data-path="/packageStaff/pages/staff-tasks/index" bindtap="goPage">全部待办</text>
+      </view>
+      <block wx:for="{{dashboard.tasks}}" wx:key="id">
+        <view class="task-row" data-path="{{item.route}}" bindtap="goPage">
+          <view class="task-row-main">
+            <text class="row-title">{{item.title}}</text>
+            <text class="row-meta">{{item.time}} · {{item.resident}} · {{item.room}}</text>
+          </view>
+          <text class="row-action">{{item.actionText}}</text>
+        </view>
+      </block>
+    </view>
+
+    <view class="staff-nav">
+      <button class="ghost-btn" data-path="/packageStaff/pages/staff-profile/index" bindtap="goPage">员工我的</button>
+    </view>
+  </view>
+</view>

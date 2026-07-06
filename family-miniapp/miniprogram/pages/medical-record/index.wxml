@@ -1,16 +1,38 @@
 <view class="container">
-  <view class="surface card">
+  <view class="page-head">
     <view class="section-title">就医记录</view>
-    <view class="list-empty" wx:if="{{records.length === 0}}">暂无就医记录或未完成访问验证</view>
-    <block wx:for="{{records}}" wx:key="id">
-      <view class="item">
-        <view class="line"><text class="label">就诊时间</text><text class="value">{{item.date}}</text></view>
-        <view class="line"><text class="label">医院/科室</text><text class="value">{{item.hospital}}</text></view>
-        <view class="line"><text class="label">就诊原因</text><text class="value">{{item.reason}}</text></view>
-        <view class="line"><text class="label">诊断结果</text><text class="value">{{item.diagnosis}}</text></view>
-        <view class="line"><text class="label">医生建议</text><text class="value">{{item.advice}}</text></view>
-        <view class="line"><text class="label">用药记录</text><text class="value">{{item.meds}}</text></view>
-      </view>
-    </block>
+    <view class="section-subtitle">长者历次就诊、诊断与用药记录，点击查看完整详情</view>
   </view>
+
+  <view class="state-card surface" wx:if="{{denied}}">
+    <view class="state-title">未完成访问验证</view>
+    <view class="muted">就医记录属于敏感信息，请通过安全验证后查看。</view>
+    <button class="ghost-btn state-btn" bindtap="onShow">重新验证</button>
+  </view>
+
+  <view class="state-card surface" wx:elif="{{loadError}}">
+    <view class="state-title">加载失败</view>
+    <view class="muted">{{loadError}}</view>
+    <button class="ghost-btn state-btn" bindtap="retry">重新加载</button>
+  </view>
+
+  <view class="loading-tip" wx:elif="{{loading && records.length === 0}}">正在加载就医记录…</view>
+
+  <view class="list-empty" wx:elif="{{records.length === 0}}">暂无就医记录</view>
+
+  <block wx:else>
+    <view class="record-card surface" wx:for="{{records}}" wx:key="id" data-id="{{item.id}}" bindtap="openDetail">
+      <view class="record-top">
+        <view class="record-date">{{item.date || '就诊记录'}}</view>
+        <view class="accent-chip" wx:if="{{item.hospital}}">{{item.hospital}}</view>
+      </view>
+      <view class="record-diagnosis" wx:if="{{item.diagnosis}}">诊断：{{item.diagnosis}}</view>
+      <view class="record-line" wx:if="{{item.reason}}"><text class="k">就诊原因</text><text class="v">{{item.reason}}</text></view>
+      <view class="record-line" wx:if="{{item.advice}}"><text class="k">医生建议</text><text class="v ellipsis">{{item.advice}}</text></view>
+      <view class="record-foot">
+        <text class="record-meds ellipsis" wx:if="{{item.meds}}">用药：{{item.meds}}</text>
+        <text class="record-more">查看详情 ›</text>
+      </view>
+    </view>
+  </block>
 </view>

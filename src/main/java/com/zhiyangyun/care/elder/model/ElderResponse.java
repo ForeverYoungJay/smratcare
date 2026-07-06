@@ -1,5 +1,7 @@
 package com.zhiyangyun.care.elder.model;
 
+import com.zhiyangyun.care.compliance.annotation.SensitiveField;
+import com.zhiyangyun.care.compliance.annotation.SensitiveType;
 import java.time.LocalDate;
 import lombok.Data;
 
@@ -11,10 +13,13 @@ public class ElderResponse {
   private String elderCode;
   private String elderQrCode;
   private String fullName;
+  @SensitiveField(type = SensitiveType.ID_CARD)
   private String idCardNo;
   private Integer gender;
   private LocalDate birthDate;
+  @SensitiveField(type = SensitiveType.PHONE)
   private String phone;
+  @SensitiveField(type = SensitiveType.ADDRESS)
   private String homeAddress;
   private String medicalInsuranceCopyUrl;
   private String householdCopyUrl;

@@ -1,0 +1,23 @@
+<!-- 加载骨架 -->
+<view class="sv-skeleton surface" wx:if="{{loading}}">
+  <view class="sv-sk-row" wx:for="{{rows}}" wx:key="*this">
+    <view class="sv-sk-line sv-sk-line--lg"></view>
+    <view class="sv-sk-line sv-sk-line--sm"></view>
+  </view>
+</view>
+
+<!-- 错误态 -->
+<view class="sv-state surface" wx:elif="{{error}}">
+  <view class="sv-icon sv-icon--error">!</view>
+  <view class="sv-title">加载遇到问题</view>
+  <view class="sv-desc">{{error}}</view>
+  <button class="ghost-btn sv-retry" bindtap="onRetry">{{retryText}}</button>
+</view>
+
+<!-- 空态 -->
+<view class="sv-state surface" wx:elif="{{empty}}">
+  <view class="sv-icon sv-icon--empty">☺</view>
+  <view class="sv-title">{{emptyText}}</view>
+  <view class="sv-desc" wx:if="{{emptyHint}}">{{emptyHint}}</view>
+  <slot name="empty-action"></slot>
+</view>

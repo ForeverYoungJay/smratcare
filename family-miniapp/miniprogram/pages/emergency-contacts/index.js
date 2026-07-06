@@ -2,14 +2,37 @@ const { getEmergencyContacts } = require('../../services/family');
 
 Page({
   data: {
-    contacts: []
+    contacts: [],
+    loading: false,
+    loadError: ''
   },
-  async onShow() {
+  onShow() {
     getApp().ensureLogin();
-    const contacts = await getEmergencyContacts();
-    this.setData({ contacts: contacts || [] });
+    this.loadContacts();
+  },
+  onPullDownRefresh() {
+    this.loadContacts().finally(() => wx.stopPullDownRefresh());
+  },
+  async loadContacts() {
+    this.setData({ loading: true, loadError: '' });
+    try {
+      const contacts = await getEmergencyContacts();
+      this.setData({ contacts: contacts || [] });
+    } catch (error) {
+      this.setData({ contacts: [], loadError: error.message || '联系人加载失败，请稍后重试' });
+    } finally {
+      this.setData({ loading: false });
+    }
+  },
+  retry() {
+    this.loadContacts();
   },
   call(e) {
-    wx.makePhoneCall({ phoneNumber: e.currentTarget.dataset.phone });
+    const phone = e.currentTarget.dataset.phone;
+    if (!phone) {
+      wx.showToast({ title: '暂无电话', icon: 'none' });
+      return;
+    }
+    wx.makePhoneCall({ phoneNumber: String(phone) });
   }
 });

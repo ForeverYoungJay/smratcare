@@ -46,19 +46,19 @@ export const routes: RouteRecordRaw[] = [
         path: 'portal',
         name: 'Portal',
         component: () => import('../views/Portal.vue'),
-        meta: { title: '首页', icon: 'HomeOutlined', navSection: 'core', navOrder: 10, navPinned: true }
+        meta: { title: '首页', icon: 'HomeOutlined', navSection: 'entry', navOrder: 10, navPinned: true }
       },
       {
         path: 'function-map',
         name: 'FunctionMap',
         component: () => import('../views/FunctionMap.vue'),
-        meta: { title: '全部功能', icon: 'ApartmentOutlined', navSection: 'core', navOrder: 15, navPinned: true }
+        meta: { title: '全部功能', icon: 'ApartmentOutlined', navSection: 'entry', navOrder: 15, navPinned: true }
       },
       {
         path: 'workbench',
         name: 'Workbench',
         component: () => import('../layouts/RouteView.vue'),
-        meta: { title: '工作台', icon: 'AppstoreOutlined', navSection: 'core', navOrder: 20, navPinned: true },
+        meta: { title: '工作台', icon: 'AppstoreOutlined', navSection: 'entry', navOrder: 20, navPinned: true },
         redirect: '/workbench/overview',
         children: [
           {
@@ -114,7 +114,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'elder',
         name: 'Elder',
-        meta: { title: '长者管理', icon: 'TeamOutlined', navSection: 'core', navOrder: 30, navPinned: true },
+        meta: { title: '长者管理', icon: 'TeamOutlined', navSection: 'care', navOrder: 30, navPinned: true },
         children: [
           {
             path: '',
@@ -339,7 +339,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'logistics',
         name: 'Logistics',
-        meta: { title: '后勤保障', icon: 'ToolOutlined', navSection: 'assurance', navOrder: 80, navPinned: true, roles: ['LOGISTICS_EMPLOYEE', 'LOGISTICS_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
+        meta: { title: '后勤保障', icon: 'ToolOutlined', navSection: 'support', navOrder: 80, navPinned: true, roles: ['LOGISTICS_EMPLOYEE', 'LOGISTICS_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
         children: [
           {
             path: '',
@@ -1397,7 +1397,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'medical-care',
         name: 'MedicalCare',
-        meta: { title: '医护健康服务', icon: 'MedicineBoxOutlined', navSection: 'core', navOrder: 40, navPinned: true, roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
+        meta: { title: '医护健康服务', icon: 'MedicineBoxOutlined', navSection: 'care', navOrder: 40, navPinned: true, roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
         redirect: '/medical-care/center',
         children: [
           {
@@ -1515,6 +1515,12 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '告警派单看板', roles: ['NURSING_EMPLOYEE', 'NURSING_MINISTER', 'MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
           },
           {
+            path: 'smart-device-health',
+            name: 'MedicalCareSmartDeviceHealth',
+            component: () => import('../views/smart/DeviceHealth.vue'),
+            meta: { title: '设备健康监控', roles: ['NURSING_EMPLOYEE', 'NURSING_MINISTER', 'MEDICAL_MINISTER', 'LOGISTICS_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
+          },
+          {
             path: 'emr',
             name: 'MedicalCareEmr',
             component: () => import('../views/emr/EmrRecords.vue'),
@@ -1543,6 +1549,24 @@ export const routes: RouteRecordRaw[] = [
             name: 'MedicalCareAiReports',
             component: () => import('../views/medical/AiHealthReport.vue'),
             meta: { title: 'AI健康评估报告' }
+          },
+          {
+            path: 'rounds',
+            name: 'MedicalCareRounds',
+            component: () => import('../views/medical/RoundsWorkbench.vue'),
+            meta: { title: '医生巡诊', roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
+          },
+          {
+            path: 'followup',
+            name: 'MedicalCareChronicFollowup',
+            component: () => import('../views/medical/ChronicFollowup.vue'),
+            meta: { title: '慢病随访', roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
+          },
+          {
+            path: 'emergency',
+            name: 'MedicalCareEmergencyEvents',
+            component: () => import('../views/medical/EmergencyEvents.vue'),
+            meta: { title: '120急救事件', roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'NURSING_EMPLOYEE', 'NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
           }
         ]
       },
@@ -1552,7 +1576,7 @@ export const routes: RouteRecordRaw[] = [
         meta: {
           title: '消防安全管理',
           icon: 'SafetyOutlined',
-          navSection: 'assurance',
+          navSection: 'compliance',
           navOrder: 90,
           navPinned: true,
           roles: ['GUARD', 'LOGISTICS_EMPLOYEE', 'LOGISTICS_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
@@ -1620,8 +1644,8 @@ export const routes: RouteRecordRaw[] = [
         meta: {
           title: '长护险与监管',
           icon: 'SafetyCertificateOutlined',
-          navSection: 'operations',
-          navOrder: 75,
+          navSection: 'compliance',
+          navOrder: 85,
           navPinned: true,
           roles: ['NURSING_EMPLOYEE', 'NURSING_MINISTER', 'MEDICAL_MINISTER', 'FINANCE_EMPLOYEE', 'FINANCE_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
         },
@@ -1674,6 +1698,33 @@ export const routes: RouteRecordRaw[] = [
             component: () => import('../views/govreport/ChannelConfig.vue'),
             meta: {
               title: '上报渠道',
+              roles: ['DIRECTOR', 'SYS_ADMIN', 'ADMIN']
+            }
+          },
+          {
+            path: 'medins-sheets',
+            name: 'MedinsSheets',
+            component: () => import('../views/medins/SettlementSheet.vue'),
+            meta: {
+              title: '医保结算清单',
+              roles: ['FINANCE_EMPLOYEE', 'FINANCE_MINISTER', 'MEDICAL_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
+            }
+          },
+          {
+            path: 'medins-evouchers',
+            name: 'MedinsEvouchers',
+            component: () => import('../views/medins/Evoucher.vue'),
+            meta: {
+              title: '医保电子凭证',
+              roles: ['MEDICAL_MINISTER', 'NURSING_MINISTER', 'FINANCE_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
+            }
+          },
+          {
+            path: 'medins-channels',
+            name: 'MedinsChannels',
+            component: () => import('../views/medins/ChannelConfig.vue'),
+            meta: {
+              title: '医保渠道配置',
               roles: ['DIRECTOR', 'SYS_ADMIN', 'ADMIN']
             }
           }
@@ -1756,11 +1807,38 @@ export const routes: RouteRecordRaw[] = [
             }
           },
           {
+            path: 'executive-bi-screen',
+            name: 'StatsExecutiveBiScreen',
+            component: () => import('../views/cockpit/ExecutiveBiScreen.vue'),
+            meta: {
+              title: '经营驾驶舱大屏',
+              roles: ['DIRECTOR', 'SYS_ADMIN']
+            }
+          },
+          {
             path: 'sensitive-access-audit',
             name: 'StatsSensitiveAccessAudit',
             component: () => import('../views/compliance/SensitiveAccessAudit.vue'),
             meta: {
               title: '敏感数据审计',
+              roles: ['SYS_ADMIN', 'DIRECTOR', 'ADMIN']
+            }
+          },
+          {
+            path: 'security-policy',
+            name: 'StatsSecurityPolicy',
+            component: () => import('../views/compliance/SecurityPolicyConfig.vue'),
+            meta: {
+              title: '安全策略配置',
+              roles: ['SYS_ADMIN', 'DIRECTOR', 'ADMIN']
+            }
+          },
+          {
+            path: 'export-audit',
+            name: 'StatsExportAudit',
+            component: () => import('../views/compliance/ExportAudit.vue'),
+            meta: {
+              title: '导出审计',
               roles: ['SYS_ADMIN', 'DIRECTOR', 'ADMIN']
             }
           },
@@ -1817,6 +1895,33 @@ export const routes: RouteRecordRaw[] = [
             name: 'StatsElderFlowReport',
             component: () => import('../views/stats/ElderFlowReport.vue'),
             meta: { title: '老人出入报表' }
+          }
+        ]
+      },
+      {
+        path: 'ai',
+        name: 'AiCenter',
+        meta: {
+          title: 'AI 智能提效',
+          icon: 'RobotOutlined',
+          navSection: 'operations',
+          navOrder: 72,
+          navPinned: true,
+          roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'NURSING_EMPLOYEE', 'NURSING_MINISTER', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
+        },
+        redirect: '/ai/schedule',
+        children: [
+          {
+            path: 'schedule',
+            name: 'AiScheduleWorkbench',
+            component: () => import('../views/ai/SmartScheduleWorkbench.vue'),
+            meta: { title: '智能排班工作台', roles: ['NURSING_MINISTER', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
+          },
+          {
+            path: 'risk',
+            name: 'AiRiskBoard',
+            component: () => import('../views/ai/RiskPredictionBoard.vue'),
+            meta: { title: '健康风险预测看板', roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'NURSING_EMPLOYEE', 'NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
           }
         ]
       },
@@ -2085,7 +2190,7 @@ export const routes: RouteRecordRaw[] = [
         meta: {
           title: '行政管理',
           icon: 'ApartmentOutlined',
-          navSection: 'assurance',
+          navSection: 'support',
           navOrder: 100,
           navPinned: true,
           roles: [
@@ -2398,7 +2503,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'hr',
         name: 'Hr',
-        meta: { title: '人力资源', icon: 'TeamOutlined', navSection: 'assurance', navOrder: 110, navPinned: true, roles: ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
+        meta: { title: '人力资源', icon: 'TeamOutlined', navSection: 'support', navOrder: 110, navPinned: true, roles: ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
         redirect: '/hr/overview',
         children: [
           {

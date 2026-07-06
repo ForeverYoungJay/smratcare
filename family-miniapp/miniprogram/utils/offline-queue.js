@@ -59,6 +59,8 @@ async function submitItem(item) {
   }
   if (item.type === 'incident') return staff.submitIncident(payload);
   if (item.type === 'handover') return staff.submitHandover(payload);
+  if (item.type === 'vitals') return staff.submitStaffVitalRecord(payload);
+  if (item.type === 'patrol-scan') return staff.submitPatrolScan(payload);
   // Unknown type: treat as done so it does not clog the queue forever.
   return null;
 }

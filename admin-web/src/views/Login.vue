@@ -28,7 +28,7 @@
           <div class="subtitle">智慧养老管理平台</div>
         </div>
       </div>
-      <a-form :model="form" @finish="onSubmit" layout="vertical">
+      <a-form v-if="!twoFactor.active" :model="form" @finish="onSubmit" layout="vertical">
         <a-form-item label="用户名" name="username" :rules="[{ required: true, message: '请输入用户名' }]">
           <a-input v-model:value="form.username" placeholder="admin" />
         </a-form-item>
@@ -37,6 +37,30 @@
         </a-form-item>
         <a-button type="primary" html-type="submit" block :loading="loading">登录</a-button>
         <a-button block style="margin-top: 8px" @click="goEnterpriseHome">返回企业首页</a-button>
+      </a-form>
+      <a-form v-else layout="vertical" @finish="onVerifyTwoFactor">
+        <a-alert
+          type="info"
+          show-icon
+          style="margin-bottom: 16px"
+          message="安全验证（双因子登录）"
+          :description="`本机构已开启双因子登录，验证码已发送至 ${twoFactor.phone || '预留手机号'}`"
+        />
+        <a-form-item label="短信验证码">
+          <a-input
+            v-model:value="twoFactor.code"
+            placeholder="请输入短信验证码"
+            :maxlength="8"
+            autocomplete="one-time-code"
+          />
+        </a-form-item>
+        <a-button type="primary" html-type="submit" block :loading="twoFactor.submitting">验证并登录</a-button>
+        <div class="twofa-actions">
+          <a-button type="link" size="small" :disabled="twoFactor.countdown > 0" @click="onResendTwoFactor">
+            {{ twoFactor.countdown > 0 ? `重新发送(${twoFactor.countdown}s)` : '重新发送验证码' }}
+          </a-button>
+          <a-button type="link" size="small" @click="backToPasswordStep">返回重新登录</a-button>
+        </div>
       </a-form>
       <div class="tips">
         推荐使用现代浏览器访问以获得最佳体验
@@ -68,10 +92,11 @@
 
 <script setup lang="ts">
 import { message } from 'ant-design-vue'
-import { reactive, ref } from 'vue'
+import { onUnmounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import brandLogoUrl from '../assets/guifeng-logo.png'
 import { login } from '../api/auth'
+import { verifyTwoFactor, resendTwoFactorCode } from '../api/complianceSecurity'
 import { useUserStore } from '../stores/user'
 
 const route = useRoute()
@@ -84,6 +109,46 @@ const form = reactive({
 })
 
 const loading = ref(false)
+
+// 双因子登录第二步（机构安全策略开启 2FA 时，第一步只返回 challengeToken）
+const twoFactor = reactive({
+  active: false,
+  challengeToken: '',
+  phone: '',
+  code: '',
+  submitting: false,
+  countdown: 0
+})
+let countdownTimer: ReturnType<typeof setInterval> | null = null
+
+function startTwoFactorCountdown(seconds = 60) {
+  twoFactor.countdown = seconds
+  if (countdownTimer) clearInterval(countdownTimer)
+  countdownTimer = setInterval(() => {
+    twoFactor.countdown -= 1
+    if (twoFactor.countdown <= 0 && countdownTimer) {
+      clearInterval(countdownTimer)
+      countdownTimer = null
+    }
+  }, 1000)
+}
+
+function backToPasswordStep() {
+  twoFactor.active = false
+  twoFactor.challengeToken = ''
+  twoFactor.phone = ''
+  twoFactor.code = ''
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
+  }
+  twoFactor.countdown = 0
+}
+
+onUnmounted(() => {
+  if (countdownTimer) clearInterval(countdownTimer)
+})
+
 const showDemoPanel = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true'
 const demoAccounts = [
   {
@@ -172,12 +237,16 @@ async function onSubmit() {
   loading.value = true
   try {
     const res = await login(form)
-    userStore.setAuth(res)
-    const redirect = normalizeRedirectPath(typeof route.query.redirect === 'string' ? route.query.redirect : '')
-    const fallbackPath = resolvePostLoginPath(res.roles || [])
-    const nextPath = redirect || fallbackPath
-    await router.replace(nextPath)
-    message.success(nextPath.startsWith('/workbench') ? '登录成功，已进入个人工作台' : '登录成功')
+    if ((res as any)?.requireTwoFactor) {
+      // 机构安全策略开启 2FA：进入短信验证码第二步
+      twoFactor.active = true
+      twoFactor.challengeToken = (res as any).challengeToken || ''
+      twoFactor.phone = (res as any).twoFactorPhone || ''
+      twoFactor.code = ''
+      startTwoFactorCountdown()
+      return
+    }
+    await finishLogin(res)
   } catch (error: any) {
     const status = Number(error?.response?.status || 0)
     const backendMsg = String(error?.response?.data?.message || error?.response?.data?.msg || error?.message || '')
@@ -209,6 +278,50 @@ async function onSubmit() {
     message.error('登录失败，请稍后重试。')
   } finally {
     loading.value = false
+  }
+}
+
+async function finishLogin(res: any) {
+  userStore.setAuth(res)
+  const redirect = normalizeRedirectPath(typeof route.query.redirect === 'string' ? route.query.redirect : '')
+  const fallbackPath = resolvePostLoginPath(res.roles || [])
+  const nextPath = redirect || fallbackPath
+  await router.replace(nextPath)
+  message.success(nextPath.startsWith('/workbench') ? '登录成功，已进入个人工作台' : '登录成功')
+}
+
+async function onVerifyTwoFactor() {
+  const code = twoFactor.code.trim()
+  if (!code) {
+    message.warning('请输入短信验证码')
+    return
+  }
+  twoFactor.submitting = true
+  try {
+    const res = await verifyTwoFactor({ challengeToken: twoFactor.challengeToken, verifyCode: code })
+    backToPasswordStep()
+    await finishLogin(res)
+  } catch (error: any) {
+    // 验证码错误等提示由请求拦截器统一弹出；会话失效时回到第一步
+    const msg = String(error?.message || error?.response?.data?.message || '')
+    if (msg.includes('重新登录')) {
+      backToPasswordStep()
+    }
+  } finally {
+    twoFactor.submitting = false
+  }
+}
+
+async function onResendTwoFactor() {
+  try {
+    const res = await resendTwoFactorCode({ challengeToken: twoFactor.challengeToken })
+    startTwoFactorCountdown(res?.retryAfterSeconds || 60)
+    message.success('验证码已重新发送')
+  } catch (error: any) {
+    const msg = String(error?.message || error?.response?.data?.message || '')
+    if (msg.includes('重新登录')) {
+      backToPasswordStep()
+    }
   }
 }
 
@@ -382,6 +495,12 @@ function goEnterpriseHome() {
 .subtitle {
   font-size: 12px;
   color: var(--muted, #5c6f69);
+}
+
+.twofa-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
 }
 
 .tips {

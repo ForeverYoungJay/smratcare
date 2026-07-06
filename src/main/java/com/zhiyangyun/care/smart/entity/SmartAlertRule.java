@@ -27,6 +27,8 @@ public class SmartAlertRule {
   private Integer durationSec;
   private String level;
   private String disabilityLevelScope;
+  /** 适用护理等级，逗号分隔，空=全部。 */
+  private String careLevelScope;
   private Integer autoDispatch;
   private Integer notifyFamily;
   private Integer priority;

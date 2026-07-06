@@ -23,6 +23,10 @@ public class SmartAlert {
   private String title;
   private String content;
   private String location;
+  /** 联动影像引用（视频厂商适配层预留，如片段URL/ID）。 */
+  private String mediaRef;
+  /** 联动定位引用（定位厂商适配层预留，如轨迹ID/坐标）。 */
+  private String locationRef;
   private String status;
   private LocalDateTime firstTriggeredAt;
   private LocalDateTime latestTriggeredAt;

@@ -1,0 +1,81 @@
+<view class="container">
+  <view class="section-title">我的待办</view>
+  <view class="section-subtitle">聚合 OA 提醒、审批流、换班确认和值班通知</view>
+
+  <view class="summary-grid">
+    <view class="surface summary-card">
+      <text>待办</text>
+      <strong>{{summary.openCount || 0}}</strong>
+    </view>
+    <view class="surface summary-card warning">
+      <text>今日</text>
+      <strong>{{summary.dueTodayCount || 0}}</strong>
+    </view>
+    <view class="surface summary-card danger">
+      <text>逾期</text>
+      <strong>{{summary.overdueCount || 0}}</strong>
+    </view>
+    <view class="surface summary-card">
+      <text>审批</text>
+      <strong>{{summary.approvalOpenCount || 0}}</strong>
+    </view>
+  </view>
+
+  <view class="search-row">
+    <input class="search-input" value="{{keyword}}" placeholder="搜索标题、内容、负责人" bindinput="onKeywordInput" confirm-type="search" bindconfirm="searchTodos" />
+    <button class="ghost-btn search-btn" bindtap="searchTodos">搜索</button>
+  </view>
+
+  <view class="filter-row">
+    <block wx:for="{{statusFilters}}" wx:key="value">
+      <view class="filter {{activeStatus === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="switchStatus">{{item.label}}</view>
+    </block>
+  </view>
+
+  <view class="filter-row compact">
+    <block wx:for="{{sourceFilters}}" wx:key="value">
+      <view class="filter source {{activeSource === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="switchSource">{{item.label}}</view>
+    </block>
+  </view>
+
+  <state-view
+    loading="{{loading}}"
+    error="{{loadError}}"
+    empty="{{!loading && !loadError && todos.length === 0}}"
+    empty-text="暂无待办"
+    empty-hint="审批提醒、换班确认和值班通知会显示在这里。"
+    bind:retry="loadData" />
+
+  <view wx:if="{{!loading && !loadError && todos.length}}">
+    <block wx:for="{{todos}}" wx:key="id">
+      <view class="surface todo-card">
+        <view class="todo-head">
+          <view>
+            <view class="todo-title">{{item.title}}</view>
+            <view class="todo-meta">{{item.sourceText}} · 截止 {{item.dueText || '未设置'}}</view>
+          </view>
+          <text class="status-pill {{item.status === 'DONE' ? 'done' : ''}}">{{item.status === 'DONE' ? '已完成' : '待处理'}}</text>
+        </view>
+        <view class="todo-content">{{item.content || '无内容'}}</view>
+        <view class="todo-foot">
+          <text>负责人：{{item.assigneeName || '未指定'}}</text>
+          <text>创建：{{item.createText || '-'}}</text>
+        </view>
+        <view class="action-row" wx:if="{{item.status === 'OPEN'}}">
+          <button class="ghost-btn action-btn" wx:if="{{item.sourceType === 'APPROVAL'}}" bindtap="goApproval">查看审批</button>
+          <button class="primary-btn action-btn" wx:else data-id="{{item.id}}" loading="{{operatingId === item.id}}" bindtap="markDone">标记完成</button>
+        </view>
+      </view>
+    </block>
+    <view class="surface state-card" wx:if="{{loadingMore}}">
+      <view class="section-subtitle">正在加载更多待办...</view>
+    </view>
+    <view class="surface state-card" wx:elif="{{hasMore}}">
+      <view class="section-subtitle">已加载 {{todos.length}} 条待办</view>
+      <button class="ghost-btn retry-btn" bindtap="loadMore">继续加载</button>
+    </view>
+    <view class="surface state-card" wx:else>
+      <view class="section-subtitle">没有更多了</view>
+    </view>
+  </view>
+</view>

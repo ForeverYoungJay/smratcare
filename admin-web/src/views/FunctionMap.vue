@@ -74,7 +74,7 @@ function flattenChildren(items: MenuItem[] = []): FlatPage[] {
 
 function sectionOf(item: MenuItem): NavSectionKey {
   const path = item.path || `/${item.key}`
-  return (routeNavMeta[path]?.section as NavSectionKey) || 'assurance'
+  return (routeNavMeta[path]?.section as NavSectionKey) || 'support'
 }
 
 const groups = computed<Group[]>(() => {

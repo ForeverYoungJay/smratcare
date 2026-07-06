@@ -1,4 +1,5 @@
 const { getHomeDashboard, getWeeklyBrief, getCapabilityStatus } = require('../../services/family');
+const { requestSubscribeOncePerDay } = require('../../utils/subscribe');
 
 const CAPABILITY_ALERT_STATUSES = new Set(['OFF', 'MOCK', 'BIND_REQUIRED', 'DEPRECATED']);
 
@@ -77,7 +78,7 @@ Page({
   onShow() {
     getApp().ensureLogin();
     if (getApp().globalData.userType === 'staff') {
-      wx.reLaunch({ url: '/pages/staff-home/index' });
+      wx.reLaunch({ url: '/packageStaff/pages/staff-home/index' });
       return;
     }
     const app = getApp();
@@ -87,6 +88,8 @@ Page({
       return;
     }
     this.loadCapabilityStatus();
+    // 每天最多请求一次家属端通用提醒订阅授权（健康预警/费用/紧急事件）
+    requestSubscribeOncePerDay(['familyGeneral', 'familyHealth']);
   },
   onPullDownRefresh() {
     this.loadData(true);

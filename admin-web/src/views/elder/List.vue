@@ -206,6 +206,15 @@
         <div class="qr-text">{{ qrText }}</div>
       </div>
     </a-modal>
+
+    <ExportConfirmModal
+      v-model:open="exportConfirmOpen"
+      module="ELDER_LIST"
+      module-label="长者名单"
+      :scope="exportScope"
+      :estimated-rows="rows.length"
+      @confirmed="doExportCsv"
+    />
   </PageContainer>
 </template>
 
@@ -220,10 +229,12 @@ import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import ExportConfirmModal from '../../components/ExportConfirmModal.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { exportCsv } from '../../utils/export'
 import { lifecycleStageColor, lifecycleStageLabel, normalizeLifecycleStage } from '../../utils/lifecycleStage'
+import { completeExport } from '../../api/complianceSecurity'
 import { getElderPage, assignBed, bindFamily, deleteElder } from '../../api/elder'
 import { getBedList } from '../../api/bed'
 import { getFamilyUserPage } from '../../api/family'
@@ -615,7 +626,22 @@ function onTableChange(_: any, __: any, sorter: any) {
     .catch(() => {})
 }
 
+// 导出二次确认（合规留痕）：先弹窗确认拿一次性 exportTicket，导出后回填行数
+const exportConfirmOpen = ref(false)
+const exportScope = computed(() => {
+  const tags = activeFilterTags.value
+  return tags.length ? `筛选：${tags.join('、')}（当前页 ${rows.value.length} 行）` : `全部（当前页 ${rows.value.length} 行）`
+})
+
 function exportCsvData() {
+  if (!rows.value.length) {
+    message.warning('当前列表暂无数据可导出')
+    return
+  }
+  exportConfirmOpen.value = true
+}
+
+function doExportCsv(exportTicket: string) {
   exportCsv(
     rows.value.map((r) => ({
       姓名: r.fullName,
@@ -628,6 +654,7 @@ function exportCsvData() {
     })),
     'elder-list.csv'
   )
+  completeExport({ exportTicket, rowCount: rows.value.length }).catch(() => {})
 }
 
 function goCreate() {

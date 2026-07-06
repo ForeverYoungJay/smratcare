@@ -1,0 +1,45 @@
+<view class="container">
+  <view class="section-title">员工待办</view>
+  <view class="section-subtitle">护理、用药、巡检、维修和送餐统一处理</view>
+
+  <view class="workbench-grid">
+    <block wx:for="{{workbenches}}" wx:key="route">
+      <view class="surface workbench-card" data-path="{{item.route}}" bindtap="goWorkbench">
+        <view class="workbench-title">{{item.title}}</view>
+        <view class="workbench-desc">{{item.desc}}</view>
+      </view>
+    </block>
+  </view>
+
+  <scroll-view class="filter-scroll" scroll-x>
+    <block wx:for="{{filters}}" wx:key="value">
+      <view class="filter {{active === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="switchFilter">{{item.label}}</view>
+    </block>
+  </scroll-view>
+
+  <state-view
+    loading="{{loading}}"
+    error="{{loadError}}"
+    empty="{{!loading && !loadError && tasks.length === 0}}"
+    empty-text="当前没有待办"
+    empty-hint="切换上方筛选，或稍后下拉刷新"
+    skeleton-rows="{{4}}"
+    bind:retry="loadData" />
+
+  <view class="surface panel" wx:if="{{!loading && !loadError && tasks.length}}">
+    <block wx:for="{{tasks}}" wx:key="id">
+      <view class="task-row" data-id="{{item.id}}" data-route="{{item.route}}" bindtap="openTask">
+        <view class="task-main">
+          <view class="task-title">{{item.title}}</view>
+          <view class="task-meta">{{item.time}} · {{item.resident}} · {{item.room}}</view>
+          <view class="task-status">{{item.status}}</view>
+        </view>
+        <text class="task-action">{{item.actionText}}</text>
+      </view>
+    </block>
+    <view class="list-footer">
+      <text wx:if="{{hasMore}}">上拉加载更多</text>
+      <text wx:else>没有更多了</text>
+    </view>
+  </view>
+</view>

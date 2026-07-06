@@ -11,20 +11,46 @@ import org.springframework.util.StringUtils;
 /**
  * 智慧安全场景规则引擎（纯逻辑）。给定一条设备事件与其指标，在候选规则中匹配并选出最应触发的规则：
  * 先比严重等级（CRITICAL &gt; HIGH &gt; WARNING），同等级再比优先级（priority 小者优先）。
+ *
+ * <p>标准场景枚举：FALL / SOS / BED_EXIT_TIMEOUT / GEO_FENCE / LINGER / VITAL；
+ * 旧枚举与常见厂商别名（BED_EXIT/LEAVE/STAY/WANDER/GEOFENCE/VITAL_ABNORMAL 等）自动归一兼容。</p>
  */
 @Component
 public class SmartAlertRuleEngine {
 
+  /** 兼容旧枚举/厂商别名 → 标准场景枚举。 */
+  public static String canonicalEventType(String eventType) {
+    if (!StringUtils.hasText(eventType)) {
+      return null;
+    }
+    String upper = eventType.trim().toUpperCase();
+    return switch (upper) {
+      case "BED_EXIT", "LEAVE_BED", "OFF_BED" -> "BED_EXIT_TIMEOUT";
+      case "LEAVE", "WANDER", "GEOFENCE", "FENCE_OUT" -> "GEO_FENCE";
+      case "STAY", "STAY_TOO_LONG", "OVERSTAY" -> "LINGER";
+      case "VITAL_ABNORMAL", "VITAL_SIGN" -> "VITAL";
+      default -> upper;
+    };
+  }
+
+  /** 兼容旧签名（不带护理等级）。 */
+  public SmartRuleMatch evaluate(String eventType, String deviceType, Map<String, Double> metrics,
+      Integer disabilityLevel, List<SmartAlertRule> rules) {
+    return evaluate(eventType, deviceType, metrics, disabilityLevel, null, rules);
+  }
+
   /**
-   * @param eventType 事件类型（如 FALL/SOS/BED_EXIT/VITAL）
+   * @param eventType 事件类型（如 FALL/SOS/BED_EXIT_TIMEOUT/GEO_FENCE/LINGER/VITAL，兼容旧别名）
    * @param deviceType 设备类型（可空）
    * @param metrics 事件携带指标（如 heartRate/spo2），可空
    * @param disabilityLevel 长者失能等级（可空，用于规则适用范围过滤）
+   * @param careLevel 长者护理等级（可空，用于规则适用范围过滤）
    * @param rules 候选规则集
    */
   public SmartRuleMatch evaluate(String eventType, String deviceType, Map<String, Double> metrics,
-      Integer disabilityLevel, List<SmartAlertRule> rules) {
-    if (!StringUtils.hasText(eventType) || rules == null || rules.isEmpty()) {
+      Integer disabilityLevel, String careLevel, List<SmartAlertRule> rules) {
+    String canonicalType = canonicalEventType(eventType);
+    if (canonicalType == null || rules == null || rules.isEmpty()) {
       return SmartRuleMatch.noMatch();
     }
     SmartAlertRule best = null;
@@ -32,7 +58,7 @@ public class SmartAlertRuleEngine {
       if (rule.getEnabled() != null && rule.getEnabled() == 0) {
         continue;
       }
-      if (!eventType.equalsIgnoreCase(rule.getEventType())) {
+      if (!canonicalType.equalsIgnoreCase(canonicalEventType(rule.getEventType()))) {
         continue;
       }
       if (StringUtils.hasText(rule.getDeviceType())
@@ -40,6 +66,9 @@ public class SmartAlertRuleEngine {
         continue;
       }
       if (!scopeMatches(rule.getDisabilityLevelScope(), disabilityLevel)) {
+        continue;
+      }
+      if (!careLevelScopeMatches(rule.getCareLevelScope(), careLevel)) {
         continue;
       }
       if (!conditionMatches(rule, metrics)) {
@@ -103,6 +132,21 @@ public class SmartAlertRuleEngine {
     }
     for (String part : scope.split(",")) {
       if (part.trim().equals(String.valueOf(disabilityLevel))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean careLevelScopeMatches(String scope, String careLevel) {
+    if (!StringUtils.hasText(scope)) {
+      return true;
+    }
+    if (!StringUtils.hasText(careLevel)) {
+      return false;
+    }
+    for (String part : scope.split(",")) {
+      if (part.trim().equalsIgnoreCase(careLevel.trim())) {
         return true;
       }
     }

@@ -30,6 +30,9 @@ public class SmartAlertDispatch {
   private LocalDateTime reviewedAt;
   private LocalDateTime responseDeadline;
   private Integer escalationCount;
+  private Long escalatedToId;
+  private String escalatedToName;
+  private LocalDateTime escalatedAt;
   private String handleNote;
   private String reviewNote;
   private Long incidentId;

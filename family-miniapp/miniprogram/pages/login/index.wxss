@@ -191,3 +191,61 @@
   line-height: 1.6;
   color: var(--muted);
 }
+
+/* 微信一键登录 */
+.wechat-login {
+  margin-top: 26rpx;
+}
+
+.wechat-divider {
+  display: flex;
+  align-items: center;
+  margin: 6rpx 0 22rpx;
+  color: var(--faint);
+  font-size: 24rpx;
+}
+
+.wechat-divider::before,
+.wechat-divider::after {
+  content: '';
+  flex: 1;
+  height: 1rpx;
+  background: var(--border);
+}
+
+.wechat-divider text {
+  padding: 0 20rpx;
+}
+
+.wechat-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 16rpx;
+  background: #07C160;
+  color: #ffffff;
+  font-size: 30rpx;
+  font-weight: 700;
+  border: 0;
+  box-shadow: 0 8rpx 20rpx rgba(7, 193, 96, 0.22);
+}
+
+.wechat-btn[disabled] {
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+.wechat-icon {
+  margin-right: 12rpx;
+  font-size: 34rpx;
+}
+
+.wechat-tip {
+  margin-top: 14rpx;
+  text-align: center;
+  color: var(--muted);
+  font-size: 22rpx;
+  line-height: 1.6;
+}

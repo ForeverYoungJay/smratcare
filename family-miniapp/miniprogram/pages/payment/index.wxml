@@ -20,6 +20,9 @@
       <view class="warn-title">部分支付数据暂未同步</view>
       <view class="warn-sub">{{partialWarning}}</view>
     </view>
+    <view class="sync-hint" wx:if="{{pendingSyncing}}">
+      <text class="sync-dot">●</text> 检测到待支付订单，正在自动为你刷新支付状态…
+    </view>
 
     <view class="guard-brief" wx:if="{{guard}}">
       <view class="guard-main">

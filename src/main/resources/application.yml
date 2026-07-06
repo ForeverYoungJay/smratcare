@@ -90,6 +90,24 @@ app:
       retry-interval-minutes: 5
       retry-batch-size: 100
       retry-cron: "0 */5 * * * ?"
+    mini-app:
+      login-enabled: true
+      app-id: ""
+      app-secret: ""
+      auto-create-account: true
+      jscode2session-url: "https://api.weixin.qq.com/sns/jscode2session"
+      access-token-url: "https://api.weixin.qq.com/cgi-bin/token"
+      get-user-phone-number-url: "https://api.weixin.qq.com/wxa/business/getuserphonenumber"
+      access-token-expire-buffer-seconds: 120
+      # 本地联调 / E2E：开启后可用 MOCK-PHONE:/MOCK-OPENID: 前缀离线换取手机号与 openId
+      mock-enabled: true
+    support:
+      organization-name: "智养云颐养中心"
+      service-phone: "400-800-9000"
+      service-email: "family-support@gfyy.org.cn"
+      service-hours: "工作日 09:00-18:00"
+      wechat-official-account: "智养云颐养"
+      address: ""
     sms-code:
       enabled: true
       provider: "mock"

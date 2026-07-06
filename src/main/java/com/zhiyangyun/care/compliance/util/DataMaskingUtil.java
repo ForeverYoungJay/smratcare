@@ -69,6 +69,21 @@ public final class DataMaskingUtil {
     return v.substring(0, 6) + MASK;
   }
 
+  /** 病情/健康摘要：保留前 2 个字符，其余打码，避免病情细节外泄。 */
+  public static String maskMedicalSummary(String summary) {
+    if (summary == null) {
+      return null;
+    }
+    String v = summary.trim();
+    if (v.isEmpty()) {
+      return v;
+    }
+    if (v.length() <= 2) {
+      return "*".repeat(v.length());
+    }
+    return v.substring(0, 2) + MASK;
+  }
+
   private static String maskAll(String v) {
     if (v == null || v.isEmpty()) {
       return v;

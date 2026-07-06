@@ -61,6 +61,20 @@
     <button class="primary-btn login-btn" loading="{{loading}}" disabled="{{!runtimeReady}}" bindtap="onSubmit">
       {{identity === 'staff' ? '登录员工工作台' : (mode === 'login' ? '登录并进入首页' : (mode === 'register' ? '注册并登录' : '重置密码并登录'))}}
     </button>
+
+    <view class="wechat-login" wx:if="{{identity === 'family' && mode === 'login'}}">
+      <view class="wechat-divider"><text>或</text></view>
+      <button
+        class="wechat-btn"
+        open-type="getPhoneNumber"
+        loading="{{wechatLoading}}"
+        disabled="{{!runtimeReady || wechatLoading}}"
+        bindgetphonenumber="onWechatLogin">
+        <text class="wechat-icon">💬</text>
+        微信手机号一键登录
+      </button>
+      <view class="wechat-tip">授权微信绑定的手机号后自动登录，无需记忆密码</view>
+    </view>
     <view class="tips" wx:if="{{identity === 'family' && mode !== 'login'}}">当前未接真实短信时，默认验证码为 1234。验证码有效期 5 分钟，连续输错将触发保护限制。</view>
     <view class="tips" wx:if="{{identity === 'staff'}}">员工端用于护理执行、查房巡检、用药确认、维修和餐食配送。</view>
     <view class="agreement-box">

@@ -8,6 +8,7 @@ const {
   getRechargeOrder,
   getRechargeOrders
 } = require('../../services/family');
+const { requestSubscribe } = require('../../utils/subscribe');
 
 const PRESET_AMOUNTS = ['200', '500', '1000', '2000'];
 const ORDER_FILTERS = [
@@ -111,6 +112,7 @@ Page({
     paying: false,
     allowManualFallback: false,
     partialWarning: '',
+    pendingSyncing: false,
     runtimeNotice: ''
   },
   onLoad(query) {
@@ -174,6 +176,7 @@ Page({
         previewBalance: previewBalance.toFixed(2),
         partialWarning: warnings.length ? `以下信息暂未同步成功：${warnings.join('、')}。可稍后下拉刷新重试。` : ''
       });
+      this.maybeAutoSyncPending(orderList);
     } catch (error) {
       this.setData({
         loadError: error.message || '支付信息加载失败，请稍后重试',
@@ -186,6 +189,65 @@ Page({
       });
     } finally {
       this.setData({ loading: false });
+    }
+  },
+  onHide() {
+    this.cancelAutoSync();
+  },
+  onUnload() {
+    this.cancelAutoSync();
+  },
+  // 存在「待支付/待同步」的充值订单时，自动轮询后端刷新状态，
+  // 避免家属停留在“部分支付数据暂未同步”的静止提示上。
+  maybeAutoSyncPending(orderList) {
+    this.cancelAutoSync();
+    const pending = (orderList || [])
+      .filter((item) => item && (item.status === 'PREPAY_CREATED' || item.status === 'INIT'))
+      .map((item) => item.outTradeNo)
+      .filter(Boolean);
+    if (!pending.length) {
+      if (this.data.pendingSyncing) {
+        this.setData({ pendingSyncing: false });
+      }
+      return;
+    }
+    this.autoSyncRounds = 0;
+    this.setData({ pendingSyncing: true });
+    this.runAutoSyncRound(pending);
+  },
+  runAutoSyncRound(outTradeNos) {
+    const MAX_ROUNDS = 4;
+    if (!outTradeNos || !outTradeNos.length || this.autoSyncRounds >= MAX_ROUNDS) {
+      this.setData({ pendingSyncing: false });
+      return;
+    }
+    this.autoSyncTimer = setTimeout(async () => {
+      this.autoSyncTimer = null;
+      this.autoSyncRounds += 1;
+      let changed = false;
+      for (let i = 0; i < outTradeNos.length; i += 1) {
+        try {
+          const order = await getRechargeOrder(outTradeNos[i]);
+          const status = order && order.status;
+          if (status && status !== 'PREPAY_CREATED' && status !== 'INIT') {
+            changed = true;
+          }
+        } catch (error) {
+          // 单个订单查询失败忽略，继续下一轮
+        }
+      }
+      if (changed) {
+        this.cancelAutoSync();
+        await this.loadData();
+        return;
+      }
+      this.runAutoSyncRound(outTradeNos);
+    }, 5000);
+  },
+  cancelAutoSync() {
+    if (this.autoSyncTimer) {
+      clearTimeout(this.autoSyncTimer);
+      this.autoSyncTimer = null;
     }
   },
   onRechargeInput(e) {
@@ -275,6 +337,8 @@ Page({
     if (!prepayPrompt) {
       return;
     }
+    // 用户确认充值时顺带请求订阅「缴费到账」通知授权（失败静默，不阻断支付）
+    await requestSubscribe('familyPayment');
     this.setData({ paying: true });
     wx.showLoading({ title: '创建支付单', mask: true });
     let outTradeNo = '';

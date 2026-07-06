@@ -8,32 +8,47 @@ import com.zhiyangyun.care.smart.mapper.SmartDeviceMapper;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * 设备心跳离线监控：心跳/事件超过阈值未上报的在线设备置为离线，并生成设备离线告警，
- * 防止"哑设备"漏报。
+ * 设备健康监控：
+ * <ul>
+ *   <li>心跳/事件超过阈值未上报的在线设备置为离线，并生成设备离线告警，防止"哑设备"漏报；</li>
+ *   <li>电量低于阈值的设备生成低电量预警。</li>
+ * </ul>
+ * 阈值可配置：zhiyangyun.smart.monitor.offline-minutes（默认10）、
+ * zhiyangyun.smart.monitor.low-battery-percent（默认20）。
  */
 @Component
 public class SmartDeviceHeartbeatMonitor {
 
-  private static final int OFFLINE_THRESHOLD_MINUTES = 10;
   private static final String OFFLINE_ALERT_TYPE = "DEVICE_OFFLINE";
+  private static final String LOW_BATTERY_ALERT_TYPE = "DEVICE_LOW_BATTERY";
   private static final DateTimeFormatter NO_FMT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
   private final SmartDeviceMapper deviceMapper;
   private final SmartAlertMapper alertMapper;
+  private final int offlineMinutes;
+  private final int lowBatteryPercent;
 
-  public SmartDeviceHeartbeatMonitor(SmartDeviceMapper deviceMapper, SmartAlertMapper alertMapper) {
+  public SmartDeviceHeartbeatMonitor(
+      SmartDeviceMapper deviceMapper,
+      SmartAlertMapper alertMapper,
+      @Value("${zhiyangyun.smart.monitor.offline-minutes:10}") int offlineMinutes,
+      @Value("${zhiyangyun.smart.monitor.low-battery-percent:20}") int lowBatteryPercent) {
     this.deviceMapper = deviceMapper;
     this.alertMapper = alertMapper;
+    this.offlineMinutes = offlineMinutes;
+    this.lowBatteryPercent = lowBatteryPercent;
   }
 
+  /** 每 5 分钟扫描心跳超时设备。 */
   @Scheduled(cron = "0 */5 * * * ?")
   public void scanOfflineDevices() {
     LocalDateTime now = LocalDateTime.now();
-    LocalDateTime cutoff = now.minusMinutes(OFFLINE_THRESHOLD_MINUTES);
+    LocalDateTime cutoff = now.minusMinutes(offlineMinutes);
     List<SmartDevice> devices = deviceMapper.selectList(Wrappers.lambdaQuery(SmartDevice.class)
         .eq(SmartDevice::getIsDeleted, 0)
         .eq(SmartDevice::getEnabled, 1)
@@ -46,15 +61,33 @@ public class SmartDeviceHeartbeatMonitor {
       device.setOnlineStatus("OFFLINE");
       device.setUpdateTime(now);
       deviceMapper.updateById(device);
-      raiseOfflineAlert(device, now);
+      raiseDeviceAlert(device, OFFLINE_ALERT_TYPE, "OFF", "设备离线",
+          "设备[" + device.getDeviceName() + "]超过 " + offlineMinutes + " 分钟未上报心跳", now);
     }
   }
 
-  private void raiseOfflineAlert(SmartDevice device, LocalDateTime now) {
+  /** 每 10 分钟扫描低电量设备（电量随心跳/事件上报刷新）。 */
+  @Scheduled(cron = "0 2/10 * * * ?")
+  public void scanLowBatteryDevices() {
+    LocalDateTime now = LocalDateTime.now();
+    List<SmartDevice> devices = deviceMapper.selectList(Wrappers.lambdaQuery(SmartDevice.class)
+        .eq(SmartDevice::getIsDeleted, 0)
+        .eq(SmartDevice::getEnabled, 1)
+        .isNotNull(SmartDevice::getBatteryLevel)
+        .le(SmartDevice::getBatteryLevel, lowBatteryPercent));
+    for (SmartDevice device : devices) {
+      raiseDeviceAlert(device, LOW_BATTERY_ALERT_TYPE, "BAT", "设备低电量",
+          "设备[" + device.getDeviceName() + "]电量 " + device.getBatteryLevel()
+              + "%，低于阈值 " + lowBatteryPercent + "%，请及时充电/更换电池", now);
+    }
+  }
+
+  private void raiseDeviceAlert(SmartDevice device, String alertType, String noPrefix,
+      String title, String content, LocalDateTime now) {
     Long open = alertMapper.selectCount(Wrappers.lambdaQuery(SmartAlert.class)
         .eq(SmartAlert::getIsDeleted, 0)
         .eq(SmartAlert::getDeviceId, device.getId())
-        .eq(SmartAlert::getAlertType, OFFLINE_ALERT_TYPE)
+        .eq(SmartAlert::getAlertType, alertType)
         .in(SmartAlert::getStatus, List.of("OPEN", "ACKNOWLEDGED")));
     if (open != null && open > 0) {
       return;
@@ -64,11 +97,11 @@ public class SmartDeviceHeartbeatMonitor {
     alert.setTenantId(device.getTenantId());
     alert.setElderId(device.getElderId());
     alert.setDeviceId(device.getId());
-    alert.setAlertNo("OFF" + now.format(NO_FMT) + device.getId());
-    alert.setAlertType(OFFLINE_ALERT_TYPE);
+    alert.setAlertNo(noPrefix + now.format(NO_FMT) + device.getId());
+    alert.setAlertType(alertType);
     alert.setLevel("WARNING");
-    alert.setTitle("设备离线");
-    alert.setContent("设备[" + device.getDeviceName() + "]超过 " + OFFLINE_THRESHOLD_MINUTES + " 分钟未上报心跳");
+    alert.setTitle(title);
+    alert.setContent(content);
     alert.setLocation(device.getLocation());
     alert.setStatus("OPEN");
     alert.setFirstTriggeredAt(now);

@@ -15,8 +15,23 @@ export interface SmartDevice {
   onlineStatus: string
   lastHeartbeatAt?: string
   lastEventAt?: string
+  batteryLevel?: number
+  signalStrength?: number
+  firmwareVersion?: string
   enabled: number
   remark?: string
+}
+
+export interface SmartDeviceHealthSummary {
+  totalCount: number
+  onlineCount: number
+  offlineCount: number
+  lowBatteryCount: number
+  weakSignalCount: number
+  staleHeartbeatCount: number
+  lowBatteryThreshold?: number
+  weakSignalThreshold?: number
+  offlineMinutes?: number
 }
 
 export interface SmartAlert {
@@ -41,6 +56,8 @@ export interface SmartAlert {
   resolutionNote?: string
   escalationCount: number
   notifyFamily: number
+  mediaRef?: string
+  locationRef?: string
 }
 
 export interface SmartAlertSummary {
@@ -79,6 +96,7 @@ export interface SmartAlertRule {
   durationSec?: number
   level?: string
   disabilityLevelScope?: string
+  careLevelScope?: string
   autoDispatch?: number
   notifyFamily?: number
   priority?: number
@@ -104,6 +122,9 @@ export interface SmartAlertDispatch {
   reviewedAt?: string
   responseDeadline?: string
   escalationCount?: number
+  escalatedToId?: Id
+  escalatedToName?: string
+  escalatedAt?: string
   handleNote?: string
   reviewNote?: string
   incidentId?: Id

@@ -1,14 +1,28 @@
 <view class="container">
-  <view class="surface card">
+  <view class="page-head">
     <view class="section-title">院内重要联系人</view>
-    <block wx:for="{{contacts}}" wx:key="id">
-      <view class="item">
-        <view>
-          <view class="name">{{item.role}} · {{item.name}}</view>
-          <view class="duty">值班：{{item.duty}}</view>
-        </view>
-        <button class="primary-btn small" data-phone="{{item.phone}}" bindtap="call">拨号</button>
-      </view>
-    </block>
+    <view class="section-subtitle">遇到紧急情况可第一时间联系值班人员</view>
   </view>
+
+  <view class="state-card surface" wx:if="{{loadError}}">
+    <view class="state-title">加载失败</view>
+    <view class="muted">{{loadError}}</view>
+    <button class="ghost-btn state-btn" bindtap="retry">重新加载</button>
+  </view>
+
+  <view class="loading-tip" wx:elif="{{loading && contacts.length === 0}}">正在加载联系人…</view>
+
+  <view class="list-empty" wx:elif="{{contacts.length === 0}}">暂无联系人信息</view>
+
+  <block wx:else>
+    <view class="contact-card surface" wx:for="{{contacts}}" wx:key="id">
+      <view class="contact-avatar">{{item.name ? item.name[0] : '院'}}</view>
+      <view class="contact-main">
+        <view class="contact-name">{{item.name}}<text class="contact-role" wx:if="{{item.role}}"> · {{item.role}}</text></view>
+        <view class="contact-duty" wx:if="{{item.duty}}">值班：{{item.duty}}</view>
+        <view class="contact-phone" wx:if="{{item.phone}}">{{item.phone}}</view>
+      </view>
+      <button class="call-btn" data-phone="{{item.phone}}" bindtap="call">拨打</button>
+    </view>
+  </block>
 </view>

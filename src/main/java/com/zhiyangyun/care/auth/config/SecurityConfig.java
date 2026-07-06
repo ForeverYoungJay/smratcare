@@ -92,14 +92,19 @@ public class SecurityConfig {
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
             .requestMatchers("/uploads/**").permitAll()
+            // 2FA 第二步：凭 challengeToken + 短信验证码换取正式令牌（challengeToken 在请求体中校验）
+            .requestMatchers("/api/auth/2fa/verify", "/api/auth/2fa/resend").permitAll()
             .requestMatchers("/api/auth/login",
                 "/api/auth/family/bootstrap",
                 "/api/auth/family/login",
+                "/api/auth/family/wechat-login",
                 "/api/auth/family/register",
                 "/api/auth/family/password/reset",
                 "/api/auth/family/sms-code/**",
                 "/api/family/register").permitAll()
             .requestMatchers("/api/family/payment/wechat/notify").permitAll()
+            // IoT 厂商网关标准事件上报：控制器内做 API-Key 校验（zhiyangyun.smart.ingest.api-key）
+            .requestMatchers("/api/smart/events/ingest").permitAll()
             .requestMatchers("/ws/**").permitAll()
             .requestMatchers("/api/files/**").authenticated()
             .requestMatchers("/api/auth/**").authenticated()

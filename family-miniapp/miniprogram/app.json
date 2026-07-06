@@ -23,6 +23,7 @@
     "pages/security-verify/index",
     "pages/health/index",
     "pages/medical-record/index",
+    "pages/medical-record-detail/index",
     "pages/assessment-report/index",
     "pages/report-viewer/index",
     "pages/emergency-contacts/index",
@@ -38,34 +39,51 @@
     "pages/care-log/index",
     "pages/activity-album/index",
     "pages/outing-record/index",
-    "pages/affection/index",
-    "pages/staff-home/index",
-    "pages/staff-tasks/index",
-    "pages/staff-task-detail/index",
-    "pages/staff-care/index",
-    "pages/staff-care-execution/index",
-    "pages/staff-medical/index",
-    "pages/staff-clinical/index",
-    "pages/staff-logistics/index",
-    "pages/staff-profile/index",
-    "pages/staff-todo/index",
-    "pages/staff-contacts/index",
-    "pages/staff-report/index",
-    "pages/staff-notices/index",
-    "pages/staff-suggestions/index",
-    "pages/staff-vitals/index",
-    "pages/staff-material/index",
-    "pages/staff-meals/index",
-    "pages/staff-repairs/index",
-    "pages/staff-schedule/index",
-    "pages/staff-attendance/index",
-    "pages/staff-approval/index",
-    "pages/staff-handover/index",
-    "pages/staff-incident/index",
-    "pages/staff-patrol/index",
-    "pages/staff-receipts/index",
-    "pages/staff-incidents/index"
+    "pages/affection/index"
   ],
+  "subPackages": [
+    {
+      "root": "packageStaff",
+      "name": "staff",
+      "pages": [
+        "pages/staff-home/index",
+        "pages/staff-tasks/index",
+        "pages/staff-task-detail/index",
+        "pages/staff-care/index",
+        "pages/staff-care-execution/index",
+        "pages/staff-medical/index",
+        "pages/staff-clinical/index",
+        "pages/staff-logistics/index",
+        "pages/staff-profile/index",
+        "pages/staff-todo/index",
+        "pages/staff-contacts/index",
+        "pages/staff-report/index",
+        "pages/staff-notices/index",
+        "pages/staff-suggestions/index",
+        "pages/staff-vitals/index",
+        "pages/staff-material/index",
+        "pages/staff-meals/index",
+        "pages/staff-repairs/index",
+        "pages/staff-schedule/index",
+        "pages/staff-attendance/index",
+        "pages/staff-approval/index",
+        "pages/staff-handover/index",
+        "pages/staff-incident/index",
+        "pages/staff-patrol/index",
+        "pages/staff-receipts/index",
+        "pages/staff-incidents/index"
+      ]
+    }
+  ],
+  "preloadRule": {
+    "pages/login/index": {
+      "network": "all",
+      "packages": ["staff"]
+    }
+  },
+  "usingComponents": {
+    "state-view": "/components/state-view/index"
+  },
   "window": {
     "navigationBarTitleText": "智养云",
     "navigationBarBackgroundColor": "#e7f0eb",

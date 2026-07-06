@@ -22,11 +22,12 @@
 
     <div class="scene-hud">
       <div class="scene-legend">
-        <div class="legend-chip status-occupied">在住</div>
         <div class="legend-chip status-empty">空床</div>
-        <div class="legend-chip status-warning">维护 / 外出</div>
-        <div class="legend-chip status-ai">重点关注</div>
-        <div class="legend-chip status-alert">异常告警</div>
+        <div class="legend-chip status-occupied">有人</div>
+        <div class="legend-chip status-nursing">护理中</div>
+        <div class="legend-chip status-cleaning">清洁中</div>
+        <div class="legend-chip status-reserved">待入住</div>
+        <div class="legend-chip status-alert">告警</div>
       </div>
     </div>
 
@@ -162,23 +163,61 @@ const currentLevelLabel = computed(() => {
   return '房间'
 })
 
-// 床位状态语义配色（与全局养老绿主题一致）：
-// 在住=品牌绿 / 平稳在住=浅一档的绿 / 关注=蓝紫 / 维护·外出=琥珀 / 异常=红 / 空床=暖灰
+// 床态语义配色（数字孪生暗色主题，对应看板六态）：
+// 空床=薄荷绿 / 有人=天蓝 / 护理中=青蓝 / 清洁中=琥珀 / 待入住=紫 / 告警=红
+type BedStatusKey = 'empty' | 'occupied' | 'nursing' | 'cleaning' | 'reserved' | 'alert'
+
+const STATUS_META: Record<BedStatusKey, { text: string; hex: string; glow: number; base: number }> = {
+  empty: { text: '空床', hex: '#34d39a', glow: 0x34d39a, base: 0x123a30 },
+  occupied: { text: '有人', hex: '#4c9dff', glow: 0x4c9dff, base: 0x13294d },
+  nursing: { text: '护理中', hex: '#26c6e0', glow: 0x26c6e0, base: 0x123a45 },
+  cleaning: { text: '清洁中', hex: '#f2a13d', glow: 0xf2a13d, base: 0x3a2d13 },
+  reserved: { text: '待入住', hex: '#a97bf5', glow: 0xa97bf5, base: 0x2a2450 },
+  alert: { text: '告警', hex: '#ff5d6c', glow: 0xff5d6c, base: 0x431922 }
+}
+
+// 单床状态归一：告警 > 清洁/维护 > 待入住 > 护理 > 有人 > 空床
+function bedStatusKey(bed: any): BedStatusKey {
+  const abnormal = Number(bed?.abnormalVital24hCount || 0)
+  const source = String(bed?.occupancySource || '')
+  if (bed?.riskLevel === 'HIGH' || abnormal > 0) return 'alert'
+  if (bed?.status === 0 || source === 'MAINTENANCE' || source === 'CLEANING' || source === 'FROZEN') return 'cleaning'
+  if (!bed?.elderId && source === 'RESERVATION') return 'reserved'
+  if (bed?.elderId) {
+    if (bed?.riskLevel === 'MEDIUM' || bed?.riskSource) return 'nursing'
+    return 'occupied'
+  }
+  return 'empty'
+}
+
+const STATUS_PRIORITY: BedStatusKey[] = ['alert', 'cleaning', 'reserved', 'nursing', 'occupied', 'empty']
+
+// 房间状态取其床位中优先级最高者
+function roomStatusKey(room: RoomScene): BedStatusKey {
+  if (!room.beds?.length) return 'empty'
+  const keys = new Set(room.beds.map((bed) => bedStatusKey(bed)))
+  return STATUS_PRIORITY.find((key) => keys.has(key)) || 'empty'
+}
+
+function makeBedMaterial(key: BedStatusKey) {
+  const meta = STATUS_META[key]
+  return new THREE.MeshStandardMaterial({
+    color: meta.glow,
+    emissive: meta.glow,
+    emissiveIntensity: key === 'alert' ? 0.55 : key === 'empty' ? 0.16 : 0.36,
+    metalness: 0.2,
+    roughness: 0.34
+  })
+}
+
 const materials = {
-  buildingShell: new THREE.MeshStandardMaterial({ color: 0xf0f3ec, transparent: true, opacity: 0.98, roughness: 0.74, metalness: 0.06 }),
-  buildingCap: new THREE.MeshStandardMaterial({ color: 0xe2e8dc, transparent: true, opacity: 1, roughness: 0.62, metalness: 0.04 }),
-  buildingHitbox: new THREE.MeshBasicMaterial({ color: 0x2e8a72, transparent: true, opacity: 0.01, side: THREE.DoubleSide }),
-  floor: new THREE.MeshStandardMaterial({ color: 0xf9fbf5, transparent: true, opacity: 0.98, roughness: 0.8, metalness: 0.02 }),
-  roomNeutral: new THREE.MeshStandardMaterial({ color: 0xf4f0e6, transparent: true, opacity: 0.98, roughness: 0.84, metalness: 0.02 }),
-  roomHover: new THREE.MeshStandardMaterial({ color: 0xe4f1ea, emissive: 0xdcede6, emissiveIntensity: 0.08, transparent: true, opacity: 0.98 }),
-  hover: new THREE.MeshStandardMaterial({ color: 0xe8f3ef, emissive: 0xd6eae2, emissiveIntensity: 0.16, transparent: true, opacity: 0.98 }),
-  bedNormal: new THREE.MeshStandardMaterial({ color: 0xccd4cc, emissive: 0xe7ece5, emissiveIntensity: 0.08, metalness: 0.12, roughness: 0.44 }),
-  bedOccupied: new THREE.MeshStandardMaterial({ color: 0x2e8a72, emissive: 0x6cc3a6, emissiveIntensity: 0.3, metalness: 0.08, roughness: 0.3 }),
-  bedSleep: new THREE.MeshStandardMaterial({ color: 0x55a98c, emissive: 0x8fd4ba, emissiveIntensity: 0.22, metalness: 0.06, roughness: 0.3 }),
-  bedAi: new THREE.MeshStandardMaterial({ color: 0x6b79d8, emissive: 0xa4adf0, emissiveIntensity: 0.28, metalness: 0.08, roughness: 0.34 }),
-  bedWarning: new THREE.MeshStandardMaterial({ color: 0xde9b3d, emissive: 0xf3c37e, emissiveIntensity: 0.24, metalness: 0.06, roughness: 0.3 }),
-  bedAlert: new THREE.MeshStandardMaterial({ color: 0xc9504b, emissive: 0xef8f88, emissiveIntensity: 0.36, metalness: 0.06, roughness: 0.28 }),
-  bedOffline: new THREE.MeshStandardMaterial({ color: 0xc7cdc6, emissive: 0xdde2da, emissiveIntensity: 0.08, metalness: 0.08, roughness: 0.42 })
+  buildingShell: new THREE.MeshStandardMaterial({ color: 0x16233d, transparent: true, opacity: 0.96, roughness: 0.5, metalness: 0.3 }),
+  buildingCap: new THREE.MeshStandardMaterial({ color: 0x1f3355, transparent: true, opacity: 1, roughness: 0.42, metalness: 0.4 }),
+  buildingHitbox: new THREE.MeshBasicMaterial({ color: 0x4c9dff, transparent: true, opacity: 0.01, side: THREE.DoubleSide }),
+  floor: new THREE.MeshStandardMaterial({ color: 0x0f1c33, transparent: true, opacity: 0.92, roughness: 0.5, metalness: 0.32 }),
+  roomNeutral: new THREE.MeshStandardMaterial({ color: 0x14243f, transparent: true, opacity: 0.94, roughness: 0.46, metalness: 0.3 }),
+  roomHover: new THREE.MeshStandardMaterial({ color: 0x1d3358, emissive: 0x2c62b0, emissiveIntensity: 0.35, transparent: true, opacity: 0.96 }),
+  hover: new THREE.MeshStandardMaterial({ color: 0x1d3358, emissive: 0x2c62b0, emissiveIntensity: 0.4, transparent: true, opacity: 0.96 })
 }
 
 function emitScopeChange(scope: PanoramaScope) {
@@ -207,58 +246,49 @@ function createLabel(text: string, className: string) {
   return new CSS2DObject(div)
 }
 
-function resolveBedVisualState(bed: any): 'normal' | 'occupied' | 'sleep' | 'ai' | 'warning' | 'alert' | 'offline' {
-  const abnormalCount = Number(bed.abnormalVital24hCount || 0)
-  if (bed.status === 0 || bed.occupancySource === 'FROZEN') return 'offline'
-  if (bed.riskLevel === 'HIGH' || abnormalCount > 0) return 'alert'
-  if (bed.status === 3 || bed.occupancySource === 'MAINTENANCE' || bed.occupancySource === 'CLEANING') return 'warning'
-  if (bed.riskLevel === 'MEDIUM' || bed.riskSource) return 'ai'
-  if (bed.riskLevel === 'LOW' && bed.elderId) return 'sleep'
-  if (bed.elderId) return 'occupied'
-  return 'normal'
+const STATUS_ICON: Record<BedStatusKey, string> = {
+  empty: '🛏',
+  occupied: '👤',
+  nursing: '➕',
+  cleaning: '🧹',
+  reserved: '🕘',
+  alert: '⚠'
 }
 
-function materialForState(state: ReturnType<typeof resolveBedVisualState>) {
-  if (state === 'occupied') return materials.bedOccupied.clone()
-  if (state === 'sleep') return materials.bedSleep.clone()
-  if (state === 'ai') return materials.bedAi.clone()
-  if (state === 'warning') return materials.bedWarning.clone()
-  if (state === 'alert') return materials.bedAlert.clone()
-  if (state === 'offline') return materials.bedOffline.clone()
-  return materials.bedNormal.clone()
+// 悬浮床态标签（对应看板图上的状态胶囊）：房间号 + 状态文案 + 状态色
+function createRoomPill(room: RoomScene, key: BedStatusKey) {
+  const meta = STATUS_META[key]
+  const div = document.createElement('div')
+  div.className = `room-pill status-${key}`
+  div.style.setProperty('--pill', meta.hex)
+  const icon = document.createElement('span')
+  icon.className = 'room-pill__icon'
+  icon.textContent = STATUS_ICON[key]
+  const body = document.createElement('div')
+  body.className = 'room-pill__body'
+  const no = document.createElement('strong')
+  no.textContent = room.roomNo
+  const status = document.createElement('small')
+  status.textContent = meta.text
+  body.appendChild(no)
+  body.appendChild(status)
+  div.appendChild(icon)
+  div.appendChild(body)
+  return new CSS2DObject(div)
 }
 
+function materialForStatus(key: BedStatusKey) {
+  return makeBedMaterial(key)
+}
+
+// 房间地面按状态泛出对应色调的辉光，暗色底上一眼可辨
 function roomMaterialForData(room: RoomScene) {
-  const ratio = room.totalBeds ? room.occupiedBeds / room.totalBeds : 0
-  const alertBeds = room.beds.filter((bed) => String(bed.riskLevel || '') === 'HIGH' || Number(bed.abnormalVital24hCount || 0) > 0).length
-  const concernBeds = room.beds.filter((bed) => String(bed.riskLevel || '') === 'MEDIUM').length
+  const key = roomStatusKey(room)
+  const meta = STATUS_META[key]
   const material = materials.roomNeutral.clone()
-  if (alertBeds > 0) {
-    // 有高风险/异常床位的房间：地面泛红，一眼即见
-    material.color = new THREE.Color(0xf9ebe9)
-    material.emissive = new THREE.Color(0xf2c7c2)
-    material.emissiveIntensity = 0.07
-    return material
-  }
-  if (concernBeds > 0) {
-    material.color = new THREE.Color(0xeef0fa)
-    material.emissive = new THREE.Color(0xd4d9f4)
-    material.emissiveIntensity = 0.06
-    return material
-  }
-  if (ratio >= 1) {
-    material.color = new THREE.Color(0xe8f3ec)
-    material.emissive = new THREE.Color(0xd0ecdb)
-    material.emissiveIntensity = 0.05
-    return material
-  }
-  if (ratio === 0) {
-    material.color = new THREE.Color(0xf3f5f0)
-    return material
-  }
-  material.color = new THREE.Color(0xf4f0e6)
-  material.emissive = new THREE.Color(0xfaf3e6)
-  material.emissiveIntensity = 0.03
+  material.color = new THREE.Color(meta.base)
+  material.emissive = new THREE.Color(meta.glow)
+  material.emissiveIntensity = key === 'empty' ? 0.05 : key === 'alert' ? 0.22 : 0.12
   return material
 }
 
@@ -279,15 +309,15 @@ function createBuildingMass(totalFloors: number) {
   body.receiveShadow = true
   group.add(body)
 
-  const grooveMaterial = new THREE.MeshStandardMaterial({ color: 0xdde3d4, roughness: 0.8, metalness: 0.02 })
+  const grooveMaterial = new THREE.MeshStandardMaterial({ color: 0x0e1b30, roughness: 0.6, metalness: 0.3 })
   const windowMaterial = new THREE.MeshStandardMaterial({
-    color: 0xf6ecd2,
-    emissive: 0xefdcae,
-    emissiveIntensity: 0.28,
-    roughness: 0.35,
-    metalness: 0.03
+    color: 0x1a3a63,
+    emissive: 0x4c9dff,
+    emissiveIntensity: 0.5,
+    roughness: 0.25,
+    metalness: 0.2
   })
-  const frameMaterial = new THREE.MeshStandardMaterial({ color: 0xe7ebdf, roughness: 0.6, metalness: 0.02 })
+  const frameMaterial = new THREE.MeshStandardMaterial({ color: 0x24395c, roughness: 0.5, metalness: 0.3 })
 
   const windowsPerSide = 4
   const winW = 1.16
@@ -309,7 +339,7 @@ function createBuildingMass(totalFloors: number) {
     for (let w = 0; w < windowsPerSide; w += 1) {
       const offset = (w - (windowsPerSide - 1) / 2) * (width / windowsPerSide)
       const lit = (level * 7 + w * 3) % 5 !== 0
-      const winMat = lit ? windowMaterial : new THREE.MeshStandardMaterial({ color: 0xcfd8e2, roughness: 0.3, metalness: 0.08 })
+      const winMat = lit ? windowMaterial : new THREE.MeshStandardMaterial({ color: 0x142743, roughness: 0.3, metalness: 0.2 })
       ;[-1, 1].forEach((direction) => {
         const frameZ = new THREE.Mesh(frameGeo, frameMaterial)
         frameZ.position.set(offset, centerY, direction * (depth / 2 + 0.02))
@@ -338,7 +368,7 @@ function createBuildingMass(totalFloors: number) {
 
   const penthouse = new THREE.Mesh(
     new RoundedBoxGeometry(width * 0.34, 0.72, depth * 0.3, 2, 0.14),
-    new THREE.MeshStandardMaterial({ color: 0xe9eee2, roughness: 0.7, metalness: 0.03 })
+    new THREE.MeshStandardMaterial({ color: 0x1c2f4d, roughness: 0.55, metalness: 0.3 })
   )
   penthouse.position.set(-width * 0.2, bodyHeight + 0.34 + 0.36, -depth * 0.18)
   penthouse.castShadow = true
@@ -346,7 +376,7 @@ function createBuildingMass(totalFloors: number) {
 
   const roofGarden = new THREE.Mesh(
     new RoundedBoxGeometry(width * 0.4, 0.24, depth * 0.42, 2, 0.12),
-    new THREE.MeshStandardMaterial({ color: 0x9dc3a2, roughness: 0.9, metalness: 0.01 })
+    new THREE.MeshStandardMaterial({ color: 0x1f7a63, emissive: 0x2ea884, emissiveIntensity: 0.25, roughness: 0.7, metalness: 0.1 })
   )
   roofGarden.position.set(width * 0.2, bodyHeight + 0.34 + 0.12, depth * 0.16)
   group.add(roofGarden)
@@ -354,39 +384,13 @@ function createBuildingMass(totalFloors: number) {
   return group
 }
 
-// 简洁风格化树木：圆角树冠 + 圆柱树干，撑起园区绿意
-function createTree(scale = 1) {
-  const tree = new THREE.Group()
-  const trunk = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.14 * scale, 0.2 * scale, 1.1 * scale, 8),
-    new THREE.MeshStandardMaterial({ color: 0x9a7b58, roughness: 0.9, metalness: 0.01 })
-  )
-  trunk.position.y = 0.55 * scale
-  trunk.castShadow = true
-  tree.add(trunk)
-
-  const foliageMaterial = new THREE.MeshStandardMaterial({ color: 0x7fb08a, roughness: 0.85, metalness: 0.01 })
-  const crown = new THREE.Mesh(new THREE.SphereGeometry(1.05 * scale, 14, 12), foliageMaterial)
-  crown.position.y = 1.9 * scale
-  crown.scale.y = 1.12
-  crown.castShadow = true
-  tree.add(crown)
-
-  const crownSide = new THREE.Mesh(new THREE.SphereGeometry(0.62 * scale, 12, 10), foliageMaterial.clone())
-  ;(crownSide.material as THREE.MeshStandardMaterial).color = new THREE.Color(0x92bd97)
-  crownSide.position.set(0.62 * scale, 1.5 * scale, 0.24 * scale)
-  crownSide.castShadow = true
-  tree.add(crownSide)
-
-  return tree
-}
-
 function createBedUnit(bed: any, width: number, depth: number) {
-  const state = resolveBedVisualState(bed)
+  const state = bedStatusKey(bed)
+  const meta = STATUS_META[state]
   const group = new THREE.Group()
   const frameHeight = 0.18
 
-  const frameMaterial = new THREE.MeshStandardMaterial({ color: 0xeaeee6, metalness: 0.12, roughness: 0.38 })
+  const frameMaterial = new THREE.MeshStandardMaterial({ color: 0x2a4066, metalness: 0.4, roughness: 0.4 })
   const frameRailGeo = new THREE.BoxGeometry(width, frameHeight, 0.08)
   const sideRailGeo = new THREE.BoxGeometry(0.08, frameHeight, depth - 0.18)
   ;[-1, 1].forEach((direction) => {
@@ -404,14 +408,14 @@ function createBedUnit(bed: any, width: number, depth: number) {
     ;[-1, 1].forEach((zDirection) => {
       const leg = new THREE.Mesh(
         new THREE.CylinderGeometry(0.035, 0.05, 0.24, 10),
-        new THREE.MeshStandardMaterial({ color: 0xcdd5cb, metalness: 0.18, roughness: 0.36 })
+        new THREE.MeshStandardMaterial({ color: 0x243758, metalness: 0.4, roughness: 0.4 })
       )
       leg.position.set(xDirection * (width / 2 - 0.12), 0.12, zDirection * (depth / 2 - 0.12))
       group.add(leg)
     })
   })
 
-  const mattressMaterial = materialForState(state)
+  const mattressMaterial = materialForStatus(state)
   const mattress = new THREE.Mesh(new RoundedBoxGeometry(width * 0.8, 0.14, depth * 0.68, 2, 0.05), mattressMaterial)
   mattress.position.y = frameHeight + 0.07
   mattress.castShadow = true
@@ -421,7 +425,7 @@ function createBedUnit(bed: any, width: number, depth: number) {
 
   const pillow = new THREE.Mesh(
     new RoundedBoxGeometry(width * 0.42, 0.09, depth * 0.16, 2, 0.04),
-    new THREE.MeshStandardMaterial({ color: 0xfdfefb, roughness: 0.62, metalness: 0.02 })
+    new THREE.MeshStandardMaterial({ color: 0xdce8f7, roughness: 0.6, metalness: 0.04 })
   )
   pillow.position.set(0, frameHeight + 0.16, -depth * 0.2)
   group.add(pillow)
@@ -429,9 +433,11 @@ function createBedUnit(bed: any, width: number, depth: number) {
   const blanket = new THREE.Mesh(
     new RoundedBoxGeometry(width * 0.76, 0.08, depth * 0.34, 2, 0.04),
     new THREE.MeshStandardMaterial({
-      color: state === 'alert' ? 0xf6d4d1 : state === 'ai' ? 0xdde1f8 : state === 'warning' ? 0xf6e4c4 : 0xdfeade,
-      roughness: 0.7,
-      metalness: 0.02
+      color: meta.glow,
+      emissive: meta.glow,
+      emissiveIntensity: state === 'empty' ? 0.04 : 0.14,
+      roughness: 0.6,
+      metalness: 0.05
     })
   )
   blanket.position.set(0, frameHeight + 0.14, depth * 0.08)
@@ -439,7 +445,7 @@ function createBedUnit(bed: any, width: number, depth: number) {
 
   const headboard = new THREE.Mesh(
     new RoundedBoxGeometry(width * 0.84, 0.34, 0.1, 2, 0.05),
-    new THREE.MeshStandardMaterial({ color: 0xd3c9b4, metalness: 0.08, roughness: 0.4 })
+    new THREE.MeshStandardMaterial({ color: 0x2b4168, metalness: 0.3, roughness: 0.42 })
   )
   headboard.position.set(0, 0.3, -depth * 0.34)
   headboard.castShadow = true
@@ -447,17 +453,17 @@ function createBedUnit(bed: any, width: number, depth: number) {
 
   const tailboard = new THREE.Mesh(
     new RoundedBoxGeometry(width * 0.72, 0.2, 0.08, 2, 0.04),
-    new THREE.MeshStandardMaterial({ color: 0xddd5c3, metalness: 0.08, roughness: 0.42 })
+    new THREE.MeshStandardMaterial({ color: 0x243a5e, metalness: 0.3, roughness: 0.44 })
   )
   tailboard.position.set(0, 0.2, depth * 0.33)
   group.add(tailboard)
 
-  // 床头小柜替代原先的输液杆式监护屏，只在有长者的床位出现，柜上一块小监护屏
+  // 床头小柜 + 监护屏：只在有长者的床位出现，屏色跟随状态
   if (bed.elderId) {
     const bedside = new THREE.Group()
     const cabinet = new THREE.Mesh(
       new RoundedBoxGeometry(0.22, 0.26, 0.22, 2, 0.04),
-      new THREE.MeshStandardMaterial({ color: 0xe3dcc9, roughness: 0.6, metalness: 0.03 })
+      new THREE.MeshStandardMaterial({ color: 0x223350, roughness: 0.5, metalness: 0.2 })
     )
     cabinet.position.y = 0.13
     cabinet.castShadow = true
@@ -465,11 +471,11 @@ function createBedUnit(bed: any, width: number, depth: number) {
     const monitorScreen = new THREE.Mesh(
       new RoundedBoxGeometry(0.16, 0.1, 0.03, 2, 0.02),
       new THREE.MeshStandardMaterial({
-        color: state === 'alert' ? 0x2f1820 : 0x18271f,
-        emissive: state === 'alert' ? 0xff7d78 : state === 'ai' ? 0xa4adf0 : 0x63d6b8,
-        emissiveIntensity: state === 'alert' ? 0.35 : 0.16,
+        color: 0x0b1626,
+        emissive: meta.glow,
+        emissiveIntensity: state === 'alert' ? 0.5 : 0.28,
         roughness: 0.34,
-        metalness: 0.18
+        metalness: 0.2
       })
     )
     monitorScreen.position.set(0, 0.32, 0)
@@ -479,11 +485,11 @@ function createBedUnit(bed: any, width: number, depth: number) {
     group.add(bedside)
   }
 
-  // 地面光环只保留在需要注意的床位（异常/维护），平稳床位保持干净
-  if (state === 'alert' || state === 'warning') {
+  // 地面光环：告警强、其余弱，空床不加光环
+  if (state !== 'empty') {
     const halo = new THREE.Mesh(
       new THREE.RingGeometry(Math.min(width, depth) * 0.38, Math.min(width, depth) * 0.52, 32),
-      new THREE.MeshBasicMaterial({ color: mattressMaterial.color, transparent: true, opacity: state === 'alert' ? 0.26 : 0.14, side: THREE.DoubleSide })
+      new THREE.MeshBasicMaterial({ color: meta.glow, transparent: true, opacity: state === 'alert' ? 0.34 : 0.16, side: THREE.DoubleSide })
     )
     halo.rotation.x = -Math.PI / 2
     halo.position.y = 0.03
@@ -492,9 +498,9 @@ function createBedUnit(bed: any, width: number, depth: number) {
     mattress.userData.halo = halo
   }
 
-  // 只让异常/维护床位有动效，平稳床位静止——整体更安静耐看
-  if (state === 'alert') animatedBeds.push({ mesh: mattress, type: 'pulse', baseIntensity: 0.42 })
-  else if (state === 'warning') animatedBeds.push({ mesh: mattress, type: 'blink', baseIntensity: 0.28 })
+  // 告警脉动、清洁/护理柔和呼吸，其余静止
+  if (state === 'alert') animatedBeds.push({ mesh: mattress, type: 'pulse', baseIntensity: 0.55 })
+  else if (state === 'cleaning' || state === 'nursing' || state === 'reserved') animatedBeds.push({ mesh: mattress, type: 'blink', baseIntensity: 0.34 })
 
   return group
 }
@@ -502,62 +508,54 @@ function createBedUnit(bed: any, width: number, depth: number) {
 function buildAtmosphere() {
   if (!scene.value) return
 
+  // 深色基座平台：数字孪生底盘
   const campusBase = new THREE.Mesh(
     new THREE.CylinderGeometry(78, 84, 1.4, 64),
-    new THREE.MeshStandardMaterial({
-      color: 0xf1f4ec,
-      roughness: 0.86,
-      metalness: 0.02
-    })
+    new THREE.MeshStandardMaterial({ color: 0x0a1424, roughness: 0.7, metalness: 0.28 })
   )
   campusBase.position.y = -0.7
   campusBase.receiveShadow = true
   campusBase.userData.isGenerated = true
   scene.value.add(campusBase)
 
-  // 草坪环带：园区外围一圈柔和的绿意，呼应养老院庭院
-  const lawnRing = new THREE.Mesh(
-    new THREE.RingGeometry(34, 74, 96),
-    new THREE.MeshStandardMaterial({ color: 0xdcead8, roughness: 0.92, metalness: 0.01, transparent: true, opacity: 0.85, side: THREE.DoubleSide })
+  // 内圈发光地台，营造舞台聚光
+  const stageDisc = new THREE.Mesh(
+    new THREE.CircleGeometry(40, 96),
+    new THREE.MeshStandardMaterial({ color: 0x11213c, emissive: 0x18365f, emissiveIntensity: 0.3, roughness: 0.55, metalness: 0.2, transparent: true, opacity: 0.95 })
   )
-  lawnRing.rotation.x = -Math.PI / 2
-  lawnRing.position.y = 0.015
-  lawnRing.receiveShadow = true
-  lawnRing.userData.isGenerated = true
-  scene.value.add(lawnRing)
+  stageDisc.rotation.x = -Math.PI / 2
+  stageDisc.position.y = 0.01
+  stageDisc.receiveShadow = true
+  stageDisc.userData.isGenerated = true
+  scene.value.add(stageDisc)
 
-  const gridHelper = new THREE.GridHelper(180, 28, 0xd3ddcd, 0xe6ece0)
+  // 霓虹网格地面
+  const gridHelper = new THREE.GridHelper(200, 40, 0x3d6fb0, 0x1c3355)
   gridHelper.position.y = 0.02
   gridHelper.material.transparent = true
-  ;(gridHelper.material as THREE.Material).opacity = 0.22
+  ;(gridHelper.material as THREE.Material).opacity = 0.4
   gridHelper.userData.isGenerated = true
   scene.value.add(gridHelper)
 
-  // 园区步道环：暖色混凝土质感，替代原先的发光科技环
+  // 发光科技环
   const pathRing = new THREE.Mesh(
-    new THREE.RingGeometry(27.5, 30.5, 96),
-    new THREE.MeshStandardMaterial({ color: 0xe9e2d2, roughness: 0.95, metalness: 0.01, transparent: true, opacity: 0.9, side: THREE.DoubleSide })
+    new THREE.RingGeometry(27.5, 29.2, 128),
+    new THREE.MeshBasicMaterial({ color: 0x4c9dff, transparent: true, opacity: 0.5, side: THREE.DoubleSide })
   )
   pathRing.rotation.x = -Math.PI / 2
-  pathRing.position.y = 0.03
-  pathRing.receiveShadow = true
+  pathRing.position.y = 0.04
   pathRing.userData.isGenerated = true
   scene.value.add(pathRing)
 
-  // 园区树木：确定性伪随机分布在草坪带上，营造疗养花园氛围
-  const treeCount = 16
-  for (let i = 0; i < treeCount; i += 1) {
-    const angle = (i / treeCount) * Math.PI * 2 + (i % 3) * 0.14
-    const radius = 36 + ((i * 37) % 24)
-    const scale = 0.85 + ((i * 13) % 10) / 22
-    const tree = createTree(scale)
-    tree.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius)
-    tree.rotation.y = i * 1.7
-    tree.userData.isGenerated = true
-    scene.value.add(tree)
-  }
+  const outerRing = new THREE.Mesh(
+    new THREE.RingGeometry(38.5, 39.4, 128),
+    new THREE.MeshBasicMaterial({ color: 0x26c6e0, transparent: true, opacity: 0.28, side: THREE.DoubleSide })
+  )
+  outerRing.rotation.x = -Math.PI / 2
+  outerRing.position.y = 0.04
+  outerRing.userData.isGenerated = true
+  scene.value.add(outerRing)
 
-  // 不再使用漂浮粒子（噪点感重），保留静谧沙盘氛围
   particles = null
 }
 
@@ -568,8 +566,8 @@ function initScene() {
   const height = canvasRef.value.clientHeight
 
   scene.value = new THREE.Scene()
-  scene.value.background = new THREE.Color(0xf5f7f1)
-  scene.value.fog = new THREE.FogExp2(0xf5f7f1, 0.0022)
+  scene.value.background = new THREE.Color(0x070f1d)
+  scene.value.fog = new THREE.FogExp2(0x070f1d, 0.0026)
 
   camera.value = new THREE.PerspectiveCamera(40, width / height, 0.1, 1600)
   camera.value.position.set(50, 38, 62)
@@ -577,10 +575,10 @@ function initScene() {
   renderer.value = new THREE.WebGLRenderer({ antialias: true, alpha: true })
   renderer.value.setSize(width, height)
   renderer.value.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-  renderer.value.setClearColor(0xf5f7f1, 1)
+  renderer.value.setClearColor(0x070f1d, 1)
   renderer.value.outputColorSpace = THREE.SRGBColorSpace
   renderer.value.toneMapping = THREE.ACESFilmicToneMapping
-  renderer.value.toneMappingExposure = 0.98
+  renderer.value.toneMappingExposure = 1.05
   // 柔和阴影：让楼栋与地面产生真实体积感
   renderer.value.shadowMap.enabled = true
   renderer.value.shadowMap.type = THREE.PCFSoftShadowMap
@@ -603,14 +601,14 @@ function initScene() {
   controls.value.autoRotateSpeed = 0.09
   controls.value.target.set(0, 6, 0)
 
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.72)
+  const ambientLight = new THREE.AmbientLight(0x6f93c8, 0.65)
   scene.value.add(ambientLight)
 
-  // 天空-地面半球光：暖白天光 + 草地反光，比纯环境光更柔和自然
-  const hemiLight = new THREE.HemisphereLight(0xfdfff8, 0xd7e2cf, 0.55)
+  // 天空-地面半球光：冷蓝天光 + 深底反光
+  const hemiLight = new THREE.HemisphereLight(0x9fc4ff, 0x0a1424, 0.5)
   scene.value.add(hemiLight)
 
-  const topLight = new THREE.DirectionalLight(0xfffbf2, 1.12)
+  const topLight = new THREE.DirectionalLight(0xdcecff, 1.0)
   topLight.position.set(40, 90, 40)
   topLight.castShadow = true
   topLight.shadow.mapSize.set(2048, 2048)
@@ -623,12 +621,12 @@ function initScene() {
   topLight.shadow.radius = 4
   scene.value.add(topLight)
 
-  const fillLight = new THREE.DirectionalLight(0xd6e8da, 0.4)
+  const fillLight = new THREE.DirectionalLight(0x3f6bb0, 0.5)
   fillLight.position.set(-56, 28, -46)
   scene.value.add(fillLight)
 
-  const rimLight = new THREE.PointLight(0xbcd9c8, 0.72, 240, 2)
-  rimLight.position.set(0, 18, -20)
+  const rimLight = new THREE.PointLight(0x4c9dff, 1.1, 260, 2)
+  rimLight.position.set(0, 20, -20)
   scene.value.add(rimLight)
 
   buildAtmosphere()
@@ -733,7 +731,7 @@ function buildSceneData() {
 
       const corridor = new THREE.Mesh(
         new THREE.BoxGeometry(Math.max(3.6, slabWidth * 0.24), 0.04, slabDepth - 1.2),
-        new THREE.MeshStandardMaterial({ color: 0xefeee6, roughness: 0.92, metalness: 0.02 })
+        new THREE.MeshStandardMaterial({ color: 0x0f2038, roughness: 0.6, metalness: 0.25, emissive: 0x18365f, emissiveIntensity: 0.18 })
       )
       corridor.position.y = 0.21
       floorGroup.add(corridor)
@@ -742,11 +740,11 @@ function buildSceneData() {
       nurseStation.position.set(0, 0.32, 0)
       const stationBase = new THREE.Mesh(
         new THREE.CylinderGeometry(1.3, 1.45, 0.42, 28),
-        new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0.04 })
+        new THREE.MeshStandardMaterial({ color: 0x16294a, roughness: 0.4, metalness: 0.3, emissive: 0x2c62b0, emissiveIntensity: 0.25 })
       )
       const stationTop = new THREE.Mesh(
         new THREE.CylinderGeometry(1.05, 1.15, 0.16, 28),
-        new THREE.MeshStandardMaterial({ color: 0xd9e8dc, roughness: 0.32, metalness: 0.08 })
+        new THREE.MeshStandardMaterial({ color: 0x1f7a63, emissive: 0x2ea884, emissiveIntensity: 0.4, roughness: 0.3, metalness: 0.2 })
       )
       stationTop.position.y = 0.24
       nurseStation.add(stationBase)
@@ -760,7 +758,7 @@ function buildSceneData() {
 
       const slabEdge = new THREE.LineSegments(
         new THREE.EdgesGeometry(new THREE.BoxGeometry(slabWidth, 0.36, slabDepth)),
-        new THREE.LineBasicMaterial({ color: 0xb8cbe0, transparent: true, opacity: 0.28 })
+        new THREE.LineBasicMaterial({ color: 0x4c9dff, transparent: true, opacity: 0.4 })
       )
       slabEdge.position.y = 0.18
       floorGroup.add(slabEdge)
@@ -785,18 +783,23 @@ function buildSceneData() {
         roomGroup.add(roomTile)
         interactableObjects.push(roomTile)
 
+        const roomStatus = roomStatusKey(roomItem)
+        const roomStatusMeta = STATUS_META[roomStatus]
+
         const roomCarpet = new THREE.Mesh(
           new THREE.BoxGeometry(roomSize - 0.42, 0.02, roomSize - 0.42),
           new THREE.MeshStandardMaterial({
-            color: roomItem.occupiedBeds ? 0xf8f4ed : 0xf3f7fb,
-            roughness: 0.92,
-            metalness: 0.01
+            color: roomStatusMeta.base,
+            emissive: roomStatusMeta.glow,
+            emissiveIntensity: roomStatus === 'empty' ? 0.03 : 0.1,
+            roughness: 0.7,
+            metalness: 0.15
           })
         )
         roomCarpet.position.y = 0.2
         roomGroup.add(roomCarpet)
 
-        const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xfbfaf3, roughness: 0.86, metalness: 0.02 })
+        const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x1a2c49, roughness: 0.5, metalness: 0.3, transparent: true, opacity: 0.72 })
         const wallHeight = 1.08
         const wallThickness = 0.08
         const sideWallDepth = roomSize - 0.32
@@ -816,7 +819,7 @@ function buildSceneData() {
         })
         const doorLintel = new THREE.Mesh(
           new THREE.BoxGeometry(1.28, 0.14, wallThickness),
-          new THREE.MeshStandardMaterial({ color: 0xd9e5f3, roughness: 0.42, metalness: 0.06 })
+          new THREE.MeshStandardMaterial({ color: 0x24395c, emissive: roomStatusMeta.glow, emissiveIntensity: 0.35, roughness: 0.4, metalness: 0.3 })
         )
         doorLintel.position.set(0, wallHeight + 0.02, roomSize / 2 - wallThickness / 2)
         roomGroup.add(doorLintel)
@@ -824,13 +827,13 @@ function buildSceneData() {
         const windowBand = new THREE.Mesh(
           new THREE.BoxGeometry(roomSize * 0.56, 0.22, 0.02),
           new THREE.MeshStandardMaterial({
-            color: 0xd7ebff,
-            emissive: 0xbfe4ff,
-            emissiveIntensity: 0.12,
+            color: 0x1a3a63,
+            emissive: 0x6fb6ff,
+            emissiveIntensity: 0.35,
             roughness: 0.12,
-            metalness: 0.06,
+            metalness: 0.1,
             transparent: true,
-            opacity: 0.84
+            opacity: 0.9
           })
         )
         windowBand.position.set(0, wallHeight * 0.72, -roomSize / 2 + 0.05)
@@ -839,34 +842,19 @@ function buildSceneData() {
         const roomLight = new THREE.Mesh(
           new THREE.CylinderGeometry(0.36, 0.36, 0.04, 18),
           new THREE.MeshStandardMaterial({
-            color: 0xffffff,
-            emissive: roomItem.occupiedBeds ? 0xf8f6d8 : 0xe7eef8,
-            emissiveIntensity: roomItem.occupiedBeds ? 0.16 : 0.08,
+            color: 0x0b1626,
+            emissive: roomStatusMeta.glow,
+            emissiveIntensity: roomStatus === 'empty' ? 0.12 : 0.3,
             roughness: 0.22,
-            metalness: 0.02
+            metalness: 0.1
           })
         )
         roomLight.position.set(0, wallHeight + 0.08, 0)
         roomGroup.add(roomLight)
 
-        if (roomItem.beds.some((bed: any) => String(bed.riskLevel || '') === 'HIGH')) {
-          const beacon = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.08, 0.12, 0.12, 16),
-            new THREE.MeshStandardMaterial({
-              color: 0xffe1e6,
-              emissive: 0xff6d89,
-              emissiveIntensity: 0.4,
-              roughness: 0.24,
-              metalness: 0.02
-            })
-          )
-          beacon.position.set(roomSize / 2 - 0.4, wallHeight + 0.12, -roomSize / 2 + 0.4)
-          roomGroup.add(beacon)
-        }
-
         const roomEdges = new THREE.LineSegments(
           new THREE.EdgesGeometry(new THREE.BoxGeometry(roomSize, 0.18, roomSize)),
-          new THREE.LineBasicMaterial({ color: roomItem.occupiedBeds >= roomItem.totalBeds ? 0x5fae97 : 0x5c6f69, transparent: true, opacity: 0.24 })
+          new THREE.LineBasicMaterial({ color: roomStatusMeta.glow, transparent: true, opacity: 0.45 })
         )
         roomEdges.position.y = 0.09
         roomGroup.add(roomEdges)
@@ -889,8 +877,8 @@ function buildSceneData() {
           })
         }
 
-        const roomLabel = createLabel(`${roomItem.roomNo} · ${roomItem.occupiedBeds}/${roomItem.totalBeds}`, 'room-label')
-        roomLabel.position.set(0, 1.76, 0)
+        const roomLabel = createRoomPill(roomItem, roomStatus)
+        roomLabel.position.set(0, 1.9, 0)
         roomLabel.visible = false
         roomGroup.add(roomLabel)
 
@@ -982,7 +970,7 @@ function updateVisibility() {
         child.children.forEach((subChild) => {
           if (subChild.userData.type === 'room') {
             subChild.visible = true
-            const roomLabel = subChild.children.find((roomChild) => roomChild instanceof CSS2DObject && roomChild.element.className.includes('room-label'))
+            const roomLabel = subChild.children.find((roomChild) => roomChild instanceof CSS2DObject && roomChild.element.className.includes('room-pill'))
             if (roomLabel) roomLabel.visible = true
           }
           if (subChild instanceof CSS2DObject && subChild.element.className.includes('floor-label')) subChild.visible = false
@@ -997,7 +985,7 @@ function updateVisibility() {
           if (subChild.userData.type === 'room') {
             const isCurrentRoom = subChild.userData.room.roomNo === selectedRoom.value
             subChild.visible = currentLevel.value !== 'ROOM' || isCurrentRoom
-            const roomLabel = subChild.children.find((roomChild) => roomChild instanceof CSS2DObject && roomChild.element.className.includes('room-label'))
+            const roomLabel = subChild.children.find((roomChild) => roomChild instanceof CSS2DObject && roomChild.element.className.includes('room-pill'))
             if (roomLabel) roomLabel.visible = currentLevel.value !== 'ROOM'
           }
           if (subChild instanceof CSS2DObject && subChild.element.className.includes('floor-label')) subChild.visible = currentLevel.value === 'FLOOR'
@@ -1092,7 +1080,7 @@ function restoreHoverObject(obj: THREE.Object3D) {
     ;(obj as THREE.Mesh).scale.set(1, 1, 1)
     if (obj.userData.halo) {
       const haloMaterial = (obj.userData.halo as THREE.Mesh).material as THREE.MeshBasicMaterial
-      haloMaterial.opacity = obj.userData.state === 'alert' ? 0.24 : 0.12
+      haloMaterial.opacity = obj.userData.state === 'alert' ? 0.34 : 0.16
     }
   }
 }
@@ -1419,12 +1407,12 @@ onBeforeUnmount(() => {
   overflow: hidden;
   border-radius: 26px;
   background:
-    radial-gradient(circle at 12% 12%, rgba(46, 138, 114, 0.1), transparent 28%),
-    radial-gradient(circle at 82% 0%, rgba(229, 138, 58, 0.08), transparent 30%),
-    linear-gradient(180deg, #f9faf5 0%, #eff3ea 100%);
+    radial-gradient(circle at 16% 8%, rgba(76, 157, 255, 0.16), transparent 34%),
+    radial-gradient(circle at 84% 4%, rgba(38, 198, 224, 0.12), transparent 32%),
+    linear-gradient(180deg, #0b1526 0%, #060d1a 100%);
   box-shadow:
-    inset 0 0 90px rgba(46, 138, 114, 0.05),
-    inset 0 0 30px rgba(229, 138, 58, 0.03);
+    inset 0 0 120px rgba(6, 13, 26, 0.6),
+    inset 0 0 40px rgba(76, 157, 255, 0.06);
 }
 
 .canvas-wrapper {
@@ -1438,8 +1426,8 @@ onBeforeUnmount(() => {
   pointer-events: none;
   z-index: 1;
   background:
-    radial-gradient(circle at center, rgba(255, 255, 255, 0.02), rgba(231, 238, 227, 0.12) 100%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(232, 239, 229, 0.12));
+    radial-gradient(circle at 50% 120%, rgba(76, 157, 255, 0.12), transparent 55%),
+    linear-gradient(180deg, rgba(8, 16, 30, 0), rgba(4, 9, 18, 0.55) 100%);
 }
 
 .scene-toolbar,
@@ -1471,10 +1459,10 @@ onBeforeUnmount(() => {
 .scene-legend {
   padding: 12px 16px;
   border-radius: 18px;
-  border: 1px solid rgba(187, 217, 207, 0.5);
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 14px 28px rgba(34, 51, 46, 0.1);
+  border: 1px solid rgba(90, 140, 210, 0.3);
+  background: rgba(14, 26, 46, 0.78);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 14px 34px rgba(2, 8, 20, 0.5);
 }
 
 .toolbar-center {
@@ -1485,34 +1473,34 @@ onBeforeUnmount(() => {
 }
 
 .toolbar-center strong {
-  color: var(--ink);
+  color: #eaf2ff;
 }
 
 .toolbar-center small,
 .toolbar-eyebrow {
-  color: var(--muted-2);
+  color: #8ba2c8;
   font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
 .tech-btn {
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(187, 217, 207, 0.55);
-  color: var(--ink-soft);
+  background: rgba(24, 42, 70, 0.85);
+  border: 1px solid rgba(90, 140, 210, 0.35);
+  color: #cfe0f7;
   border-radius: 14px;
 }
 
 .tech-btn:hover {
-  border-color: rgba(var(--primary-rgb), 0.4);
-  color: var(--primary-strong);
-  box-shadow: 0 10px 24px rgba(var(--primary-rgb), 0.14);
+  border-color: rgba(76, 157, 255, 0.6);
+  color: #eaf2ff;
+  box-shadow: 0 10px 24px rgba(76, 157, 255, 0.24);
 }
 
 .scene-legend {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .legend-chip {
@@ -1521,7 +1509,7 @@ onBeforeUnmount(() => {
   border: 0;
   background: transparent;
   font-size: 12px;
-  color: var(--muted);
+  color: #c3d4ee;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1532,24 +1520,26 @@ onBeforeUnmount(() => {
   width: 10px;
   height: 10px;
   border-radius: 999px;
+  box-shadow: 0 0 8px currentColor;
 }
 
-.status-occupied::before { background: #2e8a72; }
-.status-empty::before { background: #c7cdc6; }
-.status-warning::before { background: #de9b3d; }
-.status-ai::before { background: #6b79d8; }
-.status-alert::before { background: #c9504b; }
+.status-empty::before { background: #34d39a; color: #34d39a; }
+.status-occupied::before { background: #4c9dff; color: #4c9dff; }
+.status-nursing::before { background: #26c6e0; color: #26c6e0; }
+.status-cleaning::before { background: #f2a13d; color: #f2a13d; }
+.status-reserved::before { background: #a97bf5; color: #a97bf5; }
+.status-alert::before { background: #ff5d6c; color: #ff5d6c; }
 
 .tech-tooltip {
   position: absolute;
   z-index: 8;
   width: 230px;
   border-radius: 18px;
-  border: 1px solid rgba(187, 217, 207, 0.55);
-  background: rgba(255, 255, 255, 0.96);
-  color: var(--ink-soft);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 16px 28px rgba(34, 51, 46, 0.12);
+  border: 1px solid rgba(90, 140, 210, 0.35);
+  background: rgba(12, 24, 44, 0.94);
+  color: #d7e4f7;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 18px 38px rgba(2, 8, 20, 0.6);
   padding: 14px;
   pointer-events: none;
 }
@@ -1560,17 +1550,18 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 12px;
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(187, 217, 207, 0.4);
+  border-bottom: 1px solid rgba(90, 140, 210, 0.28);
   margin-bottom: 8px;
 }
 
 .tt-header strong {
   font-size: 14px;
+  color: #eaf2ff;
 }
 
 .tt-header small {
   font-size: 11px;
-  color: var(--muted-2);
+  color: #8ba2c8;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -1588,40 +1579,112 @@ onBeforeUnmount(() => {
 }
 
 .tt-row span {
-  color: var(--muted-2);
+  color: #8ba2c8;
 }
 
 .tt-row strong {
-  color: var(--ink);
+  color: #eaf2ff;
 }
 
-.tt-row strong.cyan { color: var(--primary); }
-.tt-row strong.green { color: var(--success); }
-.tt-row strong.blue { color: var(--info); }
-.tt-row strong.purple { color: #6b79d8; }
-.tt-row strong.red { color: var(--danger); }
+.tt-row strong.cyan { color: #26c6e0; }
+.tt-row strong.green { color: #34d39a; }
+.tt-row strong.blue { color: #4c9dff; }
+.tt-row strong.purple { color: #a97bf5; }
+.tt-row strong.red { color: #ff5d6c; }
 
 .tt-tip {
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px dashed rgba(187, 217, 207, 0.55);
-  color: var(--muted-2);
+  border-top: 1px dashed rgba(90, 140, 210, 0.35);
+  color: #8ba2c8;
   font-size: 12px;
 }
 
 :global(.scene-label) {
-  padding: 6px 12px;
+  padding: 5px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(187, 217, 207, 0.55);
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--ink-soft);
+  border: 1px solid rgba(90, 140, 210, 0.4);
+  background: rgba(14, 26, 46, 0.82);
+  color: #d7e4f7;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.05em;
-  text-transform: uppercase;
   backdrop-filter: blur(10px);
-  box-shadow: 0 12px 26px rgba(34, 51, 46, 0.1);
+  box-shadow: 0 10px 24px rgba(2, 8, 20, 0.5);
   white-space: nowrap;
+}
+
+:global(.scene-label.station-label) {
+  border-color: rgba(46, 168, 132, 0.6);
+  color: #7ff0cf;
+  box-shadow: 0 0 18px rgba(46, 168, 132, 0.4);
+}
+
+:global(.scene-label.building-label) {
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  color: #eaf2ff;
+}
+
+/* 悬浮床态胶囊：对应看板图中每间房上方的状态标签 */
+:global(.room-pill) {
+  --pill: #4c9dff;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 5px 6px;
+  border-radius: 999px;
+  background: rgba(9, 18, 34, 0.9);
+  border: 1px solid color-mix(in srgb, var(--pill) 65%, transparent);
+  box-shadow: 0 8px 22px rgba(2, 8, 20, 0.55), 0 0 16px color-mix(in srgb, var(--pill) 40%, transparent);
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+  transform: translateY(-2px);
+}
+
+:global(.room-pill::after) {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 2px;
+  height: 6px;
+  transform: translateX(-50%);
+  background: var(--pill);
+  opacity: 0.7;
+}
+
+:global(.room-pill__icon) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  background: color-mix(in srgb, var(--pill) 26%, rgba(9, 18, 34, 0.6));
+  color: #fff;
+}
+
+:global(.room-pill__body) {
+  display: grid;
+  gap: 1px;
+  line-height: 1.05;
+}
+
+:global(.room-pill__body strong) {
+  font-size: 12px;
+  font-weight: 800;
+  color: #f2f7ff;
+}
+
+:global(.room-pill__body small) {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--pill);
 }
 
 @media (max-width: 960px) {

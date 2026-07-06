@@ -60,13 +60,20 @@ App({
     pendingMessageFilter: '',
     capabilityAlertCount: 0,
     mallOrdersDirty: false,
-    // 员工端订阅消息模板 ID。请在微信公众平台（小程序后台）->
+    // 订阅消息模板 ID。请在微信公众平台（小程序后台）->
     // 功能 -> 订阅消息中申请对应模板后，把模板 ID 填到这里；
     // 保持空串时 utils/subscribe.js 会静默跳过订阅请求，不影响业务。
+    // family* 为家属端场景，其余为员工端场景。
     subscribeTemplates: {
+      // 员工端
       taskOverdue: '',
       approvalResult: '',
-      noticePublish: ''
+      noticePublish: '',
+      // 家属端：缴费/充值、健康预警、探视预约、通用提醒
+      familyPayment: '',
+      familyHealth: '',
+      familyVisit: '',
+      familyGeneral: ''
     }
   },
   onLaunch() {

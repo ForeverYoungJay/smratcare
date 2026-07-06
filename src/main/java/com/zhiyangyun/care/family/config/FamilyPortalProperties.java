@@ -13,8 +13,41 @@ public class FamilyPortalProperties {
 
   private WechatPay wechatPay = new WechatPay();
   private WechatNotify wechatNotify = new WechatNotify();
+  private MiniApp miniApp = new MiniApp();
+  private Support support = new Support();
   private Recharge recharge = new Recharge();
   private SmsCode smsCode = new SmsCode();
+
+  @Data
+  public static class MiniApp {
+    /** 是否允许微信手机号一键登录（getPhoneNumber + jscode2session）。 */
+    private boolean loginEnabled = false;
+    /** 小程序 appId / appSecret，留空时回退到 wechat-notify、wechat-pay 的配置。 */
+    private String appId;
+    private String appSecret;
+    /** 一键登录时若手机号无家属账号，是否自动创建（无密码，可后续补设或直接绑定长者）。 */
+    private boolean autoCreateAccount = true;
+    private String jscode2sessionUrl = "https://api.weixin.qq.com/sns/jscode2session";
+    private String accessTokenUrl = "https://api.weixin.qq.com/cgi-bin/token";
+    private String getUserPhoneNumberUrl = "https://api.weixin.qq.com/wxa/business/getuserphonenumber";
+    private int accessTokenExpireBufferSeconds = 120;
+    /**
+     * 联调/E2E 专用：为 true 时，loginCode 形如 "MOCK-OPENID:xxx"、phoneCode 形如 "MOCK-PHONE:138..."
+     * 会被直接解析，无需真实微信服务器。生产环境必须为 false。
+     */
+    private boolean mockEnabled = false;
+  }
+
+  @Data
+  public static class Support {
+    /** 客服信息，供家属端「帮助与反馈」等页面展示。 */
+    private String organizationName = "";
+    private String servicePhone = "";
+    private String serviceEmail = "";
+    private String serviceHours = "工作日 09:00-18:00";
+    private String wechatOfficialAccount = "";
+    private String address = "";
+  }
 
   @Data
   public static class WechatPay {

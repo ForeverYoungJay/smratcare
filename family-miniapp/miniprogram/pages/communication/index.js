@@ -6,6 +6,7 @@ const {
   uploadCommunicationMedia,
   uploadVoiceMessage
 } = require('../../services/family');
+const { requestSubscribe } = require('../../utils/subscribe');
 
 const ROLE_OPTIONS = [
   { value: '客服中心', label: '客服中心', desc: '咨询、投诉、通用问题' },
@@ -436,6 +437,8 @@ Page({
       wx.showToast({ title: '请填写预约时间', icon: 'none' });
       return;
     }
+    // 提交预约前请求订阅「探视预约结果」通知授权（失败静默）
+    await requestSubscribe('familyVisit');
     this.setData({ sending: true });
     try {
       await bookVideoVisit({

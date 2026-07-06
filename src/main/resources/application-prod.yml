@@ -94,6 +94,23 @@ app:
       retry-interval-minutes: ${FAMILY_WECHAT_NOTIFY_RETRY_INTERVAL_MINUTES:5}
       retry-batch-size: ${FAMILY_WECHAT_NOTIFY_RETRY_BATCH_SIZE:100}
       retry-cron: "${FAMILY_WECHAT_NOTIFY_RETRY_CRON:0 */5 * * * ?}"
+    mini-app:
+      login-enabled: ${FAMILY_MINIAPP_LOGIN_ENABLED:true}
+      app-id: ${FAMILY_MINIAPP_APP_ID:${FAMILY_WECHAT_NOTIFY_APP_ID:${FAMILY_WECHAT_APP_ID:}}}
+      app-secret: ${FAMILY_MINIAPP_APP_SECRET:${FAMILY_WECHAT_NOTIFY_APP_SECRET:${FAMILY_WECHAT_APP_SECRET:}}}
+      auto-create-account: ${FAMILY_MINIAPP_AUTO_CREATE_ACCOUNT:true}
+      jscode2session-url: ${FAMILY_MINIAPP_JSCODE2SESSION_URL:https://api.weixin.qq.com/sns/jscode2session}
+      access-token-url: ${FAMILY_MINIAPP_ACCESS_TOKEN_URL:https://api.weixin.qq.com/cgi-bin/token}
+      get-user-phone-number-url: ${FAMILY_MINIAPP_GET_USER_PHONE_NUMBER_URL:https://api.weixin.qq.com/wxa/business/getuserphonenumber}
+      access-token-expire-buffer-seconds: ${FAMILY_MINIAPP_ACCESS_TOKEN_EXPIRE_BUFFER_SECONDS:120}
+      mock-enabled: ${FAMILY_MINIAPP_MOCK_ENABLED:false}
+    support:
+      organization-name: ${FAMILY_SUPPORT_ORG_NAME:}
+      service-phone: ${FAMILY_SUPPORT_SERVICE_PHONE:}
+      service-email: ${FAMILY_SUPPORT_SERVICE_EMAIL:}
+      service-hours: ${FAMILY_SUPPORT_SERVICE_HOURS:工作日 09:00-18:00}
+      wechat-official-account: ${FAMILY_SUPPORT_WECHAT_OFFICIAL_ACCOUNT:}
+      address: ${FAMILY_SUPPORT_ADDRESS:}
     sms-code:
       enabled: ${FAMILY_SMS_CODE_ENABLED:true}
       provider: ${FAMILY_SMS_CODE_PROVIDER:aliyun}

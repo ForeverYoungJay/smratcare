@@ -20,6 +20,9 @@ import com.zhiyangyun.care.auth.model.FamilySmsCodeSendRequest;
 import com.zhiyangyun.care.auth.model.FamilySmsCodeSendResponse;
 import com.zhiyangyun.care.auth.model.FamilySmsCodeVerifyRequest;
 import com.zhiyangyun.care.auth.model.FamilySmsCodeVerifyResponse;
+import com.zhiyangyun.care.auth.model.FamilyWechatLoginRequest;
+import com.zhiyangyun.care.auth.model.TwoFactorResendRequest;
+import com.zhiyangyun.care.auth.model.TwoFactorVerifyRequest;
 import com.zhiyangyun.care.auth.security.TokenBlacklistService;
 import com.zhiyangyun.care.auth.security.TokenProvider;
 import com.zhiyangyun.care.auth.security.PermissionRegistry;
@@ -27,9 +30,16 @@ import com.zhiyangyun.care.auth.security.PagePermissionPathHelper;
 import com.zhiyangyun.care.auth.security.RoleCodeHelper;
 import com.zhiyangyun.care.auth.security.RolePagePermissionPresetHelper;
 import com.zhiyangyun.care.auth.entity.Org;
+import com.zhiyangyun.care.compliance.model.SecurityPolicyView;
+import com.zhiyangyun.care.compliance.service.ComplianceSecurityPolicyService;
+import com.zhiyangyun.care.compliance.service.LoginSecurityService;
+import com.zhiyangyun.care.compliance.util.DataMaskingUtil;
 import com.zhiyangyun.care.elder.entity.FamilyUser;
 import com.zhiyangyun.care.elder.mapper.FamilyUserMapper;
+import com.zhiyangyun.care.family.config.FamilyPortalProperties;
 import com.zhiyangyun.care.family.service.FamilySmsCodeService;
+import com.zhiyangyun.care.family.service.WechatMiniAppAuthService;
+import io.jsonwebtoken.Claims;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -61,6 +71,10 @@ public class AuthController {
   private final FamilySmsCodeService familySmsCodeService;
   private final PasswordEncoder passwordEncoder;
   private final ObjectMapper objectMapper;
+  private final ComplianceSecurityPolicyService securityPolicyService;
+  private final LoginSecurityService loginSecurityService;
+  private final WechatMiniAppAuthService wechatMiniAppAuthService;
+  private final FamilyPortalProperties familyPortalProperties;
 
   public AuthController(AuthenticationManager authenticationManager,
       TokenProvider tokenProvider,
@@ -72,7 +86,11 @@ public class AuthController {
       PermissionRegistry permissionRegistry,
       FamilySmsCodeService familySmsCodeService,
       PasswordEncoder passwordEncoder,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      ComplianceSecurityPolicyService securityPolicyService,
+      LoginSecurityService loginSecurityService,
+      WechatMiniAppAuthService wechatMiniAppAuthService,
+      FamilyPortalProperties familyPortalProperties) {
     this.authenticationManager = authenticationManager;
     this.tokenProvider = tokenProvider;
     this.staffMapper = staffMapper;
@@ -84,6 +102,10 @@ public class AuthController {
     this.familySmsCodeService = familySmsCodeService;
     this.passwordEncoder = passwordEncoder;
     this.objectMapper = objectMapper;
+    this.securityPolicyService = securityPolicyService;
+    this.loginSecurityService = loginSecurityService;
+    this.wechatMiniAppAuthService = wechatMiniAppAuthService;
+    this.familyPortalProperties = familyPortalProperties;
   }
 
   @GetMapping("/family/bootstrap")
@@ -191,10 +213,29 @@ public class AuthController {
   }
 
   @PostMapping("/login")
-  public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+  public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request,
+      HttpServletRequest httpServletRequest) {
     String loginId = defaultText(request.getUsername(), "");
-    Authentication authentication = authenticationManager.authenticate(
-        new UsernamePasswordAuthenticationToken(loginId, request.getPassword()));
+
+    // 机构安全策略：登录失败锁定（策略读取/校验失败均不阻断登录，见 LoginSecurityService）
+    StaffAccount policyStaff = staffMapper.selectOne(
+        Wrappers.lambdaQuery(StaffAccount.class)
+            .and(w -> w.eq(StaffAccount::getUsername, loginId).or().eq(StaffAccount::getStaffNo, loginId))
+            .eq(StaffAccount::getIsDeleted, 0)
+            .last("LIMIT 1"));
+    SecurityPolicyView policy = securityPolicyService.getEffectivePolicy(
+        policyStaff == null ? null : policyStaff.getOrgId());
+    loginSecurityService.assertNotLocked(loginId, policy);
+
+    Authentication authentication;
+    try {
+      authentication = authenticationManager.authenticate(
+          new UsernamePasswordAuthenticationToken(loginId, request.getPassword()));
+    } catch (Exception ex) {
+      loginSecurityService.record(policyStaff == null ? null : policyStaff.getOrgId(),
+          policyStaff == null ? null : policyStaff.getId(), loginId, "PASSWORD", false, "BAD_CREDENTIALS");
+      throw ex;
+    }
     SecurityContextHolder.getContext().setAuthentication(authentication);
 
     StaffAccount staff = staffMapper.selectOne(
@@ -203,22 +244,161 @@ public class AuthController {
             .eq(StaffAccount::getStatus, 1)
             .eq(StaffAccount::getIsDeleted, 0));
     if (staff == null) {
+      loginSecurityService.record(null, null, loginId, "PASSWORD", false, "ACCOUNT_DISABLED");
       throw new IllegalArgumentException("账号不存在或已停用");
     }
-    staff.setLastLoginTime(java.time.LocalDateTime.now());
-    staffMapper.updateById(staff);
+
+    // 机构安全策略：密码有效期（password_max_days=0 表示不启用；无密码更新时间时不判定）
+    if (policy.getPasswordMaxDays() != null && policy.getPasswordMaxDays() > 0
+        && staff.getPasswordSnapshotUpdatedAt() != null
+        && staff.getPasswordSnapshotUpdatedAt().plusDays(policy.getPasswordMaxDays())
+            .isBefore(java.time.LocalDateTime.now())) {
+      loginSecurityService.record(staff.getOrgId(), staff.getId(), staff.getUsername(),
+          "PASSWORD", false, "PASSWORD_EXPIRED");
+      throw new IllegalArgumentException(
+          "密码已超过有效期（" + policy.getPasswordMaxDays() + " 天），请联系管理员重置密码后再登录");
+    }
+
     List<String> roles = RoleCodeHelper.normalizeRoles(
         roleMapper.selectRoleCodesByStaff(staff.getId(), staff.getOrgId()));
+
+    // 机构安全策略：双因子登录（返回挑战令牌，不签发正式 token）
+    if (requiresTwoFactor(policy, roles)) {
+      if (hasText(staff.getPhone())) {
+        familySmsCodeService.sendCode(staff.getOrgId(), null, staff.getPhone(), "STAFF_2FA",
+            resolveClientIp(httpServletRequest));
+        loginSecurityService.record(staff.getOrgId(), staff.getId(), staff.getUsername(),
+            "2FA_CHALLENGE", true, null);
+        LoginResponse challengeResponse = new LoginResponse();
+        challengeResponse.setRequireTwoFactor(true);
+        challengeResponse.setChallengeToken(
+            tokenProvider.generateChallengeToken(staff.getId(), staff.getUsername(), staff.getOrgId()));
+        challengeResponse.setTwoFactorPhone(DataMaskingUtil.maskPhone(staff.getPhone()));
+        return Result.ok(challengeResponse);
+      }
+      // 未配置手机号时降级为单因子放行（避免管理员被锁死），留痕以便审计
+      loginSecurityService.record(staff.getOrgId(), staff.getId(), staff.getUsername(),
+          "2FA_CHALLENGE", false, "2FA_PHONE_MISSING");
+    }
+
+    staff.setLastLoginTime(java.time.LocalDateTime.now());
+    staffMapper.updateById(staff);
     List<Role> roleEntities = roleMapper.selectRolesByStaff(staff.getId(), staff.getOrgId());
 
-    String token = tokenProvider.generateToken(staff.getId(), staff.getUsername(), staff.getOrgId(), roles);
+    // 机构安全策略：会话超时（session_timeout_minutes=0 表示使用全局 JWT 默认）
+    String token = tokenProvider.generateToken(staff.getId(), staff.getUsername(), staff.getOrgId(), roles,
+        policy.getSessionTimeoutMinutes() == null ? 0 : policy.getSessionTimeoutMinutes());
     LoginResponse response = new LoginResponse();
     response.setToken(token);
     response.setRoles(roles);
     response.setPermissions(permissionRegistry.getPermissionsByRoles(roles));
     response.setPagePermissions(mergeRoutePermissions(roleEntities));
     response.setStaffInfo(toStaffInfo(staff));
+    loginSecurityService.record(staff.getOrgId(), staff.getId(), staff.getUsername(), "PASSWORD", true, null);
     return Result.ok(response);
+  }
+
+  /** 2FA 第二步：凭挑战令牌 + 短信验证码换取正式登录令牌。 */
+  @PostMapping("/2fa/verify")
+  public Result<LoginResponse> verifyTwoFactor(@Valid @RequestBody TwoFactorVerifyRequest request,
+      HttpServletRequest httpServletRequest) {
+    StaffAccount staff = resolveChallengeStaff(request.getChallengeToken());
+    Claims claims = parseChallengeClaims(request.getChallengeToken());
+
+    FamilySmsCodeVerifyResponse verifyResult = familySmsCodeService.verifyCode(
+        staff.getOrgId(), staff.getPhone(), "STAFF_2FA", request.getVerifyCode(), true,
+        resolveClientIp(httpServletRequest));
+    if (!Boolean.TRUE.equals(verifyResult.getPassed())) {
+      loginSecurityService.record(staff.getOrgId(), staff.getId(), staff.getUsername(),
+          "2FA_VERIFY", false, "2FA_CODE_ERROR");
+      throw new IllegalArgumentException(defaultText(verifyResult.getMessage(), "验证码校验失败"));
+    }
+
+    // 挑战令牌一次性使用：校验通过后立即拉黑
+    long ttl = tokenProvider.getExpirationMillis(claims) - System.currentTimeMillis();
+    tokenBlacklistService.blacklist(claims.getId(), Math.max(ttl, 0));
+
+    staff.setLastLoginTime(java.time.LocalDateTime.now());
+    staffMapper.updateById(staff);
+    List<String> roles = RoleCodeHelper.normalizeRoles(
+        roleMapper.selectRoleCodesByStaff(staff.getId(), staff.getOrgId()));
+    List<Role> roleEntities = roleMapper.selectRolesByStaff(staff.getId(), staff.getOrgId());
+
+    SecurityPolicyView policy = securityPolicyService.getEffectivePolicy(staff.getOrgId());
+    String token = tokenProvider.generateToken(staff.getId(), staff.getUsername(), staff.getOrgId(), roles,
+        policy.getSessionTimeoutMinutes() == null ? 0 : policy.getSessionTimeoutMinutes());
+    LoginResponse response = new LoginResponse();
+    response.setToken(token);
+    response.setRoles(roles);
+    response.setPermissions(permissionRegistry.getPermissionsByRoles(roles));
+    response.setPagePermissions(mergeRoutePermissions(roleEntities));
+    response.setStaffInfo(toStaffInfo(staff));
+    loginSecurityService.record(staff.getOrgId(), staff.getId(), staff.getUsername(), "2FA_VERIFY", true, null);
+    return Result.ok(response);
+  }
+
+  /** 2FA 第二步：重发短信验证码（沿用家属短信通道的冷却/限流）。 */
+  @PostMapping("/2fa/resend")
+  public Result<FamilySmsCodeSendResponse> resendTwoFactorCode(@Valid @RequestBody TwoFactorResendRequest request,
+      HttpServletRequest httpServletRequest) {
+    StaffAccount staff = resolveChallengeStaff(request.getChallengeToken());
+    return Result.ok(familySmsCodeService.sendCode(staff.getOrgId(), null, staff.getPhone(), "STAFF_2FA",
+        resolveClientIp(httpServletRequest)));
+  }
+
+  private Claims parseChallengeClaims(String challengeToken) {
+    Claims claims;
+    try {
+      claims = tokenProvider.parseToken(challengeToken);
+    } catch (Exception ex) {
+      throw new IllegalArgumentException("二次验证会话已失效，请重新登录");
+    }
+    if (!TokenProvider.TOKEN_TYPE_2FA_CHALLENGE.equals(
+        claims.get(TokenProvider.CLAIM_TOKEN_TYPE, String.class))) {
+      throw new IllegalArgumentException("无效的二次验证会话，请重新登录");
+    }
+    if (tokenBlacklistService.isBlacklisted(claims.getId())) {
+      throw new IllegalArgumentException("二次验证会话已使用，请重新登录");
+    }
+    return claims;
+  }
+
+  private StaffAccount resolveChallengeStaff(String challengeToken) {
+    Claims claims = parseChallengeClaims(challengeToken);
+    Long staffId;
+    try {
+      staffId = Long.valueOf(claims.getSubject());
+    } catch (NumberFormatException ex) {
+      throw new IllegalArgumentException("无效的二次验证会话，请重新登录");
+    }
+    StaffAccount staff = staffMapper.selectById(staffId);
+    if (staff == null || !Integer.valueOf(1).equals(staff.getStatus())
+        || Integer.valueOf(1).equals(staff.getIsDeleted())) {
+      throw new IllegalArgumentException("账号不存在或已停用");
+    }
+    if (!hasText(staff.getPhone())) {
+      throw new IllegalArgumentException("账号未配置手机号，无法完成二次验证");
+    }
+    return staff;
+  }
+
+  private boolean requiresTwoFactor(SecurityPolicyView policy, List<String> roles) {
+    if (policy == null || !Boolean.TRUE.equals(policy.getTwoFactorEnabled())) {
+      return false;
+    }
+    List<String> scopedRoles = policy.getTwoFactorRoles();
+    if (scopedRoles == null || scopedRoles.isEmpty()) {
+      return true;
+    }
+    if (roles == null || roles.isEmpty()) {
+      return false;
+    }
+    for (String role : roles) {
+      if (role != null && scopedRoles.contains(role.toUpperCase(java.util.Locale.ROOT))) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @PostMapping("/logout")
@@ -261,6 +441,69 @@ public class AuthController {
     return Result.ok(buildFamilyLoginResponse(user));
   }
 
+  /** 微信手机号一键登录：授权手机号换账号，缺账号时按配置自动创建。 */
+  @PostMapping("/family/wechat-login")
+  public Result<FamilyLoginResponse> familyWechatLogin(@Valid @RequestBody FamilyWechatLoginRequest request) {
+    if (!wechatMiniAppAuthService.isLoginEnabled()) {
+      throw new IllegalStateException("微信一键登录暂未开启，请使用手机号密码登录");
+    }
+    Long orgId = resolveFamilyOrgId(request.getOrgId());
+    String phone = wechatMiniAppAuthService.resolvePhoneNumber(request.getPhoneCode());
+    if (!hasText(phone)) {
+      throw new IllegalArgumentException("未能获取微信手机号，请改用手机号密码登录");
+    }
+    String openId = null;
+    try {
+      openId = wechatMiniAppAuthService.resolveOpenId(request.getLoginCode());
+    } catch (Exception ex) {
+      // openId 仅用于通知绑定，获取失败不阻断登录
+    }
+
+    FamilyUser user = familyUserMapper.selectOne(
+        Wrappers.lambdaQuery(FamilyUser.class)
+            .eq(FamilyUser::getOrgId, orgId)
+            .eq(FamilyUser::getPhone, phone)
+            .eq(FamilyUser::getIsDeleted, 0)
+            .last("LIMIT 1"));
+    boolean created = false;
+    if (user == null) {
+      FamilyPortalProperties.MiniApp miniApp = familyPortalProperties.getMiniApp();
+      if (miniApp == null || !miniApp.isAutoCreateAccount()) {
+        throw new IllegalArgumentException("该手机号尚未注册家属账号，请先注册");
+      }
+      user = new FamilyUser();
+      user.setOrgId(orgId);
+      user.setPhone(phone);
+      user.setUsername(phone);
+      user.setRealName(defaultText(request.getNickName(), phone));
+      user.setStatus(1);
+      if (openId != null) {
+        user.setOpenId(openId);
+      }
+      familyUserMapper.insert(user);
+      created = true;
+    } else {
+      if (user.getStatus() == null || user.getStatus() != 1) {
+        throw new IllegalArgumentException("账号已停用，请联系机构管理员");
+      }
+      boolean dirty = false;
+      if (!hasText(user.getUsername())) {
+        user.setUsername(phone);
+        dirty = true;
+      }
+      if (openId != null && !openId.equals(defaultText(user.getOpenId(), null))) {
+        user.setOpenId(openId);
+        dirty = true;
+      }
+      if (dirty) {
+        familyUserMapper.updateById(user);
+      }
+    }
+    FamilyLoginResponse response = buildFamilyLoginResponse(user);
+    response.setNewAccount(created);
+    return Result.ok(response);
+  }
+
   private FamilyLoginResponse buildFamilyLoginResponse(FamilyUser user) {
     String token = tokenProvider.generateToken(user.getId(), user.getPhone(), user.getOrgId(), List.of("FAMILY"));
     FamilyLoginResponse response = new FamilyLoginResponse();
@@ -269,6 +512,7 @@ public class AuthController {
     response.setOrgId(user.getOrgId());
     response.setPhone(user.getPhone());
     response.setRealName(user.getRealName());
+    response.setNewAccount(Boolean.FALSE);
     return response;
   }
 

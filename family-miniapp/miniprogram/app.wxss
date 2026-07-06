@@ -297,3 +297,105 @@ textarea {
   background: #E7F4EC;
   color: var(--success);
 }
+
+/* ===== 统一状态/空态/骨架/列表 视觉规范（页面局部定义会自然覆盖） ===== */
+.empty-card,
+.state-card {
+  padding: 40rpx 32rpx;
+  margin-bottom: 18rpx;
+  text-align: center;
+}
+
+.empty-text {
+  padding: 40rpx 20rpx;
+  text-align: center;
+  color: var(--faint);
+  font-size: 26rpx;
+  line-height: 1.6;
+}
+
+.retry-btn {
+  margin: 24rpx auto 0;
+  min-width: 220rpx;
+}
+
+.list-footer {
+  padding: 26rpx 0 6rpx;
+  text-align: center;
+  color: var(--faint);
+  font-size: 24rpx;
+}
+
+/* 横向筛选条：胶囊风格，未选中浅底、选中品牌色 */
+.filter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56rpx;
+  padding: 0 26rpx;
+  margin: 0 12rpx 0 0;
+  border-radius: 999rpx;
+  background: #ffffff;
+  border: 1rpx solid var(--border);
+  color: var(--muted);
+  font-size: 26rpx;
+  white-space: nowrap;
+}
+
+.filter.active {
+  background: var(--brand-soft);
+  border-color: rgba(33, 112, 95, 0.35);
+  color: var(--brand);
+  font-weight: 700;
+}
+
+/* 状态徽标（正常/异常/完成/待处理），全端统一配色 */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40rpx;
+  padding: 0 18rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  line-height: 1;
+  font-weight: 700;
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.status-pill.danger {
+  background: #F9E7E6;
+  color: var(--danger);
+}
+
+.status-pill.warning {
+  background: #FBF0E2;
+  color: #B27221;
+}
+
+.status-pill.done,
+.status-pill.success {
+  background: #E7F4EC;
+  color: var(--success);
+}
+
+.status-pill.pending,
+.status-pill.info {
+  background: #EDF4F9;
+  color: var(--info);
+}
+
+/* 通用骨架屏工具类（非组件场景可直接使用） */
+.skeleton-line {
+  height: 24rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(90deg, #ECEFEA 25%, #F5F7F3 37%, #ECEFEA 63%);
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.3s ease infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}

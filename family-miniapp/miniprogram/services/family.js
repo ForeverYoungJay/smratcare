@@ -152,6 +152,15 @@ async function resetFamilyPassword(payload) {
   });
 }
 
+async function familyWechatLogin(payload) {
+  return request({
+    url: '/api/auth/family/wechat-login',
+    method: 'POST',
+    data: payload,
+    auth: false
+  });
+}
+
 async function getFamilyAuthBootstrap() {
   return request({
     url: '/api/auth/family/bootstrap',
@@ -829,6 +838,24 @@ async function getHelpFaqs() {
   );
 }
 
+async function getSupportInfo() {
+  return withFallback(
+    async () => request({ url: '/api/family/support-info' }),
+    () => {
+      const app = getApp();
+      const info = (app && app.globalData && app.globalData.supportInfo) || {};
+      return {
+        organizationName: info.organizationName || '',
+        servicePhone: info.supportPhone || '',
+        serviceEmail: info.serviceEmail || '',
+        serviceHours: info.supportHours || '',
+        wechatOfficialAccount: '',
+        address: ''
+      };
+    }
+  );
+}
+
 async function getTodoCenter(options = {}) {
   const elderId = resolveCurrentElderId(options.elderId);
   return withFallback(
@@ -907,6 +934,7 @@ async function removeFamilyBinding(elderId) {
 
 module.exports = {
   familyLogin,
+  familyWechatLogin,
   sendFamilySmsCode,
   verifyFamilySmsCode,
   registerFamily,
@@ -981,6 +1009,7 @@ module.exports = {
   sendCommunicationMessage,
   getCommunicationTemplates,
   getHelpFaqs,
+  getSupportInfo,
   getTodoCenter,
   handleTodoAction,
   generateAiAssessmentReports,

@@ -16,3 +16,6 @@ output/qa/*.png
 # JVM attach artifacts & Maven partial-download markers
 .attach_pid*
 *.lastUpdated
+
+# Claude Code local settings
+.claude/

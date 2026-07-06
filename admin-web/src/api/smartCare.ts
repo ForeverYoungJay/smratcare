@@ -1,5 +1,13 @@
 import request, { fetchPage } from '../utils/request'
-import type { SmartAlert, SmartAlertDispatch, SmartAlertRule, SmartAlertSummary, SmartDevice, SmartDeviceEventRequest } from '../types'
+import type {
+  SmartAlert,
+  SmartAlertDispatch,
+  SmartAlertRule,
+  SmartAlertSummary,
+  SmartDevice,
+  SmartDeviceEventRequest,
+  SmartDeviceHealthSummary
+} from '../types'
 
 export function getSmartDevicePage(params: {
   pageNo?: number
@@ -107,10 +115,33 @@ export function onsiteSmartDispatch(id: string | number) {
   return request.post<SmartAlertDispatch>(`/api/smart/dispatch/${id}/onsite`)
 }
 
-export function handleSmartDispatch(data: { dispatchId: string | number; note?: string; incidentId?: string | number }) {
+export function handleSmartDispatch(data: {
+  dispatchId: string | number
+  note?: string
+  incidentId?: string | number
+  createIncident?: boolean
+  incidentType?: string
+}) {
   return request.post<SmartAlertDispatch>('/api/smart/dispatch/handle', data)
 }
 
 export function reviewSmartDispatch(data: { dispatchId: string | number; note?: string }) {
   return request.post<SmartAlertDispatch>('/api/smart/dispatch/review', data)
+}
+
+// ===== 设备健康监控 =====
+export function getSmartDeviceHealthSummary() {
+  return request.get<SmartDeviceHealthSummary>('/api/smart/devices/health/summary')
+}
+
+export function getSmartDeviceHealthPage(params: {
+  pageNo?: number
+  pageSize?: number
+  keyword?: string
+  deviceType?: string
+  onlineStatus?: string
+  lowBatteryOnly?: boolean
+  weakSignalOnly?: boolean
+}) {
+  return fetchPage<SmartDevice>('/api/smart/devices/health/page', params)
 }

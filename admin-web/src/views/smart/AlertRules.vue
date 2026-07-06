@@ -91,6 +91,12 @@
             <a-form-item label="适用失能等级"><a-input v-model:value="form.disabilityLevelScope" placeholder="如 4,5；空=全部" /></a-form-item>
           </a-col>
           <a-col :span="8">
+            <a-form-item label="适用护理等级"><a-input v-model:value="form.careLevelScope" placeholder="如 一级,特级；空=全部" /></a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="适用设备类型"><a-input v-model:value="form.deviceType" placeholder="如 MATTRESS；空=全部" /></a-form-item>
+          </a-col>
+          <a-col :span="8">
             <a-form-item label="自动派单">
               <a-switch v-model:checked="autoDispatchBool" />
             </a-form-item>
@@ -125,11 +131,18 @@ import type { Id, PageResult, SmartAlertRule } from '../../types'
 const eventTypeOptions = [
   { label: '跌倒 FALL', value: 'FALL' },
   { label: 'SOS呼叫', value: 'SOS' },
-  { label: '离床 BED_EXIT', value: 'BED_EXIT' },
-  { label: '离院 LEAVE', value: 'LEAVE' },
-  { label: '久滞 STAY', value: 'STAY' },
-  { label: '体征 VITAL', value: 'VITAL' }
+  { label: '离床超时 BED_EXIT_TIMEOUT', value: 'BED_EXIT_TIMEOUT' },
+  { label: '离院防走失 GEO_FENCE', value: 'GEO_FENCE' },
+  { label: '久滞 LINGER', value: 'LINGER' },
+  { label: '体征异常 VITAL', value: 'VITAL' }
 ]
+// 旧枚举别名（服务端自动归一，仅用于展示存量规则）
+const legacyEventTypeText: Record<string, string> = {
+  BED_EXIT: '离床超时(旧 BED_EXIT)',
+  LEAVE: '离院防走失(旧 LEAVE)',
+  STAY: '久滞(旧 STAY)',
+  VITAL_ABNORMAL: '体征异常(旧 VITAL_ABNORMAL)'
+}
 const operatorOptions = [
   { label: '事件触发(PRESENT)', value: 'PRESENT' },
   { label: '大于 >', value: 'GT' },
@@ -170,7 +183,7 @@ const autoDispatchBool = ref(true)
 const notifyFamilyBool = ref(false)
 
 function eventTypeText(t?: string) {
-  return eventTypeOptions.find((o) => o.value === t)?.label || t || '-'
+  return eventTypeOptions.find((o) => o.value === t)?.label || legacyEventTypeText[t || ''] || t || '-'
 }
 function opText(op?: string) {
   return ({ GT: '>', GE: '≥', LT: '<', LE: '≤', EQ: '=', RANGE_OUT: '区间外' } as Record<string, string>)[op || ''] || op || ''
@@ -221,7 +234,7 @@ function openCreate() {
   Object.assign(form, {
     id: undefined, ruleCode: '', ruleName: '', eventType: 'FALL', operator: 'PRESENT',
     metricKey: '', threshold: undefined, threshold2: undefined, durationSec: undefined,
-    level: 'HIGH', disabilityLevelScope: '', priority: 100, remark: ''
+    level: 'HIGH', disabilityLevelScope: '', careLevelScope: '', deviceType: '', priority: 100, remark: ''
   })
   autoDispatchBool.value = true
   notifyFamilyBool.value = false

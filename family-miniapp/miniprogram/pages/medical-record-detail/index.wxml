@@ -1,0 +1,36 @@
+<view class="container">
+  <view class="state-card surface" wx:if="{{expired}}">
+    <view class="state-title">记录已过期</view>
+    <view class="muted">该就医记录详情已失效，请返回就医记录列表重新打开。</view>
+    <button class="ghost-btn state-btn" bindtap="goBack">返回列表</button>
+  </view>
+
+  <block wx:elif="{{record}}">
+    <view class="hero surface">
+      <view class="hero-date">{{record.date || '就诊记录'}}</view>
+      <view class="hero-hospital" wx:if="{{record.hospital}}">{{record.hospital}}</view>
+    </view>
+
+    <view class="detail-block surface" wx:if="{{record.diagnosis}}">
+      <view class="block-title diagnosis-title">诊断结果</view>
+      <view class="block-text strong">{{record.diagnosis}}</view>
+    </view>
+
+    <view class="detail-block surface" wx:if="{{record.reason}}">
+      <view class="block-title">就诊原因</view>
+      <view class="block-text">{{record.reason}}</view>
+    </view>
+
+    <view class="detail-block surface" wx:if="{{record.advice}}">
+      <view class="block-title">医生建议</view>
+      <view class="block-text">{{record.advice}}</view>
+    </view>
+
+    <view class="detail-block surface" wx:if="{{record.meds}}">
+      <view class="block-title">用药记录</view>
+      <view class="block-text">{{record.meds}}</view>
+    </view>
+
+    <view class="detail-tip">如对诊疗或用药有疑问，可在“在线沟通”联系医护，或通过“帮助与反馈”联系客服。</view>
+  </block>
+</view>

@@ -4,13 +4,16 @@ import com.zhiyangyun.care.auth.model.FamilySmsCodeSendResponse;
 import com.zhiyangyun.care.auth.model.FamilySmsCodeVerifyResponse;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.family.config.FamilyPortalProperties;
 import com.zhiyangyun.care.family.model.FamilyPortalModels;
 import com.zhiyangyun.care.family.service.FamilyPortalService;
 import com.zhiyangyun.care.family.service.FamilySmsCodeService;
 import com.zhiyangyun.care.visit.model.VisitBookingResponse;
 import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,11 +29,32 @@ import org.springframework.web.bind.annotation.RestController;
 public class FamilyPortalController {
   private final FamilyPortalService familyPortalService;
   private final FamilySmsCodeService familySmsCodeService;
+  private final FamilyPortalProperties familyPortalProperties;
 
   public FamilyPortalController(FamilyPortalService familyPortalService,
-      FamilySmsCodeService familySmsCodeService) {
+      FamilySmsCodeService familySmsCodeService,
+      FamilyPortalProperties familyPortalProperties) {
     this.familyPortalService = familyPortalService;
     this.familySmsCodeService = familySmsCodeService;
+    this.familyPortalProperties = familyPortalProperties;
+  }
+
+  /** 客服/机构联系信息，供帮助与反馈等页面展示（可通过 app.family.support 配置）。 */
+  @GetMapping("/support-info")
+  public Result<Map<String, Object>> supportInfo() {
+    FamilyPortalProperties.Support support = familyPortalProperties.getSupport();
+    Map<String, Object> data = new LinkedHashMap<>();
+    data.put("organizationName", support == null ? "" : nullToEmpty(support.getOrganizationName()));
+    data.put("servicePhone", support == null ? "" : nullToEmpty(support.getServicePhone()));
+    data.put("serviceEmail", support == null ? "" : nullToEmpty(support.getServiceEmail()));
+    data.put("serviceHours", support == null ? "" : nullToEmpty(support.getServiceHours()));
+    data.put("wechatOfficialAccount", support == null ? "" : nullToEmpty(support.getWechatOfficialAccount()));
+    data.put("address", support == null ? "" : nullToEmpty(support.getAddress()));
+    return Result.ok(data);
+  }
+
+  private String nullToEmpty(String value) {
+    return value == null ? "" : value.trim();
   }
 
   @GetMapping("/dashboard/home")

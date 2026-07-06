@@ -14,6 +14,8 @@ import com.zhiyangyun.care.family.entity.FamilySmsCodeLog;
 import com.zhiyangyun.care.family.mapper.FamilyNotifyLogMapper;
 import com.zhiyangyun.care.family.mapper.FamilyRechargeOrderMapper;
 import com.zhiyangyun.care.family.mapper.FamilySmsCodeLogMapper;
+import com.zhiyangyun.care.family.model.FamilyNotifyCommand;
+import com.zhiyangyun.care.family.service.FamilyWechatNotifyService;
 import java.math.RoundingMode;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -27,6 +29,8 @@ import java.util.Map;
 import lombok.Data;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -42,17 +46,85 @@ public class FamilyOpsController {
   private final FamilyRechargeOrderMapper familyRechargeOrderMapper;
   private final ElderMapper elderMapper;
   private final FamilyUserMapper familyUserMapper;
+  private final FamilyWechatNotifyService familyWechatNotifyService;
 
   public FamilyOpsController(FamilySmsCodeLogMapper familySmsCodeLogMapper,
       FamilyNotifyLogMapper familyNotifyLogMapper,
       FamilyRechargeOrderMapper familyRechargeOrderMapper,
       ElderMapper elderMapper,
-      FamilyUserMapper familyUserMapper) {
+      FamilyUserMapper familyUserMapper,
+      FamilyWechatNotifyService familyWechatNotifyService) {
     this.familySmsCodeLogMapper = familySmsCodeLogMapper;
     this.familyNotifyLogMapper = familyNotifyLogMapper;
     this.familyRechargeOrderMapper = familyRechargeOrderMapper;
     this.elderMapper = elderMapper;
     this.familyUserMapper = familyUserMapper;
+    this.familyWechatNotifyService = familyWechatNotifyService;
+  }
+
+  /**
+   * 订阅消息推送链路端到端自测：为指定家属构造一条通知并真实投递，返回落库结果。
+   * 便于上线前验证 access_token / openId 绑定 / 模板配置是否打通。
+   */
+  @PreAuthorize("hasAnyRole('FINANCE_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PostMapping("/test-notify")
+  public Result<TestNotifyResponse> testNotify(@RequestBody TestNotifyRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    if (request == null || request.getFamilyUserId() == null) {
+      throw new IllegalArgumentException("familyUserId 不能为空");
+    }
+    FamilyUser familyUser = familyUserMapper.selectById(request.getFamilyUserId());
+    if (familyUser == null || Integer.valueOf(1).equals(familyUser.getIsDeleted())
+        || (orgId != null && !orgId.equals(familyUser.getOrgId()))) {
+      throw new IllegalArgumentException("家属账号不存在或不属于当前机构");
+    }
+
+    FamilyNotifyCommand command = new FamilyNotifyCommand();
+    command.setOrgId(familyUser.getOrgId());
+    command.setFamilyUserId(familyUser.getId());
+    command.setElderId(request.getElderId());
+    command.setEventType(normalizeText(request.getEventType(), "GENERAL"));
+    command.setLevel(normalizeText(request.getLevel(), "normal"));
+    command.setTitle(normalizeText(request.getTitle(), "推送链路自测"));
+    command.setContent(normalizeText(request.getContent(), "这是一条家属端订阅消息推送链路的端到端测试通知。"));
+    command.setPagePath(normalizeOptional(request.getPagePath()));
+    familyWechatNotifyService.notifyFamily(command);
+
+    FamilyNotifyLog latest = familyNotifyLogMapper.selectOne(
+        Wrappers.lambdaQuery(FamilyNotifyLog.class)
+            .eq(FamilyNotifyLog::getIsDeleted, 0)
+            .eq(FamilyNotifyLog::getOrgId, familyUser.getOrgId())
+            .eq(FamilyNotifyLog::getFamilyUserId, familyUser.getId())
+            .orderByDesc(FamilyNotifyLog::getId)
+            .last("LIMIT 1"));
+    TestNotifyResponse response = new TestNotifyResponse();
+    response.setFamilyUserId(familyUser.getId());
+    response.setBoundOpenId(familyUser.getOpenId() != null && !familyUser.getOpenId().isBlank());
+    if (latest != null) {
+      response.setLogId(latest.getId());
+      response.setStatus(latest.getStatus());
+      response.setLastError(latest.getLastError());
+      response.setTemplateId(latest.getTemplateId());
+    }
+    response.setSummary(buildTestNotifySummary(response));
+    return Result.ok(response);
+  }
+
+  private String buildTestNotifySummary(TestNotifyResponse response) {
+    if (!response.isBoundOpenId()) {
+      return "该家属尚未绑定微信 openId，通知已跳过；请在小程序登录后自动绑定或引导授权。";
+    }
+    String status = normalizeStatus(response.getStatus());
+    if ("SUCCESS".equals(status)) {
+      return "推送链路打通：订阅消息已成功下发，请在微信客户端确认收到。";
+    }
+    if ("SKIPPED".equals(status)) {
+      return "通知被跳过：" + normalizeText(response.getLastError(), "可能是家属关闭了该类型提醒。");
+    }
+    if ("FAILED".equals(status)) {
+      return "推送失败：" + normalizeText(response.getLastError(), "请核查模板ID、access_token 与 openId。");
+    }
+    return "通知已入库，状态：" + status;
   }
 
   @PreAuthorize("hasAnyRole('FINANCE_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
@@ -580,6 +652,28 @@ public class FamilyOpsController {
     private BigDecimal totalAmount = BigDecimal.ZERO;
     private BigDecimal paidAmount = BigDecimal.ZERO;
     private BigDecimal abnormalAmount = BigDecimal.ZERO;
+  }
+
+  @Data
+  public static class TestNotifyRequest {
+    private Long familyUserId;
+    private Long elderId;
+    private String eventType;
+    private String level;
+    private String title;
+    private String content;
+    private String pagePath;
+  }
+
+  @Data
+  public static class TestNotifyResponse {
+    private Long familyUserId;
+    private boolean boundOpenId;
+    private Long logId;
+    private String status;
+    private String templateId;
+    private String lastError;
+    private String summary;
   }
 
   @Data

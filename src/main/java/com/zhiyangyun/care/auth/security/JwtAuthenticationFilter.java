@@ -53,6 +53,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       String token = header.substring(7);
       try {
         Claims claims = tokenProvider.parseToken(token);
+        // 2FA 挑战令牌仅用于第二步短信验证码校验，不能作为访问令牌
+        if (TokenProvider.TOKEN_TYPE_2FA_CHALLENGE.equals(claims.get(TokenProvider.CLAIM_TOKEN_TYPE, String.class))) {
+          log.info("Rejected 2FA challenge token used as access token for path={}", request.getRequestURI());
+          SecurityContextHolder.clearContext();
+          filterChain.doFilter(request, response);
+          return;
+        }
         String jti = claims.getId();
         if (tokenBlacklistService.isBlacklisted(jti)) {
           log.info("Rejected blacklisted token for path={}, jti={}", request.getRequestURI(), jti);

@@ -1,16 +1,16 @@
 const taskGroups = [
-  { key: 'care', title: '护理执行', count: 8, tone: 'warning', route: '/pages/staff-care/index' },
-  { key: 'medication', title: '用药确认', count: 3, tone: 'danger', route: '/pages/staff-medical/index?module=medication' },
-  { key: 'inspection', title: '巡房巡检', count: 2, tone: 'danger', route: '/pages/staff-medical/index?module=inspection' },
-  { key: 'logistics', title: '后勤工单', count: 5, tone: 'warning', route: '/pages/staff-logistics/index' }
+  { key: 'care', title: '护理执行', count: 8, tone: 'warning', route: '/packageStaff/pages/staff-care/index' },
+  { key: 'medication', title: '用药确认', count: 3, tone: 'danger', route: '/packageStaff/pages/staff-medical/index?module=medication' },
+  { key: 'inspection', title: '巡房巡检', count: 2, tone: 'danger', route: '/packageStaff/pages/staff-medical/index?module=inspection' },
+  { key: 'logistics', title: '后勤工单', count: 5, tone: 'warning', route: '/packageStaff/pages/staff-logistics/index' }
 ];
 
 const tasks = [
-  { id: 'care-1', module: 'CARE', title: '协助王桂兰晨间洗漱', resident: '王桂兰', room: '3F-302-1', time: '08:20', status: '待执行', priority: 'MEDIUM', actionText: '护理执行', evidenceRequired: true, checklist: ['核对床号和姓名', '完成晨间洗漱', '记录皮肤和精神状态'], route: '/pages/staff-care-execution/index?id=care-1' },
-  { id: 'med-1', module: 'MEDICATION', title: '张建国早餐后用药', resident: '张建国', room: '2F-215-2', time: '08:40', status: '待确认', priority: 'HIGH', actionText: '用药确认', evidenceRequired: false, checklist: ['核对老人身份', '核对药品和剂量', '记录服药情况'], route: '/pages/staff-clinical/index?mode=MEDICATION&id=med-1' },
-  { id: 'inspect-1', module: 'INSPECTION', title: '夜间异常巡检复核', resident: '刘秀英', room: '4F-408-1', time: '09:10', status: '异常待跟进', priority: 'HIGH', actionText: '巡检复核', evidenceRequired: true, checklist: ['复测生命体征', '拍照或语音记录', '同步责任医生'], route: '/pages/staff-clinical/index?mode=INSPECTION&id=inspect-1' },
-  { id: 'repair-1', module: 'LOGISTICS', title: '306 卫生间扶手松动', resident: '公共区域', room: '3F-306', time: '09:30', status: '待到场', priority: 'MEDIUM', actionText: '维修处理', evidenceRequired: true, checklist: ['到场确认位置', '记录处理材料', '拍照验收'], route: '/pages/staff-repairs/index' },
-  { id: 'meal-1', module: 'MEAL', title: '糖尿病软食餐配送', resident: '陈阿姨', room: '2F-208-1', time: '11:20', status: '待配送', priority: 'MEDIUM', actionText: '送餐签收', evidenceRequired: false, checklist: ['核对餐别', '确认禁忌标签', '送达签收'], route: '/pages/staff-meals/index' }
+  { id: 'care-1', module: 'CARE', title: '协助王桂兰晨间洗漱', resident: '王桂兰', room: '3F-302-1', time: '08:20', status: '待执行', priority: 'MEDIUM', actionText: '护理执行', evidenceRequired: true, checklist: ['核对床号和姓名', '完成晨间洗漱', '记录皮肤和精神状态'], route: '/packageStaff/pages/staff-care-execution/index?id=care-1' },
+  { id: 'med-1', module: 'MEDICATION', title: '张建国早餐后用药', resident: '张建国', room: '2F-215-2', time: '08:40', status: '待确认', priority: 'HIGH', actionText: '用药确认', evidenceRequired: false, checklist: ['核对老人身份', '核对药品和剂量', '记录服药情况'], route: '/packageStaff/pages/staff-clinical/index?mode=MEDICATION&id=med-1' },
+  { id: 'inspect-1', module: 'INSPECTION', title: '夜间异常巡检复核', resident: '刘秀英', room: '4F-408-1', time: '09:10', status: '异常待跟进', priority: 'HIGH', actionText: '巡检复核', evidenceRequired: true, checklist: ['复测生命体征', '拍照或语音记录', '同步责任医生'], route: '/packageStaff/pages/staff-clinical/index?mode=INSPECTION&id=inspect-1' },
+  { id: 'repair-1', module: 'LOGISTICS', title: '306 卫生间扶手松动', resident: '公共区域', room: '3F-306', time: '09:30', status: '待到场', priority: 'MEDIUM', actionText: '维修处理', evidenceRequired: true, checklist: ['到场确认位置', '记录处理材料', '拍照验收'], route: '/packageStaff/pages/staff-repairs/index' },
+  { id: 'meal-1', module: 'MEAL', title: '糖尿病软食餐配送', resident: '陈阿姨', room: '2F-208-1', time: '11:20', status: '待配送', priority: 'MEDIUM', actionText: '送餐签收', evidenceRequired: false, checklist: ['核对餐别', '确认禁忌标签', '送达签收'], route: '/packageStaff/pages/staff-meals/index' }
 ];
 
 const schedule = [
@@ -114,25 +114,25 @@ function getStaffDashboard() {
     mobileLevel: 'MEDIUM',
     notices: ['08:40 有 3 项用药待确认', '巡检异常需在 30 分钟内跟进', '午餐特殊餐配送已生成'],
     quickEntries: [
-      { title: '待办', desc: '通知提醒', route: '/pages/staff-todo/index' },
-      { title: '通讯', desc: '一键联系', route: '/pages/staff-contacts/index' },
-      { title: '日报', desc: '工作汇报', route: '/pages/staff-report/index' },
-      { title: '公告', desc: '制度通知', route: '/pages/staff-notices/index' },
-      { title: '建议', desc: '一线反馈', route: '/pages/staff-suggestions/index' },
-      { title: '护理', desc: '现场照护', route: '/pages/staff-care-execution/index' },
-      { title: '体征', desc: '现场补录', route: '/pages/staff-vitals/index' },
-      { title: '用药', desc: '三查七对', route: '/pages/staff-clinical/index?mode=MEDICATION' },
-      { title: '巡检', desc: '异常复核', route: '/pages/staff-clinical/index?mode=INSPECTION' },
-      { title: '物资', desc: '申领补给', route: '/pages/staff-material/index' },
-      { title: '送餐', desc: '签收反馈', route: '/pages/staff-meals/index' },
-      { title: '维修', desc: '到场验收', route: '/pages/staff-repairs/index' },
-      { title: '排班', desc: '今日班次', route: '/pages/staff-schedule/index' },
-      { title: '审批', desc: '请假调班', route: '/pages/staff-approval/index' },
-      { title: '交接', desc: '班次重点', route: '/pages/staff-handover/index' },
-      { title: '上报', desc: '异常事件', route: '/pages/staff-incident/index' },
-      { title: '扫码', desc: '巡检核验', route: '/pages/staff-patrol/index' },
-      { title: '记录', desc: '执行回执', route: '/pages/staff-receipts/index' },
-      { title: '异常', desc: '上报追踪', route: '/pages/staff-incidents/index' }
+      { title: '待办', desc: '通知提醒', route: '/packageStaff/pages/staff-todo/index' },
+      { title: '通讯', desc: '一键联系', route: '/packageStaff/pages/staff-contacts/index' },
+      { title: '日报', desc: '工作汇报', route: '/packageStaff/pages/staff-report/index' },
+      { title: '公告', desc: '制度通知', route: '/packageStaff/pages/staff-notices/index' },
+      { title: '建议', desc: '一线反馈', route: '/packageStaff/pages/staff-suggestions/index' },
+      { title: '护理', desc: '现场照护', route: '/packageStaff/pages/staff-care-execution/index' },
+      { title: '体征', desc: '现场补录', route: '/packageStaff/pages/staff-vitals/index' },
+      { title: '用药', desc: '三查七对', route: '/packageStaff/pages/staff-clinical/index?mode=MEDICATION' },
+      { title: '巡检', desc: '异常复核', route: '/packageStaff/pages/staff-clinical/index?mode=INSPECTION' },
+      { title: '物资', desc: '申领补给', route: '/packageStaff/pages/staff-material/index' },
+      { title: '送餐', desc: '签收反馈', route: '/packageStaff/pages/staff-meals/index' },
+      { title: '维修', desc: '到场验收', route: '/packageStaff/pages/staff-repairs/index' },
+      { title: '排班', desc: '今日班次', route: '/packageStaff/pages/staff-schedule/index' },
+      { title: '审批', desc: '请假调班', route: '/packageStaff/pages/staff-approval/index' },
+      { title: '交接', desc: '班次重点', route: '/packageStaff/pages/staff-handover/index' },
+      { title: '上报', desc: '异常事件', route: '/packageStaff/pages/staff-incident/index' },
+      { title: '扫码', desc: '巡检核验', route: '/packageStaff/pages/staff-patrol/index' },
+      { title: '记录', desc: '执行回执', route: '/packageStaff/pages/staff-receipts/index' },
+      { title: '异常', desc: '上报追踪', route: '/packageStaff/pages/staff-incidents/index' }
     ],
     taskGroups,
     tasks: tasks.slice(0, 4)

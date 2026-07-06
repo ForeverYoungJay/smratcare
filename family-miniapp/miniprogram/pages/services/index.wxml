@@ -16,6 +16,10 @@
         <text class="title">待办中心</text>
         <text class="desc">消息、缴费、日程待办统一聚合</text>
       </view>
+      <view class="entry" data-icon="态" data-path="/pages/dynamic/index" bindtap="go">
+        <text class="title">长者动态</text>
+        <text class="desc">护理日志、相册、膳食、健康与外出一站汇总</text>
+      </view>
       <view class="entry" data-icon="缴" data-path="/pages/payment/index" bindtap="go">
         <text class="title">在线缴费</text>
         <text class="desc">账单查询 / 在线充值 / 自动扣费设置</text>

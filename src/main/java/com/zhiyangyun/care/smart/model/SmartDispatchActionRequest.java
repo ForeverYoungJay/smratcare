@@ -12,4 +12,8 @@ public class SmartDispatchActionRequest {
   private String assigneeName;
   private String note;
   private Long incidentId;
+  /** 处置时一键生成不良事件记录（与 incidentId 二选一）。 */
+  private Boolean createIncident;
+  /** 一键生成不良事件时的事故类型（缺省取告警类型）。 */
+  private String incidentType;
 }

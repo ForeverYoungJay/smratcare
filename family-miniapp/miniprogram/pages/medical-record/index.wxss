@@ -1,5 +1,34 @@
-.card { padding: 24rpx; }
-.item { margin-top: 14rpx; padding: 14rpx; background: #FAFAF7; border-radius: 12rpx; border: 1rpx solid #E4E7E0; }
-.line { margin-top: 8rpx; display: flex; justify-content: space-between; gap: 20rpx; }
-.label { width: 140rpx; font-size: 22rpx; color: #5C6F69; }
-.value { flex: 1; font-size: 23rpx; color: #22332E; text-align: right; }
+.page-head { padding: 6rpx 8rpx 20rpx; }
+
+.loading-tip { padding: 40rpx; text-align: center; color: var(--faint); font-size: 26rpx; }
+
+.record-card { padding: 24rpx; margin-bottom: 18rpx; }
+
+.record-top { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
+.record-date { font-size: 30rpx; font-weight: 800; color: var(--ink); }
+
+.record-diagnosis {
+  margin-top: 14rpx;
+  padding: 12rpx 16rpx;
+  border-radius: var(--radius-ctl);
+  background: var(--brand-soft);
+  color: var(--brand-deep);
+  font-size: 26rpx;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.record-line { margin-top: 14rpx; display: flex; gap: 18rpx; }
+.record-line .k { flex: none; width: 128rpx; font-size: 24rpx; color: var(--muted); }
+.record-line .v { flex: 1; font-size: 25rpx; color: var(--ink); line-height: 1.6; }
+
+.ellipsis { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+.record-foot {
+  margin-top: 18rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; gap: 18rpx;
+}
+.record-meds { flex: 1; font-size: 23rpx; color: var(--muted); }
+.record-more { flex: none; font-size: 24rpx; color: var(--brand); font-weight: 700; }

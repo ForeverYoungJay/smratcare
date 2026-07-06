@@ -234,3 +234,24 @@
   color: #5C6F69;
   line-height: 1.45;
 }
+
+/* 待支付订单自动刷新提示 */
+.sync-hint {
+  margin-top: 14rpx;
+  padding: 14rpx 20rpx;
+  border-radius: 14rpx;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
+.sync-dot {
+  color: var(--accent);
+  animation: syncBlink 1.1s ease-in-out infinite;
+}
+
+@keyframes syncBlink {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}

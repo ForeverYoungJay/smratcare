@@ -1,4 +1,4 @@
-const { getHelpFaqs } = require('../../services/family');
+const { getHelpFaqs, getSupportInfo } = require('../../services/family');
 
 function groupFaqs(list = []) {
   const grouped = {};
@@ -26,13 +26,37 @@ Page({
   },
   async onShow() {
     getApp().ensureLogin();
-    const supportInfo = getApp().globalData.supportInfo || {};
+    const fallback = getApp().globalData.supportInfo || {};
     this.setData({
-      supportInfo,
+      supportInfo: fallback,
       complianceInfo: getApp().globalData.complianceInfo || {},
-      serviceEmail: String(supportInfo.serviceEmail || '').trim()
+      serviceEmail: String(fallback.serviceEmail || '').trim()
     });
+    this.loadSupportInfo();
     await this.loadFaqs();
+  },
+  async loadSupportInfo() {
+    try {
+      const info = await getSupportInfo();
+      if (!info) {
+        return;
+      }
+      const fallback = getApp().globalData.supportInfo || {};
+      const supportInfo = {
+        organizationName: info.organizationName || fallback.organizationName || '',
+        supportPhone: info.servicePhone || fallback.supportPhone || '',
+        supportHours: info.serviceHours || fallback.supportHours || '',
+        serviceEmail: info.serviceEmail || fallback.serviceEmail || '',
+        wechatOfficialAccount: info.wechatOfficialAccount || '',
+        address: info.address || ''
+      };
+      this.setData({
+        supportInfo,
+        serviceEmail: String(supportInfo.serviceEmail || '').trim()
+      });
+    } catch (error) {
+      // 客服信息拉取失败时保留本地兜底，不打断页面
+    }
   },
   async loadFaqs() {
     this.setData({ loading: true });
