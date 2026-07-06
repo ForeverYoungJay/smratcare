@@ -33,7 +33,7 @@
     <view class="time-grid">
       <view class="field">
         <view class="field-label">采集日期</view>
-        <picker mode="date" value="{{measuredDate}}" bindchange="onDateChange">
+        <picker mode="date" value="{{measuredDate}}" end="{{today}}" bindchange="onDateChange">
           <view class="picker-line">{{measuredDate}}</view>
         </picker>
       </view>
@@ -79,7 +79,7 @@
 
   <view wx:if="{{!loading && !loadError && records.length}}">
     <block wx:for="{{records}}" wx:key="id">
-      <view class="surface vital-card">
+      <view class="surface vital-card {{item.statusClass === 'danger' ? 'is-danger' : ''}}">
         <view class="vital-head">
           <view>
             <view class="vital-title">{{item.elderName || '未命名老人'}} · {{item.typeLabel}}</view>

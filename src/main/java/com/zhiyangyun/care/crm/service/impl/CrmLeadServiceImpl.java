@@ -8,6 +8,7 @@ import com.zhiyangyun.care.auth.entity.StaffAccount;
 import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.common.web.PageGuard;
+import com.zhiyangyun.care.crm.constant.ContractFlowStage;
 import com.zhiyangyun.care.crm.entity.CrmContract;
 import com.zhiyangyun.care.crm.entity.CrmCallbackPlan;
 import com.zhiyangyun.care.crm.entity.CrmLead;
@@ -41,10 +42,10 @@ import org.springframework.stereotype.Service;
 @Service
 public class CrmLeadServiceImpl implements CrmLeadService {
   private static final Pattern CONTRACT_SEQ_PATTERN = Pattern.compile("^(gfyy\\d{8})(\\d{3,})$");
-  private static final String FLOW_PENDING_ASSESSMENT = "PENDING_ASSESSMENT";
-  private static final String FLOW_PENDING_BED_SELECT = "PENDING_BED_SELECT";
-  private static final String FLOW_PENDING_SIGN = "PENDING_SIGN";
-  private static final String FLOW_SIGNED = "SIGNED";
+  private static final String FLOW_PENDING_ASSESSMENT = ContractFlowStage.PENDING_ASSESSMENT.code();
+  private static final String FLOW_PENDING_BED_SELECT = ContractFlowStage.PENDING_BED_SELECT.code();
+  private static final String FLOW_PENDING_SIGN = ContractFlowStage.PENDING_SIGN.code();
+  private static final String FLOW_SIGNED = ContractFlowStage.SIGNED.code();
   private final CrmLeadMapper leadMapper;
   private final CrmCallbackPlanMapper callbackPlanMapper;
   private final CrmContractMapper contractMapper;

@@ -3,56 +3,57 @@
   <view class="section-subtitle">查房、用药确认和异常巡检闭环</view>
 
   <view class="summary-grid">
-    <view class="surface summary-card" bindtap="goMedication">
+    <view class="surface summary-card" hover-class="summary-card-hover" bindtap="goMedication">
       <text>今日用药待办</text>
       <strong>{{medicationPending}}</strong>
     </view>
-    <view class="surface summary-card" bindtap="goInspection">
+    <view class="surface summary-card" hover-class="summary-card-hover" bindtap="goInspection">
       <text>今日巡检待办</text>
       <strong>{{inspectionPending}}</strong>
     </view>
   </view>
 
-  <view class="mode-tabs">
-    <view class="mode-tab {{activeTab === 'MEDICATION' ? 'active' : ''}}" data-tab="MEDICATION" bindtap="switchTab">用药确认</view>
-    <view class="mode-tab {{activeTab === 'INSPECTION' ? 'active' : ''}}" data-tab="INSPECTION" bindtap="switchTab">巡检复核</view>
-  </view>
+  <state-view
+    loading="{{loading}}"
+    error="{{loadError}}"
+    empty="{{false}}"
+    bind:retry="loadData" />
 
-  <view class="surface state-card" wx:if="{{loading}}">
-    <view class="state-title">正在加载医护任务</view>
-  </view>
-
-  <view class="surface state-card" wx:if="{{!loading && loadError}}">
-    <view class="state-title">医护任务加载失败</view>
-    <view class="section-subtitle">{{loadError}}</view>
-    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
-  </view>
-
-  <view class="surface panel" wx:if="{{!loading && !loadError && activeTab === 'MEDICATION'}}">
-    <view class="panel-title">用药确认</view>
-    <view class="section-subtitle" wx:if="{{medicationTasks.length === 0}}">暂无用药确认任务。</view>
-    <block wx:for="{{medicationTasks}}" wx:key="id">
-      <view class="work-row" data-id="{{item.id}}" bindtap="openMedication">
-        <view>
-          <view class="work-title">{{item.title}}</view>
-          <view class="work-meta">{{item.resident}} · {{item.room}} · {{item.time}} · {{item.status}}</view>
-        </view>
-        <text class="work-action">{{item.actionText}}</text>
+  <view wx:if="{{!loading && !loadError}}">
+    <view class="surface panel">
+      <view class="panel-head">
+        <view class="panel-title">用药确认</view>
+        <text class="panel-entry" bindtap="goMedication">进入闭环 ›</text>
       </view>
-    </block>
-  </view>
-
-  <view class="surface panel" wx:if="{{!loading && !loadError && activeTab === 'INSPECTION'}}">
-    <view class="panel-title">巡检复核</view>
-    <view class="section-subtitle" wx:if="{{inspectionTasks.length === 0}}">暂无巡检复核任务。</view>
-    <block wx:for="{{inspectionTasks}}" wx:key="id">
-      <view class="work-row" data-id="{{item.id}}" bindtap="openInspection">
-        <view>
-          <view class="work-title">{{item.title}}</view>
-          <view class="work-meta">{{item.resident}} · {{item.room}} · {{item.time}} · {{item.status}}</view>
+      <view class="section-subtitle" wx:if="{{medicationTotal === 0}}">暂无用药确认任务。</view>
+      <block wx:for="{{medicationPreview}}" wx:key="id">
+        <view class="work-row" hover-class="work-row-hover" data-id="{{item.id}}" bindtap="openMedication">
+          <view>
+            <view class="work-title">{{item.title}}</view>
+            <view class="work-meta">{{item.resident}} · {{item.room}} · {{item.time}} · {{item.status}}</view>
+          </view>
+          <text class="work-action">{{item.actionText}}</text>
         </view>
-        <text class="work-action">{{item.actionText}}</text>
+      </block>
+      <view class="more-link" wx:if="{{medicationTotal > medicationPreview.length}}" bindtap="goMedication">查看全部 {{medicationTotal}} 条 ›</view>
+    </view>
+
+    <view class="surface panel">
+      <view class="panel-head">
+        <view class="panel-title">巡检复核</view>
+        <text class="panel-entry" bindtap="goInspection">进入闭环 ›</text>
       </view>
-    </block>
+      <view class="section-subtitle" wx:if="{{inspectionTotal === 0}}">暂无巡检复核任务。</view>
+      <block wx:for="{{inspectionPreview}}" wx:key="id">
+        <view class="work-row" hover-class="work-row-hover" data-id="{{item.id}}" bindtap="openInspection">
+          <view>
+            <view class="work-title">{{item.title}}</view>
+            <view class="work-meta">{{item.resident}} · {{item.room}} · {{item.time}} · {{item.status}}</view>
+          </view>
+          <text class="work-action">{{item.actionText}}</text>
+        </view>
+      </block>
+      <view class="more-link" wx:if="{{inspectionTotal > inspectionPreview.length}}" bindtap="goInspection">查看全部 {{inspectionTotal}} 条 ›</view>
+    </view>
   </view>
 </view>

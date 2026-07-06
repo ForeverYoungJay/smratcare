@@ -2,6 +2,8 @@ package com.zhiyangyun.care.crm.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.zhiyangyun.care.crm.constant.ContractChangeStatus;
+import com.zhiyangyun.care.crm.constant.ContractFlowStage;
 import com.zhiyangyun.care.crm.entity.CrmCallbackPlan;
 import com.zhiyangyun.care.crm.entity.CrmContract;
 import com.zhiyangyun.care.crm.entity.CrmLead;
@@ -45,11 +47,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class MarketingReportServiceImpl implements MarketingReportService {
   private static final Set<String> STANDARD_SOURCES = new LinkedHashSet<>(
       Arrays.asList("自然到访", "线上咨询", "抖音", "微信", "转介绍", "社区活动", "其他"));
-  private static final String FLOW_PENDING_ASSESSMENT = "PENDING_ASSESSMENT";
-  private static final String FLOW_PENDING_BED_SELECT = "PENDING_BED_SELECT";
-  private static final String FLOW_PENDING_SIGN = "PENDING_SIGN";
-  private static final String FLOW_SIGNED = "SIGNED";
-  private static final String CHANGE_PENDING_APPROVAL = "PENDING_APPROVAL";
+  private static final String FLOW_PENDING_ASSESSMENT = ContractFlowStage.PENDING_ASSESSMENT.code();
+  private static final String FLOW_PENDING_BED_SELECT = ContractFlowStage.PENDING_BED_SELECT.code();
+  private static final String FLOW_PENDING_SIGN = ContractFlowStage.PENDING_SIGN.code();
+  private static final String FLOW_SIGNED = ContractFlowStage.SIGNED.code();
+  private static final String CHANGE_PENDING_APPROVAL = ContractChangeStatus.PENDING_APPROVAL.code();
 
   private final CrmLeadMapper crmLeadMapper;
   private final CrmCallbackPlanMapper callbackPlanMapper;

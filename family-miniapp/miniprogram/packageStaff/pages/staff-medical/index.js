@@ -1,5 +1,7 @@
 const { getTaskList } = require('../../../services/staff');
 
+const PREVIEW_LIMIT = 5;
+
 function isDoneStatus(status) {
   const text = String(status || '');
   return text.indexOf('完成') >= 0 || text.indexOf('DONE') >= 0;
@@ -9,17 +11,12 @@ Page({
   data: {
     loading: false,
     loadError: '',
-    activeTab: 'MEDICATION',
-    medicationTasks: [],
-    inspectionTasks: [],
+    medicationPreview: [],
+    inspectionPreview: [],
+    medicationTotal: 0,
+    inspectionTotal: 0,
     medicationPending: 0,
     inspectionPending: 0
-  },
-  onLoad(options = {}) {
-    const module = String(options.module || '').toUpperCase();
-    if (module === 'INSPECTION') {
-      this.setData({ activeTab: 'INSPECTION' });
-    }
   },
   onShow() {
     getApp().ensureLogin();
@@ -35,11 +32,15 @@ Page({
         getTaskList('MEDICATION'),
         getTaskList('INSPECTION')
       ]);
+      const med = medicationTasks || [];
+      const insp = inspectionTasks || [];
       this.setData({
-        medicationTasks: medicationTasks || [],
-        inspectionTasks: inspectionTasks || [],
-        medicationPending: (medicationTasks || []).filter((item) => !isDoneStatus(item.status)).length,
-        inspectionPending: (inspectionTasks || []).filter((item) => !isDoneStatus(item.status)).length
+        medicationTotal: med.length,
+        inspectionTotal: insp.length,
+        medicationPreview: med.slice(0, PREVIEW_LIMIT),
+        inspectionPreview: insp.slice(0, PREVIEW_LIMIT),
+        medicationPending: med.filter((item) => !isDoneStatus(item.status)).length,
+        inspectionPending: insp.filter((item) => !isDoneStatus(item.status)).length
       });
     } catch (error) {
       this.setData({ loadError: error.message || '医护任务加载失败' });
@@ -47,11 +48,6 @@ Page({
       this.setData({ loading: false });
       if (fromPullDown) wx.stopPullDownRefresh();
     }
-  },
-  switchTab(e) {
-    const tab = e.currentTarget.dataset.tab;
-    if (!tab || tab === this.data.activeTab) return;
-    this.setData({ activeTab: tab });
   },
   goMedication() {
     wx.navigateTo({ url: '/packageStaff/pages/staff-clinical/index?mode=MEDICATION' });

@@ -1,3 +1,4 @@
 {
-  "navigationBarTitleText": "体征补录"
+  "navigationBarTitleText": "体征补录",
+  "enablePullDownRefresh": true
 }

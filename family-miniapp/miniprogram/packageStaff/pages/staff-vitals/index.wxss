@@ -181,6 +181,15 @@
   padding: 26rpx;
 }
 
+.vital-card.is-danger {
+  border: 2rpx solid #E7B4B0;
+  background: #FDF4F3;
+}
+
+.vital-card.is-danger .vital-value {
+  color: #C9504B;
+}
+
 .vital-head {
   display: flex;
   justify-content: space-between;
