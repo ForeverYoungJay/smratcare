@@ -49,10 +49,14 @@ describe('export utils', () => {
       downloadedBlob = blob as Blob
       return 'blob:test'
     })
+    // 用字节数组而非 Blob 构造 Response：测试环境（undici）会把 Blob body 字符串化为 "[object Blob]"
     global.fetch = vi.fn().mockResolvedValue(
-      new Response(new Blob([new Uint8Array([0xef, 0xbb, 0xbf, 0x61])], { type: 'text/csv;charset=utf-8;' }), {
+      new Response(new Uint8Array([0xef, 0xbb, 0xbf, 0x61]), {
         status: 200,
-        headers: { 'content-disposition': 'attachment; filename="report.csv"' }
+        headers: {
+          'content-type': 'text/csv;charset=utf-8;',
+          'content-disposition': 'attachment; filename="report.csv"'
+        }
       })
     ) as typeof fetch
 
@@ -69,9 +73,12 @@ describe('export utils', () => {
       return 'blob:test'
     })
     global.fetch = vi.fn().mockResolvedValue(
-      new Response(new Blob(['a'], { type: 'text/csv;charset=utf-8;' }), {
+      new Response('a', {
         status: 200,
-        headers: { 'content-disposition': 'attachment; filename="report.csv"' }
+        headers: {
+          'content-type': 'text/csv;charset=utf-8;',
+          'content-disposition': 'attachment; filename="report.csv"'
+        }
       })
     ) as typeof fetch
 

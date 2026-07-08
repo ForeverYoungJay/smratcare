@@ -100,6 +100,7 @@ function openModal(record?: CarePackage) {
 async function submit() {
   try {
     await formRef.value?.validate()
+    if (submitting.value) return
     submitting.value = true
     if (form.id) {
       await updateCarePackage(form.id, form)

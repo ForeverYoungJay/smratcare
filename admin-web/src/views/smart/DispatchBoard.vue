@@ -266,6 +266,7 @@ function openAssign(record: SmartAlertDispatch) {
   assignOpen.value = true
 }
 async function submitAssign() {
+  if (saving.value) return
   saving.value = true
   try {
     await assignSmartDispatch({
@@ -293,6 +294,7 @@ async function submitHandle() {
     message.error('请填写处置说明')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     await handleSmartDispatch({
@@ -319,6 +321,7 @@ async function submitReview() {
     message.error('请填写复盘结论')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     await reviewSmartDispatch({ dispatchId: actionForm.dispatchId as Id, note: actionForm.note })

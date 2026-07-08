@@ -178,6 +178,7 @@ function openEdit(record?: OaGroupSetting) {
 
 async function submit() {
   if (!form.groupName) return
+  if (saving.value) return
   saving.value = true
   try {
     if (form.id) {

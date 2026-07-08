@@ -268,6 +268,7 @@ function openEditSelected() {
 async function submitCreate() {
   if (!formRef.value) return
   await formRef.value.validate()
+  if (submitting.value) return
   submitting.value = true
   try {
     if (editingId.value) {

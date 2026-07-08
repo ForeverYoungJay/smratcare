@@ -3,7 +3,7 @@
     <div class="group-shell">
       <section class="group-hero">
         <div>
-          <p class="eyebrow">Care Team Ledger</p>
+          <p class="eyebrow">护理班组台账</p>
           <h2>弋阳龟峰颐养中心护工小组明细表</h2>
           <p class="hero-text">为班组长准备的现场工具页。这里既能管理编组，也能临时维护护工优点、特长，并按需要生成带照片或电话的打印版台账。</p>
         </div>
@@ -471,6 +471,7 @@ function escapeHtml(value: string) {
 async function submit() {
   try {
     await formRef.value?.validate()
+    if (submitting.value) return
     submitting.value = true
     const payload: Partial<CaregiverGroupItem> = {
       name: form.name,

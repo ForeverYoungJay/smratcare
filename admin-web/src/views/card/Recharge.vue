@@ -114,6 +114,7 @@ function openRecharge() {
 }
 
 async function submit() {
+  if (saving.value) return
   saving.value = true
   try {
     await rechargeCard({

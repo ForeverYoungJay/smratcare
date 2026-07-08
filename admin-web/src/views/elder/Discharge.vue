@@ -81,6 +81,7 @@ async function submit() {
   if (!formRef.value) return
   try {
     await formRef.value.validate()
+    if (submitting.value) return
     submitting.value = true
     await dischargeElder(form)
     message.success('退院办理成功')

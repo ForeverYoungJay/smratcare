@@ -259,6 +259,7 @@ async function submitEdit() {
     `即将保存规则 ${normalizedKey}@${dayjs(form.value.effectiveMonth).format('YYYY-MM')}`
   )
   if (!confirmed) return
+  if (saving.value) return
   saving.value = true
   try {
     await upsertFinanceBillingConfig({
@@ -292,6 +293,7 @@ async function batchToggleStatus(status: 0 | 1) {
     `本次将操作 ${selected.length} 条规则`
   )
   if (!confirmed) return
+  if (saving.value) return
   saving.value = true
   try {
     await batchUpsertFinanceBillingConfig({
@@ -335,6 +337,7 @@ async function applyTemplate(type: 'STANDARD' | 'NURSING' | 'UTILITY') {
     `模板类型：${type}，共 ${templates.length} 条规则`
   )
   if (!confirmed) return
+  if (saving.value) return
   saving.value = true
   try {
     await batchUpsertFinanceBillingConfig({
@@ -432,6 +435,7 @@ async function onImportFileChange(event: Event) {
       message.warning('CSV 无有效记录')
       return
     }
+    if (saving.value) return
     saving.value = true
     await batchUpsertFinanceBillingConfig({ items })
     message.success(`导入成功，共 ${items.length} 条`)

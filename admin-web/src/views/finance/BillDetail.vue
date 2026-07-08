@@ -487,6 +487,7 @@ async function submitPay() {
   const billId = currentBillId.value
   if (!detail.value || !billId) return
   await payFormRef.value?.validate?.()
+  if (paying.value) return
   paying.value = true
   try {
     const payload = {

@@ -1,4 +1,4 @@
-import type { Id } from './common'
+import type { Id, PageQuery } from './common'
 
 export interface MarketingConversionReport {
   totalLeads: number
@@ -138,6 +138,54 @@ export interface MarketingReportQuery {
   source?: string
   staffId?: number
   type?: MarketingCallbackType
+}
+
+/** 线索分页查询条件（对应 CrmLeadController#page 的请求参数）。 */
+export interface CrmLeadPageQuery extends PageQuery {
+  keyword?: string
+  status?: number
+  source?: string
+  customerTag?: string
+  consultantName?: string
+  consultantPhone?: string
+  elderName?: string
+  elderPhone?: string
+  consultDateFrom?: string
+  consultDateTo?: string
+  consultType?: string
+  mediaChannel?: string
+  infoSource?: string
+  marketerName?: string
+  followupStatus?: string
+  reservationChannel?: string
+  contractNo?: string
+  contractStatus?: string
+  flowStage?: string
+  currentOwnerDept?: string
+  mode?: MarketingLeadMode | 'pipeline'
+  callbackType?: MarketingCallbackType
+  followupDateFrom?: string
+  followupDateTo?: string
+  followupDueOnly?: boolean
+}
+
+/** 合同分页查询条件（对应 CrmContractController#page 的请求参数）。 */
+export interface CrmContractPageQuery extends PageQuery {
+  keyword?: string
+  contractNo?: string
+  elderId?: Id | number
+  elderName?: string
+  elderPhone?: string
+  marketerName?: string
+  orgName?: string
+  flowStage?: string
+  contractStatus?: string
+  status?: string
+  changeWorkflowStatus?: string
+  excludeSigned?: boolean
+  overdueOnly?: boolean
+  sortByOverdue?: boolean
+  currentOwnerDept?: string
 }
 
 export interface MarketingDataQualityReport {
@@ -349,6 +397,14 @@ export interface SmsTaskCreateRequest {
   planSendTime?: string
 }
 
+/** 合同流程阶段（单一来源，与后端 ContractFlowStage 枚举、数据库 flow_stage 一致）。 */
+export const CONTRACT_FLOW_STAGES = ['PENDING_ASSESSMENT', 'PENDING_BED_SELECT', 'PENDING_SIGN', 'SIGNED'] as const
+export type ContractFlowStage = (typeof CONTRACT_FLOW_STAGES)[number]
+
+/** 合同变更工作流状态（单一来源，与后端 ContractChangeStatus 一致）。 */
+export const CONTRACT_CHANGE_STATUSES = ['NONE', 'IN_PROGRESS', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED'] as const
+export type ContractChangeStatus = (typeof CONTRACT_CHANGE_STATUSES)[number]
+
 export interface CrmContractItem {
   [key: string]: any
   id: Id
@@ -373,11 +429,11 @@ export interface CrmContractItem {
   contractSignedAt?: string
   contractExpiryDate?: string
   contractStatus?: string
-  flowStage?: 'PENDING_ASSESSMENT' | 'PENDING_BED_SELECT' | 'PENDING_SIGN' | 'SIGNED'
+  flowStage?: ContractFlowStage
   currentOwnerDept?: 'MARKETING' | 'ASSESSMENT'
   orgName?: string
   status?: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'SIGNED' | 'EFFECTIVE' | 'VOID'
-  changeWorkflowStatus?: 'NONE' | 'IN_PROGRESS' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED'
+  changeWorkflowStatus?: ContractChangeStatus
   changeWorkflowRemark?: string
   smsSendCount?: number
   remark?: string

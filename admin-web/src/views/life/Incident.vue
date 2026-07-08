@@ -295,6 +295,7 @@ async function submit() {
     message.error('请选择老人')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const payload = {

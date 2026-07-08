@@ -198,6 +198,7 @@ function openEdit(row: MaterialSupplierItem) {
 
 async function submit() {
   await formRef.value?.validate()
+  if (saving.value) return
   saving.value = true
   try {
     if (editingId.value) {

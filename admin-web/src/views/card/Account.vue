@@ -191,6 +191,7 @@ async function submit() {
     lossFlag: form.lossFlag,
     remark: form.remark
   }
+  if (saving.value) return
   saving.value = true
   try {
     if (form.id) {

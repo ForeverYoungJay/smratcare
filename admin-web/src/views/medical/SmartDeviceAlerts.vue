@@ -308,6 +308,7 @@ async function submitDevice() {
     message.warning('请填写设备编码、名称和类型')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     if (deviceForm.id) {
@@ -324,6 +325,7 @@ async function submitDevice() {
 }
 
 async function submitEvent() {
+  if (saving.value) return
   saving.value = true
   try {
     let payload: Record<string, any> | undefined
@@ -361,6 +363,7 @@ async function refreshDerivedAlerts() {
 
 async function submitResolve() {
   if (!selectedAlert.value) return
+  if (saving.value) return
   saving.value = true
   try {
     await resolveSmartAlert(selectedAlert.value.id, resolveForm)

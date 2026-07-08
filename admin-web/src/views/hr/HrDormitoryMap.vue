@@ -3,7 +3,7 @@
     <div class="map-shell">
       <section class="hero-panel">
         <div>
-          <p class="eyebrow">Dormitory Panorama</p>
+          <p class="eyebrow">宿舍全景</p>
           <h2>把宿舍基础配置和员工入住信息合并成完整房态图</h2>
           <p class="hero-copy">已配置的宿舍房间会完整展示标准床位，未住满的房间自动补齐空床位；待分配、冲突和超配房间也会在同一张图上高亮显示。</p>
         </div>
@@ -733,6 +733,7 @@ async function submitForm() {
       return
     }
   }
+  if (saving.value) return
   saving.value = true
   try {
     await upsertHrStaffServicePlan({ ...form })

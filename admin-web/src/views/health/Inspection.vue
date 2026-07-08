@@ -80,6 +80,14 @@
       </a-form-item>
     </SearchForm>
 
+    <a-card :bordered="false" class="summary-row" title="生命体征趋势（基于当前筛选的巡检记录）">
+      <template #extra>
+        <span class="vital-trend-hint">按“长者”筛选后即为该长者的体征趋势</span>
+      </template>
+      <v-chart v-if="vitalTrendOption" :option="vitalTrendOption" autoresize style="height: 300px" />
+      <a-empty v-else description="当前筛选范围内暂无含体征数值的巡检记录" />
+    </a-card>
+
     <DataTable
       rowKey="id"
       :columns="columns"
@@ -330,6 +338,7 @@ import {
   getHealthInspectionPage,
   getHealthInspectionSummary,
   createHealthInspection,
+  createHealthDataRecord,
   updateHealthInspection,
   deleteHealthInspection,
   getHealthInspectionVitalThresholdList,
@@ -371,6 +380,59 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const rows = ref<HealthInspection[]>([])
+
+/**
+ * 生命体征趋势：巡检的体征以固定格式串存在 result 中（“体温:36.8，血压:168/98，…”，由本页录入逻辑生成），
+ * 这里按同一格式解析出数值序列，让“查看体征趋势”在预警处理流程中可用。
+ */
+const VITAL_TREND_METRICS = [
+  { key: 'temp', label: '体温(℃)', pattern: /体温:([\d.]+)/ },
+  { key: 'systolic', label: '收缩压(mmHg)', pattern: /血压:([\d.]+)\// },
+  { key: 'diastolic', label: '舒张压(mmHg)', pattern: /血压:[\d.]+\/([\d.]+)/ },
+  { key: 'pulse', label: '脉搏(次/分)', pattern: /脉搏:([\d.]+)/ },
+  { key: 'spo2', label: '血氧(%)', pattern: /血氧:([\d.]+)/ },
+  { key: 'glucose', label: '血糖(mmol/L)', pattern: /血糖:([\d.]+)/ }
+] as const
+
+const vitalTrendOption = computed(() => {
+  const points = rows.value
+    .map((item) => {
+      const result = String(item.result || '')
+      const values: Record<string, number | null> = {}
+      let hasAny = false
+      VITAL_TREND_METRICS.forEach((metric) => {
+        const matched = result.match(metric.pattern)
+        const num = matched ? Number(matched[1]) : NaN
+        values[metric.key] = Number.isFinite(num) ? num : null
+        if (Number.isFinite(num)) hasAny = true
+      })
+      return { date: String(item.inspectionDate || ''), elderName: item.elderName || '', values, hasAny }
+    })
+    .filter((item) => item.hasAny && item.date)
+    .sort((a, b) => a.date.localeCompare(b.date))
+  if (!points.length) return null
+  const series = VITAL_TREND_METRICS
+    .map((metric) => ({
+      name: metric.label,
+      type: 'line' as const,
+      connectNulls: true,
+      smooth: true,
+      data: points.map((p) => p.values[metric.key])
+    }))
+    .filter((s) => s.data.some((v) => v != null))
+  return {
+    tooltip: { trigger: 'axis' },
+    legend: { type: 'scroll', bottom: 0 },
+    grid: { left: 48, right: 24, top: 24, bottom: 42 },
+    xAxis: {
+      type: 'category',
+      data: points.map((p) => (p.elderName ? `${p.date} ${p.elderName}` : p.date)),
+      axisLabel: { fontSize: 11 }
+    },
+    yAxis: { type: 'value', scale: true },
+    series
+  }
+})
 const query = reactive({ keyword: '', status: '', inspectionRange: [] as any[], pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const summary = reactive<HealthInspectionSummary>({
@@ -1014,11 +1076,54 @@ async function submitBoard() {
   }
   try {
     await createHealthInspection(payload)
+    await syncBoardVitalsToHealthData()
     message.success('巡检已提交并完成联动')
     boardOpen.value = false
     fetchData()
   } catch (error) {
     message.error(resolveHealthError(error, '巡检提交失败'))
+  }
+}
+
+/**
+ * 巡检体征同步写入健康数据（BP/HR/TEMP/SPO2/GLUCOSE），
+ * 使健康数据页与体征趋势能看到巡检来源的数据；同步失败不阻塞巡检提交。
+ */
+async function syncBoardVitalsToHealthData() {
+  // 当天巡检不传采集时间（由服务器落秒，规避浏览器与服务器时钟偏差）；补录历史按当日 08:00 记
+  const measuredAt = dayjs(boardForm.inspectionDate).isSame(dayjs(), 'day')
+    ? undefined
+    : `${dayjs(boardForm.inspectionDate).format('YYYY-MM-DD')}T08:00:00`
+  const alertLabels = new Set(boardVitalAlerts.value.map((item) => item.label))
+  const entries: Array<{ dataType: string; dataValue: string; abnormal: boolean }> = []
+  if (boardForm.bpSystolic != null && boardForm.bpDiastolic != null) {
+    entries.push({
+      dataType: 'BP',
+      dataValue: `${boardForm.bpSystolic}/${boardForm.bpDiastolic}`,
+      abnormal: alertLabels.has('收缩压') || alertLabels.has('舒张压')
+    })
+  }
+  if (boardForm.pulse != null) entries.push({ dataType: 'HR', dataValue: String(boardForm.pulse), abnormal: alertLabels.has('脉搏') })
+  if (boardForm.temp != null) entries.push({ dataType: 'TEMP', dataValue: String(boardForm.temp), abnormal: alertLabels.has('体温') })
+  if (boardForm.spo2 != null) entries.push({ dataType: 'SPO2', dataValue: String(boardForm.spo2), abnormal: alertLabels.has('血氧') })
+  if (boardForm.glucose != null) entries.push({ dataType: 'GLUCOSE', dataValue: String(boardForm.glucose), abnormal: alertLabels.has('血糖') })
+  if (!entries.length || !boardForm.elderId) return
+  const elderName = findElderName(boardForm.elderId) || boardForm.elderName
+  try {
+    await Promise.all(entries.map((entry) =>
+      createHealthDataRecord({
+        elderId: boardForm.elderId,
+        elderName,
+        dataType: entry.dataType,
+        dataValue: entry.dataValue,
+        measuredAt,
+        source: 'admin-web',
+        abnormalFlag: entry.abnormal ? 1 : 0,
+        remark: '来源：健康巡检录入'
+      })
+    ))
+  } catch {
+    message.warning('巡检已提交，但体征同步到健康数据失败，可稍后在健康数据页补录')
   }
 }
 
@@ -1042,6 +1147,7 @@ async function submit() {
     message.error('异常巡检请至少上传1张照片')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const payload = {
@@ -1261,6 +1367,10 @@ watch(
 <style scoped>
 .summary-row {
   margin-bottom: 12px;
+}
+.vital-trend-hint {
+  color: var(--muted);
+  font-size: 12px;
 }
 :deep(.health-row-danger > td) {
   background: rgba(var(--danger-rgb), 0.07) !important;

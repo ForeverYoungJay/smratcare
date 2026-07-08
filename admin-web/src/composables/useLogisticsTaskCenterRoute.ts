@@ -63,9 +63,9 @@ export function normalizeTaskCenterDensityMode(value: unknown): TaskCenterDensit
 }
 
 export function normalizeTaskCenterLifecycleFocus(value: unknown): TaskCenterLifecycleFocus {
-  const normalized = normalizeTaskCenterTab(value)
   const raw = firstTaskCenterQueryValue(value)
-  return raw && TASK_CENTER_TAB_VALUES.includes(normalized) ? normalized : ''
+  // 非法值应回退为“无聚焦”，而不是借用 tab 的 cleaning 默认值
+  return TASK_CENTER_TAB_VALUES.includes(raw as TaskCenterTab) ? (raw as TaskCenterTab) : ''
 }
 
 export function normalizeTaskCenterOverdueOnly(value: unknown): boolean {

@@ -21,7 +21,7 @@
     <a-card class="analytics-card card-elevated" :bordered="false">
       <div class="analytics-head">
         <div>
-          <p class="analytics-eyebrow">Dish Linkage</p>
+          <p class="analytics-eyebrow">菜品联动</p>
           <h2>分类与餐次折叠总览</h2>
           <p class="analytics-copy">点击分类可直接查看品名、本月制作次数、当前用餐人数和计划采购量，食谱排班变化会自动联动这里。</p>
         </div>
@@ -395,6 +395,7 @@ async function submit() {
     message.error(DINING_MESSAGES.invalidDishPrice)
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const payload = {

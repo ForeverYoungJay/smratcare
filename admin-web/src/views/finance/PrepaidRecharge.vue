@@ -132,6 +132,7 @@ async function submit() {
     })
     if (!confirmed) return
   }
+  if (submitting.value) return
   submitting.value = true
   try {
     const rechargeTimeText = dayjs(form.rechargeTime).format('YYYY-MM-DD HH:mm:ss')

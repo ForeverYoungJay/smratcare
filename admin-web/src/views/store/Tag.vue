@@ -148,6 +148,7 @@ function openEdit(row: ProductTagItem) {
 
 async function submit() {
   await formRef.value?.validate()
+  if (saving.value) return
   saving.value = true
   try {
     const payload = {

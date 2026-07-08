@@ -192,6 +192,7 @@ function openBuild() {
   buildOpen.value = true
 }
 async function submitBuild() {
+  if (saving.value) return
   saving.value = true
   try {
     await buildGovReportTask({

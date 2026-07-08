@@ -209,6 +209,7 @@ async function submitBind() {
     message.error('请选择长者并填写凭证授权令牌引用')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     await bindMedinsEvoucher({

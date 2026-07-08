@@ -175,6 +175,7 @@ async function submit() {
     message.warning('金额需大于0')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     await createHrExpenseApprovalFlow({

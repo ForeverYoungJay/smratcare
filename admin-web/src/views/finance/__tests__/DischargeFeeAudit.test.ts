@@ -32,6 +32,11 @@ vi.mock('ant-design-vue', () => ({
   Input: { TextArea: { name: 'TextArea' } }
 }))
 
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ query: {}, params: {}, path: '/finance/discharge-fee-audit', fullPath: '/finance/discharge-fee-audit' }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() })
+}))
+
 const globalStubs = {
   PageContainer: { template: '<div><slot /></div>' },
   SearchForm: { template: '<div><slot /><slot name="extra" /></div>' },

@@ -774,6 +774,7 @@ async function submit() {
       return
     }
   }
+  if (saving.value) return
   saving.value = true
   try {
     const payload: Record<string, any> = {

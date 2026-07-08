@@ -167,6 +167,7 @@ function openDrawer(record?: StaffPointsRule) {
 }
 
 async function submit() {
+  if (saving.value) return
   saving.value = true
   try {
     await upsertPointsRule({

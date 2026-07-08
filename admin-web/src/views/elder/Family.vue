@@ -210,6 +210,7 @@ import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getFamilyLinkedElders, getFamilyRelations, getFamilyUserPage, removeFamilyRelation, upsertFamilyUser } from '../../api/family'
 import { bindFamily } from '../../api/elder'
 import type { FamilyBindRequest, FamilyElderItem, FamilyRelationItem, FamilyUserItem, Id, PageResult } from '../../types/api'
+import { residentStatusText as elderStatusText } from '../../utils/elderStatus'
 
 const router = useRouter()
 const loading = ref(false)
@@ -415,13 +416,6 @@ function unbindFromLinked(item: FamilyElderItem) {
       }
     }
   })
-}
-
-function elderStatusText(status?: number) {
-  if (status === 1) return '在院'
-  if (status === 2) return '请假'
-  if (status === 3) return '离院'
-  return '状态待补充'
 }
 
 function go(path?: string) {

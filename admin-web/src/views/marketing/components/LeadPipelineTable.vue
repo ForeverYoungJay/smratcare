@@ -184,7 +184,7 @@
               <a-tag color="geekblue">{{ record.ownerDisplayName }}</a-tag>
             </template>
             <template v-else-if="column.key === 'infoSource'">
-              <a-tag :color="record.infoSource || record.source ? 'cyan' : 'default'">{{ record.infoSource || record.source || '未标记' }}</a-tag>
+              <a-tag :color="record.infoSource || record.source ? 'cyan' : 'default'">{{ infoSourceLabel(record.infoSource || record.source) }}</a-tag>
             </template>
             <template v-else-if="column.key === 'followupStatus'">
               <a-tag :color="followupStatusColor(record.followupStatus)">{{ record.followupStatus || '未设置' }}</a-tag>
@@ -429,7 +429,7 @@
           <a-descriptions-item label="联系电话">{{ traceLead.elderPhone || traceLead.consultantPhone || '-' }}</a-descriptions-item>
           <a-descriptions-item label="当前负责人">{{ traceLead.ownerStaffName || traceLead.marketerName || '-' }}</a-descriptions-item>
           <a-descriptions-item label="当前阶段">
-            {{ traceLead.flowStage || `线索状态 ${traceLead.status ?? '-'}` }}
+            {{ traceStageLabel(traceLead.flowStage) || `线索状态 ${traceLead.status ?? '-'}` }}
           </a-descriptions-item>
           <a-descriptions-item label="下次跟进">{{ traceLead.nextFollowDate || '-' }}</a-descriptions-item>
         </a-descriptions>
@@ -440,24 +440,24 @@
               {{ item.fromOwnerStaffName || '未分配' }} → {{ item.toOwnerStaffName || '未分配' }}
             </div>
             <div class="trace-item-meta">
-              {{ item.assignedAt || '-' }} · 操作人 {{ item.assignedByName || '-' }}
+              {{ traceTime(item.assignedAt) }} · 操作人 {{ item.assignedByName || '-' }}
             </div>
-            <div v-if="item.remark" class="trace-item-remark">{{ item.remark }}</div>
+            <div v-if="traceRemark(item.remark)" class="trace-item-remark">{{ traceRemark(item.remark) }}</div>
           </template>
         </MarketingTraceTimelineCard>
 
         <MarketingTraceTimelineCard title="阶段流转记录" :items="leadStageLogs" empty-text="暂无阶段流转记录">
           <template #default="{ item }">
             <div class="trace-item-title">
-              {{ item.fromStage || item.fromStatus || '起始' }} → {{ item.toStage || item.toStatus || '当前' }}
+              {{ traceStageLabel(item.fromStage || item.fromStatus) || '起始' }} → {{ traceStageLabel(item.toStage || item.toStatus) || '当前' }}
             </div>
             <div class="trace-item-meta">
-              {{ item.operatedAt || '-' }} · {{ item.transitionType || '阶段变更' }} · {{ item.operatedByName || '-' }}
+              {{ traceTime(item.operatedAt) }} · {{ traceTransitionLabel(item.transitionType) }} · {{ item.operatedByName || '-' }}
             </div>
             <div class="trace-item-meta">
-              归属部门 {{ item.fromOwnerDept || '-' }} → {{ item.toOwnerDept || '-' }}
+              归属部门 {{ traceStageLabel(item.fromOwnerDept) || '-' }} → {{ traceStageLabel(item.toOwnerDept) || '-' }}
             </div>
-            <div v-if="item.remark" class="trace-item-remark">{{ item.remark }}</div>
+            <div v-if="traceRemark(item.remark)" class="trace-item-remark">{{ traceRemark(item.remark) }}</div>
           </template>
         </MarketingTraceTimelineCard>
       </a-spin>
@@ -492,7 +492,7 @@ import {
 } from '../../../api/marketing'
 import { useStaffOptions } from '../../../composables/useStaffOptions'
 import { useUserStore } from '../../../stores/user'
-import { MARKETING_CALLBACK_TYPE_LABELS, MARKETING_CALLBACK_TYPE_OPTIONS, MARKETING_LEAD_MODE_LABELS } from '../../../utils/marketingEnums'
+import { CONTRACT_FLOW_STAGE_LABELS, MARKETING_CALLBACK_TYPE_LABELS, MARKETING_CALLBACK_TYPE_OPTIONS, MARKETING_LEAD_MODE_LABELS, marketingInfoSourceLabel } from '../../../utils/marketingEnums'
 import { resolveRouteAccess } from '../../../utils/routeAccess'
 import type {
   CrmLeadAssignLogItem,
@@ -578,6 +578,44 @@ const traceLoading = ref(false)
 const traceLead = ref<CrmLeadItem>()
 const leadAssignLogs = ref<CrmLeadAssignLogItem[]>([])
 const leadStageLogs = ref<CrmStageTransitionLogItem[]>([])
+
+/** 轨迹抽屉展示口径：枚举转中文、ISO 时间转常规格式、剥离系统附带的原始 JSON */
+const TRACE_STAGE_LABELS: Record<string, string> = {
+  ...CONTRACT_FLOW_STAGE_LABELS,
+  ASSESSMENT: '评估部',
+  MARKETING: '营销部',
+  CONSULTATION: '咨询',
+  INTENT: '意向',
+  RESERVATION: '预订',
+  INVALID: '失效',
+  SIGNED: '已签约'
+}
+
+function traceStageLabel(value?: string | null) {
+  const key = String(value || '').trim()
+  if (!key) return ''
+  return TRACE_STAGE_LABELS[key] || key
+}
+
+function traceTransitionLabel(value?: string | null) {
+  const key = String(value || '').trim()
+  const map: Record<string, string> = { CREATE: '创建', UPDATE: '更新', ASSIGN: '分配', ADVANCE: '推进', ROLLBACK: '回退' }
+  return map[key] || key || '阶段变更'
+}
+
+function traceTime(value?: string | null) {
+  if (!value) return '-'
+  const parsed = dayjs(value)
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD HH:mm') : value
+}
+
+function traceRemark(value?: string | null) {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  return text.replace(/\s*\|\s*\{[\s\S]*\}\s*$/, '').trim()
+}
+
+const infoSourceLabel = marketingInfoSourceLabel
 
 const planOpen = ref(false)
 const planSubmitting = ref(false)
@@ -1645,6 +1683,7 @@ async function submit() {
   if (!formRef.value) return
   try {
     await formRef.value.validate()
+    if (submitting.value) return
     submitting.value = true
     const payload: Partial<CrmLeadItem> = {
       ...form,
@@ -1867,6 +1906,17 @@ async function batchMoveToIntent(targetRows: CrmLeadItem[] = selectedRows.value)
     message.info('选中客户已是意向状态，无需重复操作')
     return
   }
+  const confirmed = await new Promise<boolean>((resolve) => {
+    Modal.confirm({
+      title: '确认转为意向客户？',
+      content: `将 ${targets.length} 条线索转为意向客户，转换后进入意向跟进流程。`,
+      okText: '确认转意向',
+      cancelText: '取消',
+      onOk: () => resolve(true),
+      onCancel: () => resolve(false)
+    })
+  })
+  if (!confirmed) return
   await batchUpdateLeadStatus({ ids: targets.map((item) => item.id), status: 1, followupStatus: '待回访' })
   message.success(`已转为意向客户 ${targets.length} 条（仅处理状态不同项）`)
   selectedRowKeys.value = []

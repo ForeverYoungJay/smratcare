@@ -60,7 +60,10 @@
           :row-selection="rowSelection"
         >
           <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'status'">
+            <template v-if="column.key === 'expectedReturnTime' || column.key === 'actualReturnTime'">
+              {{ formatOutingTime(record[column.key]) }}
+            </template>
+            <template v-else-if="column.key === 'status'">
               <a-tag :color="statusMeta(record.status).color">
                 {{ statusMeta(record.status).text }}
               </a-tag>
@@ -208,6 +211,12 @@ function statusMeta(status?: string) {
   return statusTextMap[status || ''] || { text: status || '未知', color: 'default' }
 }
 
+function formatOutingTime(value?: string) {
+  if (!value) return '-'
+  const parsed = dayjs(value)
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD HH:mm') : value
+}
+
 async function fetchData() {
   loading.value = true
   errorMessage.value = ''
@@ -267,6 +276,7 @@ async function beforeUploadLeaveNote(file: File) {
 async function submitCreate() {
   if (!formRef.value) return
   await formRef.value.validate()
+  if (submitting.value) return
   submitting.value = true
   try {
     await createOuting(form)

@@ -327,6 +327,7 @@ async function submitCreate() {
     message.error('请选择长者')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const applyId = await submitLtciApply({
@@ -368,6 +369,7 @@ async function submitDispute() {
     message.error('请填写争议理由')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     await disputeLtciAssessment({ assessmentId: disputeForm.assessmentId as Id, reason: disputeForm.reason })

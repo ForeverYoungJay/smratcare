@@ -60,7 +60,10 @@
         :row-selection="rowSelection"
       >
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'status'">
+          <template v-if="column.key === 'intentLevel'">
+            {{ intentLevelText(record.intentLevel) }}
+          </template>
+          <template v-else-if="column.key === 'status'">
             <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
           </template>
         </template>
@@ -210,6 +213,14 @@ function statusText(status?: string) {
   return '-'
 }
 
+/** 意向等级既有枚举值也有历史中文文本，统一映射后展示 */
+function intentLevelText(level?: string) {
+  if (level === 'HIGH') return '高'
+  if (level === 'MEDIUM') return '中'
+  if (level === 'LOW') return '低'
+  return level || '-'
+}
+
 function statusColor(status?: string) {
   if (status === 'REGISTERED') return 'blue'
   if (status === 'FINISHED') return 'default'
@@ -327,6 +338,7 @@ function deleteSelected() {
 async function submit() {
   if (!formRef.value) return
   await formRef.value.validate()
+  if (submitting.value) return
   submitting.value = true
   try {
     if (editId.value) {

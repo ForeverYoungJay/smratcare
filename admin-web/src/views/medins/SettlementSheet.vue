@@ -269,6 +269,7 @@ async function submitGenerate() {
     message.error('请选择长者与结算月份')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     await generateMedinsSheet({ elderId: genForm.elderId, month: genForm.month })
@@ -296,6 +297,7 @@ async function submitUpload() {
     message.error('请选择上传渠道')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const task = await uploadMedinsSheet(uploadForm.sheetId, uploadForm.channel)

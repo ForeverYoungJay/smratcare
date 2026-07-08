@@ -741,6 +741,7 @@ async function openEffectivePermissionPanel(record?: HrStaffProfile) {
 }
 
 async function submit(nextStep: 'save' | 'account' | 'contract' | 'attachment' = 'save') {
+  if (saving.value) return
   saving.value = true
   try {
     let resolvedStaffId = form.staffId

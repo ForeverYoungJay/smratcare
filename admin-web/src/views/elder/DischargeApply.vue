@@ -348,6 +348,7 @@ function openFile(url?: string) {
 async function submitCreate() {
   if (!formRef.value) return
   await formRef.value.validate()
+  if (submitting.value) return
   submitting.value = true
   try {
     await createDischargeApply(form)

@@ -141,6 +141,9 @@
               <span v-if="!parsePolicyValues(record.orgName).length">-</span>
             </a-space>
           </template>
+          <template v-else-if="column.key === 'contractStatus'">
+            {{ record.contractStatus ? contractStatusLabel(String(record.contractStatus)) : '-' }}
+          </template>
           <template v-else-if="column.key === 'slaWarning'">
             <a-tag v-if="getOverdueLevel(record) === 'high'" color="red">{{ overdueText(record) }}</a-tag>
             <span v-else>-</span>
@@ -716,6 +719,7 @@ import MarketingQuickNav from './components/MarketingQuickNav.vue'
 import MarketingListToolbar from './components/MarketingListToolbar.vue'
 import MarketingTraceTimelineCard from './components/MarketingTraceTimelineCard.vue'
 import {
+  approveContract,
   batchDeleteContracts,
   createContractAttachment,
   createCrmContract,
@@ -738,6 +742,7 @@ import { getAdmissionRecords } from '../../api/elderLifecycle'
 import { getFamilyRelations, upsertFamilyUser } from '../../api/family'
 import { createDisease, getDiseaseList } from '../../api/store'
 import { getStaffPage } from '../../api/staff'
+import { idCardValidator, mobilePhoneValidator } from '../../utils/validators'
 import { useUserStore } from '../../stores/user'
 import type {
   ContractAttachmentItem,
@@ -1003,27 +1008,8 @@ const contractFormGuideText = computed(() => {
 })
 const formDerivedBirthDate = ref('')
 const selectedPolicyValues = ref<string[]>([])
-async function validateElderPhone(_rule: unknown, value?: string) {
-  const text = String(value || '').trim()
-  if (!text) {
-    return Promise.reject(new Error('请输入长者联系电话'))
-  }
-  if (!/^1\d{10}$/.test(text)) {
-    return Promise.reject(new Error('长者联系电话格式不正确'))
-  }
-  return Promise.resolve()
-}
-
-async function validateElderIdCardNo(_rule: unknown, value?: string) {
-  const text = String(value || '').trim()
-  if (!text) {
-    return Promise.reject(new Error('请输入长者身份证号'))
-  }
-  if (!/^(\d{15}|\d{17}[\dXx])$/.test(text)) {
-    return Promise.reject(new Error('长者身份证号格式不正确'))
-  }
-  return Promise.resolve()
-}
+const validateElderPhone = mobilePhoneValidator('请输入长者联系电话', '长者联系电话格式不正确')
+const validateElderIdCardNo = idCardValidator('请输入长者身份证号', '长者身份证号格式不正确')
 
 const rules: FormRules = {
   elderName: [{ required: true, message: '请输入长者姓名' }],
@@ -1162,7 +1148,11 @@ async function openSignedLinkageHub(record: CrmContractItem) {
   try {
     let latest = record
     if (!latest.elderId || !latest.elderName || !latest.linkageSummary) {
-      latest = await getCrmContract(record.id).catch(() => record)
+      // 拉取最新合同用于补全联动信息；失败时降级使用当前行数据，但需留痕以便排查
+      latest = await getCrmContract(record.id).catch((err) => {
+        console.warn('[openSignedLinkageHub] 获取合同详情失败，降级使用列表数据', err)
+        return record
+      })
     }
     if (!latest.elderId) {
       const ensured = await ensureContractNo(latest)
@@ -2040,6 +2030,7 @@ async function submit() {
   try {
     await formRef.value.validate()
     validateFamilyDraftRows()
+    if (submitting.value) return
     submitting.value = true
     const isCreate = !form.id
     const payload: Partial<CrmContractItem> = {
@@ -2251,9 +2242,11 @@ async function openFinalize(record: CrmContractItem) {
       return
     }
     const elder = await ensureElderFromLead(lead)
-    const signingLead = normalizedFlowStage(lead) === 'PENDING_SIGN'
+    let signingLead = normalizedFlowStage(lead) === 'PENDING_SIGN'
       ? lead
       : await moveContractToPendingSign(lead.id)
+    signingLead = await ensureContractApproved(signingLead)
+    if (!signingLead) return
     finalizeLead.value = signingLead
     finalizeForm.contractNo = signingLead.contractNo || ''
     finalizeForm.elderName = elder.fullName
@@ -2265,8 +2258,50 @@ async function openFinalize(record: CrmContractItem) {
   }
 }
 
+/**
+ * 最终签署要求合同已审批通过；此前审批接口无前端入口，待签合同会卡死在签署一步。
+ * 未审批时先引导用户在此确认并调用审批接口，再进入签署弹窗。
+ */
+async function ensureContractApproved(contract: CrmContractItem): Promise<CrmContractItem | undefined> {
+  const status = String(contract.status || 'DRAFT')
+  if (!['DRAFT', 'PENDING_APPROVAL', 'REJECTED'].includes(status)) return contract
+  const confirmed = await new Promise<boolean>((resolve) => {
+    Modal.confirm({
+      title: '合同尚未审批通过',
+      content: `合同 ${contract.contractNo || '-'} 当前为“${contractStatusLabel(status)}”状态，需审批通过后才能最终签署。是否以当前账号审批通过？`,
+      okText: '审批通过并继续',
+      cancelText: '暂不签署',
+      onOk: () => resolve(true),
+      onCancel: () => resolve(false)
+    })
+  })
+  if (!confirmed) return undefined
+  try {
+    const approved = await approveContract(contract.id, '签署前审批确认')
+    message.success('合同已审批通过')
+    return approved || contract
+  } catch (error: any) {
+    message.error(error?.message || '合同审批失败，请确认当前账号具有审批权限')
+    return undefined
+  }
+}
+
+function contractStatusLabel(status: string) {
+  const map: Record<string, string> = {
+    DRAFT: '草稿',
+    PENDING_APPROVAL: '待审批',
+    APPROVED: '已审批',
+    REJECTED: '已驳回',
+    SIGNED: '已签署',
+    EFFECTIVE: '已生效',
+    VOID: '作废'
+  }
+  return map[status] || status
+}
+
 async function submitFinalize() {
   if (!finalizeLead.value) return
+  if (finalizing.value) return
   finalizing.value = true
   try {
     const finalized = await finalizeContract(finalizeLead.value.id, finalizeForm.remark || finalizeLead.value.remark)

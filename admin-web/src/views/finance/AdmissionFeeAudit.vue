@@ -143,6 +143,7 @@ async function submitCreate() {
     message.error('请输入有效费用总额')
     return
   }
+  if (creating.value) return
   creating.value = true
   try {
     await createAdmissionFeeAudit({

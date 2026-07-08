@@ -526,7 +526,7 @@ public class MedicalCareWorkbenchController {
           focusActions,
           "inspection-open",
           "闭环异常巡检",
-          "跟进 ABNORMAL/FOLLOWING 巡检记录，避免异常长期挂起。",
+          "跟进“异常/跟进中”状态的巡检记录，避免异常长期挂起。",
           "/medical-care/inspection?status=ABNORMAL",
           "HIGH",
           abnormalInspectionOpen);

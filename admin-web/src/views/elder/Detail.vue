@@ -157,6 +157,7 @@ import { bindFamily, getElderDetail, getElderDiseases, updateElder, updateElderD
 import { getDiseaseList } from '../../api/store'
 import { getFamilyRelations, getFamilyUserPage, removeFamilyRelation } from '../../api/family'
 import type { DiseaseItem, ElderItem, FamilyRelationItem, FamilyBindRequest, FamilyUserItem, PageResult, Id } from '../../types/api'
+import { residentStatusText as statusText } from '../../utils/elderStatus'
 
 const route = useRoute()
 const elderId = computed(() => String(route.params.id || ''))
@@ -239,13 +240,6 @@ const pagedFamilies = computed(() => {
   const start = (familyQuery.pageNo - 1) * familyQuery.pageSize
   return filteredFamilies.value.slice(start, start + familyQuery.pageSize)
 })
-function statusText(status?: number) {
-  if (status === 1) return '在院'
-  if (status === 2) return '请假'
-  if (status === 3) return '离院'
-  return '-'
-}
-
 function riskPrecommitText(value?: string) {
   if (value === 'RESCUE_FIRST') return '第一时间抢救'
   if (value === 'NOTIFY_FAMILY_FIRST') return '第一时间通知家属'
@@ -313,6 +307,7 @@ async function saveBase() {
   if (!baseFormRef.value) return
   try {
     await baseFormRef.value.validate()
+    if (saving.value) return
     saving.value = true
     await updateElder(elderId.value, baseForm)
     message.success('保存成功')

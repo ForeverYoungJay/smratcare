@@ -308,6 +308,7 @@ async function submit() {
     message.error('采集时间不能晚于当前时间')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const measuredAt = dayjs(form.measuredAt).format('YYYY-MM-DDTHH:mm:ss')

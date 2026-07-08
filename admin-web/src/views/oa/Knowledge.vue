@@ -289,6 +289,7 @@ async function submit() {
     remark: form.remark ? String(form.remark).trim() : undefined,
     expiredAt: normalizeExpiredAt(form.expiredAt)
   }
+  if (saving.value) return
   saving.value = true
   try {
     if (form.id) {

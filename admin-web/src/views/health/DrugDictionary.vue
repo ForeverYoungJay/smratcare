@@ -174,6 +174,7 @@ async function submit() {
     message.error('药品编码长度不能超过64')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const payload = {

@@ -603,6 +603,7 @@ async function submit() {
     uploaderName: form.uploaderName,
     remark: form.remark
   }
+  if (saving.value) return
   saving.value = true
   try {
     const creating = !form.id

@@ -114,6 +114,7 @@ function openConsume() {
 }
 
 async function submit() {
+  if (saving.value) return
   saving.value = true
   try {
     await consumeCard({

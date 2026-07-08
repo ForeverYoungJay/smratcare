@@ -157,6 +157,7 @@ async function submit() {
     message.error(DINING_MESSAGES.requiredDeliveryAreaFields)
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const payload = {

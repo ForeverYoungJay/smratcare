@@ -285,6 +285,7 @@ async function submit() {
     message.error(DINING_MESSAGES.requiredMealOrder)
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const payload = {

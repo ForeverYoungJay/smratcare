@@ -50,9 +50,9 @@ export const marketingRoutes: RouteRecordRaw[] = [
         meta: { title: '客户线索管理' },
         redirect: '/marketing/leads/all',
         children: [
-          view('all', 'MarketingLeadsAll', '全部线索', () => import('../views/marketing/SalesPipeline.vue')),
-          view('intent', 'MarketingLeadsIntent', '意向客户', () => import('../views/marketing/SalesIntent.vue')),
-          view('invalid', 'MarketingLeadsInvalid', '失效客户', () => import('../views/marketing/SalesInvalid.vue')),
+          lead('all', 'MarketingLeadsAll', '全部线索', { mode: 'pipeline', title: '线索跟进池', subTitle: '咨询、意向、待回访统一管理，支持转预订与放弃' }),
+          lead('intent', 'MarketingLeadsIntent', '意向客户', { mode: 'intent', title: '意向客户', subTitle: '重点意向客户持续跟进' }),
+          lead('invalid', 'MarketingLeadsInvalid', '失效客户', { mode: 'invalid', title: '失效用户', subTitle: '流失与失效线索归档管理' }),
           lead('blacklist', 'MarketingLeadsBlacklist', '黑名单', { mode: 'invalid', title: '黑名单', subTitle: '黑名单客户集中处置与恢复', scenario: 'blacklist' }),
           lead('unknown-source', 'MarketingLeadsUnknownSource', '渠道不明客户', { mode: 'consultation', title: '渠道不明客户', subTitle: '缺失渠道的线索预警与补全', scenario: 'source_unknown' }),
           lead('medical-transfer', 'MarketingLeadsMedicalTransfer', '外来就医转线索（来自医护模块）', { mode: 'consultation', title: '外来就医转线索', subTitle: '来自医护模块的潜客自动流入', scenario: 'source_medical' })
@@ -101,7 +101,7 @@ export const marketingRoutes: RouteRecordRaw[] = [
         meta: { title: '预定与床态联动' },
         redirect: '/marketing/reservation/records',
         children: [
-          view('records', 'MarketingReservationRecords', '床位预定记录', () => import('../views/marketing/SalesReservation.vue')),
+          lead('records', 'MarketingReservationRecords', '床位预定记录', { mode: 'reservation', title: '预订管理', subTitle: '已预订客户与签约前准备' }),
           lead('lock', 'MarketingReservationLock', '锁床管理', { mode: 'reservation', title: '锁床管理', subTitle: '锁床客户与锁床状态跟踪', scenario: 'lock_bed' }),
           lead('expiring', 'MarketingReservationExpiring', '预定到期提醒', { mode: 'reservation', title: '预定到期提醒', subTitle: '锁床临期与预定超时预警', scenario: 'expiring_lock' }),
           view('panorama', 'MarketingReservationPanorama', '床态全景（销售视角）', () => import('../views/marketing/RoomPanorama.vue'))

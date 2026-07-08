@@ -175,6 +175,7 @@ async function submit() {
     message.warning('请填写员工和证书名称')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     await createHrProfileCertificate({

@@ -344,6 +344,7 @@ async function submit() {
       return
     }
   }
+  if (submitting.value) return
   submitting.value = true
   try {
     await saveShiftTemplateBatch({

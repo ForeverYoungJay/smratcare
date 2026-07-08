@@ -147,6 +147,7 @@ async function submit() {
     message.error('请填写机构编码、机构名称和机构类型')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const payload = {

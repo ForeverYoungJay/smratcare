@@ -1017,10 +1017,15 @@ public class CrmContractServiceImpl implements CrmContractService {
       return null;
     }
     String normalized = value.toUpperCase(Locale.ROOT);
-    return switch (normalized) {
-      case CHANGE_NONE, CHANGE_IN_PROGRESS, CHANGE_PENDING_APPROVAL, CHANGE_APPROVED, CHANGE_REJECTED -> normalized;
-      default -> null;
-    };
+    // CHANGE_* 常量来自枚举方法调用，非编译期常量，不能作为 switch case 标签
+    if (CHANGE_NONE.equals(normalized)
+        || CHANGE_IN_PROGRESS.equals(normalized)
+        || CHANGE_PENDING_APPROVAL.equals(normalized)
+        || CHANGE_APPROVED.equals(normalized)
+        || CHANGE_REJECTED.equals(normalized)) {
+      return normalized;
+    }
+    return null;
   }
 
   private void validateChangeWorkflowTransition(String currentStatus, String nextStatus) {

@@ -52,7 +52,21 @@
         </a-row>
         <a-form-item label="医嘱内容" required><a-input v-model:value="form.content" placeholder="如 氨氯地平片 5mg 口服" /></a-form-item>
         <a-row :gutter="16">
-          <a-col :span="6"><a-form-item label="药品ID"><a-input-number v-model:value="form.drugId" style="width:100%" placeholder="药疗选填" /></a-form-item></a-col>
+          <a-col :span="6">
+            <a-form-item label="药品">
+              <a-select
+                v-model:value="form.drugId"
+                show-search
+                allow-clear
+                :filter-option="false"
+                :options="drugOptions"
+                :loading="drugLoading"
+                placeholder="搜索药品（药疗选填）"
+                @search="searchDrugs"
+                @focus="() => !drugOptions.length && searchDrugs('')"
+              />
+            </a-form-item>
+          </a-col>
           <a-col :span="6"><a-form-item label="剂量"><a-input v-model:value="form.dosage" placeholder="如 5mg" /></a-form-item></a-col>
           <a-col :span="6">
             <a-form-item label="频次">
@@ -79,6 +93,7 @@ import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { getMedicalOrderPage, createMedicalOrder, stopMedicalOrder } from '../../api/medOrder'
+import { getDrugPage } from '../../api/pharmacy'
 import type { Id, MedicalOrder, PageResult } from '../../types'
 
 const typeOptions = [
@@ -99,6 +114,23 @@ const rows = ref<MedicalOrder[]>([])
 const query = reactive({ elderId: undefined as Id | undefined, status: undefined as string | undefined, category: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const { elderOptions, searchElders } = useElderOptions({ pageSize: 50 })
+
+const drugOptions = ref<Array<{ label: string; value: Id }>>([])
+const drugLoading = ref(false)
+async function searchDrugs(keyword = '') {
+  drugLoading.value = true
+  try {
+    const page = await getDrugPage({ pageNo: 1, pageSize: 50, keyword: keyword.trim() || undefined, status: 1 })
+    drugOptions.value = (page.list || []).map((item) => ({
+      label: [item.drugName, item.spec, item.unit ? `/${item.unit}` : ''].filter(Boolean).join(' '),
+      value: item.id
+    }))
+  } catch {
+    drugOptions.value = []
+  } finally {
+    drugLoading.value = false
+  }
+}
 
 const columns = [
   { title: '长者ID', dataIndex: 'elderId', key: 'elderId', width: 100 },
@@ -132,9 +164,11 @@ function handleTableChange(p: any) { pagination.current = p.current; pagination.
 
 function openCreate() {
   Object.assign(form, { elderId: undefined, orderType: 'LONG_TERM', category: 'DRUG', content: '', drugId: undefined, dosage: '', frequency: 'BID', route: '', quantityPerTime: undefined, startTime: undefined, priority: '' })
+  if (!drugOptions.value.length) void searchDrugs('')
   createOpen.value = true
 }
 async function submit() {
+  if (saving.value) return
   if (!form.elderId || !form.content) { message.error('请填写长者与医嘱内容'); return }
   saving.value = true
   try {

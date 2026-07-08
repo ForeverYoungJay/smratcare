@@ -233,6 +233,7 @@ async function submit() {
     message.error('缺少员工信息')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const payload: any = {

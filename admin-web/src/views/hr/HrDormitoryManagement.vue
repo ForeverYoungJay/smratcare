@@ -3,7 +3,7 @@
     <div class="dorm-shell">
       <section class="hero-panel">
         <div>
-          <p class="eyebrow">Dormitory Desk</p>
+          <p class="eyebrow">宿舍管理台</p>
           <h2>把员工入住台账和宿舍基础配置放在同一个入口统一维护</h2>
           <p class="hero-copy">支持床位分配、电表维护、冲突检查，以及楼栋/楼层/房间标准床位数配置，房态图会直接使用这里的基础数据补齐空床位。</p>
         </div>
@@ -881,6 +881,7 @@ async function submitForm() {
       return
     }
   }
+  if (saving.value) return
   saving.value = true
   try {
     await upsertHrStaffServicePlan({ ...form })

@@ -197,6 +197,7 @@ async function submit() {
     message.warning('请填写制度名称、上传文件和更新时间')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     await createHrPolicy({

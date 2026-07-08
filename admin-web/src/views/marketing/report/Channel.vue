@@ -25,7 +25,7 @@
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'source'">
             <div class="row-action-links">
-              <a-button type="link" size="small" @click="goSourceLeads(record.source)">{{ record.source }}</a-button>
+              <a-button type="link" size="small" @click="goSourceLeads(record.source)">{{ marketingInfoSourceLabel(record.source) }}</a-button>
             </div>
           </template>
         </template>
@@ -43,6 +43,7 @@ import MarketingQuickNav from '../components/MarketingQuickNav.vue'
 import { getMarketingChannelReport } from '../../../api/marketing'
 import { useReportQueryCache } from '../../../composables/useReportQueryCache'
 import { routeToUnknownSourceOrAll } from '../../../utils/marketingNav'
+import { marketingInfoSourceLabel } from '../../../utils/marketingEnums'
 import { exportCsv } from '../../../utils/export'
 import type { MarketingChannelReportItem, MarketingReportQuery } from '../../../types'
 

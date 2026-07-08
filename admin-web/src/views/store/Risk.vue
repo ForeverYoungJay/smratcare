@@ -135,6 +135,7 @@ async function selectDisease(item: DiseaseItem) {
 
 async function save() {
   if (!currentDisease.value) return
+  if (saving.value) return
   saving.value = true
   try {
     const tagIds = tagGroups.value.flatMap((g) => g.selectedIds)

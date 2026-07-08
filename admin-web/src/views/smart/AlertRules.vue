@@ -252,6 +252,7 @@ async function submit() {
     message.error('请填写编码、名称与事件类型')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const payload: Partial<SmartAlertRule> = {

@@ -384,6 +384,7 @@ async function submit() {
     message.error('请填写必填项')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const payload = {

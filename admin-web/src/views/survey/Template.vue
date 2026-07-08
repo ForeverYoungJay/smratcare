@@ -448,6 +448,7 @@ async function submit() {
   if (!formRef.value) return
   try {
     await formRef.value.validate()
+    if (submitting.value) return
     submitting.value = true
     const payload = buildPayload()
     if (form.id) {

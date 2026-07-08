@@ -95,6 +95,7 @@ function openSign(record: MedicalOrderExecution, status: string) {
   signOpen.value = true
 }
 async function submitSign() {
+  if (saving.value) return
   saving.value = true
   try {
     await signOrderExecution({

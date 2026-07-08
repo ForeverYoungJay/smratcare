@@ -131,6 +131,7 @@ function openEdit(record: EmrRecord) { Object.assign(form, record); editOpen.val
 function openDetail(record: EmrRecord) { current.value = record; detailOpen.value = true }
 
 async function submit() {
+  if (saving.value) return
   if (!form.elderId) { message.error('请选择长者'); return }
   saving.value = true
   try {

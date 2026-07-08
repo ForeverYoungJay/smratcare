@@ -28,11 +28,14 @@
       <a-tab-pane key="batches" tab="批次库存">
         <DataTable rowKey="id" :columns="batchColumns" :data-source="batches" :loading="loading" :pagination="batchPagination" @change="onBatchPage">
           <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'expireDate'">
+            <template v-if="column.key === 'drugId'">
+              {{ drugDisplayName(record.drugId) }}
+            </template>
+            <template v-else-if="column.key === 'expireDate'">
               <span :class="{ 'exp-warn': isNearExpiry(record.expireDate) }">{{ record.expireDate || '-' }}</span>
             </template>
             <template v-else-if="column.key === 'status'">
-              <a-tag :color="record.status === 'ACTIVE' ? 'green' : 'default'">{{ record.status }}</a-tag>
+              <a-tag :color="record.status === 'ACTIVE' ? 'green' : 'default'">{{ record.status === 'ACTIVE' ? '在库' : record.status === 'INACTIVE' ? '停用' : (record.status || '-') }}</a-tag>
             </template>
           </template>
         </DataTable>
@@ -41,7 +44,10 @@
       <a-tab-pane key="records" tab="发药记录">
         <DataTable rowKey="id" :columns="recordColumns" :data-source="records" :loading="loading" :pagination="recordPagination" @change="onRecordPage">
           <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'dispenseType'">
+            <template v-if="column.key === 'drugId'">
+              {{ drugDisplayName(record.drugId) }}
+            </template>
+            <template v-else-if="column.key === 'dispenseType'">
               <a-tag :color="record.dispenseType === 'RETURN' ? 'orange' : 'blue'">{{ record.dispenseType === 'RETURN' ? '退药' : '发药' }}</a-tag>
             </template>
           </template>
@@ -77,7 +83,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
@@ -93,6 +99,16 @@ const saving = ref(false)
 const { elderOptions, searchElders } = useElderOptions({ pageSize: 50 })
 
 const drugs = ref<DrugCatalog[]>([])
+/** 批次/发药记录接口只返回 drugId，用已加载目录映射出药品名，避免员工对着纯数字 ID */
+const drugNameById = computed(() => {
+  const map = new Map<string, string>()
+  drugs.value.forEach((item) => map.set(String(item.id), item.drugName || String(item.id)))
+  return map
+})
+function drugDisplayName(drugId?: Id) {
+  if (drugId == null || drugId === '') return '-'
+  return drugNameById.value.get(String(drugId)) || `ID:${drugId}`
+}
 const drugQuery = reactive({ keyword: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const drugPagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const drugColumns = [
@@ -110,7 +126,7 @@ const batches = ref<DrugBatch[]>([])
 const batchQuery = reactive({ drugId: undefined as Id | undefined, pageNo: 1, pageSize: 10 })
 const batchPagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const batchColumns = [
-  { title: '药品ID', dataIndex: 'drugId', key: 'drugId', width: 110 },
+  { title: '药品', key: 'drugId', width: 140 },
   { title: '批号', dataIndex: 'batchNo', key: 'batchNo', width: 140 },
   { title: '效期', key: 'expireDate', width: 130 },
   { title: '库存', dataIndex: 'quantity', key: 'quantity', width: 90 },
@@ -123,7 +139,7 @@ const recordPagination = reactive({ current: 1, pageSize: 10, total: 0, showSize
 const recordQuery = reactive({ pageNo: 1, pageSize: 10 })
 const recordColumns = [
   { title: '记录ID', dataIndex: 'id', key: 'id', width: 120 },
-  { title: '药品ID', dataIndex: 'drugId', key: 'drugId', width: 110 },
+  { title: '药品', key: 'drugId', width: 140 },
   { title: '批号', dataIndex: 'batchNo', key: 'batchNo', width: 140 },
   { title: '类型', key: 'dispenseType', width: 90 },
   { title: '数量', dataIndex: 'quantity', key: 'quantity', width: 80 },
@@ -194,6 +210,7 @@ function openInbound(record: DrugCatalog) {
 }
 async function submitInbound() {
   if (!currentDrug.value || !inboundForm.batchNo || !inboundForm.quantity) { message.error('请填写批号与数量'); return }
+  if (saving.value) return
   saving.value = true
   try {
     await drugInbound({
@@ -218,6 +235,7 @@ function openDispense(record: DrugCatalog) {
 }
 async function submitDispense() {
   if (!currentDrug.value || !dispenseForm.quantity) { message.error('请填写发药数量'); return }
+  if (saving.value) return
   saving.value = true
   try {
     const recs = await drugDispense({

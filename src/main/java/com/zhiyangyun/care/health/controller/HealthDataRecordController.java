@@ -138,7 +138,8 @@ public class HealthDataRecordController {
     item.setElderName(elderResolveSupport.resolveElderName(elderId, normalizeText(request.getElderName())));
     item.setDataType(normalizeDataType(request.getDataType()));
     item.setDataValue(normalizeText(request.getDataValue()));
-    item.setMeasuredAt(request.getMeasuredAt());
+    // 未显式传采集时间时以服务器时间为准，避免客户端时钟偏差导致“晚于当前时间”校验失败
+    item.setMeasuredAt(request.getMeasuredAt() == null ? LocalDateTime.now() : request.getMeasuredAt());
     item.setSource(normalizeText(request.getSource()));
     item.setAbnormalFlag(request.getAbnormalFlag() == null ? 0 : request.getAbnormalFlag());
     item.setRemark(normalizeText(request.getRemark()));
@@ -161,7 +162,9 @@ public class HealthDataRecordController {
     item.setElderName(elderResolveSupport.resolveElderName(elderId, normalizeText(request.getElderName())));
     item.setDataType(normalizeDataType(request.getDataType()));
     item.setDataValue(normalizeText(request.getDataValue()));
-    item.setMeasuredAt(request.getMeasuredAt());
+    if (request.getMeasuredAt() != null) {
+      item.setMeasuredAt(request.getMeasuredAt());
+    }
     item.setSource(normalizeText(request.getSource()));
     item.setAbnormalFlag(request.getAbnormalFlag() == null ? 0 : request.getAbnormalFlag());
     item.setRemark(normalizeText(request.getRemark()));

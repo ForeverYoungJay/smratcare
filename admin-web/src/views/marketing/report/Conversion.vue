@@ -3,7 +3,7 @@
     <MarketingQuickNav parent-path="/marketing/reports" />
     <section class="conversion-hero">
       <div class="conversion-hero-copy">
-        <small>Conversion Intelligence</small>
+        <small>转化洞察</small>
         <h2>把咨询、意向、预订到签约的每一段损耗都看清楚</h2>
         <p>统一查看阶段数量、转化率和当前筛选口径，方便从渠道、时间和负责人三个维度定位问题。</p>
       </div>

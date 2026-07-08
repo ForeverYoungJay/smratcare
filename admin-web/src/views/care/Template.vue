@@ -105,6 +105,7 @@ function openModal(record?: CareTaskTemplate) {
 async function submit() {
   try {
     await formRef.value?.validate()
+    if (submitting.value) return
     submitting.value = true
     if (form.id) {
       await updateTemplate(form.id, form)

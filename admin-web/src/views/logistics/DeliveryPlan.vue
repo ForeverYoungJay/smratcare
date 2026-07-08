@@ -324,6 +324,7 @@ async function submitFail() {
     message.warning('请填写未送达原因')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     await updateDiningDeliveryRecord(record.id, {
@@ -349,6 +350,7 @@ async function submitFail() {
 async function submitRedispatch() {
   const record = selectedRecord.value
   if (!record) return
+  if (saving.value) return
   saving.value = true
   try {
     await redispatchDiningDeliveryRecord(record.id, {
@@ -388,6 +390,7 @@ async function submitCreate() {
   const selectedArea = createForm.deliveryAreaId
     ? deliveryAreas.value.find((item) => item.id === createForm.deliveryAreaId)
     : undefined
+  if (creating.value) return
   creating.value = true
   try {
     await createDiningDeliveryRecord({

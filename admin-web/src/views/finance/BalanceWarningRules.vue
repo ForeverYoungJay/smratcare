@@ -178,6 +178,7 @@ function findValue(key: string) {
 }
 
 async function saveThreshold() {
+  if (saving.value) return
   saving.value = true
   try {
     await upsertFinanceBillingConfig({
@@ -195,6 +196,7 @@ async function saveThreshold() {
 }
 
 async function saveNotifyTargets() {
+  if (saving.value) return
   saving.value = true
   try {
     await Promise.all([
@@ -281,6 +283,7 @@ async function onImportFileChange(event: Event) {
       message.warning('CSV 无有效余额预警配置')
       return
     }
+    if (saving.value) return
     saving.value = true
     await batchUpsertFinanceBillingConfig({ items })
     message.success(`导入成功，共 ${items.length} 条`)

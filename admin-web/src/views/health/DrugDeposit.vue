@@ -211,6 +211,7 @@ async function submit() {
     message.error('到期日期不能早于缴存日期')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const payload = {

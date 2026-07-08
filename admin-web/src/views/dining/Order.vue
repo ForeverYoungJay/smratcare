@@ -470,6 +470,7 @@ async function submit() {
   if (!(await ensureValidElderSelection())) {
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     if (!riskResult.value) {

@@ -68,7 +68,10 @@
         </a-space>
       </template>
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'status'">
+        <template v-if="column.key === 'publishTime'">
+          {{ formatPublishTime(record.publishTime) }}
+        </template>
+        <template v-else-if="column.key === 'status'">
           <a-tag :color="record.status === 'PUBLISHED' ? 'green' : 'orange'">
             {{ record.status === 'PUBLISHED' ? '已发布' : '草稿' }}
           </a-tag>
@@ -94,6 +97,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
@@ -221,6 +225,7 @@ async function submit() {
     return
   }
   const payload = { title: form.title, content: form.content, status: form.status }
+  if (saving.value) return
   saving.value = true
   try {
     const creating = !form.id
@@ -241,14 +246,22 @@ async function submit() {
   }
 }
 
+function formatPublishTime(value?: string) {
+  if (!value) return '-'
+  const parsed = dayjs(value)
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD HH:mm') : value
+}
+
 async function publish(record: OaNotice) {
   if (record.status !== 'DRAFT') return
   await publishNotice(String(record.id))
+  message.success('公告已发布')
   fetchData()
 }
 
 async function remove(record: OaNotice) {
   await deleteNotice(String(record.id))
+  message.success('公告已删除')
   fetchData()
 }
 

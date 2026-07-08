@@ -245,6 +245,7 @@ function openModal(record?: ServiceBookingItem) {
 async function submit() {
   try {
     await formRef.value?.validate()
+    if (submitting.value) return
     submitting.value = true
     const payload: Partial<ServiceBookingItem> = {
       elderId: form.elderId,

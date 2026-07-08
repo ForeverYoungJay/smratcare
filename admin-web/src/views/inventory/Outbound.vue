@@ -73,10 +73,13 @@
         :data="filteredRows"
         :column-config="{ resizable: true }"
       >
-        <vxe-column field="createTime" title="出库时间" width="180" />
+        <vxe-column field="createTime" title="出库时间" width="180">
+          <template #default="{ row }">
+            <span>{{ formatRecordTime(row.createTime) }}</span>
+          </template>
+        </vxe-column>
         <vxe-column field="outboundNo" title="领用单号" min-width="160" />
         <vxe-column field="productName" title="商品名称" min-width="160" />
-        <vxe-column field="productId" title="商品ID" width="120" />
         <vxe-column field="itemType" title="物资类型" width="110">
           <template #default="{ row }">{{ itemTypeLabel(productById.get(String(row.productId))?.itemType) }}</template>
         </vxe-column>
@@ -355,6 +358,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import dayjs from 'dayjs'
 import { Modal, message } from 'ant-design-vue'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -611,6 +615,12 @@ const sheetFailureCodeSummary = computed(() => {
     .sort((a, b) => b.count - a.count)
     .slice(0, 6)
 })
+
+function formatRecordTime(value?: string) {
+  if (!value) return '-'
+  const parsed = dayjs(value)
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD HH:mm') : value
+}
 
 async function fetchProducts() {
   const res: PageResult<ProductItem> = await getProductPage({ pageNo: 1, pageSize: 300 })

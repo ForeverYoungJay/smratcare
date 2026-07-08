@@ -546,6 +546,7 @@ async function submit() {
   if (!payload.requiredDate && onboardDate.value) {
     payload.requiredDate = onboardDate.value.format('YYYY-MM-DD')
   }
+  if (saving.value) return
   saving.value = true
   try {
     if (form.id) {

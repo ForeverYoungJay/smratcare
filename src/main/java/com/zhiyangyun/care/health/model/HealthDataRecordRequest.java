@@ -1,7 +1,6 @@
 package com.zhiyangyun.care.health.model;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
@@ -21,7 +20,7 @@ public class HealthDataRecordRequest {
   @Size(max = 128, message = "dataValue too long")
   private String dataValue;
 
-  @NotNull
+  /** 可空：不传时由服务端按当前时间落库，避免客户端时钟偏差触发“晚于当前时间”校验 */
   private LocalDateTime measuredAt;
 
   @Size(max = 64, message = "source too long")

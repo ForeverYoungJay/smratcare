@@ -546,7 +546,7 @@
                       {{ resolveBedTypeLabel(record.bedType) }}
                     </template>
                     <template v-else-if="column.key === 'status'">
-                      <a-tag :color="statusTag(record.status)">{{ statusLabel(record.status) }}</a-tag>
+                      <a-tag :color="bedOccupancyTag(record)">{{ bedOccupancyLabel(record) }}</a-tag>
                     </template>
                     <template v-else-if="column.key === 'action'">
                       <div class="row-actions">
@@ -1252,9 +1252,9 @@ const roomStats = computed(() => {
 
 const bedStats = computed(() => {
   const total = bedList.value.length
-  const available = bedList.value.filter((b) => b.status === 1).length
-  const occupied = bedList.value.filter((b) => b.status === 2).length
+  const occupied = bedList.value.filter((b) => b.status === 2 || isBedOccupied(b)).length
   const maintenance = bedList.value.filter((b) => b.status === 3).length
+  const available = bedList.value.filter((b) => b.status === 1 && !isBedOccupied(b)).length
   return { total, available, occupied, maintenance }
 })
 
@@ -1455,11 +1455,31 @@ function statusTag(status?: number) {
   return 'default'
 }
 
+/** 床位占用展示口径与入住办理保持一致：有绑定长者即视为“入住”，避免“空床却有老人”的矛盾显示 */
+function isBedOccupied(bed: Partial<BedItem>) {
+  return !!String(bed.elderId || '').trim() && bed.status !== 0 && bed.status !== 3
+}
+
+function bedOccupancyLabel(bed: Partial<BedItem>) {
+  if (isBedOccupied(bed)) return '入住'
+  return statusLabel(bed.status)
+}
+
+function bedOccupancyTag(bed: Partial<BedItem>) {
+  if (isBedOccupied(bed)) return 'orange'
+  return statusTag(bed.status)
+}
+
 function resolveRoomTypeLabel(roomType?: string) {
   const raw = String(roomType || '').trim()
   if (!raw) return '-'
   const normalized = raw.toUpperCase()
   const fallbackMap: Record<string, string> = {
+    SINGLE: '单人间',
+    DOUBLE: '双人间',
+    TRIPLE: '三人间',
+    QUAD: '四人间',
+    SUITE: '套间',
     ROOM_SINGLE: '单人间',
     ROOM_DOUBLE: '双人间',
     ROOM_TRIPLE: '三人间',
@@ -3082,7 +3102,7 @@ function exportBedCsv() {
       房间: b.roomNo || '',
       老人: b.elderName || '',
       护理等级: b.careLevel || '',
-      状态: statusLabel(b.status)
+      状态: bedOccupancyLabel(b)
     })),
     'bed-list.csv'
   )

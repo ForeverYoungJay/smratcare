@@ -246,6 +246,7 @@ function beforeTemplateUpload(file: File) {
 
 async function submit() {
   await formRef.value?.validate()
+  if (saving.value) return
   saving.value = true
   try {
     if (form.id) {

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { defineComponent } from 'vue'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import DischargeSettlement from '../DischargeSettlement.vue'
 
 const getDischargeSettlementPage = vi.hoisted(() => vi.fn().mockResolvedValue({ list: [], total: 0, pageNo: 1, pageSize: 10 }))
@@ -21,6 +21,11 @@ vi.mock('../../../api/baseConfig', () => ({
 
 vi.mock('ant-design-vue', () => ({
   message: { success: vi.fn(), error: vi.fn(), warning: vi.fn() }
+}))
+
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ query: {}, params: {}, path: '/finance/discharge-settlement', fullPath: '/finance/discharge-settlement' }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() })
 }))
 
 const SearchFormStub = defineComponent({
@@ -46,9 +51,16 @@ const ButtonStub = defineComponent({
   template: `<button class="a-button" @click="$emit('click')"><slot /></button>`
 })
 
+const KeywordStub = defineComponent({
+  props: { value: { type: String, default: '' } },
+  emits: ['update:value'],
+  template: `<input class="keyword-input" :value="value" @input="$emit('update:value', $event.target.value)" />`
+})
+
 const globalStubs = {
   PageContainer: { template: '<div><slot /></div>' },
   SearchForm: SearchFormStub,
+  ElderNameAutocomplete: KeywordStub,
   DataTable: { template: '<div />' },
   'a-form': { template: '<form><slot /></form>' },
   'a-form-item': { template: '<div><slot /></div>' },
@@ -62,9 +74,10 @@ const globalStubs = {
   'a-tag': { template: '<span><slot /></span>' }
 }
 
+// onMounted 里有多级 await（配置 → 老人池 → 列表），flushPromises 才能等到列表请求发出
 const waitTick = async () => {
-  await Promise.resolve()
-  await Promise.resolve()
+  await flushPromises()
+  await flushPromises()
 }
 
 describe('DischargeSettlement', () => {
@@ -84,7 +97,7 @@ describe('DischargeSettlement', () => {
       expect.objectContaining({ keyword: undefined })
     )
 
-    await wrapper.find('input.text-input').setValue('张三')
+    await wrapper.find('input.keyword-input').setValue('张三')
     await wrapper.find('button.search-btn').trigger('click')
     await waitTick()
 

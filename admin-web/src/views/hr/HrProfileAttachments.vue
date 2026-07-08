@@ -190,6 +190,7 @@ async function submit() {
     message.warning('请填写附件名称和附件链接')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     await createHrProfileAttachment(form)

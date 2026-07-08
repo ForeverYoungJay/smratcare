@@ -100,7 +100,7 @@ public class FinanceServiceImpl implements FinanceService {
     BigDecimal outstanding = totalAmount.subtract(paidAmount);
 
     if (request.getAmount().compareTo(outstanding) > 0) {
-      throw new IllegalArgumentException("Payment exceeds outstanding amount");
+      throw new IllegalArgumentException("收款金额超过应收余额，请核对后重新登记");
     }
 
     PaymentRecord record = new PaymentRecord();
@@ -198,7 +198,7 @@ public class FinanceServiceImpl implements FinanceService {
         .reduce(BigDecimal.ZERO, BigDecimal::add);
     BigDecimal newPaid = otherPaid.add(request.getAmount());
     if (newPaid.compareTo(totalAmount) > 0) {
-      throw new IllegalArgumentException("Payment exceeds outstanding amount");
+      throw new IllegalArgumentException("收款金额超过应收余额，请核对后重新登记");
     }
 
     String beforeMethod = safeMethod(paymentRecord.getPayMethod());

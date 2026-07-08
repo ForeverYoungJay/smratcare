@@ -1,4 +1,4 @@
-import type { MarketingCallbackType, MarketingLeadMode, MarketingPlanModuleType, MarketingPlanStatus } from '../types'
+import type { ContractChangeStatus, ContractFlowStage, MarketingCallbackType, MarketingLeadMode, MarketingPlanModuleType, MarketingPlanStatus } from '../types'
 
 export const MARKETING_PLAN_STATUS_LABELS: Record<string, string> = {
   DRAFT: '草稿',
@@ -69,3 +69,34 @@ export const MARKETING_SNAPSHOT_TYPE_OPTIONS = Object.entries(MARKETING_SNAPSHOT
   value,
   label
 }))
+
+export const CONTRACT_FLOW_STAGE_LABELS: Record<ContractFlowStage, string> = {
+  PENDING_ASSESSMENT: '待评估',
+  PENDING_BED_SELECT: '待选床',
+  PENDING_SIGN: '待签约',
+  SIGNED: '已签约'
+}
+
+export const CONTRACT_CHANGE_STATUS_LABELS: Record<ContractChangeStatus, string> = {
+  NONE: '无变更',
+  IN_PROGRESS: '变更中',
+  PENDING_APPROVAL: '待审批',
+  APPROVED: '变更通过',
+  REJECTED: '变更驳回'
+}
+
+/** 线索来源/渠道枚举 → 中文（历史数据存在中文与枚举混用，未命中的原样透传） */
+export const MARKETING_INFO_SOURCE_LABELS: Record<string, string> = {
+  ONLINE: '线上',
+  OFFLINE: '线下',
+  PHONE: '电话',
+  REFERRAL: '转介绍',
+  WALK_IN: '到访',
+  MEDICAL: '医护转介'
+}
+
+export function marketingInfoSourceLabel(value?: string | null) {
+  const key = String(value || '').trim()
+  if (!key) return '未标记'
+  return MARKETING_INFO_SOURCE_LABELS[key.toUpperCase()] || key
+}

@@ -144,13 +144,9 @@ export const legacyModuleRedirects: RouteRecordRaw[] = [
   {
     path: 'inventory',
     name: 'Inventory',
+    redirect: '/logistics/storage/stock-query',
     meta: { title: '库存管理', icon: 'AlertOutlined', hidden: true },
     children: [
-      {
-        path: '',
-        redirect: '/logistics/storage/stock-query',
-        meta: { hidden: true }
-      },
       {
         path: 'overview',
         redirect: '/logistics/storage/stock-query',

@@ -234,6 +234,7 @@ async function submit() {
     message.error('结束日期不能早于开始日期')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const payload = {

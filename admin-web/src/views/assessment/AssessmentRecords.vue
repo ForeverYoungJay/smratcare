@@ -352,9 +352,23 @@
       :ok-button-props="{ disabled: formReadonly }"
       :ok-text="formReadonly ? '已查看' : admissionModalConfirmText"
       cancel-text="关闭"
+      centered
+      :body-style="{ maxHeight: 'calc(100vh - 220px)', overflowY: 'auto', paddingRight: '20px' }"
       @ok="submit"
       @cancel="() => (open = false)"
     >
+      <a-alert
+        v-if="admissionElderArchiveMissing"
+        style="margin-bottom: 12px"
+        type="warning"
+        show-icon
+        :message="`未找到「${admissionElderNameFromRoute}」的长者档案`"
+        description="入住评估需要先建立长者档案。请先前往长者管理完成建档，再回到本页继续评估（合同信息会自动带回）。"
+      >
+        <template #action>
+          <a-button size="small" type="primary" @click="goCreateElderArchive">去建档</a-button>
+        </template>
+      </a-alert>
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">
@@ -1853,6 +1867,7 @@ async function resolveContractNoByElder(elderId?: Id) {
 }
 
 async function onElderChange(elderId?: Id) {
+  if (elderId) admissionElderArchiveMissing.value = false
   form.elderName = findElderName(elderId)
   if (!elderId || formReadonly.value) return
   if (admissionContractNoFromRoute.value) {
@@ -1990,8 +2005,38 @@ function openForm(record?: AssessmentRecord, readonly = false) {
         ensureSelectedElder(contract.elderId as any, contract.elderName || undefined)
       }
     }
+    if (isAdmissionAssessment.value && !form.elderId && admissionElderNameFromRoute.value) {
+      void prefillElderByRouteName(admissionElderNameFromRoute.value)
+    }
   }
   open.value = true
+}
+
+/**
+ * 营销闭环只带来 elderName（新线索此时可能尚未建档）：
+ * 按姓名远程搜索档案，唯一匹配则自动选中；找不到则提示先去建档，避免用户在空下拉里迷路。
+ */
+const admissionElderArchiveMissing = ref(false)
+async function prefillElderByRouteName(name: string) {
+  admissionElderArchiveMissing.value = false
+  try {
+    await loadElderOptions(name)
+    const matches = (elderOptions.value || []).filter((item) => String(item.name || item.label || '').includes(name))
+    if (matches.length === 1) {
+      form.elderId = matches[0].value as any
+      form.elderName = String(matches[0].name || matches[0].label || name)
+      ensureSelectedElder(matches[0].value as any, form.elderName)
+      return
+    }
+    admissionElderArchiveMissing.value = matches.length === 0
+  } catch {
+    // 搜索失败不阻塞手动选择
+  }
+}
+
+function goCreateElderArchive() {
+  open.value = false
+  void router.push({ path: '/elder/create', query: { fullName: admissionElderNameFromRoute.value || undefined } })
 }
 
 function onScoreAutoChange(checked: boolean) {
@@ -2120,6 +2165,7 @@ async function submit() {
       message.info('闭环模式已自动将评估状态改为“已完成”')
     }
   }
+  if (submitting.value) return
   submitting.value = true
   try {
     const payload = {

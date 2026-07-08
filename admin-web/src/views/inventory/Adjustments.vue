@@ -61,7 +61,11 @@
         :data="rows"
         :column-config="{ resizable: true }"
       >
-        <vxe-column field="createTime" title="调整时间" width="180" />
+        <vxe-column field="createTime" title="调整时间" width="180">
+          <template #default="{ row }">
+            <span>{{ dayjs(row.createTime).isValid() ? dayjs(row.createTime).format('YYYY-MM-DD HH:mm') : (row.createTime || '-') }}</span>
+          </template>
+        </vxe-column>
         <vxe-column field="productName" title="商品名称" min-width="160" />
         <vxe-column field="productId" title="商品ID" width="120" />
         <vxe-column field="batchId" title="批次ID" width="120" />
@@ -619,6 +623,7 @@ async function submitCreate() {
     periodAutoTaskEnabled: createForm.periodType !== 'NONE',
     photoUrls: uploadedPhotoUrls.value
   }
+  if (saving.value) return
   saving.value = true
   try {
     await adjustInventory({

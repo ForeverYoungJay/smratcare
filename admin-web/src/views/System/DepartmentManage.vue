@@ -172,6 +172,7 @@ async function submit() {
     message.error('请填写部门名称')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const payload = {

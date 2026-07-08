@@ -277,6 +277,7 @@ function openEditPlan(plan: MedicalFollowupPlan) {
 }
 async function submitPlan() {
   if (!planForm.elderId || !planForm.frequencyDays) { message.error('请填写长者与随访频次'); return }
+  if (saving.value) return
   saving.value = true
   try {
     if (editingPlanId.value) {
@@ -313,6 +314,7 @@ function openCreateRecord(plan: MedicalFollowupPlan) {
   recordOpen.value = true
 }
 async function submitRecord() {
+  if (saving.value) return
   saving.value = true
   try {
     await createFollowupRecord({ ...recordForm })

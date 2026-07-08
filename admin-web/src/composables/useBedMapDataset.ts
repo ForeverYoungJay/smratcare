@@ -89,6 +89,20 @@ async function refreshBedMapDataset(options?: {
   await Promise.all(tasks)
 }
 
+/** 清空模块级缓存：单元测试隔离用，业务代码请用 refreshBedMapDataset 强刷 */
+export function resetBedMapDatasetState() {
+  plainBeds.value = []
+  riskBeds.value = []
+  roomList.value = []
+  roomTypeItems.value = []
+  bedTypeItems.value = []
+  areaItems.value = []
+  plainBedPromise = null
+  riskBedPromise = null
+  roomListPromise = null
+  configPromise = null
+}
+
 export function useBedMapDataset() {
   return {
     plainBeds: readonly(plainBeds),

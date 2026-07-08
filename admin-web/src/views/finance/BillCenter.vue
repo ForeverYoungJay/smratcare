@@ -659,6 +659,7 @@ function openEditLatestPayment(row: BillItem) {
 }
 
 async function submitPay() {
+  if (paying.value) return
   await payFormRef.value?.validate?.()
   if (!activeBillId.value) return
   paying.value = true

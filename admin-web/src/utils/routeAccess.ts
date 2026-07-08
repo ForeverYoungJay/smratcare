@@ -117,6 +117,11 @@ export function resolveRouteAccess(router: Router, roles: string[], path: string
     return { canAccess: false, requiredRoles: [] }
   }
 
+  // 未知地址命中 NotFound 兜底路由时直接放行，让用户看到 404 而不是被页面权限校验误判为 403
+  if (resolved.matched.length === 1 && resolved.matched[0].name === 'NotFound') {
+    return { canAccess: true, requiredRoles: [] }
+  }
+
   const roleGroups = resolved.matched
     .map((record) => ((record.meta?.roles as string[] | undefined) || []).filter(Boolean))
     .filter((group) => group.length > 0)

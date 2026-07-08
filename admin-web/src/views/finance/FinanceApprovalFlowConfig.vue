@@ -291,6 +291,7 @@ async function saveRoles() {
     })
     if (!confirmed) return
   }
+  if (saving.value) return
   saving.value = true
   try {
     await Promise.all([
@@ -367,6 +368,7 @@ async function saveLevels() {
     })
     if (!confirmed) return
   }
+  if (saving.value) return
   saving.value = true
   try {
     await Promise.all([
@@ -482,6 +484,7 @@ async function applyRecommendedTemplate(type: 'STANDARD' | 'STRICT' | 'FAST') {
     })
     if (!confirmed) return
   }
+  if (saving.value) return
   saving.value = true
   try {
     await batchUpsertFinanceBillingConfig({
@@ -578,6 +581,7 @@ async function onImportFileChange(event: Event) {
       message.warning('CSV 无有效审批流配置')
       return
     }
+    if (saving.value) return
     saving.value = true
     await batchUpsertFinanceBillingConfig({ items })
     message.success(`导入成功，共 ${items.length} 条`)

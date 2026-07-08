@@ -480,6 +480,7 @@ async function submit() {
     message.warning('同一物资不能重复添加')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const payload = {

@@ -24,6 +24,11 @@ vi.mock('ant-design-vue', () => ({
   message
 }))
 
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ query: {}, params: {}, path: '/finance/consumption', fullPath: '/finance/consumption' }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() })
+}))
+
 const SearchFormStub = defineComponent({
   emits: ['search', 'reset'],
   template: `

@@ -632,6 +632,7 @@ async function submit() {
     message.error('请选择部门')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const creating = !form.id

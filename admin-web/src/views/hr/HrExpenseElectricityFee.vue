@@ -3,7 +3,7 @@
     <div class="ops-shell">
       <section class="hero-panel">
         <div>
-          <p class="eyebrow">Dorm Utility Desk</p>
+          <p class="eyebrow">宿舍水电台账</p>
           <h2>员工宿舍、电表、电费上传与财务推送统一处理</h2>
           <p class="hero-copy">支持按月批量上传员工电费金额，自动回写宿舍与电表信息，并一键同步财务或打印下载。</p>
         </div>

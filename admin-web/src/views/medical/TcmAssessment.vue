@@ -430,6 +430,7 @@ async function submit() {
     message.error('请填写长者和评估日期')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const payload = {

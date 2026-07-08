@@ -3,22 +3,42 @@
     <template #meta>
       <a-space wrap>
         <StatusTag :text="roleLabel" tone="pending" />
-        <StatusTag text="个人优先视角" tone="normal" />
+        <StatusTag :text="personaOverride === 'auto' ? '自动匹配视角' : '手动视角'" tone="normal" />
         <StatusTag :text="`最近刷新 ${refreshedAt}`" tone="offline" />
       </a-space>
     </template>
 
     <template #extra>
       <a-space wrap>
+        <a-select
+          :value="personaOverride"
+          size="small"
+          style="min-width: 148px"
+          :options="personaOptions"
+          @change="setPersonaOverride"
+        />
         <a-button
           v-for="action in attendanceActionButtons"
           :key="action"
-          :loading="attendanceSubmitting"
+          :loading="attendancePending === action"
+          :disabled="attendanceSubmitting && attendancePending !== action"
           @click="handleAttendanceAction(action)"
         >{{ attendanceActionLabel(action) }}</a-button>
-        <a-button type="primary" :loading="loading" @click="loadWorkbench">刷新工作台</a-button>
+        <a-button type="primary" :loading="loading" @click="loadWorkbench()">刷新工作台</a-button>
       </a-space>
     </template>
+
+    <a-alert
+      v-if="loadFailures.length"
+      class="workbench-load-alert"
+      type="warning"
+      show-icon
+      :message="`部分数据加载失败：${loadFailures.join('、')}，可能显示为占位符`"
+    >
+      <template #action>
+        <a-button size="small" type="link" :loading="loading" @click="loadWorkbench()">重试</a-button>
+      </template>
+    </a-alert>
 
     <section class="workbench-hero">
       <div class="workbench-hero-copy">
@@ -41,7 +61,12 @@
       </div>
     </section>
 
-    <section class="workbench-summary-grid">
+    <div v-if="initialLoading" class="workbench-skeleton">
+      <a-skeleton active :title="false" :paragraph="{ rows: 3 }" />
+      <a-skeleton active :title="false" :paragraph="{ rows: 6 }" />
+    </div>
+
+    <section v-if="!initialLoading" class="workbench-summary-grid">
       <OverviewMetricCard
         v-for="item in summaryMetrics"
         :key="item.label"
@@ -54,7 +79,7 @@
       />
     </section>
 
-    <section class="workbench-shell">
+    <section v-if="!initialLoading" class="workbench-shell">
       <WorkbenchModuleCard title="我的日程" eyebrow="今日">
         <div class="schedule-head">
           <div>
@@ -166,6 +191,12 @@
         </div>
       </WorkbenchModuleCard>
 
+      <WorkbenchModuleCard v-if="!orderedPrimaryModules.length" title="业务模块" eyebrow="提示">
+        <a-empty description="当前角色暂无可展示的业务模块，可前往「全部功能」查看有权限的入口">
+          <a-button type="primary" @click="openPath('/function-map')">前往全部功能</a-button>
+        </a-empty>
+      </WorkbenchModuleCard>
+
       <WorkbenchModuleCard title="最近访问" eyebrow="最近">
         <div class="recent-visit-list">
           <button
@@ -202,7 +233,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
@@ -277,8 +308,14 @@ type WorkbenchPersona = {
 const router = useRouter()
 const userStore = useUserStore()
 const loading = ref(false)
+const initialLoading = ref(true)
+const loadFailures = ref<string[]>([])
 const attendanceSubmitting = ref(false)
+const attendancePending = ref<AttendanceAction | null>(null)
 const refreshedAt = ref('--')
+const REFRESH_INTERVAL_MS = 60_000
+let refreshTimer: ReturnType<typeof setInterval> | null = null
+let refreshInFlight = false
 const calendarRef = ref<InstanceType<typeof FullCalendar> | null>(null)
 const selectedDate = ref(dayjs())
 const calendarCursor = ref(dayjs().startOf('month'))
@@ -317,8 +354,55 @@ function hasRoleFragment(fragment: string) {
   return normalizedRoles.value.some((role) => role.includes(fragment))
 }
 
+type PersonaKey = WorkbenchPersona['key']
+type PersonaOption = PersonaKey | 'auto'
+
+const PERSONA_STORAGE_PREFIX = 'workbench:persona:'
+const PERSONA_VALUES: PersonaOption[] = ['auto', 'nursing', 'medical', 'logistics', 'finance', 'hr', 'marketing', 'manager']
+
+const personaOptions: { value: PersonaOption; label: string }[] = [
+  { value: 'auto', label: '自动匹配视角' },
+  { value: 'nursing', label: '护理执行视角' },
+  { value: 'medical', label: '医务处置视角' },
+  { value: 'logistics', label: '后勤保障视角' },
+  { value: 'finance', label: '财务运营视角' },
+  { value: 'hr', label: '人事行政视角' },
+  { value: 'marketing', label: '营销转化视角' },
+  { value: 'manager', label: '综合管理视角' }
+]
+
+function personaStorageKey() {
+  const id = userStore.staffInfo?.id ?? userStore.staffInfo?.username ?? 'default'
+  return `${PERSONA_STORAGE_PREFIX}${id}`
+}
+
+function loadStoredPersona(): PersonaOption {
+  try {
+    const raw = localStorage.getItem(personaStorageKey())
+    return raw && PERSONA_VALUES.includes(raw as PersonaOption) ? (raw as PersonaOption) : 'auto'
+  } catch {
+    return 'auto'
+  }
+}
+
+const personaOverride = ref<PersonaOption>(loadStoredPersona())
+
+function setPersonaOverride(value: PersonaOption) {
+  personaOverride.value = value
+  try {
+    localStorage.setItem(personaStorageKey(), value)
+  } catch {
+    /* localStorage 不可用时仅保留本次会话选择 */
+  }
+}
+
+// 手动选定视角时以选择为准；auto 时回退到基于角色的自动匹配。无论哪种，下方模块仍按 canAccess 过滤，不会越权。
+function matchPersona(key: PersonaKey, autoCondition: boolean) {
+  return personaOverride.value === key || (personaOverride.value === 'auto' && autoCondition)
+}
+
 const workbenchPersona = computed<WorkbenchPersona>(() => {
-  if (hasRoleFragment('NURSING')) {
+  if (matchPersona('nursing', hasRoleFragment('NURSING'))) {
     return {
       key: 'nursing',
       roleLabel: '护理执行角色',
@@ -349,7 +433,7 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
       preferredActions: ['/medical-care/care-task-board', '/medical-care/unified-task-center', '/workbench/attendance']
     }
   }
-  if (hasRoleFragment('MEDICAL')) {
+  if (matchPersona('medical', hasRoleFragment('MEDICAL'))) {
     return {
       key: 'medical',
       roleLabel: '医务处置角色',
@@ -380,7 +464,7 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
       preferredActions: ['/medical-care/unified-task-center', '/medical-care/care-task-board', '/workbench/attendance']
     }
   }
-  if (hasRoleFragment('LOGISTICS') || hasRoleFragment('GUARD')) {
+  if (matchPersona('logistics', hasRoleFragment('LOGISTICS') || hasRoleFragment('GUARD'))) {
     return {
       key: 'logistics',
       roleLabel: '后勤保障角色',
@@ -411,7 +495,7 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
       preferredActions: ['/logistics/task-center', '/workbench/attendance', '/workbench/todo']
     }
   }
-  if (hasRoleFragment('FINANCE')) {
+  if (matchPersona('finance', hasRoleFragment('FINANCE'))) {
     return {
       key: 'finance',
       roleLabel: '财务运营角色',
@@ -442,7 +526,7 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
       preferredActions: ['/finance/workbench', '/finance/bills/in-resident', '/workbench/approvals']
     }
   }
-  if (hasRoleFragment('HR')) {
+  if (matchPersona('hr', hasRoleFragment('HR'))) {
     return {
       key: 'hr',
       roleLabel: '人事行政角色',
@@ -473,7 +557,7 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
       preferredActions: ['/hr/overview', '/workbench/attendance', '/workbench/approvals']
     }
   }
-  if (hasRoleFragment('MARKETING')) {
+  if (matchPersona('marketing', hasRoleFragment('MARKETING'))) {
     return {
       key: 'marketing',
       roleLabel: '营销转化角色',
@@ -597,23 +681,8 @@ const attendanceActionButtons = computed<AttendanceAction[]>(() => {
   return []
 })
 
-const summaryMetrics = computed(() => ([
-  {
-    label: '我的待办',
-    value: displayNumber(portalSummary.value?.openTodoCount),
-    helper: `逾期 ${displayNumber(portalSummary.value?.overdueTodoCount)}`,
-    tone: 'brand' as const,
-    path: '/workbench/todo'
-  },
-  {
-    label: '我的审批',
-    value: displayNumber(portalSummary.value?.pendingApprovalCount),
-    helper: '待审批与待确认',
-    tone: 'warning' as const,
-    path: '/workbench/approvals'
-  },
-  ...workbenchPersona.value.summaryMetrics
-]))
+// 通用的“我的待办/我的审批”已在 hero 焦点卡与下方 module 卡呈现，这里只保留角色专属指标，避免同一数字重复计数
+const summaryMetrics = computed(() => workbenchPersona.value.summaryMetrics)
 
 const scheduleItems = computed(() => ([
   { label: '当月在岗', value: `${displayNumber(attendanceOverview.onDutyDays)} 天`, path: '/workbench/attendance' },
@@ -829,7 +898,7 @@ const calendarOptions = computed(() => ({
     title: task.title,
     start: task.startTime || task.endTime,
     end: task.endTime || task.startTime,
-    color: task.urgency === 'EMERGENCY' ? '#d9485f' : task.calendarType === 'COLLAB' ? '#f59e0b' : '#2f8f83',
+    color: task.urgency === 'EMERGENCY' ? 'var(--danger)' : task.calendarType === 'COLLAB' ? 'var(--warning)' : 'var(--primary)',
     classNames: [
       selectedDate.value.isSame(task.startTime || task.endTime || '', 'day') ? 'workbench-calendar-event--focus' : '',
       task.status === 'DONE' ? 'workbench-calendar-event--done' : ''
@@ -854,10 +923,10 @@ const calendarOptions = computed(() => ({
   }
 }))
 
-async function loadCalendar(base = calendarCursor.value) {
+async function loadCalendar(base = calendarCursor.value): Promise<boolean> {
   if (!canAccess('/workbench/schedule')) {
     calendarRows.value = []
-    return
+    return true
   }
   const monthStart = dayjs(base).startOf('month')
   const monthEnd = monthStart.endOf('month')
@@ -867,8 +936,10 @@ async function loadCalendar(base = calendarCursor.value) {
       endDate: monthEnd.format('YYYY-MM-DD')
     })
     calendarRows.value = Array.isArray(rows) ? rows : []
+    return true
   } catch {
     calendarRows.value = []
+    return false
   }
 }
 
@@ -902,17 +973,27 @@ async function refreshAttendance() {
   Object.assign(attendanceOverview, data || {})
 }
 
-async function loadWorkbench() {
-  loading.value = true
+async function loadWorkbench(options: { silent?: boolean } = {}) {
+  if (refreshInFlight) return
+  refreshInFlight = true
+  if (!options.silent) loading.value = true
+  const failures: string[] = []
+  // 403 表示当前角色无该数据权限，属于正常裁剪，不计入“加载失败”；其余（网络/5xx）才提示
+  const capture = (label: string) => (error: any) => {
+    if (error?.response?.status !== 403) failures.push(label)
+    return null
+  }
   try {
-    const [portal, logistics] = await Promise.all([
-      getPortalSummary({ silent403: true, silentError: true }).catch(() => null),
-      getLogisticsWorkbenchSummary(undefined, { silent403: true, silentError: true }).catch(() => null),
-      refreshAttendance().catch(() => undefined),
-      loadCalendar(calendarCursor.value).catch(() => undefined)
+    const [portal, logistics, , calendarOk] = await Promise.all([
+      getPortalSummary({ silent403: true, silentError: true }).catch(capture('工作待办')),
+      getLogisticsWorkbenchSummary(undefined, { silent403: true, silentError: true }).catch(capture('后勤工单')),
+      refreshAttendance().catch(capture('考勤')),
+      loadCalendar(calendarCursor.value)
     ])
     portalSummary.value = portal
     logisticsSummary.value = logistics
+    if (calendarOk === false) failures.push('日程')
+    loadFailures.value = failures
     refreshedAt.value = new Date().toLocaleString('zh-CN', {
       month: '2-digit',
       day: '2-digit',
@@ -920,7 +1001,9 @@ async function loadWorkbench() {
       minute: '2-digit'
     })
   } finally {
-    loading.value = false
+    refreshInFlight = false
+    if (!options.silent) loading.value = false
+    initialLoading.value = false
   }
 }
 
@@ -936,7 +1019,9 @@ function attendanceActionLabel(action: AttendanceAction) {
 }
 
 async function handleAttendanceAction(action: AttendanceAction) {
+  if (attendanceSubmitting.value) return
   attendanceSubmitting.value = true
+  attendancePending.value = action
   try {
     await punchAttendance(action)
     message.success(action === 'IN' ? '上班打卡成功' : action === 'OUT' ? '下班打卡成功' : '考勤状态已更新')
@@ -945,6 +1030,7 @@ async function handleAttendanceAction(action: AttendanceAction) {
     message.error(error?.message || '打卡失败，请稍后重试')
   } finally {
     attendanceSubmitting.value = false
+    attendancePending.value = null
   }
 }
 
@@ -958,12 +1044,39 @@ function formatVisitTime(timestamp: number) {
   })
 }
 
+function handleVisibilityChange() {
+  // 标签页重新可见时立即补一次刷新，隐藏时不做无谓请求
+  if (document.visibilityState === 'visible') loadWorkbench({ silent: true })
+}
+
 onMounted(() => {
   loadWorkbench()
+  refreshTimer = setInterval(() => {
+    if (document.visibilityState === 'visible') loadWorkbench({ silent: true })
+  }, REFRESH_INTERVAL_MS)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+})
+
+onUnmounted(() => {
+  if (refreshTimer) {
+    clearInterval(refreshTimer)
+    refreshTimer = null
+  }
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>
 
 <style scoped>
+.workbench-load-alert {
+  margin-bottom: 18px;
+  border-radius: 14px;
+}
+
+.workbench-skeleton {
+  display: grid;
+  gap: 18px;
+}
+
 .workbench-hero,
 .workbench-summary-grid {
   display: grid;
@@ -982,7 +1095,7 @@ onMounted(() => {
 }
 
 .workbench-summary-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
 .workbench-hero-copy {
@@ -1238,7 +1351,7 @@ onMounted(() => {
   --fc-event-border-color: transparent;
   --fc-page-bg-color: transparent;
   --fc-neutral-bg-color: rgba(243, 248, 249, 0.9);
-  --fc-today-bg-color: rgba(47, 143, 131, 0.08);
+  --fc-today-bg-color: rgba(var(--primary-rgb), 0.08);
   font-size: 13px;
 }
 
@@ -1260,11 +1373,11 @@ onMounted(() => {
 }
 
 :deep(.fc .workbench-calendar-day--selected) {
-  background: rgba(47, 143, 131, 0.12);
+  background: rgba(var(--primary-rgb), 0.12);
 }
 
 :deep(.fc .workbench-calendar-day--today) .fc-daygrid-day-number {
-  color: #2f8f83;
+  color: var(--primary);
   font-weight: 700;
 }
 
@@ -1279,7 +1392,7 @@ onMounted(() => {
 }
 
 :deep(.fc .workbench-calendar-event--focus) {
-  box-shadow: 0 0 0 1px rgba(15, 104, 96, 0.18);
+  box-shadow: 0 0 0 1px rgba(var(--primary-rgb), 0.18);
 }
 
 @media (max-width: 1280px) {

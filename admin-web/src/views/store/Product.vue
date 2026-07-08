@@ -471,6 +471,7 @@ async function submit() {
   }
   try {
     await formRef.value?.validate()
+    if (saving.value) return
     saving.value = true
     const payload = {
       productName: form.productName,

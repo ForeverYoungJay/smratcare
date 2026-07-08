@@ -25,12 +25,28 @@ const GENERIC_FORBIDDEN_PATTERNS = [
   /当前账号无该操作权限/
 ]
 
+/** 后端偶发返回英文原文，已知报文在展示前翻译为中文 */
+const KNOWN_ERROR_TRANSLATIONS: Array<{ pattern: RegExp; text: string }> = [
+  { pattern: /payment exceeds outstanding amount/i, text: '收款金额超过应收余额，请核对后重新登记' },
+  { pattern: /access denied/i, text: '当前账号无该操作权限' },
+  { pattern: /bad credentials/i, text: '用户名或密码不正确' },
+  { pattern: /^elder not found$/i, text: '未找到对应长者档案，可能已被删除' },
+  { pattern: /^(department|role|staff|record|bill) not found$/i, text: '未找到对应数据，可能已被删除' },
+  { pattern: /internal server error/i, text: '服务器处理异常，请稍后重试' },
+  { pattern: /^request failed with status code \d+$/i, text: '请求失败，请稍后重试' }
+]
+
+function translateKnownErrorMessage(text: string) {
+  const matched = KNOWN_ERROR_TRANSLATIONS.find((item) => item.pattern.test(text))
+  return matched ? matched.text : text
+}
+
 function resolveErrorMessage(payload: any, fallback = '请求失败') {
   if (!payload) return fallback
-  if (typeof payload === 'string') return payload || fallback
-  if (typeof payload?.msg === 'string' && payload.msg) return payload.msg
-  if (typeof payload?.message === 'string' && payload.message) return payload.message
-  if (typeof payload?.error === 'string' && payload.error) return payload.error
+  if (typeof payload === 'string') return translateKnownErrorMessage(payload) || fallback
+  if (typeof payload?.msg === 'string' && payload.msg) return translateKnownErrorMessage(payload.msg)
+  if (typeof payload?.message === 'string' && payload.message) return translateKnownErrorMessage(payload.message)
+  if (typeof payload?.error === 'string' && payload.error) return translateKnownErrorMessage(payload.error)
   return fallback
 }
 
@@ -163,7 +179,16 @@ request.interceptors.response.use(
     if (!forceErrorToast && method === 'GET' && isTimeoutOrNetwork) {
       return Promise.reject(error)
     }
-    message.error(resolveAxiosErrorMessage(error))
+    const resolvedMessage = resolveAxiosErrorMessage(error)
+    // 调用方常用 error.message 再次提示：将“Request failed with status code xxx”替换为业务信息，避免英文原文二次弹出
+    if (error && typeof error === 'object') {
+      try {
+        error.message = resolvedMessage
+      } catch {
+        // message 只读时忽略，不影响主流程
+      }
+    }
+    message.error(resolvedMessage)
     return Promise.reject(error)
   }
 )

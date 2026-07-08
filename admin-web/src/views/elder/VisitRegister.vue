@@ -56,7 +56,10 @@
           :row-selection="rowSelection"
         >
           <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'status'">
+            <template v-if="column.key === 'visitTime'">
+              {{ formatVisitTime(record.visitTime) }}
+            </template>
+            <template v-else-if="column.key === 'status'">
               <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
             </template>
           </template>
@@ -309,6 +312,12 @@ function statusText(status?: number) {
   return '待登记'
 }
 
+function formatVisitTime(value?: string) {
+  if (!value) return '-'
+  const parsed = dayjs(value)
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD HH:mm') : value
+}
+
 function statusColor(status?: number) {
   if (status === 1) return 'green'
   if (status === 2) return 'default'
@@ -469,6 +478,7 @@ function buildTimeSlot(visitTime: string) {
 async function submitEdit() {
   if (!formRef.value) return
   await formRef.value.validate()
+  if (submitting.value) return
   submitting.value = true
   try {
     const payload: VisitBookRequest = {
@@ -491,6 +501,14 @@ async function submitEdit() {
       message.success('来访预约已新增')
     }
     editOpen.value = false
+    // 列表默认按“今天”过滤：把日期筛选切到预约当天，确保刚保存的记录立即可见
+    const visitDate = form.visitTime ? dayjs(form.visitTime).format('YYYY-MM-DD') : ''
+    if (visitDate) {
+      const [from, to] = query.dateRange || []
+      if (!from || !to || visitDate < from || visitDate > to) {
+        query.dateRange = [visitDate, visitDate]
+      }
+    }
     await fetchData()
   } finally {
     submitting.value = false

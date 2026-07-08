@@ -332,6 +332,7 @@ async function submit() {
     message.warning('个人相册请选择所属老人')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const payload = {

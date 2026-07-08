@@ -126,12 +126,24 @@
         <a-row :gutter="16">
           <a-col :span="12">
             <a-form-item label="开始时间">
-              <a-input v-model:value="form.startTime" placeholder="2026-03-23T08:00:00" />
+              <a-date-picker
+                v-model:value="form.startTime"
+                show-time
+                value-format="YYYY-MM-DDTHH:mm:ss"
+                placeholder="请选择开始时间"
+                style="width: 100%"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="12">
             <a-form-item label="结束时间">
-              <a-input v-model:value="form.endTime" placeholder="2026-03-23T17:00:00" />
+              <a-date-picker
+                v-model:value="form.endTime"
+                show-time
+                value-format="YYYY-MM-DDTHH:mm:ss"
+                placeholder="请选择结束时间"
+                style="width: 100%"
+              />
             </a-form-item>
           </a-col>
         </a-row>
@@ -229,7 +241,6 @@ const swapQuery = reactive({
 const swapPagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 
 const columns = [
-  { title: '员工ID', dataIndex: 'staffId', key: 'staffId', width: 100 },
   { title: '员工姓名', dataIndex: 'staffName', key: 'staffName', width: 140 },
   { title: '值班日期', dataIndex: 'dutyDate', key: 'dutyDate', width: 120 },
   { title: '班次', dataIndex: 'shiftCode', key: 'shiftCode', width: 100 },
@@ -414,7 +425,10 @@ function openEdit(record?: ScheduleItem) {
 }
 
 async function submit() {
-  if (!form.staffId || !dutyDate.value) return
+  if (!form.staffId || !dutyDate.value) {
+    message.warning(!form.staffId ? '请选择员工' : '请选择值班日期')
+    return
+  }
   const selected = staffOptions.value.find((item) => String(item.value) === String(form.staffId))
   const payload = {
     ...form,
@@ -422,6 +436,7 @@ async function submit() {
     staffName: selected?.name || form.staffName,
     dutyDate: dutyDate.value.format('YYYY-MM-DD')
   }
+  if (saving.value) return
   saving.value = true
   try {
     if (form.id) {

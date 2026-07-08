@@ -52,12 +52,12 @@
       <a-form layout="vertical" :model="form">
         <a-row :gutter="12">
           <a-col :span="12">
-            <a-form-item label="调出仓库">
+            <a-form-item label="调出仓库" required>
               <a-select v-model:value="form.fromWarehouseId" :options="warehouseOptions" />
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item label="调入仓库">
+            <a-form-item label="调入仓库" required>
               <a-select v-model:value="form.toWarehouseId" :options="warehouseOptions" />
             </a-form-item>
           </a-col>
@@ -315,6 +315,7 @@ async function submit() {
     return
   }
 
+  if (saving.value) return
   saving.value = true
   try {
     const payload = {

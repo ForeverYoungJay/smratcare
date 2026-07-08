@@ -109,6 +109,7 @@ async function submitEdit() {
     message.error('请填写渠道编码')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     await saveMedinsChannel({

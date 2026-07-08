@@ -156,6 +156,7 @@ async function submitGenerate() {
     message.error('请选择长者与结算月份')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     await generateLtciSettlement(genForm.elderId, genForm.month)

@@ -301,6 +301,7 @@ async function submit() {
     reporterName: form.reporterName,
     status: form.status
   }
+  if (saving.value) return
   saving.value = true
   try {
     if (form.id) {

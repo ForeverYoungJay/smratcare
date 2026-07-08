@@ -244,6 +244,7 @@ function openModal(record?: ServicePlanItem) {
 async function submit() {
   try {
     await formRef.value?.validate()
+    if (submitting.value) return
     submitting.value = true
     const payload: Partial<ServicePlanItem> = {
       planName: form.planName,

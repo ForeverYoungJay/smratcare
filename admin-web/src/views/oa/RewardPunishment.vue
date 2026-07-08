@@ -243,6 +243,7 @@ async function submit() {
     message.error('请选择发生日期')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const payload = {

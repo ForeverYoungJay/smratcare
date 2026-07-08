@@ -82,12 +82,13 @@ public class MarketingReportServiceImpl implements MarketingReportService {
   public MarketingConversionReportResponse conversion(
       Long tenantId, String dateFrom, String dateTo, String source, Long staffId) {
     List<CrmLead> leads = crmLeadMapper.selectList(leadWrapperByCreateTime(tenantId, dateFrom, dateTo, source, staffId));
-    long total = leads.size();
-    long consult = leads.stream().filter(this::isConsultLead).count();
-    long intent = leads.stream().filter(this::isIntentLead).count();
-    long reserve = leads.stream().filter(this::hasReservationEvidence).count();
-    long invalid = leads.stream().filter(this::isInvalidLead).count();
-    long contractCount = leads.stream().filter(this::isSignedLead).count();
+    FunnelCounts counts = computeFunnelCounts(leads);
+    long total = counts.total();
+    long consult = counts.consult();
+    long intent = counts.intent();
+    long reserve = counts.reserve();
+    long invalid = counts.invalid();
+    long contractCount = counts.signed();
 
     MarketingConversionReportResponse response = new MarketingConversionReportResponse();
     response.setTotalLeads(total);
@@ -214,11 +215,12 @@ public class MarketingReportServiceImpl implements MarketingReportService {
   public MarketingFollowupReportResponse followup(
       Long tenantId, String dateFrom, String dateTo, String source, Long staffId) {
     List<CrmLead> leads = crmLeadMapper.selectList(leadWrapperByCreateTime(tenantId, dateFrom, dateTo, source, staffId));
-    long total = leads.size();
-    long consult = leads.stream().filter(this::isConsultLead).count();
-    long intent = leads.stream().filter(this::isIntentLead).count();
-    long reserve = leads.stream().filter(this::hasReservationEvidence).count();
-    long invalid = leads.stream().filter(this::isInvalidLead).count();
+    FunnelCounts counts = computeFunnelCounts(leads);
+    long total = counts.total();
+    long consult = counts.consult();
+    long intent = counts.intent();
+    long reserve = counts.reserve();
+    long invalid = counts.invalid();
 
     LocalDate today = LocalDate.now();
     LambdaQueryWrapper<CrmLead> overdueWrapper = Wrappers.lambdaQuery(CrmLead.class)
@@ -948,10 +950,11 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     List<CrmLead> leads = crmLeadMapper.selectList(buildLeadEntryWrapper(
         tenantId, currentStaffId, adminView, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
         consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName));
-    long consultCount = leads.stream().filter(this::isConsultLead).count();
-    long intentCount = leads.stream().filter(this::isIntentLead).count();
-    long reservationCount = leads.stream().filter(this::hasReservationEvidence).count();
-    long invalidCount = leads.stream().filter(this::isInvalidLead).count();
+    FunnelCounts funnel = computeFunnelCounts(leads);
+    long consultCount = funnel.consult();
+    long intentCount = funnel.intent();
+    long reservationCount = funnel.reserve();
+    long invalidCount = funnel.invalid();
     List<CrmLead> modeLeads = leads.stream()
         .filter(lead -> matchesLeadEntryMode(lead, normalizedMode))
         .toList();
@@ -968,7 +971,7 @@ public class MarketingReportServiceImpl implements MarketingReportService {
       default -> total;
     };
 
-    long signedContractCount = leads.stream().filter(this::isSignedLead).count();
+    long signedContractCount = funnel.signed();
     long unsignedReservationCount = leads.stream().filter(this::hasReservationEvidence).filter(lead -> !isSignedLead(lead)).count();
     long refundedReservationCount = leads.stream().filter(this::hasReservationEvidence).filter(lead -> Integer.valueOf(1).equals(lead.getRefunded())).count();
 
@@ -1076,6 +1079,38 @@ public class MarketingReportServiceImpl implements MarketingReportService {
   private boolean isConsultLead(CrmLead lead) {
     return lead != null && !isInvalidLead(lead) && !isSignedLead(lead) && !hasReservationEvidence(lead)
         && !Integer.valueOf(1).equals(lead.getStatus());
+  }
+
+  /** 漏斗各阶段计数（口径与 isXxxLead 判定完全一致）。 */
+  private record FunnelCounts(long total, long consult, long intent, long reserve, long invalid, long signed) {}
+
+  /**
+   * 单次遍历统计漏斗各阶段数量，替代此前对同一 List 的 4~5 次 stream 重复扫描，口径保持不变。
+   */
+  private FunnelCounts computeFunnelCounts(List<CrmLead> leads) {
+    long consult = 0;
+    long intent = 0;
+    long reserve = 0;
+    long invalid = 0;
+    long signed = 0;
+    for (CrmLead lead : leads) {
+      if (isConsultLead(lead)) {
+        consult++;
+      }
+      if (isIntentLead(lead)) {
+        intent++;
+      }
+      if (hasReservationEvidence(lead)) {
+        reserve++;
+      }
+      if (isInvalidLead(lead)) {
+        invalid++;
+      }
+      if (isSignedLead(lead)) {
+        signed++;
+      }
+    }
+    return new FunnelCounts(leads.size(), consult, intent, reserve, invalid, signed);
   }
 
   private long countContractsByStage(List<CrmContract> contracts, String flowStage) {

@@ -1422,6 +1422,7 @@ async function submit() {
   const repeatRule = form.recurrenceRule
   const repeatInterval = Math.max(1, Number(form.recurrenceInterval || 1))
 
+  if (saving.value) return
   saving.value = true
   try {
     if (editingTaskId.value != null) {

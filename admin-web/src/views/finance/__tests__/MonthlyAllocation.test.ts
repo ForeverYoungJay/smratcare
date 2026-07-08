@@ -48,11 +48,12 @@ describe('MonthlyAllocation', () => {
     await waitTick()
 
     const vm = wrapper.vm as any
-    expect(vm.calcAvgAmount(100, 3)).toBe('33.33')
-    expect(vm.calcAvgAmount(100, 0)).toBe('--')
+    expect(vm.resolveAvgAmount({ totalAmount: 100, targetCount: 3 })).toBe('33.33')
+    expect(vm.resolveAvgAmount({ totalAmount: 100, targetCount: 0 })).toBe('--')
+    expect(vm.resolveAvgAmount({ avgAmount: 12.345 })).toBe('12.35')
   })
 
-  it('blocks create when amount positive and targetCount zero', async () => {
+  it('blocks create when no elder selected', async () => {
     const wrapper = mount(MonthlyAllocation, { global: { stubs: globalStubs } })
     await waitTick()
 
@@ -60,10 +61,10 @@ describe('MonthlyAllocation', () => {
     vm.createForm.allocationMonth = '2026-02'
     vm.createForm.allocationName = '保洁费'
     vm.createForm.totalAmount = 99
-    vm.createForm.targetCount = 0
+    vm.createForm.elderIds = []
     await vm.submitCreate()
 
-    expect(message.error).toHaveBeenCalledWith('总金额大于0时，目标人数必须大于0')
+    expect(message.error).toHaveBeenCalledWith('请至少选择一位分摊老人')
     expect(createMonthlyAllocation).not.toHaveBeenCalled()
   })
 })

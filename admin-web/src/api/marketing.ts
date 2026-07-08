@@ -13,6 +13,8 @@ import type {
   ContractAttachmentCreateRequest,
   ContractAttachmentItem,
   CrmLeadItem,
+  CrmLeadPageQuery,
+  CrmContractPageQuery,
   CrmSalesReportSnapshotItem,
   CrmStageTransitionLogItem,
   LeadBatchDeleteRequest,
@@ -49,7 +51,7 @@ import type {
 
 export { createCrmLead, updateCrmLead, deleteCrmLead }
 
-export function getLeadPage(params: any, config?: Record<string, any>) {
+export function getLeadPage(params: CrmLeadPageQuery, config?: Record<string, any>) {
   return getCrmLeadPage(params, config)
 }
 
@@ -65,8 +67,8 @@ export function getLeadStageLogs(leadId: Id, limit = 20) {
   return request.get<CrmStageTransitionLogItem[]>(`/api/crm/leads/${leadId}/stage-logs`, { params: { limit } })
 }
 
-export function getContractPage(params: any, config?: Record<string, any>) {
-  return fetchPage<CrmContractItem>('/api/crm/contracts/page', params, config)
+export function getContractPage(params: CrmContractPageQuery, config?: Record<string, any>) {
+  return fetchPage<CrmContractItem>('/api/crm/contracts/page', params as Record<string, any>, config)
 }
 
 export function getContractStageSummary(params?: { currentOwnerDept?: string }) {
@@ -222,6 +224,9 @@ export function uploadMarketingFile(file: File, bizType = 'marketing-contract') 
   })
 }
 
+/** 全量拉取的分页硬上限：最多 MAX_FULL_SCAN_PAGES 页，防止无限循环/超大内存占用。 */
+const MAX_FULL_SCAN_PAGES = 30
+
 export async function getAllLeads(pageSize = 200): Promise<CrmLeadItem[]> {
   let pageNo = 1
   let total = 0
@@ -231,7 +236,12 @@ export async function getAllLeads(pageSize = 200): Promise<CrmLeadItem[]> {
     result.push(...(page.list || []))
     total = page.total || 0
     pageNo += 1
-  } while (result.length < total && pageNo <= 30)
+  } while (result.length < total && pageNo <= MAX_FULL_SCAN_PAGES)
+  if (result.length < total) {
+    console.warn(
+      `[getAllLeads] 数据量(${total})超过全量拉取上限(${MAX_FULL_SCAN_PAGES * pageSize})，仅返回前 ${result.length} 条，统计结果可能不完整`
+    )
+  }
   return result
 }
 
@@ -244,7 +254,12 @@ export async function getAllAdmissions(pageSize = 200): Promise<AdmissionRecordI
     result.push(...(page.list || []))
     total = page.total || 0
     pageNo += 1
-  } while (result.length < total && pageNo <= 30)
+  } while (result.length < total && pageNo <= MAX_FULL_SCAN_PAGES)
+  if (result.length < total) {
+    console.warn(
+      `[getAllAdmissions] 数据量(${total})超过全量拉取上限(${MAX_FULL_SCAN_PAGES * pageSize})，仅返回前 ${result.length} 条，统计结果可能不完整`
+    )
+  }
   return result
 }
 

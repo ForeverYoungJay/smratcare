@@ -947,6 +947,7 @@ async function submit() {
     purchaseDocumentUrls: viewConfig.value.showMaintenanceAttachments ? form.purchaseDocumentUrls : undefined
   }
 
+  if (saving.value) return
   saving.value = true
   try {
     if (form.id) {

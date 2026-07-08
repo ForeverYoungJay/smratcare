@@ -104,6 +104,7 @@ function openModal(record?: ServiceItem) {
 async function submit() {
   try {
     await formRef.value?.validate()
+    if (submitting.value) return
     submitting.value = true
     if (form.id) {
       await updateServiceItem(form.id, form)

@@ -509,6 +509,7 @@ async function openPreview() {
 }
 
 async function submitCreate() {
+  if (creating.value) return
   if (!createForm.allocationMonth) {
     message.error('请选择月份')
     return

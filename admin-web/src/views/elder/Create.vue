@@ -472,12 +472,12 @@ const duplicateWarningText = computed(() =>
 
 const rules: FormRules = {
   fullName: [{ required: true, message: '请输入姓名' }],
-  idCardNo: [{ validator: validateIdCardNo, trigger: 'blur' }],
+  idCardNo: [{ required: true, validator: validateIdCardNo, trigger: 'blur' }],
   phone: [{ validator: validatePhone, trigger: 'blur' }],
-  homeAddress: [{ validator: validateHomeAddress, trigger: 'blur' }],
-  gender: [{ validator: validateGender, trigger: 'change' }],
+  homeAddress: [{ required: true, validator: validateHomeAddress, trigger: 'blur' }],
+  gender: [{ required: true, validator: validateGender, trigger: 'change' }],
   birthDate: [{ validator: validateBirthDate, trigger: 'change' }],
-  admissionDate: [{ validator: validateAdmissionDate, trigger: 'change' }],
+  admissionDate: [{ required: true, validator: validateAdmissionDate, trigger: 'change' }],
   contractNo: [{ validator: validateContractNo, trigger: 'blur' }],
   occupancyMode: [{ required: true, message: '请选择入住方式', trigger: 'change' }],
   bedId: [{ validator: validateBedId, trigger: 'change' }],
@@ -495,6 +495,7 @@ async function submit() {
     await formRef.value.validate()
     validateFamilyDraftRows()
     await refreshDuplicateWarnings()
+    if (saving.value) return
     saving.value = true
     const normalizedContractNo = String(form.contractNo || '').trim()
     const shouldAdmit = !!form.admissionDate && !!normalizedContractNo
@@ -856,6 +857,10 @@ watch(
 onMounted(async () => {
   if (!familyDraftRows.value.length) {
     addFamilyDraftRow()
+  }
+  const fullNameFromRoute = trimText(String(route.query.fullName || ''))
+  if (!form.fullName && fullNameFromRoute) {
+    form.fullName = fullNameFromRoute
   }
   if (!form.admissionDate) {
     form.admissionDate = dayjs().format('YYYY-MM-DD')

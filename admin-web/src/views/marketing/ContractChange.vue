@@ -221,6 +221,7 @@ function openEditSelected() {
 
 async function saveEdit() {
   if (!editForm.id) return
+  if (saving.value) return
   saving.value = true
   try {
     await updateCrmContract(String(editForm.id), {

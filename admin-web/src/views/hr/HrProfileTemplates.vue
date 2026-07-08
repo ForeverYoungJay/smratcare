@@ -186,6 +186,7 @@ async function submit() {
     message.warning('请填写模板名称并上传合同模板')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     await createHrProfileTemplate(form)

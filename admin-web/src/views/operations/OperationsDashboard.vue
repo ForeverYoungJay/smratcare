@@ -2,7 +2,7 @@
   <PageContainer title="管理驾驶舱" subTitle="一个入口承接经营、服务、安全、人力、后勤、营销和智能化闭环">
     <template #extra>
       <a-space wrap>
-        <a-tag color="blue">{{ capability.overallStatus || '运营能力同步中' }}</a-tag>
+        <a-tag color="blue">{{ overallStatusText(capability.overallStatus) }}</a-tag>
         <a-button :loading="loading" @click="loadData">刷新</a-button>
       </a-space>
     </template>
@@ -63,7 +63,7 @@
             <div class="index-banner">
               <span>风险指数</span>
               <strong>{{ safetyRisk.riskIndex }}</strong>
-              <a-tag :color="levelColor(safetyRisk.riskLevel)">{{ safetyRisk.riskLevel || 'LOW' }}</a-tag>
+              <a-tag :color="levelColor(safetyRisk.riskLevel)">{{ levelText(safetyRisk.riskLevel) }}</a-tag>
             </div>
             <MetricStrip :items="safetyRisk.metrics" />
             <PanelList title="风险来源" :items="safetyRisk.riskSources" />
@@ -77,7 +77,7 @@
             <div class="index-banner">
               <span>人力指数</span>
               <strong>{{ workforce.workforceIndex }}</strong>
-              <a-tag :color="levelColor(workforce.workforceLevel)">{{ workforce.workforceLevel || 'LOW' }}</a-tag>
+              <a-tag :color="levelColor(workforce.workforceLevel)">{{ levelText(workforce.workforceLevel) }}</a-tag>
             </div>
             <MetricStrip :items="workforce.metrics" />
             <PanelList title="人力风险" :items="workforce.risks" />
@@ -92,7 +92,7 @@
             <div class="index-banner">
               <span>后勤指数</span>
               <strong>{{ logistics.logisticsIndex }}</strong>
-              <a-tag :color="levelColor(logistics.logisticsLevel)">{{ logistics.logisticsLevel || 'LOW' }}</a-tag>
+              <a-tag :color="levelColor(logistics.logisticsLevel)">{{ levelText(logistics.logisticsLevel) }}</a-tag>
             </div>
             <MetricStrip :items="logistics.metrics" />
             <PanelList title="保障风险" :items="logistics.risks" />
@@ -105,7 +105,7 @@
             <div class="index-banner">
               <span>转化指数</span>
               <strong>{{ marketing.conversionIndex }}</strong>
-              <a-tag :color="levelColor(marketing.conversionLevel)">{{ marketing.conversionLevel || 'LOW' }}</a-tag>
+              <a-tag :color="levelColor(marketing.conversionLevel)">{{ levelText(marketing.conversionLevel) }}</a-tag>
             </div>
             <MetricStrip :items="marketing.metrics" />
             <PanelList title="漏斗阶段" :items="marketing.funnelStages" />
@@ -303,7 +303,21 @@ function statusText(status?: string) {
   if (status === 'READY') return '已落地'
   if (status === 'PARTIAL') return '增强中'
   if (status === 'PLANNED') return '待建设'
+  if (status === 'LANDING') return '落地中'
   return status || '未知'
+}
+
+function overallStatusText(status?: string) {
+  if (!status) return '运营能力同步中'
+  return statusText(status)
+}
+
+function levelText(level?: string) {
+  if (level === 'CRITICAL') return '严重'
+  if (level === 'HIGH') return '高'
+  if (level === 'MEDIUM') return '中'
+  if (level === 'LOW' || !level) return '低'
+  return level
 }
 
 function statusColor(status?: string) {

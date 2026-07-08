@@ -114,6 +114,7 @@ function openModal(record?: CareLevelItem) {
 async function submit() {
   try {
     await formRef.value?.validate()
+    if (submitting.value) return
     submitting.value = true
     const payload: Partial<CareLevelItem> = {
       levelCode: form.levelCode,

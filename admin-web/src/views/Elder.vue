@@ -247,6 +247,7 @@ function openUnbind(record: ElderItem) {
 }
 
 async function submit() {
+  if (saving.value) return
   saving.value = true
   try {
     if (form.id) {

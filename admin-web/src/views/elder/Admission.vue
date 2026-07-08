@@ -35,7 +35,7 @@
             :options="admissionElderOptions"
             :loading="elderLoading"
             placeholder="请输入老人姓名/拼音首字母"
-            @search="searchElders"
+            @search="onElderSearch"
             @focus="() => !admissionElderOptions.length && searchElders('')"
             @change="onElderChange"
           />
@@ -106,6 +106,12 @@
             :disabled="!assetSelect.roomId"
             :placeholder="assetSelect.roomId ? '请选择床位' : '请先选择房间'"
           >
+            <template #notFoundContent>
+              <a-empty
+                :image="undefined"
+                :description="assetSelect.roomId ? '该房间暂无空闲床位，可更换房间或到床位管理新增/释放床位' : '请先选择房间'"
+              />
+            </template>
             <a-select-option v-for="item in bedOptions" :key="item.value" :value="item.value" :label="item.label">
               {{ item.label }}
             </a-select-option>
@@ -226,6 +232,9 @@
           <template v-else-if="column.key === 'operatorName'">
             {{ record.operatorName || record.createByName || record.creatorName || '-' }}
           </template>
+          <template v-else-if="column.key === 'createTime'">
+            {{ formatRecordTime(record.createTime) }}
+          </template>
         </template>
       </a-table>
       <a-pagination
@@ -267,10 +276,16 @@
           :message="`确认无误后将正式建立老人档案，后续资料修改需申请审批。当前待完善项：${submitChecklist.filter((item) => !item.ready).length}`"
         />
         <a-alert
-          v-if="submitChecklist.some((item) => !item.ready)"
+          v-if="submitBlockingCount > 0"
           type="error"
           show-icon
-          message="存在待完善项，建议先点击条目跳转补全后再提交。"
+          :message="`存在 ${submitBlockingCount} 项必须补全的资料（如身份证/户口本附件），补全前无法提交。点击上方条目可跳转补全。`"
+        />
+        <a-alert
+          v-else-if="submitChecklist.some((item) => !item.ready)"
+          type="warning"
+          show-icon
+          message="基础疾病信息未维护不影响本次提交，建议后续在健康档案中补全。"
         />
       </a-space>
     </a-modal>
@@ -293,6 +308,7 @@ import { admitElder, exportAdmissionRecords, getAdmissionRecordSummary, getAdmis
 import { getElderDetail, getElderDiseases } from '../../api/elder'
 import { getContractAttachments, getContractPage } from '../../api/marketing'
 import { normalizeId, normalizeResidentId } from '../../utils/id'
+import { residentStatusText as statusText } from '../../utils/elderStatus'
 import { useUserStore } from '../../stores/user'
 import type {
   AdmissionRecordDimensionItem,
@@ -337,6 +353,7 @@ const { elderOptions, elderLoading, searchElders, findElderName, ensureSelectedE
   inHospitalOnly: false
 })
 const pendingBedSelectContracts = ref<CrmContractItem[]>([])
+const elderSearchKeyword = ref('')
 const admissionElderOptions = computed(() => {
   const map = new Map<string, { label: string; value: string; name: string }>()
   ;(elderOptions.value || []).forEach((item) => {
@@ -348,14 +365,22 @@ const admissionElderOptions = computed(() => {
       name: String(item.name || item.label || id)
     })
   })
+  // 合同来源的候选人也要跟随搜索关键词过滤，否则输入关键词后列表看起来“搜不动”
+  const keyword = elderSearchKeyword.value.trim()
   ;(pendingBedSelectContracts.value || []).forEach((item) => {
     const elderId = String(item.elderId || '').trim()
     const elderName = String(item.elderName || item.name || '').trim()
     if (!elderId || !elderName || map.has(elderId)) return
+    if (keyword && !elderName.includes(keyword)) return
     map.set(elderId, { label: elderName, value: elderId, name: elderName })
   })
   return Array.from(map.values())
 })
+
+function onElderSearch(keyword: string) {
+  elderSearchKeyword.value = String(keyword || '')
+  void searchElders(keyword)
+}
 const buildings = ref<BuildingItem[]>([])
 const floors = ref<FloorItem[]>([])
 const rooms = ref<RoomItem[]>([])
@@ -627,13 +652,6 @@ const columns = [
   { title: '操作员姓名', key: 'operatorName', width: 140 },
   { title: '登记时间', dataIndex: 'createTime', key: 'createTime', width: 180 }
 ]
-function statusText(status?: number) {
-  if (status === 1) return '在院'
-  if (status === 2) return '请假'
-  if (status === 3) return '离院'
-  return '-'
-}
-
 function displayElderName(record: AdmissionRecordItem) {
   const name = String(record.elderName || '').trim()
   if (name) return name
@@ -645,6 +663,12 @@ function displayElderName(record: AdmissionRecordItem) {
   return '-'
 }
 
+function formatRecordTime(value?: string) {
+  if (!value) return '-'
+  const parsed = dayjs(value)
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD HH:mm') : value
+}
+
 async function submit() {
   if (!formRef.value) return
   try {
@@ -653,6 +677,7 @@ async function submit() {
       message.warning('整租入住需要先选择一个主床位')
       return
     }
+    if (submitting.value) return
     submitting.value = true
     if (form.bedId && !form.bedStartDate) {
       form.bedStartDate = form.admissionDate || new Date().toISOString().slice(0, 10)

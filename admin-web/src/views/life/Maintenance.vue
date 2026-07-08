@@ -59,8 +59,18 @@
         <template v-else-if="column.key === 'totalCost'">
           {{ Number(record.totalCost || 0).toFixed(2) }}
         </template>
+        <template v-else-if="column.key === 'reportedAt'">
+          {{ formatReportedAt(record.reportedAt) }}
+        </template>
         <template v-else-if="column.key === 'action'">
           <div class="row-action-links">
+            <a-button
+              v-if="record.status === 'OPEN'"
+              type="link"
+              size="small"
+              class="action-strong"
+              @click="startProcessing(record)"
+            >接单</a-button>
             <a-button
               v-if="record.status === 'OPEN' || record.status === 'PROCESSING'"
               type="link"
@@ -157,6 +167,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import dayjs from 'dayjs'
 import type { FormInstance } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
@@ -227,6 +238,12 @@ function statusLabel(status?: string) {
   if (status === 'COMPLETED') return '已完成'
   if (status === 'CANCELLED') return '已取消'
   return '待处理'
+}
+
+function formatReportedAt(value?: string) {
+  if (!value) return '-'
+  const parsed = dayjs(value)
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD HH:mm') : value
 }
 
 function applyStatusChip(value?: string) {
@@ -365,6 +382,7 @@ async function submit() {
       status: form.status,
       remark: form.remark
     }
+    if (saving.value) return
     saving.value = true
     if (form.id) {
       await updateMaintenance(form.id, payload)
@@ -382,6 +400,29 @@ async function submit() {
     message.error(error?.message || '保存报修单失败')
   } finally {
     saving.value = false
+  }
+}
+
+async function startProcessing(record: MaintenanceRequest) {
+  try {
+    // PUT 为整单更新，带上原字段避免局部提交把其他字段清空
+    await updateMaintenance(record.id!, {
+      roomId: record.roomId,
+      reporterName: record.reporterName,
+      assigneeName: record.assigneeName,
+      issueType: record.issueType,
+      description: record.description,
+      laborCost: record.laborCost,
+      materialCost: record.materialCost,
+      totalCost: record.totalCost,
+      priority: record.priority,
+      remark: record.remark,
+      status: 'PROCESSING'
+    })
+    message.success('已接单，工单进入处理中')
+    await fetchData()
+  } catch (error: any) {
+    message.error(error?.message || '接单失败')
   }
 }
 

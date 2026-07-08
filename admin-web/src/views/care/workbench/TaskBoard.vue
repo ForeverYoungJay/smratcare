@@ -38,7 +38,10 @@
         <a-table :columns="columns" :data-source="rows" :pagination="false" row-key="taskDailyId" :row-class-name="resolveRowClassName">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'status'">
-              <a-tag :color="statusColor(record.status)">{{ record.status || '-' }}</a-tag>
+              <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
+            </template>
+            <template v-else-if="column.key === 'planTime'">
+              {{ formatPlanTime(record.planTime) }}
             </template>
             <template v-else-if="column.key === 'flags'">
               <a-space>
@@ -83,7 +86,7 @@ const columns = [
   { title: '长者', dataIndex: 'elderName', key: 'elderName', width: 100 },
   { title: '房间', dataIndex: 'roomNo', key: 'roomNo', width: 90 },
   { title: '任务', dataIndex: 'taskName', key: 'taskName' },
-  { title: '计划时间', dataIndex: 'planTime', key: 'planTime', width: 170 },
+  { title: '计划时间', key: 'planTime', width: 170 },
   { title: '执行护工', dataIndex: 'staffName', key: 'staffName', width: 100 },
   { title: '状态', key: 'status', width: 90 },
   { title: '标记', key: 'flags', width: 140 }
@@ -93,7 +96,7 @@ const summaryCards = computed(() => [
   { title: '任务总数', value: summary.value.totalCount || 0, desc: '当日任务池' },
   { title: '待执行', value: summary.value.pendingCount || 0, desc: '含待分配与执行中' },
   { title: '已完成', value: summary.value.doneCount || 0, desc: `完成率 ${Math.round((summary.value.completionRate || 0) * 100)}%` },
-  { title: '异常/超时', value: (summary.value.exceptionCount || 0) + (summary.value.overdueCount || 0), desc: '优先处理' }
+  { title: '异常/超时', value: (Number(summary.value.exceptionCount) || 0) + (Number(summary.value.overdueCount) || 0), desc: '优先处理' }
 ])
 const signedLinkageContext = computed(() => {
   const source = routeQueryText(route.query.source).toLowerCase()
@@ -112,6 +115,25 @@ function statusColor(status?: string) {
   if (status === 'EXCEPTION') return 'red'
   if (status === 'PENDING') return 'orange'
   return 'default'
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  DONE: '已完成',
+  EXCEPTION: '异常',
+  PENDING: '待执行',
+  PROCESSING: '执行中',
+  CANCELLED: '已取消'
+}
+
+function statusLabel(status?: string) {
+  if (!status) return '-'
+  return STATUS_LABELS[status] || status
+}
+
+function formatPlanTime(value?: string) {
+  if (!value) return '-'
+  const parsed = dayjs(value)
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD HH:mm') : value
 }
 
 function go(path: string) {

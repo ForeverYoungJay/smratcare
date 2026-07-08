@@ -378,6 +378,7 @@ async function submit() {
     message.error('日志时间不能晚于当前时间')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const payload = {

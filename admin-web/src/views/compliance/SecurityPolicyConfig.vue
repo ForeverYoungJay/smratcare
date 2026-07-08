@@ -143,6 +143,7 @@ async function save() {
     message.error('日志留存天数不得低于 180 天（等保2.0要求）')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     await updateSecurityPolicy({ ...form })

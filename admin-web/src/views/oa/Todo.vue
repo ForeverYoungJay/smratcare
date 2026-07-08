@@ -888,6 +888,7 @@ async function submit() {
     assigneeName,
     status: 'OPEN'
   }
+  if (saving.value) return
   saving.value = true
   try {
     let saved: OaTodo | null = null

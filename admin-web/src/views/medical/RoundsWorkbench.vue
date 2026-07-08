@@ -247,6 +247,7 @@ function openCreatePlan() {
 }
 async function submitPlan() {
   if (!planForm.planDate) { message.error('请选择巡诊日期'); return }
+  if (saving.value) return
   saving.value = true
   try {
     await createRoundsPlan({ ...planForm })
@@ -283,6 +284,7 @@ function openCreateRecord(plan?: MedicalRoundsPlan) {
 }
 async function submitRecord() {
   if (!recordForm.elderId || !recordForm.findings) { message.error('请填写长者与查体所见'); return }
+  if (saving.value) return
   saving.value = true
   try {
     await createRoundsRecord({ ...recordForm, generateEmr: generateEmr.value ? 1 : 0 })

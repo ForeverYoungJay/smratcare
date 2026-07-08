@@ -882,6 +882,7 @@ async function submitPlanner() {
     message.warning('请完整填写活动名称和活动时间')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const payload: Partial<OaActivityPlan> = {

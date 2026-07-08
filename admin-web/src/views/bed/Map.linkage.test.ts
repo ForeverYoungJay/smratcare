@@ -2,6 +2,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import BedMap from './Map.vue'
 import { emitLiveSync, inferLiveSyncTopics } from '../../utils/liveSync'
+import { resetBedMapDatasetState } from '../../composables/useBedMapDataset'
 
 const getBedMap = vi.hoisted(() => vi.fn())
 const getBaseConfigItemList = vi.hoisted(() => vi.fn())
@@ -40,6 +41,7 @@ vi.mock('ant-design-vue', () => ({
 
 describe('BedMap live linkage', () => {
   beforeEach(() => {
+    resetBedMapDatasetState()
     vi.useFakeTimers()
     getBedMap.mockResolvedValue([
       { id: 1, roomId: 101, bedNo: '01', roomNo: 'A101', building: 'A栋', floorNo: '1F', status: 1 }
@@ -56,7 +58,10 @@ describe('BedMap live linkage', () => {
     mount(BedMap, {
       global: {
         stubs: {
-          PageContainer: { template: '<div><slot /></div>' }
+          PageContainer: { template: '<div><slot /></div>' },
+          // a-table-column 的作用域插槽在未注册组件下会以 undefined 入参渲染，显式 stub 避免误报
+          'a-table': true,
+          'a-table-column': true
         }
       }
     })
@@ -83,7 +88,10 @@ describe('BedMap live linkage', () => {
     mount(BedMap, {
       global: {
         stubs: {
-          PageContainer: { template: '<div><slot /></div>' }
+          PageContainer: { template: '<div><slot /></div>' },
+          // a-table-column 的作用域插槽在未注册组件下会以 undefined 入参渲染，显式 stub 避免误报
+          'a-table': true,
+          'a-table-column': true
         }
       }
     })

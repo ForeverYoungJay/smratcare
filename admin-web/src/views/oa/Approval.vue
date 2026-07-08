@@ -541,6 +541,21 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <a-modal
+      v-model:open="rejectDialogOpen"
+      :title="rejectDialogIds.length > 1 ? `批量驳回（${rejectDialogIds.length} 条）` : '驳回审批'"
+      :confirm-loading="rejectDialogSubmitting"
+      ok-text="确认驳回"
+      cancel-text="取消"
+      @ok="submitRejectDialog"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="驳回原因" required>
+          <a-textarea v-model:value="rejectDialogRemark" :rows="3" placeholder="请填写驳回原因，将同步给申请人" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </PageContainer>
 </template>
 
@@ -548,7 +563,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { useRoute } from 'vue-router'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -969,10 +984,17 @@ function statusLabel(status?: string) {
   return '待审批'
 }
 
+/** 系统联动生成的审批类型不在下拉选项里，这里补充展示映射，避免直出英文枚举 */
+const EXTRA_TYPE_LABELS: Record<string, string> = {
+  FINANCE_CROSS_PERIOD: '财务跨期处理',
+  HR_RECRUITMENT: '招聘需求',
+  ELDER_PROFILE_CHANGE: '老人档案修改'
+}
+
 function typeLabel(type?: string) {
   const value = String(type || '').toUpperCase()
   const option = typeOptions.find((item) => item.value === value)
-  return option?.label || type || '-'
+  return option?.label || EXTRA_TYPE_LABELS[value] || type || '-'
 }
 
 function approvalPeriodText(record: OaApproval) {
@@ -1509,6 +1531,7 @@ async function submit() {
     status: form.status,
     remark: form.remark
   }
+  if (saving.value) return
   saving.value = true
   try {
     if (form.id) {
@@ -1618,6 +1641,17 @@ function openPolicy(path: string) {
 
 async function approve(record: OaApproval) {
   if (record.status !== 'PENDING') return
+  const confirmed = await new Promise<boolean>((resolve) => {
+    Modal.confirm({
+      title: '确认通过该审批？',
+      content: `${typeLabel(record.approvalType)}：${record.title || '-'}，通过后流程不可回退。`,
+      okText: '确认通过',
+      cancelText: '取消',
+      onOk: () => resolve(true),
+      onCancel: () => resolve(false)
+    })
+  })
+  if (!confirmed) return
   try {
     await approveApproval(String(record.id), '同意')
     message.success('审批已通过')
@@ -1627,21 +1661,44 @@ async function approve(record: OaApproval) {
   }
 }
 
-async function reject(record: OaApproval) {
-  if (record.status !== 'PENDING') return
-  const remark = window.prompt('请输入驳回原因', '请补充材料后重提')
-  if (remark === null) return
-  if (!remark.trim()) {
+const rejectDialogOpen = ref(false)
+const rejectDialogSubmitting = ref(false)
+const rejectDialogRemark = ref('')
+const rejectDialogIds = ref<string[]>([])
+
+function openRejectDialog(ids: string[]) {
+  rejectDialogIds.value = ids
+  rejectDialogRemark.value = ids.length > 1 ? '批量未通过，请补充材料后重提' : '请补充材料后重提'
+  rejectDialogOpen.value = true
+}
+
+async function submitRejectDialog() {
+  const remark = rejectDialogRemark.value.trim()
+  if (!remark) {
     message.warning('驳回原因不能为空')
     return
   }
+  rejectDialogSubmitting.value = true
   try {
-    await rejectApproval(String(record.id), remark.trim())
-    message.success('已驳回')
+    if (rejectDialogIds.value.length > 1) {
+      const affected = await batchRejectApproval(rejectDialogIds.value, remark)
+      message.success(`批量驳回完成，共处理 ${affected || 0} 条`)
+    } else {
+      await rejectApproval(rejectDialogIds.value[0], remark)
+      message.success('已驳回')
+    }
+    rejectDialogOpen.value = false
     await fetchData()
   } catch (error: any) {
     message.error(error?.message || '驳回失败')
+  } finally {
+    rejectDialogSubmitting.value = false
   }
+}
+
+async function reject(record: OaApproval) {
+  if (record.status !== 'PENDING') return
+  openRejectDialog([String(record.id)])
 }
 
 async function remove(record: OaApproval) {
@@ -1815,6 +1872,18 @@ async function batchApprove() {
     message.info('勾选项中没有“待审批”记录')
     return
   }
+  const count = selectedPendingIds.value.length
+  const confirmed = await new Promise<boolean>((resolve) => {
+    Modal.confirm({
+      title: '确认批量通过？',
+      content: `将批量通过 ${count} 条待审批记录，通过后流程不可回退。`,
+      okText: '确认通过',
+      cancelText: '取消',
+      onOk: () => resolve(true),
+      onCancel: () => resolve(false)
+    })
+  })
+  if (!confirmed) return
   const affected = await batchApproveApproval(selectedPendingIds.value)
   message.success(`批量通过完成，共处理 ${affected || 0} 条`)
   fetchData()
@@ -1829,15 +1898,7 @@ async function batchReject() {
     message.info('勾选项中没有“待审批”记录')
     return
   }
-  const remark = window.prompt('请输入批量驳回原因', '批量未通过，请补充材料后重提')
-  if (remark === null) return
-  if (!remark.trim()) {
-    message.warning('批量驳回原因不能为空')
-    return
-  }
-  const affected = await batchRejectApproval(selectedPendingIds.value, remark.trim())
-  message.success(`批量驳回完成，共处理 ${affected || 0} 条`)
-  fetchData()
+  openRejectDialog([...selectedPendingIds.value])
 }
 
 async function batchRemove() {

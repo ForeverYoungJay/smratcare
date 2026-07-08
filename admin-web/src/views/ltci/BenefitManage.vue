@@ -221,6 +221,7 @@ async function submitInsured() {
     message.error('请填写长者与参保号')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const id = await registerLtciInsured({
@@ -254,6 +255,7 @@ async function submitBenefit() {
     message.error('请填写参保记录、长者与日限额')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     await grantLtciBenefit({
@@ -287,6 +289,7 @@ async function submitRecord() {
     message.error('请填写长者与费用')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     await addLtciServiceRecord({

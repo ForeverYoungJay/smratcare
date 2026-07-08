@@ -56,6 +56,8 @@ export async function runTaskBatch<T>(options: RunTaskBatchOptions<T>): Promise<
 
   for (const row of options.rows) {
     const itemId = options.getItemId(row)
+    // 每行处理前取一次时间戳，失败回执记录的是该行开始处理的时间
+    const at = now()
     try {
       await options.execute(row)
       successIds.push(itemId)
@@ -65,7 +67,7 @@ export async function runTaskBatch<T>(options: RunTaskBatchOptions<T>): Promise<
       options.onStep?.(false, row)
       const detail = options.parseErrorDetail(error)
       failures.push({
-        at: now(),
+        at,
         action: options.action,
         itemId,
         reason: detail.reason,

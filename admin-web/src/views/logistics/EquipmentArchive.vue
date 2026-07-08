@@ -252,6 +252,7 @@ async function submit() {
     status: form.status,
     remark: form.remark.trim() || undefined
   }
+  if (saving.value) return
   saving.value = true
   try {
     if (form.id) {

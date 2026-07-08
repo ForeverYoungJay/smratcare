@@ -43,9 +43,12 @@
         :data="rows"
         :column-config="{ resizable: true }"
       >
-        <vxe-column field="createTime" title="入库时间" width="180" />
+        <vxe-column field="createTime" title="入库时间" width="180">
+          <template #default="{ row }">
+            <span>{{ formatInboundTime(row.createTime) }}</span>
+          </template>
+        </vxe-column>
         <vxe-column field="productName" title="商品名称" min-width="160" />
-        <vxe-column field="productId" title="商品ID" width="120" />
         <vxe-column field="batchNo" title="批次号" min-width="160" />
         <vxe-column field="changeQty" title="入库数量" width="120" />
         <vxe-column field="remark" title="备注" min-width="160" />
@@ -98,6 +101,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
@@ -141,6 +145,12 @@ const productOptions = computed(() =>
     value: p.id
   }))
 )
+
+function formatInboundTime(value?: string) {
+  if (!value) return '-'
+  const parsed = dayjs(value)
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD HH:mm') : value
+}
 
 async function fetchProducts() {
   const res: PageResult<ProductItem> = await getProductPage({ pageNo: 1, pageSize: 200 })
@@ -233,6 +243,7 @@ function openInbound() {
 
 async function submit() {
   await formRef.value?.validate()
+  if (saving.value) return
   saving.value = true
   try {
     await createInbound({

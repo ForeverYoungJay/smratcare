@@ -224,7 +224,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { DownOutlined } from '@ant-design/icons-vue'
-import dayjs from 'dayjs'
 import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
@@ -234,6 +233,12 @@ import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { exportCsv } from '../../utils/export'
 import { lifecycleStageColor, lifecycleStageLabel, normalizeLifecycleStage } from '../../utils/lifecycleStage'
+import {
+  residentStatusText as statusText,
+  residentStatusTag as statusTag,
+  maskIdCard,
+  ageOf
+} from '../../utils/elderStatus'
 import { completeExport } from '../../api/complianceSecurity'
 import { getElderPage, assignBed, bindFamily, deleteElder } from '../../api/elder'
 import { getBedList } from '../../api/bed'
@@ -340,56 +345,6 @@ const qrOpen = ref(false)
 const qrDataUrl = ref('')
 const qrText = ref('')
 
-function resolveResidentLifecycleStatus(item?: Partial<ElderItem>) {
-  const lifecycleStatus = String(item?.lifecycleStatus || '').trim().toUpperCase()
-  if (lifecycleStatus) return lifecycleStatus
-  if (item?.status === 1) return 'IN_HOSPITAL'
-  if (item?.status === 2) return 'OUTING'
-  if (item?.status === 3) return item?.departureType === 'DEATH' ? 'DECEASED' : 'DISCHARGED'
-  return ''
-}
-
-function resolveResidentStatusView(item?: Partial<ElderItem>) {
-  const lifecycleStage = normalizeLifecycleStage(item?.lifecycleStage, item?.lifecycleContractStatus)
-  if (lifecycleStage === 'PENDING_BED_SELECT') return 'PENDING_BED_SELECT'
-  if (lifecycleStage === 'PENDING_SIGN') return 'PENDING_SIGN'
-  return resolveResidentLifecycleStatus(item)
-}
-
-function statusText(item?: Partial<ElderItem> | number) {
-  const lifecycleStatus = typeof item === 'number'
-    ? resolveResidentLifecycleStatus({ status: item })
-    : resolveResidentStatusView(item)
-  if (lifecycleStatus === 'PENDING_BED_SELECT') return '待办理入住'
-  if (lifecycleStatus === 'PENDING_SIGN') return '待签署入住'
-  if (lifecycleStatus === 'INTENT') return '意向'
-  if (lifecycleStatus === 'TRIAL') return '试住'
-  if (lifecycleStatus === 'IN_HOSPITAL') return '在住'
-  if (lifecycleStatus === 'OUTING') return '外出'
-  if (lifecycleStatus === 'MEDICAL_OUTING') return '外出就医'
-  if (lifecycleStatus === 'DISCHARGE_PENDING') return '待退住'
-  if (lifecycleStatus === 'DISCHARGED') return '已退住'
-  if (lifecycleStatus === 'DECEASED') return '已身故'
-  return '未知'
-}
-
-function statusTag(item?: Partial<ElderItem> | number) {
-  const lifecycleStatus = typeof item === 'number'
-    ? resolveResidentLifecycleStatus({ status: item })
-    : resolveResidentStatusView(item)
-  if (lifecycleStatus === 'PENDING_BED_SELECT') return 'blue'
-  if (lifecycleStatus === 'PENDING_SIGN') return 'purple'
-  if (lifecycleStatus === 'INTENT') return 'gold'
-  if (lifecycleStatus === 'TRIAL') return 'cyan'
-  if (lifecycleStatus === 'IN_HOSPITAL') return 'green'
-  if (lifecycleStatus === 'OUTING') return 'orange'
-  if (lifecycleStatus === 'MEDICAL_OUTING') return 'volcano'
-  if (lifecycleStatus === 'DISCHARGE_PENDING') return 'blue'
-  if (lifecycleStatus === 'DISCHARGED') return 'red'
-  if (lifecycleStatus === 'DECEASED') return 'magenta'
-  return 'default'
-}
-
 function sourceTypeText(value?: string) {
   if (value === 'HISTORICAL_IMPORT') return '历史补录'
   if (value === 'MARKETING_CONTRACT') return '合同流程'
@@ -404,21 +359,6 @@ function sourceTypeColor(value?: string) {
 
 function resolveLifecycleStage(item: ElderItem) {
   return normalizeLifecycleStage(item.lifecycleStage, item.lifecycleContractStatus)
-}
-
-function maskIdCard(value?: string): string {
-  const id = String(value || '').trim()
-  if (!id) return '—'
-  if (id.length <= 6) return `${id.slice(0, 1)}****`
-  return `${id.slice(0, 3)}${'*'.repeat(Math.max(4, id.length - 5))}${id.slice(-2)}`
-}
-
-function ageOf(birthDate?: string): number | null {
-  if (!birthDate) return null
-  const d = dayjs(birthDate)
-  if (!d.isValid()) return null
-  const age = dayjs().diff(d, 'year')
-  return age >= 0 && age < 130 ? age : null
 }
 
 function applyStatusChip(value?: string) {

@@ -87,7 +87,11 @@
         <vxe-column field="elderName" title="老人" width="140" fixed="left"></vxe-column>
         <vxe-column field="roomNo" title="房间" width="100"></vxe-column>
         <vxe-column field="taskName" title="任务" min-width="160"></vxe-column>
-        <vxe-column field="planTime" title="计划时间" width="160"></vxe-column>
+        <vxe-column field="planTime" title="计划时间" width="160">
+          <template #default="{ row }">
+            <span>{{ formatPlanTime(row.planTime) }}</span>
+          </template>
+        </vxe-column>
         <vxe-column field="staffId" title="护工" width="140">
           <template #default="{ row }">
             <span>{{ row.staffName || staffName(row.staffId) }}</span>
@@ -97,7 +101,7 @@
           <template #default="{ row }">
             <a-space size="small">
               <a-tag :color="statusColor(row.status)">{{ statusLabel(row.status) }}</a-tag>
-              <a-tag v-if="row.overdueFlag" color="orange">逾期</a-tag>
+              <a-tag v-if="row.overdueFlag" color="red">逾期</a-tag>
               <a-tag v-if="row.suspiciousFlag" color="gold">可疑</a-tag>
             </a-space>
           </template>
@@ -129,7 +133,7 @@
         <a-descriptions-item label="老人">{{ current?.elderName }}</a-descriptions-item>
         <a-descriptions-item label="房间">{{ current?.roomNo }}</a-descriptions-item>
         <a-descriptions-item label="任务">{{ current?.taskName }}</a-descriptions-item>
-        <a-descriptions-item label="计划时间">{{ current?.planTime }}</a-descriptions-item>
+        <a-descriptions-item label="计划时间">{{ formatPlanTime(current?.planTime) }}</a-descriptions-item>
         <a-descriptions-item label="护工">{{ current?.staffName || staffName(current?.staffId) }}</a-descriptions-item>
         <a-descriptions-item label="状态">{{ statusLabel(current?.status) }}</a-descriptions-item>
       </a-descriptions>
@@ -404,7 +408,7 @@
 <script setup lang="ts">
 import { reactive, ref, computed } from 'vue'
 import dayjs from 'dayjs'
-import { Modal, message } from 'ant-design-vue'
+import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
@@ -623,6 +627,12 @@ function statusLabel(status?: string) {
     default:
       return '待执行'
   }
+}
+
+function formatPlanTime(value?: string) {
+  if (!value) return '-'
+  const parsed = dayjs(value)
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD HH:mm') : value
 }
 
 function statusColor(status?: string) {
@@ -941,13 +951,8 @@ function goToTemplatePage() {
 async function submitAssign() {
   try {
     await assignFormRef.value?.validate()
-    await new Promise<void>((resolve, reject) => {
-      Modal.confirm({
-        title: '确认派发任务？',
-        onOk: () => resolve(),
-        onCancel: () => reject()
-      })
-    })
+    // 弹窗“确定”即为确认动作，不再叠加二次确认
+    if (assigning.value) return
     assigning.value = true
     await assignTask(assignForm)
     message.success('派发成功')
@@ -964,13 +969,8 @@ async function submitAssign() {
 async function submitReview() {
   try {
     await reviewFormRef.value?.validate()
-    await new Promise<void>((resolve, reject) => {
-      Modal.confirm({
-        title: '确认提交评价？',
-        onOk: () => resolve(),
-        onCancel: () => reject()
-      })
-    })
+    // 弹窗“确定”即为确认动作，不再叠加二次确认
+    if (reviewing.value) return
     reviewing.value = true
     await reviewTask({
       taskDailyId: reviewForm.taskDailyId,

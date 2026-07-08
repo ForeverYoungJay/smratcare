@@ -761,6 +761,7 @@ async function submit() {
     recurrenceRule: form.recurring ? form.recurrenceRule : undefined,
     recurrenceInterval: form.recurring ? form.recurrenceInterval : undefined
   }
+  if (saving.value) return
   saving.value = true
   try {
     if (form.id) {

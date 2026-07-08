@@ -316,6 +316,7 @@ async function submit() {
     message.error('联系电话格式不正确')
     return
   }
+  if (saving.value) return
   saving.value = true
   try {
     const payload = {

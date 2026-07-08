@@ -157,7 +157,7 @@ const statusOptions = [
 
 const columns = [
   { title: '退住明细单号', dataIndex: 'detailNo', key: 'detailNo', width: 180 },
-  { title: '老人', dataIndex: 'elderName', key: 'elderName', width: 140 },
+  { title: '老人', dataIndex: 'elderName', key: 'elderName', width: 140, fixed: 'left' as const },
   { title: '费用项', dataIndex: 'feeItem', key: 'feeItem', width: 140 },
   { title: '退住费用设置', dataIndex: 'dischargeFeeConfig', key: 'dischargeFeeConfig', width: 160 },
   { title: '应收金额', dataIndex: 'payableAmount', key: 'payableAmount', width: 120 },
@@ -173,7 +173,7 @@ const columns = [
   { title: '财务退款时间', dataIndex: 'financeRefundTime', key: 'financeRefundTime', width: 170 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 140 },
   { title: '创建时间', dataIndex: 'createTime', key: 'createTime', width: 180 },
-  { title: '操作', key: 'action', width: 280 }
+  { title: '操作', key: 'action', width: 280, fixed: 'right' as const }
 ]
 const pendingRefundCount = computed(() => rows.value.filter(item => item.financeRefunded !== 1).length)
 const refundTotal = computed(() => rows.value.reduce((sum, item) => sum + Number(item.refundAmount || 0), 0))
@@ -291,6 +291,7 @@ async function submitCreate() {
     message.error('请选择退住费用设置')
     return
   }
+  if (creating.value) return
   creating.value = true
   try {
     await createDischargeSettlement({

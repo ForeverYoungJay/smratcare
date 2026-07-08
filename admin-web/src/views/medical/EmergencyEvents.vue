@@ -17,7 +17,10 @@
 
     <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'status'">
+        <template v-if="column.key === 'eventTime'">
+          {{ formatEventTime(record.eventTime) }}
+        </template>
+        <template v-else-if="column.key === 'status'">
           <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
         </template>
         <template v-else-if="column.key === 'outcome'">
@@ -110,6 +113,7 @@
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
+import dayjs from 'dayjs'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
@@ -164,6 +168,11 @@ const outcomeForm = reactive<Record<string, any>>({})
 const rescueForm = reactive<Record<string, any>>({})
 
 function statusText(s?: string) { return statusOptions.find((o) => o.value === s)?.label || s || '-' }
+function formatEventTime(value?: string) {
+  if (!value) return '-'
+  const parsed = dayjs(value)
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD HH:mm') : value
+}
 function statusColor(s?: string) {
   return ({ INITIATED: 'red', CALLED: 'volcano', TRANSFERRED: 'orange', RETURNED: 'green', HOSPITALIZED: 'blue', CLOSED: 'default' } as Record<string, string>)[s || ''] || 'default'
 }
@@ -194,6 +203,7 @@ function openCreate() {
   createOpen.value = true
 }
 async function submitCreate() {
+  if (saving.value) return
   if (!createForm.elderId || !createForm.symptom) { message.error('请填写长者与症状描述'); return }
   saving.value = true
   try {
@@ -220,6 +230,7 @@ function openDepart(record: MedicalEmergencyEvent) {
 async function submitDepart() {
   if (!departForm.hospitalName) { message.error('请填写送医医院'); return }
   if (!currentEvent.value) return
+  if (saving.value) return
   saving.value = true
   try {
     await transitionEmergencyEvent(currentEvent.value.id, { action: 'DEPART', ...departForm })
@@ -236,6 +247,7 @@ function openOutcome(record: MedicalEmergencyEvent) {
 }
 async function submitOutcome() {
   if (!currentEvent.value) return
+  if (saving.value) return
   saving.value = true
   try {
     await transitionEmergencyEvent(currentEvent.value.id, { action: 'OUTCOME', ...outcomeForm })
@@ -283,6 +295,7 @@ async function openRescue(record: MedicalEmergencyEvent) {
 }
 async function submitRescue() {
   if (!currentEvent.value) return
+  if (saving.value) return
   saving.value = true
   try {
     await saveRescueRecord({ eventId: currentEvent.value.id, ...rescueForm })

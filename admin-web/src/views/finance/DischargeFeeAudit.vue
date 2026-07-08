@@ -242,6 +242,7 @@ async function submitCreate() {
     message.error('请选择退住费用设置')
     return
   }
+  if (creating.value) return
   creating.value = true
   try {
     await createDischargeFeeAudit({

@@ -215,6 +215,7 @@ async function submit() {
   if (!formRef.value) return
   try {
     await formRef.value.validate()
+    if (saving.value) return
     saving.value = true
     const payload = { ...form }
     if (payload.bedId && !payload.bedStartDate) {

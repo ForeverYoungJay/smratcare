@@ -98,7 +98,7 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public Result<Void> handleIllegalArgument(IllegalArgumentException ex) {
     log.warn("Bad request: {}", ex.getMessage());
-    return Result.error(400, defaultText(ex.getMessage(), "请求参数不正确"));
+    return Result.error(400, localizeBusinessMessage(defaultText(ex.getMessage(), "请求参数不正确")));
   }
 
   @ExceptionHandler(IllegalStateException.class)
@@ -110,7 +110,7 @@ public class GlobalExceptionHandler {
     }
     log.warn("Business state error: {}", ex.getMessage());
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-        .body(Result.error(400, defaultText(ex.getMessage(), "当前状态不允许执行该操作")));
+        .body(Result.error(400, localizeBusinessMessage(defaultText(ex.getMessage(), "当前状态不允许执行该操作"))));
   }
 
   @ExceptionHandler(DataIntegrityViolationException.class)
@@ -248,5 +248,103 @@ public class GlobalExceptionHandler {
       return fallback;
     }
     return value.trim();
+  }
+
+  /** 业务异常里的实体英文名 → 中文（用于 not found / required / must be positive 等句式的统一翻译） */
+  private static final String[][] BUSINESS_ENTITY_WORDS = {
+      {"purchase order", "采购单"},
+      {"transfer order", "调拨单"},
+      {"transfer quantity", "调拨数量"},
+      {"purchase quantity", "采购数量"},
+      {"payment amount", "收款金额"},
+      {"unit price", "单价"},
+      {"warehouse", "仓库"},
+      {"supplier", "供应商"},
+      {"template", "模板"},
+      {"booking", "预约"},
+      {"product", "物资"},
+      {"eldername", "老人姓名"},
+      {"elderid", "老人"},
+      {"elder", "长者"},
+      {"staffid", "员工"},
+      {"staff", "员工"},
+      {"department", "部门"},
+      {"role", "角色"},
+      {"bill", "账单"},
+      {"record", "记录"},
+      {"contract", "合同"},
+      {"quantity", "数量"},
+      {"amount", "金额"},
+      {"id", "编号"}
+  };
+
+  /**
+   * 服务层散落着大量英文业务报错（"Elder not found"、"amount must be positive" 等）。
+   * 统一在出口按句式翻译成中文；已是中文的报文原样透传。
+   */
+  private String localizeBusinessMessage(String raw) {
+    if (raw == null || raw.isBlank()) {
+      return raw;
+    }
+    // 含中文说明已本地化，直接返回
+    for (int i = 0; i < raw.length(); i++) {
+      if (Character.UnicodeScript.of(raw.charAt(i)) == Character.UnicodeScript.HAN) {
+        return raw;
+      }
+    }
+    String normalized = raw.trim().toLowerCase(Locale.ROOT);
+    // 特例句式优先
+    if (normalized.equals("datefrom cannot be after dateto") || normalized.equals("from must be earlier than or equal to to")) {
+      return "开始日期不能晚于结束日期";
+    }
+    if (normalized.equals("date range is too large")) {
+      return "查询时间范围过大，请缩小范围后重试";
+    }
+    if (normalized.startsWith("invalid month format")) {
+      return "月份格式不正确，应为 YYYY-MM";
+    }
+    if (normalized.equals("from warehouse and to warehouse cannot be same")) {
+      return "调出仓库与调入仓库不能相同";
+    }
+    if (normalized.equals("transfer status does not support approved")) {
+      return "当前调拨单状态不支持审批通过";
+    }
+    if (normalized.equals("payment exceeds outstanding amount")) {
+      return "收款金额超过应收余额，请核对后重新登记";
+    }
+    if (normalized.endsWith(" unsupported")) {
+      return "不支持的操作类型或状态";
+    }
+    String entity = matchBusinessEntity(normalized);
+    if (entity != null) {
+      if (normalized.endsWith("not found")) {
+        return "未找到对应的" + entity + "，可能已被删除";
+      }
+      if (normalized.endsWith("required") || normalized.endsWith("is required")) {
+        return "请填写" + entity;
+      }
+      if (normalized.contains("or") && normalized.endsWith("required")) {
+        return "请填写" + entity;
+      }
+      if (normalized.endsWith("must be positive")) {
+        return entity + "必须大于 0";
+      }
+      if (normalized.endsWith("must not be negative")) {
+        return entity + "不能为负数";
+      }
+      if (normalized.contains("already exists")) {
+        return entity + "已存在，请调整后重试";
+      }
+    }
+    return raw;
+  }
+
+  private String matchBusinessEntity(String normalized) {
+    for (String[] pair : BUSINESS_ENTITY_WORDS) {
+      if (normalized.contains(pair[0])) {
+        return pair[1];
+      }
+    }
+    return null;
   }
 }

@@ -251,6 +251,7 @@ async function submit() {
   if (!formRef.value) return
   try {
     await formRef.value.validate()
+    if (submitting.value) return
     submitting.value = true
     if (form.id !== undefined && form.id !== null) {
       await updateSurveyQuestion(form.id, form)

@@ -199,6 +199,7 @@ async function submitEdit() {
     })
     if (!confirmed) return
   }
+  if (saving.value) return
   saving.value = true
   try {
     await upsertFinanceBillingConfig({
@@ -280,6 +281,7 @@ async function batchToggleStatus(status: 0 | 1) {
     })
     if (!confirmed) return
   }
+  if (saving.value) return
   saving.value = true
   try {
     await batchUpsertFinanceBillingConfig({
@@ -355,6 +357,7 @@ async function onImportFileChange(event: Event) {
       message.warning('CSV 无有效科目数据')
       return
     }
+    if (saving.value) return
     saving.value = true
     await batchUpsertFinanceBillingConfig({ items })
     message.success(`导入成功，共 ${items.length} 条`)

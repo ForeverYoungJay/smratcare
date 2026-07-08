@@ -3,7 +3,7 @@
     <div class="ops-shell">
       <section class="hero-panel">
         <div>
-          <p class="eyebrow">Meal Billing Desk</p>
+          <p class="eyebrow">餐费结算台</p>
           <h2>员工用餐方案、月度扣缴、财务同步放在一页处理</h2>
           <p class="hero-copy">按月份生成员工餐费账单，自动汇总早餐/中餐/晚餐方案，支持一键同步财务与打印台账。</p>
         </div>

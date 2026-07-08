@@ -589,6 +589,7 @@ function resolveGroupLabel(row: BaseConfigItem) {
 async function submit() {
   if (!formRef.value) return
   await formRef.value.validate()
+  if (submitting.value) return
   submitting.value = true
   try {
     const payload = normalizePayload(form)
