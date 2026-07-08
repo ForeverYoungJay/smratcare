@@ -346,7 +346,7 @@ const statusOptions = [
 ]
 
 const roleOpen = ref(false)
-const roleForm = reactive<{ staffId?: Id; roleIds: number[] }>({ roleIds: [] })
+const roleForm = reactive<{ staffId?: Id; roleIds: Id[] }>({ roleIds: [] })
 const credentialOpen = ref(false)
 const credentialForm = reactive<Partial<StaffCredentialItem>>({})
 const { departmentOptions, searchDepartments, ensureSelectedDepartment } = useDepartmentOptions({ pageSize: 260, preloadSize: 600 })
@@ -882,7 +882,9 @@ async function openRole(record: StaffItem) {
   roleOpen.value = true
   try {
     const rows = await getStaffRoleAssignments(record.id)
-    roleForm.roleIds = (rows || []).map((item) => Number(item.roleId)).filter((item) => Number.isFinite(item))
+    // 角色 ID 是超出 Number 安全范围的长整型，必须保持字符串：
+    // 转 Number 会丢精度，导致回显与选项对不上、提交的也是被截断的错误 ID
+    roleForm.roleIds = (rows || []).map((item) => String(item.roleId || '')).filter(Boolean)
   } catch {
     roleForm.roleIds = []
   }
