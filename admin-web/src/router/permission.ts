@@ -39,6 +39,13 @@ export function setupPermission(router: Router) {
       return
     }
 
+    // 公开页（登录/403/官网）不做角色与页面权限校验：
+    // 否则 token 失效但本地残留 pagePermissions 时，登录页自身会被拦成 403，用户死锁无法重新登录
+    if (publicPages.includes(to.path)) {
+      next()
+      return
+    }
+
     const roles = getRoles()
     const pagePermissions = getPagePermissions()
     const access = resolveRouteAccess(router, roles, to.path, pagePermissions)

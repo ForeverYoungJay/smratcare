@@ -3,7 +3,7 @@
     <section class="card-elevated marketing-workspace">
       <div class="marketing-overview">
         <div class="marketing-overview-copy">
-          <span class="marketing-overview-kicker">{{ modeLabel }} Workspace</span>
+          <span class="marketing-overview-kicker">营销工作区</span>
           <strong>{{ modeLabel }}工作区</strong>
           <span>{{ workspaceSummary }}</span>
         </div>

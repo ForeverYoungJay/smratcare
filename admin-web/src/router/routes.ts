@@ -1397,7 +1397,8 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'medical-care',
         name: 'MedicalCare',
-        meta: { title: '医护健康服务', icon: 'MedicineBoxOutlined', navSection: 'care', navOrder: 40, navPinned: true, roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
+        // 护理岗的任务看板/护理日志/巡检/交接班都在本模块下（多数子路由已授权 NURSING_*），模块级需同步放行，否则护理人员侧栏无任何业务入口
+        meta: { title: '医护健康服务', icon: 'MedicineBoxOutlined', navSection: 'care', navOrder: 40, navPinned: true, roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'NURSING_EMPLOYEE', 'NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
         redirect: '/medical-care/center',
         children: [
           {
@@ -1428,7 +1429,8 @@ export const routes: RouteRecordRaw[] = [
             path: 'care-task-board',
             name: 'MedicalCareTaskBoard',
             component: () => import('../views/care/workbench/TaskBoard.vue'),
-            meta: { title: '护理任务看板' }
+            // 护理岗核心看板：不继承医护模块的角色限制，护理员工/部长可直接使用
+            meta: { title: '护理任务看板', roles: ['NURSING_EMPLOYEE', 'NURSING_MINISTER', 'MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
           },
           {
             path: 'unified-task-center',

@@ -33,8 +33,9 @@ public final class RolePagePermissionPresetHelper {
       "/base-config");
 
   private static final Map<String, List<String>> ROLE_PAGE_PRESETS = Map.ofEntries(
-      Map.entry("NURSING_MINISTER", concat(COMMON_PERSONAL_PATHS, "/medical-care", "/elder", "/oa/approval", "/base-config")),
-      Map.entry("NURSING_EMPLOYEE", concat(COMMON_PERSONAL_PATHS, "/medical-care", "/oa/approval")),
+      // 护理岗的今日任务/交接/照护看板在 /care 前缀下，缺少该前缀会导致护理人员登录后无法进入任何护理页面
+      Map.entry("NURSING_MINISTER", concat(COMMON_PERSONAL_PATHS, "/care", "/medical-care", "/elder", "/oa/approval", "/base-config")),
+      Map.entry("NURSING_EMPLOYEE", concat(COMMON_PERSONAL_PATHS, "/care", "/medical-care", "/oa/approval")),
       Map.entry("HR_MINISTER", concat(COMMON_PERSONAL_PATHS, "/hr", "/oa", "/stats", "/system/site-config", "/system/role", "/base-config")),
       Map.entry("HR_EMPLOYEE", concat(COMMON_PERSONAL_PATHS, "/hr", "/oa", "/stats", "/base-config")),
       Map.entry("LOGISTICS_MINISTER", concat(COMMON_PERSONAL_PATHS, "/logistics", "/fire")),
