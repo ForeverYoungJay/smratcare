@@ -5,7 +5,7 @@
         <component :is="collapsed ? MenuUnfoldOutlined : MenuFoldOutlined" />
       </a-button>
       <div class="global-header__title-block">
-        <h1>{{ pageTitle }}</h1>
+        <div class="global-header__page-title">{{ pageTitle }}</div>
         <div class="global-header__divider"></div>
         <a-breadcrumb class="global-header__breadcrumb">
           <a-breadcrumb-item v-for="(item, index) in breadcrumbs" :key="`${item}-${index}`">
@@ -133,7 +133,7 @@ defineEmits<{
   min-width: 0;
 }
 
-.global-header__title-block h1 {
+.global-header__title-block .global-header__page-title {
   margin: 0;
   font-size: 17px;
   font-weight: 700;

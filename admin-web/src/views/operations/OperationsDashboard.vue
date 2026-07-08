@@ -19,7 +19,8 @@
       <a-col v-for="item in summaryCards" :key="item.key" :xs="12" :lg="6">
         <button class="summary-card" type="button" @click="openSummaryCard(item)">
           <span>{{ item.label }}</span>
-          <strong>{{ item.value }}</strong>
+          <!-- 数字指数用大号，文字型入口词降一级字号，避免与指数卡的扫读节奏混淆 -->
+          <strong :class="{ 'is-text-value': Number.isNaN(Number(item.value)) }">{{ item.value }}</strong>
           <small>{{ item.helper }}</small>
         </button>
       </a-col>
@@ -426,6 +427,10 @@ loadData()
   color: var(--ink);
   font-size: 28px;
   line-height: 1.2;
+}
+.summary-card strong.is-text-value {
+  font-size: 18px;
+  line-height: 1.4;
 }
 
 .summary-card small,

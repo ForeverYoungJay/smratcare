@@ -951,7 +951,7 @@ const headerSettings = reactive({
   directLeaderName: '',
   indirectLeaderId: undefined as string | undefined,
   indirectLeaderName: '',
-  themeColor: '#1b66d6',
+  themeColor: '#21705F',
   fontScale: 100,
   quickNotifyEnabled: true
 })
@@ -960,6 +960,7 @@ const passwordForm = reactive({
   confirmPassword: ''
 })
 const themeColorOptions = [
+  { label: '品牌绿（默认）', value: '#21705F' },
   { label: '海蓝', value: '#1b66d6' },
   { label: '翠绿', value: '#22a06b' },
   { label: '暖橙', value: '#f59e0b' },
@@ -2323,7 +2324,7 @@ function headerSettingsStorageKey() {
 }
 
 function applyAppearance() {
-  document.documentElement.style.setProperty('--primary', headerSettings.themeColor || '#1b66d6')
+  document.documentElement.style.setProperty('--primary', headerSettings.themeColor || '#21705F')
   document.documentElement.style.fontSize = `${Number(headerSettings.fontScale || 100)}%`
 }
 
@@ -2360,7 +2361,11 @@ function loadHeaderSettings() {
     }
     const parsed = JSON.parse(raw)
     headerSettings.avatarUrl = String(parsed?.avatarUrl || '')
-    headerSettings.themeColor = String(parsed?.themeColor || '#1b66d6')
+    // 旧版本（无 themeColorVersion）默认主题色是海蓝 #1b66d6，与 antd 品牌绿不一致会造成蓝绿混搭；
+    // 仅对旧版本存储且值仍为旧默认的情况迁移到品牌绿；v2 起用户主动选择（含海蓝）原样尊重
+    const storedTheme = String(parsed?.themeColor || '')
+    const isLegacyDefault = !parsed?.themeColorVersion && storedTheme.toLowerCase() === '#1b66d6'
+    headerSettings.themeColor = storedTheme && !isLegacyDefault ? storedTheme : '#21705F'
     headerSettings.fontScale = Number(parsed?.fontScale || 100)
     headerSettings.quickNotifyEnabled = parsed?.quickNotifyEnabled !== false
     headerSettings.staffNo = String(parsed?.staffNo || '')
@@ -2396,7 +2401,9 @@ function persistHeaderSettings() {
     directLeaderName: headerSettings.directLeaderName || '',
     indirectLeaderId: headerSettings.indirectLeaderId || '',
     indirectLeaderName: headerSettings.indirectLeaderName || '',
-    themeColor: headerSettings.themeColor || '#1b66d6',
+    themeColor: headerSettings.themeColor || '#21705F',
+    // v2：默认主题色已从海蓝迁移到品牌绿；带版本号保存，避免加载时把用户主动重选的海蓝再次迁移
+    themeColorVersion: 2,
     fontScale: Number(headerSettings.fontScale || 100),
     quickNotifyEnabled: headerSettings.quickNotifyEnabled !== false
   }
@@ -2507,7 +2514,7 @@ function resetHeaderSettings() {
   headerSettings.directLeaderName = ''
   headerSettings.indirectLeaderId = undefined
   headerSettings.indirectLeaderName = ''
-  headerSettings.themeColor = '#1b66d6'
+  headerSettings.themeColor = '#21705F'
   headerSettings.fontScale = 100
   headerSettings.quickNotifyEnabled = true
   passwordForm.password = ''

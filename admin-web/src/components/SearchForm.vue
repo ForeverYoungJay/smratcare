@@ -4,10 +4,11 @@
       <div class="search-copy">
         <div class="search-copy__eyebrow">{{ title }}</div>
         <strong>{{ heading }}</strong>
-        <span>{{ description }}</span>
+        <span v-if="description">{{ description }}</span>
         <div class="search-copy__meta">
-          <span class="search-chip">已启用 {{ activeFieldCount }} 个筛选条件</span>
-          <span class="search-chip search-chip--ghost">支持回车快速查询</span>
+          <!-- 空态给一次性引导，有筛选后只保留状态徽标：说明长句不再在每页常驻挤占首屏 -->
+          <span v-if="activeFieldCount > 0" class="search-chip">已启用 {{ activeFieldCount }} 个筛选条件</span>
+          <span v-else class="search-chip search-chip--ghost">输入条件后回车即可查询</span>
         </div>
       </div>
       <div class="search-side">
@@ -47,7 +48,8 @@ const props = withDefaults(
   }>(),
   {
     title: '快速筛选',
-    description: '优先输入关键词，再按状态、时间或组织范围逐步缩小结果。',
+    // 默认不再常驻说明长句（125 处调用全站重复出现会被视觉过滤且挤占首屏）；页面确有特殊口径时可显式传入
+    description: '',
     searchText: '查询',
     resetText: '清空'
   }
