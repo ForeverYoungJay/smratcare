@@ -1,4 +1,33 @@
 const { getHealthDashboard } = require('../../services/family');
+
+// 最新体征无值时回填趋势末条，仍无值显示 “--”：避免家属看到“血压 0/0”误以为出事
+function pickValue(latestValue, trendValue) {
+  const v = Number(latestValue);
+  if (Number.isFinite(v) && v > 0) return latestValue;
+  const t = Number(trendValue);
+  if (Number.isFinite(t) && t > 0) return trendValue;
+  return '--';
+}
+
+function normalizeBoard(board) {
+  const safe = board || {};
+  const latest = safe.latest || {};
+  const trend = safe.trend || [];
+  const last = trend.length ? trend[trend.length - 1] : {};
+  return {
+    ...safe,
+    trend,
+    riskTips: safe.riskTips || [],
+    latest: {
+      ...latest,
+      sbp: pickValue(latest.sbp, last.sbp),
+      dbp: pickValue(latest.dbp, last.dbp),
+      hr: pickValue(latest.hr, last.hr),
+      temp: pickValue(latest.temp, last.temp),
+      sugar: pickValue(latest.sugar, last.sugar)
+    }
+  };
+}
 const { ensureSensitiveAccess } = require('../../utils/sensitive-access');
 
 Page({
@@ -43,7 +72,7 @@ Page({
   },
   async loadData() {
     const board = await getHealthDashboard({ range: this.data.range });
-    this.setData({ board: board || { latest: {}, trend: [], riskTips: [] } });
+    this.setData({ board: normalizeBoard(board) });
   },
   switchRange(e) {
     this.setData({ range: e.currentTarget.dataset.range });

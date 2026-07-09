@@ -1,3 +1,4 @@
+const { cleanVitalText } = require('../../utils/vital-text');
 const { getHomeDashboard, getWeeklyBrief, getCapabilityStatus } = require('../../services/family');
 const { requestSubscribeOncePerDay } = require('../../utils/subscribe');
 
@@ -101,12 +102,16 @@ Page({
       const elders = (raw.elders || []).map((item) => ({
         ...item,
         avatarText: item.elderName ? item.elderName.slice(0, 1) : '长',
-        statusClass: mapStatusClass(item.statusType)
+        statusClass: mapStatusClass(item.statusType),
+        dynamicPreview: cleanVitalText(item.dynamicPreview)
       }));
       const meal = raw.meal || {};
       const schedules = (raw.schedules || []).slice(0, 4);
       const notices = (raw.notices || []).slice(0, 3);
-      const careTimeline = (raw.careTimeline || []).slice(0, 6);
+      const careTimeline = (raw.careTimeline || []).slice(0, 6).map((item) => ({
+        ...item,
+        content: cleanVitalText(item.content)
+      }));
       const normalized = {
         ...raw,
         schedules,

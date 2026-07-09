@@ -120,6 +120,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -4101,8 +4102,12 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
       Bed bed = bedMap.get(elder.getBedId());
       Room room = bed == null ? null : roomMap.get(bed.getRoomId());
       if (room != null) {
-        result.put(elder.getId(), defaultText(room.getBuilding(), "") + defaultText(room.getFloorNo(), "")
-            + defaultText(room.getRoomNo(), "") + " " + defaultText(bed.getBedNo(), ""));
+        // 楼栋/楼层/房号/床号用分隔符拼接，避免编码类名称粘连成不可读长串
+        String text = Stream.of(room.getBuilding(), room.getFloorNo(), room.getRoomNo(), bed.getBedNo())
+            .map(part -> defaultText(part, ""))
+            .filter(part -> !part.isBlank())
+            .collect(Collectors.joining(" · "));
+        result.put(elder.getId(), text);
       }
     }
     return result;

@@ -603,3 +603,11 @@
   color: var(--muted);
   line-height: 1.4;
 }
+
+/* 位置/动态等含编码的长文本：允许任意断行，防止撑破卡片 */
+.dynamic,
+.care-content,
+.focus-value,
+.elder-room {
+  word-break: break-all;
+}

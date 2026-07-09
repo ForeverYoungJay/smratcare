@@ -1,4 +1,5 @@
 const { getCareLogs } = require('../../services/family');
+const { cleanVitalText } = require('../../utils/vital-text');
 
 // 后端历史数据可能携带内部枚举，家属端展示前统一兜底翻译（后端已同步修复，此处双保险）
 const LOG_TYPE_LABELS = {
@@ -16,7 +17,8 @@ function localizeDays(days) {
     items: (day.items || []).map((item) => ({
       ...item,
       project: LOG_TYPE_LABELS[String(item.project || '').toUpperCase()] || item.project,
-      status: LOG_STATUS_LABELS[String(item.status || '').toUpperCase()] || item.status
+      status: LOG_STATUS_LABELS[String(item.status || '').toUpperCase()] || item.status,
+      note: cleanVitalText(item.note)
     }))
   }));
 }
