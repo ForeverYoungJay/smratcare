@@ -35,6 +35,7 @@
     "pages/recharge-order/index",
     "pages/communication/index",
     "pages/feedback/index",
+    "pages/survey-fill/index",
     "pages/dynamic/index",
     "pages/care-log/index",
     "pages/activity-album/index",
@@ -78,7 +79,9 @@
   "preloadRule": {
     "pages/login/index": {
       "network": "all",
-      "packages": ["staff"]
+      "packages": [
+        "staff"
+      ]
     }
   },
   "usingComponents": {

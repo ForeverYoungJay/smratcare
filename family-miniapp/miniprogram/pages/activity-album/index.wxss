@@ -27,3 +27,6 @@
 .error-box { padding: 30rpx 0; text-align: center; }
 .error-text { font-size: 23rpx; color: #B4553B; line-height: 1.6; }
 .retry-btn { margin-top: 14rpx; display: inline-block; height: 60rpx; line-height: 60rpx; font-size: 23rpx; padding: 0 30rpx; }
+
+.section-title-row { display: flex; align-items: center; justify-content: space-between; }
+.subscribe-link { font-size: 24rpx; color: #21705F; }

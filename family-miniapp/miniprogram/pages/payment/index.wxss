@@ -255,3 +255,12 @@
   0%, 100% { opacity: 0.3; }
   50% { opacity: 1; }
 }
+
+.bill-items-toggle { padding: 16rpx 0; color: #21705F; font-size: 26rpx; }
+.bill-item-line { padding-left: 16rpx; }
+.bill-item-main { display: flex; flex-direction: column; }
+.bill-item-remark { font-size: 22rpx; color: #8a9a93; word-break: break-all; }
+.bill-items-empty { padding: 16rpx 0; font-size: 24rpx; color: #8a9a93; }
+.invoice-row { display: flex; align-items: center; justify-content: space-between; padding: 16rpx 0; }
+.invoice-tip { font-size: 24rpx; color: #5C6F69; }
+.invoice-btn { border: 2rpx solid #21705F; color: #21705F; border-radius: 999rpx; background: transparent; }

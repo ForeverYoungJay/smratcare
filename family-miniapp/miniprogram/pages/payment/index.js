@@ -6,7 +6,9 @@ const {
   rechargeBalance,
   createWechatRechargePrepay,
   getRechargeOrder,
-  getRechargeOrders
+  getRechargeOrders,
+  getBillItems,
+  submitFeedback,
 } = require('../../services/family');
 const { requestSubscribe } = require('../../utils/subscribe');
 
@@ -98,6 +100,9 @@ Page({
     loading: false,
     loadError: '',
     summary: null,
+    showBillItems: false,
+    billItems: [],
+    invoiceSubmitting: false,
     guard: null,
     history: [],
     rechargeAmount: '500',
@@ -132,6 +137,33 @@ Page({
       runtimeNotice: getApp().globalData.runtimeNotice || ''
     });
     await this.loadData();
+  },
+  async toggleBillItems() {
+    const next = !this.data.showBillItems;
+    this.setData({ showBillItems: next });
+    if (next && !this.data.billItems.length) {
+      try {
+        const detail = await getBillItems({});
+        this.setData({ billItems: (detail && detail.items) || [] });
+      } catch (error) {
+        wx.showToast({ title: '账单明细加载失败', icon: 'none' });
+      }
+    }
+  },
+  async requestInvoice() {
+    if (this.data.invoiceSubmitting) return;
+    this.setData({ invoiceSubmitting: true });
+    try {
+      await submitFeedback({
+        type: '发票申请',
+        content: `申请开具 ${this.data.summary && this.data.summary.billMonth ? this.data.summary.billMonth : '本月'} 账单电子发票/收据，请财务处理后通过消息中心发送。`
+      });
+      wx.showToast({ title: '申请已提交，财务开票后将通知您', icon: 'none' });
+    } catch (error) {
+      wx.showToast({ title: error.message || '申请失败，请稍后重试', icon: 'none' });
+    } finally {
+      this.setData({ invoiceSubmitting: false });
+    }
   },
   async loadData() {
     this.setData({ loading: true, loadError: '', partialWarning: '' });

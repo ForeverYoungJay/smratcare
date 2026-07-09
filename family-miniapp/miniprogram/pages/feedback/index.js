@@ -8,6 +8,9 @@ function unwrapList(result) {
 }
 
 Page({
+  goSurvey() {
+    wx.navigateTo({ url: '/pages/survey-fill/index' });
+  },
   data: {
     feedbackTypes: [
       { value: 'EVALUATION', label: '服务评价' },

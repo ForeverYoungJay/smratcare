@@ -932,7 +932,23 @@ async function removeFamilyBinding(elderId) {
   );
 }
 
+
+async function getFamilySurveys() {
+  return request({ url: '/api/family/surveys' });
+}
+
+async function submitFamilySurvey(templateId, answers) {
+  return request({ url: `/api/family/surveys/${templateId}/submit`, method: 'POST', data: { answers } });
+}
+
+async function getBillItems(options = {}) {
+  return request({ url: '/api/family/payment/bill-items', data: { elderId: options.elderId, month: options.month } });
+}
+
 module.exports = {
+  getFamilySurveys,
+  submitFamilySurvey,
+  getBillItems,
   familyLogin,
   familyWechatLogin,
   sendFamilySmsCode,

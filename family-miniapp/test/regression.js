@@ -112,6 +112,7 @@ async function main() {
     ['/pages/meal/index', '膳食'],
     ['/pages/care-log/index', '护理日志'],
     ['/pages/weekly-brief/index', '每周简报'],
+    ['/pages/survey-fill/index', '问卷填写'],
     ['/pages/profile/index', '我的']
   ]
   let idx = 3

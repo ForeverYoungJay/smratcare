@@ -449,7 +449,7 @@ Page({
       await sendCommunicationMessage({
         targetRole: '生活管家',
         msgType: 'video',
-        content: `已提交探视预约：${videoTime}`
+        content: `已提交探视预约：${videoTime}。视频探视将由护理站通过企业微信向您发起视频通话，请留意微信来电。`
       });
       const managerIndex = ROLE_OPTIONS.findIndex((item) => item.value === '生活管家');
       this.setData({

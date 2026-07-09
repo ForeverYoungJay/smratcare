@@ -113,7 +113,7 @@
     <view class="visit-booking" wx:if="{{bookingOpen}}">
       <view class="visit-panel-head">
         <view>
-          <view class="visit-panel-title">预约探视时间</view>
+          <view class="visit-panel-title">预约探视时间（视频探视经企业微信通话）</view>
           <view class="visit-panel-subtitle">提交后会进入生活管家会话</view>
         </view>
       </view>

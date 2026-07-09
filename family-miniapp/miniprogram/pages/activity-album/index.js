@@ -6,6 +6,8 @@ const {
   resolveFileUrl
 } = require('../../services/family');
 
+const { requestSubscribe } = require('../../utils/subscribe');
+
 Page({
   data: {
     tabs: [
@@ -21,6 +23,10 @@ Page({
     commentInput: '',
     loadingComments: false,
     commenting: false
+  },
+  async subscribeUpdates() {
+    await requestSubscribe('familyAlbum');
+    wx.showToast({ title: '已开启：新相册发布会通过消息中心提醒您', icon: 'none', duration: 2500 });
   },
   async onShow() {
     getApp().ensureLogin();

@@ -11,3 +11,5 @@
 .record-meta { margin-top: 6rpx; font-size: 21rpx; color: #5C6F69; }
 .record-content { margin-top: 6rpx; font-size: 23rpx; color: #334155; }
 .record-reply { margin-top: 6rpx; font-size: 22rpx; color: #21705F; }
+
+.survey-entry { color: #21705F; }

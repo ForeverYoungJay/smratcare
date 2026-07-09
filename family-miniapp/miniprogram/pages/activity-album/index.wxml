@@ -1,6 +1,9 @@
 <view class="container">
   <view class="surface card">
-    <view class="section-title">相册 / 视频</view>
+    <view class="section-title-row">
+      <view class="section-title">相册 / 视频</view>
+      <view class="subscribe-link" bindtap="subscribeUpdates">订阅更新提醒</view>
+    </view>
     <view class="album-tabs">
       <block wx:for="{{tabs}}" wx:key="key">
         <view

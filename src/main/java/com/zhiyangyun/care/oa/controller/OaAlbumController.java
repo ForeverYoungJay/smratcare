@@ -28,11 +28,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/oa/album")
 public class OaAlbumController {
   private final OaAlbumMapper albumMapper;
+  private final com.zhiyangyun.care.family.support.FamilyNoticePublisher familyNoticePublisher;
   private final ObjectMapper objectMapper;
 
-  public OaAlbumController(OaAlbumMapper albumMapper, ObjectMapper objectMapper) {
+  public OaAlbumController(OaAlbumMapper albumMapper, ObjectMapper objectMapper,
+      com.zhiyangyun.care.family.support.FamilyNoticePublisher familyNoticePublisher) {
     this.albumMapper = albumMapper;
     this.objectMapper = objectMapper;
+    this.familyNoticePublisher = familyNoticePublisher;
   }
 
   @GetMapping("/page")
@@ -105,6 +108,14 @@ public class OaAlbumController {
     album.setRemark(request.getRemark());
     album.setCreatedBy(AuthContext.getStaffId());
     albumMapper.insert(album);
+    if ("PUBLISHED".equalsIgnoreCase(String.valueOf(album.getStatus()))) {
+      // 家属订阅动态：新相册发布即进入家属消息中心（“活动”关键词归类为活动通知）
+      familyNoticePublisher.publish(orgId,
+          "活动相册更新：" + album.getTitle(),
+          "机构发布了新的活动照片《" + album.getTitle() + "》，共 "
+              + (album.getPhotoCount() == null ? 0 : album.getPhotoCount())
+              + " 张，打开小程序“活动相册”即可查看长者的精彩瞬间。");
+    }
     return Result.ok(album);
   }
 

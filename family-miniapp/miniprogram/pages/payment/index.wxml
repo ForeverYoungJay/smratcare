@@ -44,6 +44,25 @@
     <block wx:for="{{summary.details}}" wx:key="item">
       <view class="line"><text>{{item.item}}</text><text>¥{{item.amount}}</text></view>
     </block>
+    <view class="bill-items-toggle" bindtap="toggleBillItems">
+      <text>{{showBillItems ? '收起逐项账单' : '查看逐项账单'}}</text>
+    </view>
+    <block wx:if="{{showBillItems}}">
+      <view wx:if="{{!billItems.length}}" class="bill-items-empty">本月暂无逐项账单记录</view>
+      <block wx:for="{{billItems}}" wx:key="name" wx:for-item="bi">
+        <view class="line bill-item-line">
+          <view class="bill-item-main">
+            <text>{{bi.name}}</text>
+            <text wx:if="{{bi.remark}}" class="bill-item-remark">{{bi.remark}}</text>
+          </view>
+          <text>¥{{bi.amount}}</text>
+        </view>
+      </block>
+      <view class="invoice-row">
+        <text class="invoice-tip">需要电子发票/收据？</text>
+        <button class="ghost-btn invoice-btn" size="mini" loading="{{invoiceSubmitting}}" bindtap="requestInvoice">申请开票</button>
+      </view>
+    </block>
 
     <view class="line switch-line">
       <text>自动扣费设置</text>

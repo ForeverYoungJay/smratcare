@@ -15,7 +15,7 @@
 
     <view class="action-row">
       <button class="primary-btn action action-primary" bindtap="callNurse">联系责任护士</button>
-      <button class="ghost-btn action action-secondary" bindtap="markRead">确认已读</button>
+      <button class="ghost-btn action action-secondary" bindtap="markRead">{{detail.type === '护理提醒' || detail.title.indexOf('护理等级调整') >= 0 ? '我已知悉本次调整' : '确认已读'}}</button>
     </view>
   </view>
 </view>

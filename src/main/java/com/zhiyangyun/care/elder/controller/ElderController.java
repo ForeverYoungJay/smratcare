@@ -46,6 +46,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/elder")
 public class ElderController {
   private final ElderService elderService;
+  private final com.zhiyangyun.care.family.support.FamilyNoticePublisher familyNoticePublisher;
   private final AuditLogService auditLogService;
   private final ElderMapper elderMapper;
   private final OaApprovalMapper oaApprovalMapper;
@@ -58,13 +59,15 @@ public class ElderController {
       ElderMapper elderMapper,
       OaApprovalMapper oaApprovalMapper,
       AssessmentRecordMapper assessmentRecordMapper,
-      ElderChangeLogMapper elderChangeLogMapper) {
+      ElderChangeLogMapper elderChangeLogMapper,
+      com.zhiyangyun.care.family.support.FamilyNoticePublisher familyNoticePublisher) {
     this.elderService = elderService;
     this.auditLogService = auditLogService;
     this.elderMapper = elderMapper;
     this.oaApprovalMapper = oaApprovalMapper;
     this.assessmentRecordMapper = assessmentRecordMapper;
     this.elderChangeLogMapper = elderChangeLogMapper;
+    this.familyNoticePublisher = familyNoticePublisher;
   }
 
   @PreAuthorize("@elderAuthz.canWriteElder()")
@@ -168,6 +171,12 @@ public class ElderController {
       log.setReason(buildCareLevelReason(request));
       log.setCreatedBy(AuthContext.getStaffId());
       elderChangeLogMapper.insert(log);
+      // 家属知情：护理等级调整同步通知家属（“提醒”关键词归为二级提醒），家属端可确认知悉
+      familyNoticePublisher.publish(elder.getOrgId(),
+          "护理等级调整提醒：" + elder.getFullName(),
+          "长者 " + elder.getFullName() + " 的护理等级由“" + (beforeCareLevel == null ? "未评定" : beforeCareLevel)
+              + "”调整为“" + nextCareLevel + "”。调整依据：" + buildCareLevelReason(request)
+              + "。如有疑问请联系照护团队，可在消息详情中点击“我已知悉”确认。");
     }
     ElderResponse response = elderService.get(id, AuthContext.getOrgId());
     Map<String, Object> context = new LinkedHashMap<>();
