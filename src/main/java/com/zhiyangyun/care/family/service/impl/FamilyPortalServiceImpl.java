@@ -856,9 +856,9 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
       });
       FamilyPortalModels.CareLogItem item = new FamilyPortalModels.CareLogItem();
       item.setTime(log.getLogTime() == null ? "--:--" : log.getLogTime().format(HHMM_FMT));
-      item.setProject(defaultText(log.getLogType(), "护理记录"));
+      item.setProject(careLogTypeLabel(log.getLogType()));
       item.setStaff(defaultText(log.getStaffName(), "护理组"));
-      item.setStatus(defaultText(log.getStatus(), "已记录"));
+      item.setStatus(careLogStatusLabel(log.getStatus()));
       item.setNote(defaultText(log.getContent(), defaultText(log.getRemark(), "护理已执行")));
       item.setPhotos(extractPhotoUrls(defaultText(log.getContent(), "") + "\n" + defaultText(log.getRemark(), "")));
       day.getItems().add(item);
@@ -4186,9 +4186,9 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
             .last("LIMIT 5"));
     for (HealthNursingLog log : nursingLogs) {
       LocalDateTime eventTime = log.getLogTime() == null ? log.getCreateTime() : log.getLogTime();
-      drafts.add(timelineDraft(eventTime, "护理", defaultText(log.getLogType(), "护理记录"),
+      drafts.add(timelineDraft(eventTime, "护理", careLogTypeLabel(log.getLogType()),
           defaultText(log.getContent(), defaultText(log.getRemark(), "护理记录已更新")),
-          defaultText(log.getStatus(), "已记录"), "/pages/care-log/index"));
+          careLogStatusLabel(log.getStatus()), "/pages/care-log/index"));
     }
 
     List<HealthDataRecord> healthRecords = healthDataRecordMapper.selectList(
@@ -5391,6 +5391,39 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
       return fallback;
     }
     return value.trim();
+  }
+
+  /** 护理日志类型/状态是内部枚举，给家属端展示前翻译为中文；历史中文值原样透传 */
+  private String careLogTypeLabel(String logType) {
+    String value = defaultText(logType, "护理记录");
+    switch (value.toUpperCase()) {
+      case "ROUTINE":
+        return "日常护理";
+      case "INSPECTION_FOLLOW_UP":
+      case "INSPECTION_FOLLOW":
+        return "巡检跟进";
+      case "INCIDENT":
+        return "异常处理";
+      case "MEDICAL_FOLLOW_UP":
+        return "医护随访";
+      default:
+        return value;
+    }
+  }
+
+  private String careLogStatusLabel(String status) {
+    String value = defaultText(status, "已记录");
+    switch (value.toUpperCase()) {
+      case "PENDING":
+        return "进行中";
+      case "DONE":
+      case "COMPLETED":
+        return "已完成";
+      case "CLOSED":
+        return "已关闭";
+      default:
+        return value;
+    }
   }
 
   private String normalizeIdCardNo(String value) {

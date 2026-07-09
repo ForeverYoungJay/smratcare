@@ -1,6 +1,10 @@
 <view class="container">
   <view class="surface card">
     <view class="section-title">今日日程时间轴</view>
+    <view wx:if="{{!list.length}}" class="empty-tip">
+      <text class="empty-main">今天暂无护理与服务日程</text>
+      <text class="empty-sub">有新的护理安排、活动或探视时，会在这里按时间线展示</text>
+    </view>
     <block wx:for="{{list}}" wx:key="id">
       <view class="row" data-index="{{index}}" bindtap="showDetail">
         <text class="time">{{item.time}}</text>

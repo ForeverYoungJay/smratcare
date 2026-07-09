@@ -1,5 +1,26 @@
 const { getCareLogs } = require('../../services/family');
 
+// 后端历史数据可能携带内部枚举，家属端展示前统一兜底翻译（后端已同步修复，此处双保险）
+const LOG_TYPE_LABELS = {
+  ROUTINE: '日常护理',
+  INSPECTION_FOLLOW_UP: '巡检跟进',
+  INSPECTION_FOLLOW: '巡检跟进',
+  INCIDENT: '异常处理',
+  MEDICAL_FOLLOW_UP: '医护随访'
+};
+const LOG_STATUS_LABELS = { PENDING: '进行中', DONE: '已完成', COMPLETED: '已完成', CLOSED: '已关闭' };
+
+function localizeDays(days) {
+  return (days || []).map((day) => ({
+    ...day,
+    items: (day.items || []).map((item) => ({
+      ...item,
+      project: LOG_TYPE_LABELS[String(item.project || '').toUpperCase()] || item.project,
+      status: LOG_STATUS_LABELS[String(item.status || '').toUpperCase()] || item.status
+    }))
+  }));
+}
+
 Page({
   data: {
     days: [],
@@ -18,7 +39,7 @@ Page({
     this.setData({ loading: true, loadError: '' });
     try {
       const days = await getCareLogs();
-      this.setData({ days: days || [] });
+      this.setData({ days: localizeDays(days) });
     } catch (error) {
       this.setData({ days: [], loadError: error.message || '护理日志加载失败，请检查网络后重试' });
     } finally {

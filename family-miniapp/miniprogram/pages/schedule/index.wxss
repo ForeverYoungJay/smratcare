@@ -9,3 +9,20 @@
 .todo { background: #f1f5f9; color: #5C6F69; }
 .doing { background: #eaf1ff; color: #1d4ed8; }
 .done { background: #e7f8ef; color: #21705F; }
+
+.empty-tip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12rpx;
+  padding: 80rpx 24rpx;
+}
+.empty-main {
+  font-size: 30rpx;
+  color: #4a5a54;
+}
+.empty-sub {
+  font-size: 24rpx;
+  color: #8a9a93;
+  text-align: center;
+}
