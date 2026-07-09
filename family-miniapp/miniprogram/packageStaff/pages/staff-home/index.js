@@ -4,12 +4,17 @@ const {
   getAttendanceOverview,
   getStaffTodoSummary,
   getIncidents,
-  punchAttendance
+  punchAttendance,
+  submitIncident,
+  getStaffContacts,
+  getStaffNotices,
+  getStaffApprovals
 } = require('../../../services/staff');
 const { requestSubscribeOncePerDay } = require('../../../utils/subscribe');
 
 // 内置完整员工功能清单：后端 actions 缺失或不全时兜底，确保工作台可达全部功能页。
 const STAFF_MENU = [
+  { title: '档案', desc: '床边速查', route: '/packageStaff/pages/staff-elder-card/index' },
   { title: '待办', desc: '通知提醒', route: '/packageStaff/pages/staff-todo/index' },
   { title: '通讯', desc: '一键联系', route: '/packageStaff/pages/staff-contacts/index' },
   { title: '日报', desc: '工作汇报', route: '/packageStaff/pages/staff-report/index' },
@@ -60,6 +65,7 @@ function roleCategory(roles = [], roleText = '') {
 const ROLE_QUICK_ENTRY_RULES = {
   nursing: {
     priority: [
+      '/packageStaff/pages/staff-elder-card/index',
       '/packageStaff/pages/staff-care-execution/index',
       '/packageStaff/pages/staff-vitals/index',
       '/packageStaff/pages/staff-handover/index'
@@ -71,6 +77,7 @@ const ROLE_QUICK_ENTRY_RULES = {
   },
   medical: {
     priority: [
+      '/packageStaff/pages/staff-elder-card/index',
       '/packageStaff/pages/staff-clinical/index?mode=MEDICATION',
       '/packageStaff/pages/staff-clinical/index?mode=INSPECTION',
       '/packageStaff/pages/staff-vitals/index'
@@ -195,7 +202,8 @@ function buildBattle(dashboard = {}, tasks = [], attendance = {}, todoSummary = 
     criticalTaskMeta: criticalTask ? `${criticalTask.time || '时间待定'} · ${criticalTask.resident || '对象未填'} · ${criticalTask.room || '位置未填'}` : '现场状态平稳',
     criticalTaskRoute: criticalTask ? criticalTask.route : '/packageStaff/pages/staff-tasks/index',
     actionHint: criticalTask ? criticalTask.actionText || '立即处理' : '查看全部待办',
-    riskTone: openIncidents.length || urgentTasks.length || todoSummary.overdueCount ? 'danger' : 'normal'
+    // 注意：后端 long 计数序列化为字符串，"0" 为真值，必须 Number() 后再参与判定
+    riskTone: openIncidents.length || urgentTasks.length || Number(todoSummary.overdueCount || 0) > 0 ? 'danger' : 'normal'
   };
 }
 
@@ -204,6 +212,7 @@ Page({
     loading: false,
     loadError: '',
     punching: false,
+    supporting: false,
     greeting: greetingText(),
     dashboard: {
       generatedAt: '',
@@ -234,7 +243,12 @@ Page({
     },
     partialWarning: '',
     levelText: '平稳',
-    levelClass: 'pill-normal'
+    levelClass: 'pill-normal',
+    messageHub: {
+      latestNoticeTitle: '',
+      latestApprovalText: '',
+      latestApprovalStatus: ''
+    }
   },
   onLoad() {
     this.loadData();
@@ -257,14 +271,27 @@ Page({
       const category = roleCategory(staffUser.roles || [], dashboard.roleText || '');
       dashboard.quickEntries = personalizeQuickEntries(mergeQuickEntries(dashboard.quickEntries), category);
       const warnings = [];
-      const [tasks, attendance, todoSummary, incidents] = await Promise.all([
+      const [tasks, attendance, todoSummary, incidents, notices, myApprovals] = await Promise.all([
         loadOptional(() => getTaskList(), () => dashboard.tasks || [], '待办任务', warnings),
         loadOptional(() => getAttendanceOverview(), {}, '考勤状态', warnings),
         loadOptional(() => getStaffTodoSummary({ mineOnly: true }), {}, 'OA待办', warnings),
-        loadOptional(() => getIncidents({}), [], '异常事件', warnings)
+        loadOptional(() => getIncidents({}), [], '异常事件', warnings),
+        // 消息聚合条：公告/审批动态失败静默降级，不计入部分同步告警
+        getStaffNotices({ pageSize: 1 }).catch(() => []),
+        getStaffApprovals({ mine: true, pageSize: 1 }).catch(() => [])
       ]);
+      const latestNotice = (notices || [])[0] || null;
+      const latestApproval = (myApprovals || [])[0] || null;
+      const approvalStatusText = latestApproval
+        ? (latestApproval.status === 'APPROVED' ? '已通过' : latestApproval.status === 'REJECTED' ? '已驳回' : '待审批')
+        : '';
       this.setData({
         dashboard,
+        messageHub: {
+          latestNoticeTitle: latestNotice ? (latestNotice.title || '') : '',
+          latestApprovalText: latestApproval ? (latestApproval.title || '我的申请') : '',
+          latestApprovalStatus: approvalStatusText
+        },
         battle: buildBattle(dashboard, tasks, attendance, todoSummary, incidents),
         partialWarning: warnings.length ? `部分实时数据未完成同步：${warnings.join('、')}。当前先展示已获取到的内容。` : '',
         levelText: levelText(dashboard.mobileLevel),
@@ -275,6 +302,49 @@ Page({
     } finally {
       this.setData({ loading: false });
       if (fromPullDown) wx.stopPullDownRefresh();
+    }
+  },
+  // 一键呼叫支援：二次确认后自动上报紧急事件，并尝试拨打值班联系人电话。
+  emergencySupport() {
+    if (this.data.supporting) return;
+    wx.showModal({
+      title: '呼叫支援',
+      content: '将立即上报紧急事件，并拨打值班负责人电话。确认现在需要支援吗？',
+      confirmText: '立即呼叫',
+      confirmColor: '#c9504b',
+      success: (res) => {
+        if (res.confirm) this.doEmergencySupport();
+      }
+    });
+  },
+  async doEmergencySupport() {
+    this.setData({ supporting: true });
+    let reported = false;
+    try {
+      await submitIncident({
+        incidentType: '紧急支援',
+        level: '紧急',
+        description: '一线员工在工作台发起一键支援，请就近同事与值班负责人立即前往协助。'
+      });
+      reported = true;
+    } catch (error) {
+      wx.showToast({ title: error.message || '事件上报失败，请直接电话联系', icon: 'none' });
+    }
+    try {
+      const contacts = await getStaffContacts({ size: 20 });
+      const duty = (contacts || []).find((item) => item && item.phone);
+      if (duty && duty.phone) {
+        wx.makePhoneCall({ phoneNumber: duty.phone, fail: () => {} });
+      } else if (reported) {
+        wx.showToast({ title: '事件已上报，请联系值班负责人', icon: 'none' });
+      }
+    } catch (error) {
+      if (reported) {
+        wx.showToast({ title: '事件已上报，请联系值班负责人', icon: 'none' });
+      }
+    } finally {
+      this.setData({ supporting: false });
+      if (reported) this.loadData();
     }
   },
   goPage(e) {

@@ -340,7 +340,10 @@ async function getStaffApprovals(filter = {}) {
           pageNo: filter.pageNo || 1,
           pageSize: filter.pageSize || 20,
           type: filter.type || '',
-          status: filter.status || ''
+          status: filter.status || '',
+          applicantId: filter.applicantId || '',
+          // mine=true 时后端按当前登录人过滤“我发起的”，避免前端传长整型 ID 精度丢失
+          ...(filter.mine ? { mine: 'true' } : {})
         }
       });
       return page && Array.isArray(page.records) ? page.records : [];
@@ -648,8 +651,23 @@ function normalizeStaffTask(task = {}) {
   };
 }
 
+// 床边档案速查：keyword 支持姓名 / 老人码 / 腕带码 / 床位二维码
+async function getElderCard(params = {}) {
+  return request({
+    url: '/api/operations/staff-mobile/elder-card',
+    data: { keyword: params.keyword || '', elderId: params.elderId || '' }
+  });
+}
+
+// 我的工作量统计（本月任务回执/体征录入/出勤/奖惩摘要）
+async function getMyStats() {
+  return request({ url: '/api/operations/staff-mobile/my-stats' });
+}
+
 module.exports = {
   staffLogin,
+  getElderCard,
+  getMyStats,
   getStaffDashboard,
   getTaskList,
   getTaskDetail,

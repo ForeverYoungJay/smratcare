@@ -122,12 +122,15 @@ public class OaApprovalController {
       @RequestParam(required = false) String currentApproverRole,
       @RequestParam(required = false) Long applicantId,
       @RequestParam(required = false, defaultValue = "false") boolean pendingMine,
+      @RequestParam(required = false, defaultValue = "false") boolean mine,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
+    // mine=true：员工端“我发起的”视图，申请人取当前登录人，避免前端传长整型 ID 的精度问题
+    Long effectiveApplicantId = mine ? AuthContext.getStaffId() : applicantId;
     String normalizedStatus = normalizeStatus(status);
     String normalizedType = normalizeType(type);
     String normalizedApproverRole = normalizeApproverRole(currentApproverRole);
-    var wrapper = buildQuery(orgId, normalizedStatus, normalizedType, normalizedApproverRole, applicantId, keyword, pendingMine)
+    var wrapper = buildQuery(orgId, normalizedStatus, normalizedType, normalizedApproverRole, effectiveApplicantId, keyword, pendingMine)
         .orderByDesc(OaApproval::getCreateTime);
     return Result.ok(approvalMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
   }

@@ -14,6 +14,35 @@
         <text class="pill pill-normal">{{item}}</text>
       </block>
     </view>
+    <view class="stats-block" wx:if="{{stats}}">
+      <view class="stats-title">本月工作量（{{stats.month}}）</view>
+      <view class="stats-grid">
+        <view class="stats-cell">
+          <strong>{{stats.taskCount}}</strong>
+          <text>完成任务</text>
+        </view>
+        <view class="stats-cell">
+          <strong>{{stats.vitalsCount}}</strong>
+          <text>体征录入</text>
+        </view>
+        <view class="stats-cell">
+          <strong>{{stats.attendanceDays}}</strong>
+          <text>出勤天数</text>
+        </view>
+        <view class="stats-cell">
+          <strong>{{stats.avgCheckIn}}</strong>
+          <text>平均签到</text>
+        </view>
+      </view>
+      <view class="stats-records" wx:if="{{stats.recentRecords.length}}">
+        <view class="stats-record" wx:for="{{stats.recentRecords}}" wx:key="index">
+          <text class="pill {{item.typeLabel === '表扬' ? 'pill-normal' : 'pill-warning'}}">{{item.typeLabel}}</text>
+          <text class="record-title">{{item.title}}</text>
+          <text class="record-date">{{item.date}}</text>
+        </view>
+      </view>
+    </view>
+
     <view class="quick-list">
       <block wx:for="{{quickEntries}}" wx:key="route">
         <view class="quick-row" data-path="{{item.route}}" bindtap="goPage">

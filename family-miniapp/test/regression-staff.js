@@ -92,6 +92,7 @@ async function main() {
     ['/packageStaff/pages/staff-notices/index', '公告'],
     ['/packageStaff/pages/staff-todo/index', '待办'],
     ['/packageStaff/pages/staff-suggestions/index', '建议'],
+    ['/packageStaff/pages/staff-elder-card/index', '床边档案'],
     ['/packageStaff/pages/staff-profile/index', '我的']
   ]
   let idx = 2

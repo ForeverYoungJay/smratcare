@@ -1,8 +1,57 @@
 const { getSchedule, getAttendanceOverview, punchAttendance } = require('../../../services/staff');
 
+function pad2(value) {
+  return String(value).padStart(2, '0');
+}
+
+// 由排班列表构建当月月历：周日起始 7 列网格，标记有班次的日期与今天。
+function buildCalendar(schedule = []) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const todayStr = `${year}-${pad2(month + 1)}-${pad2(now.getDate())}`;
+  const shiftByDate = {};
+  (schedule || []).forEach((item) => {
+    const date = String(item.date || '').slice(0, 10);
+    if (!date) return;
+    if (!shiftByDate[date]) shiftByDate[date] = [];
+    shiftByDate[date].push(item);
+  });
+
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push({ key: `blank-${i}`, blank: true });
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${pad2(month + 1)}-${pad2(day)}`;
+    const items = shiftByDate[dateStr] || [];
+    cells.push({
+      key: dateStr,
+      blank: false,
+      day,
+      dateStr,
+      isToday: dateStr === todayStr,
+      hasShift: items.length > 0,
+      shiftLabel: items.length ? String(items[0].shift || '班').slice(0, 2) : ''
+    });
+  }
+  while (cells.length % 7 !== 0) cells.push({ key: `tail-${cells.length}`, blank: true });
+  return {
+    monthLabel: `${year}年${month + 1}月`,
+    cells,
+    todayStr,
+    shiftByDate
+  };
+}
+
 Page({
   data: {
     schedule: [],
+    viewMode: 'calendar',
+    calendar: { monthLabel: '', cells: [] },
+    weekdays: ['日', '一', '二', '三', '四', '五', '六'],
+    selectedDate: '',
+    selectedItems: [],
     attendance: null,
     punchActions: [
       { label: '上班打卡', action: 'IN' },
@@ -29,9 +78,15 @@ Page({
         getSchedule(),
         getAttendanceOverview()
       ]);
+      const calendar = buildCalendar(schedule);
+      const selectedDate = this.data.selectedDate || calendar.todayStr;
+      this.shiftByDate = calendar.shiftByDate;
       this.setData({
         schedule,
         attendance,
+        calendar: { monthLabel: calendar.monthLabel, cells: calendar.cells },
+        selectedDate,
+        selectedItems: calendar.shiftByDate[selectedDate] || [],
         punchError: ''
       });
     } catch (error) {
@@ -39,6 +94,20 @@ Page({
     } finally {
       this.setData({ loading: false });
     }
+  },
+  switchView(e) {
+    this.setData({ viewMode: e.currentTarget.dataset.mode });
+  },
+  pickDay(e) {
+    const dateStr = e.currentTarget.dataset.date;
+    if (!dateStr) return;
+    this.setData({
+      selectedDate: dateStr,
+      selectedItems: (this.shiftByDate && this.shiftByDate[dateStr]) || []
+    });
+  },
+  goShiftSwap() {
+    wx.navigateTo({ url: '/packageStaff/pages/staff-approval/index?type=SHIFT_CHANGE' });
   },
   async punch(e) {
     if (this.data.punching) return;

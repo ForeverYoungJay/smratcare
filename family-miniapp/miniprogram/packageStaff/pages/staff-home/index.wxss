@@ -143,6 +143,93 @@
   opacity: 0.9;
 }
 
+/* 消息聚合条：最新公告与我的审批动态 */
+.message-hub {
+  margin-top: 18rpx;
+  padding: 8rpx 24rpx;
+}
+
+.hub-row {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  padding: 18rpx 0;
+  border-bottom: 1rpx solid rgba(33, 112, 95, 0.1);
+}
+
+.hub-row:last-child {
+  border-bottom: none;
+}
+
+.hub-tag {
+  flex: none;
+  padding: 2rpx 14rpx;
+  border-radius: 8rpx;
+  background: rgba(33, 112, 95, 0.12);
+  color: #21705F;
+  font-size: 21rpx;
+  font-weight: 800;
+}
+
+.hub-text {
+  flex: 1;
+  min-width: 0;
+  color: var(--ink);
+  font-size: 25rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hub-arrow {
+  color: var(--muted);
+  font-size: 32rpx;
+}
+
+.hub-status {
+  flex: none;
+  color: var(--muted);
+  font-size: 23rpx;
+  font-weight: 700;
+}
+
+.hub-status.success {
+  color: #21705F;
+}
+
+.hub-status.danger {
+  color: #c9504b;
+}
+
+/* 一键呼叫支援：红色高显著按钮，防误触依赖二次确认弹窗 */
+.support-btn {
+  margin-top: 20rpx;
+  width: 100%;
+  min-height: 84rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16rpx;
+  background: linear-gradient(135deg, #c9504b, #d4675f);
+  color: #ffffff;
+  font-size: 30rpx;
+  font-weight: 800;
+  letter-spacing: 4rpx;
+  box-shadow: 0 8rpx 18rpx rgba(201, 80, 75, 0.3);
+}
+
+.support-btn:active {
+  transform: translateY(2rpx);
+  opacity: 0.92;
+}
+
+.support-note {
+  margin-top: 10rpx;
+  color: var(--muted);
+  font-size: 22rpx;
+  text-align: center;
+}
+
 .battle-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

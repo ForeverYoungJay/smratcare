@@ -72,7 +72,8 @@
         "pages/staff-incident/index",
         "pages/staff-patrol/index",
         "pages/staff-receipts/index",
-        "pages/staff-incidents/index"
+        "pages/staff-incidents/index",
+        "pages/staff-elder-card/index"
       ]
     }
   ],

@@ -1,9 +1,11 @@
-const { getStaffProfile } = require('../../../services/staff');
+const { getStaffProfile, getMyStats } = require('../../../services/staff');
 
 Page({
   data: {
     profile: null,
+    stats: null,
     quickEntries: [
+      { title: '床边档案', desc: '扫码速查', route: '/packageStaff/pages/staff-elder-card/index' },
       { title: '我的待办', desc: '提醒通知', route: '/packageStaff/pages/staff-todo/index' },
       { title: '通讯录', desc: '一键联系', route: '/packageStaff/pages/staff-contacts/index' },
       { title: '工作日报', desc: '汇报复盘', route: '/packageStaff/pages/staff-report/index' },
@@ -37,6 +39,12 @@ Page({
       this.setData({ profile: await getStaffProfile() });
     } catch (error) {
       this.setData({ loadError: error.message || '员工信息加载失败' });
+    }
+    // 工作量统计失败不阻塞个人信息展示
+    try {
+      this.setData({ stats: await getMyStats() });
+    } catch (error) {
+      this.setData({ stats: null });
     }
   },
   goHome() {

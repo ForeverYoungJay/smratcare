@@ -56,6 +56,12 @@ Page({
     reason: '',
     policyAcknowledged: false
   },
+  onLoad(options = {}) {
+    // 支持从排班页“申请换班”深链接直达调班表单
+    if (options.type === 'SHIFT_CHANGE' || options.type === 'LEAVE') {
+      this.setData({ activeType: options.type });
+    }
+  },
   onShow() {
     getApp().ensureLogin();
     this.loadData({ reset: true });
@@ -65,7 +71,7 @@ Page({
     const nextPageNo = reset ? 1 : Number(this.data.pageNo || 1) + 1;
     this.setData(reset ? { loading: true, loadError: '' } : { loadingMore: true, loadError: '' });
     try {
-      const approvals = await getStaffApprovals({ pageNo: nextPageNo, pageSize: this.data.pageSize });
+      const approvals = await getStaffApprovals({ pageNo: nextPageNo, pageSize: this.data.pageSize, mine: true });
       const normalized = (approvals || []).map(normalizeApproval);
       this.setData({
         approvals: reset ? normalized : this.data.approvals.concat(normalized),

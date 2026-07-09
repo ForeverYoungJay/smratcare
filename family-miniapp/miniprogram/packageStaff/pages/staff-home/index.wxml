@@ -52,6 +52,21 @@
           <view class="battle-note">待处理 / 跟进中</view>
         </view>
       </view>
+      <button class="support-btn" loading="{{supporting}}" disabled="{{supporting}}" catchtap="emergencySupport">一键呼叫支援</button>
+      <view class="support-note">突发状况先按此键：自动上报紧急事件并拨打值班电话</view>
+    </view>
+
+    <view class="surface message-hub" wx:if="{{messageHub.latestNoticeTitle || messageHub.latestApprovalText}}">
+      <view class="hub-row" wx:if="{{messageHub.latestNoticeTitle}}" data-path="/packageStaff/pages/staff-notices/index" bindtap="goPage">
+        <text class="hub-tag">公告</text>
+        <text class="hub-text">{{messageHub.latestNoticeTitle}}</text>
+        <text class="hub-arrow">›</text>
+      </view>
+      <view class="hub-row" wx:if="{{messageHub.latestApprovalText}}" data-path="/packageStaff/pages/staff-approval/index" bindtap="goPage">
+        <text class="hub-tag">审批</text>
+        <text class="hub-text">{{messageHub.latestApprovalText}}</text>
+        <text class="hub-status {{messageHub.latestApprovalStatus === '已驳回' ? 'danger' : messageHub.latestApprovalStatus === '已通过' ? 'success' : ''}}">{{messageHub.latestApprovalStatus}}</text>
+      </view>
     </view>
 
     <view class="surface index-card">
