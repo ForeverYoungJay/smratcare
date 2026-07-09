@@ -17,10 +17,16 @@ function sourceText(type) {
   return '普通待办';
 }
 
+function stripSystemMarkers(content) {
+  // 待办 content 内嵌 [APPROVAL_FLOW:xx] 等系统路由标记，展示前剥离
+  return String(content || '').replace(/\[[A-Z_]+:[^\]]*\]/g, '').trim();
+}
+
 function normalizeTodo(item) {
   const sourceType = sourceTypeOf(item);
   return {
     ...item,
+    content: stripSystemMarkers(item.content),
     sourceType,
     sourceText: sourceText(sourceType),
     dueText: String(item.dueTime || '').replace('T', ' '),

@@ -83,7 +83,9 @@ public class MedicalEmergencyServiceImpl implements MedicalEmergencyService {
     // 家属侧即时告警：紧急事件同步进入家属消息中心（标题“紧急”触发一级提醒）
     familyNoticePublisher.publish(orgId,
         "紧急：" + event.getElderName() + " 突发状况，机构已启动急救流程",
-        "长者 " + event.getElderName() + " 于 " + event.getEventTime() + " 出现：" + defaultSymptom(event.getSymptom())
+        "长者 " + event.getElderName() + " 于 "
+            + event.getEventTime().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+            + " 出现：" + defaultSymptom(event.getSymptom())
             + "。医护人员已到场处置，如已呼叫120或送医，进展会持续在此通知，请保持电话畅通。");
     return event;
   }
