@@ -624,6 +624,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
             .last("LIMIT 500"));
 
     Map<LocalDate, Map<String, String>> dayMetricValues = new HashMap<>();
+    Map<String, String> latestMetricValues = new HashMap<>();
     for (HealthDataRecord record : records) {
       LocalDate date = record.getMeasuredAt() == null ? null : record.getMeasuredAt().toLocalDate();
       String metric = normalizeMetricType(record.getDataType());
@@ -631,6 +632,8 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
         continue;
       }
       dayMetricValues.computeIfAbsent(date, k -> new HashMap<>()).putIfAbsent(metric, record.getDataValue());
+      // records 按 measuredAt 倒序，首个出现即该指标的最新值
+      latestMetricValues.putIfAbsent(metric, record.getDataValue());
     }
 
     FamilyPortalModels.HealthTrendResponse response = new FamilyPortalModels.HealthTrendResponse();
@@ -657,12 +660,17 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
       trend = buildDefaultTrend(days);
     }
 
+    // 最新体征优先取各指标最近一次真实记录（可能不在同一天），无记录时回退趋势末点（演示数据）
     FamilyPortalModels.HealthTrendPoint latestPoint = trend.get(trend.size() - 1);
-    latest.setSbp(latestPoint.getSbp());
-    latest.setDbp(latestPoint.getDbp());
-    latest.setHr(latestPoint.getHr());
-    latest.setTemp(latestPoint.getTemp());
-    latest.setSugar(latestPoint.getSugar());
+    int[] latestBp = parseBloodPressure(latestMetricValues.get(METRIC_BP));
+    latest.setSbp(latestBp[0] > 0 ? latestBp[0] : latestPoint.getSbp());
+    latest.setDbp(latestBp[1] > 0 ? latestBp[1] : latestPoint.getDbp());
+    int latestHrValue = parseInteger(latestMetricValues.get(METRIC_HR), 0);
+    latest.setHr(latestHrValue > 0 ? latestHrValue : latestPoint.getHr());
+    double latestTempValue = parseDouble(latestMetricValues.get(METRIC_TEMP), 0D);
+    latest.setTemp(latestTempValue > 0 ? latestTempValue : latestPoint.getTemp());
+    double latestSugarValue = parseDouble(latestMetricValues.get(METRIC_SUGAR), 0D);
+    latest.setSugar(latestSugarValue > 0 ? latestSugarValue : latestPoint.getSugar());
 
     response.setTrend(trend);
     response.setLatest(latest);
@@ -4524,10 +4532,10 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     if (text.contains("体温") || text.contains("temp")) {
       return METRIC_TEMP;
     }
-    if (text.contains("心率") || text.contains("heart")) {
+    if (text.contains("心率") || text.contains("heart") || "hr".equals(text) || text.contains("pulse")) {
       return METRIC_HR;
     }
-    if (text.contains("血糖") || text.contains("glucose") || text.contains("sugar")) {
+    if (text.contains("血糖") || text.contains("glucose") || text.contains("sugar") || "glu".equals(text)) {
       return METRIC_SUGAR;
     }
     return null;
@@ -4893,6 +4901,11 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
             .eq(ElderFamily::getFamilyUserId, familyUserId)
             .eq(ElderFamily::getElderId, elderId)
             .last("LIMIT 1"));
+    // 主绑定家属是老人的第一联系人，不受“仅子女/直系家属”关系关键词限制，
+    // 否则关系登记为“家属”等泛称时，唯一绑定人反而看不到完整健康数据。
+    if (relation != null && Integer.valueOf(1).equals(relation.getIsPrimary())) {
+      return true;
+    }
     String relationText = defaultText(relation == null ? null : relation.getRelation(), "");
     if (scope.contains("仅子女")) {
       return relationText.contains("子") || relationText.contains("女儿") || relationText.contains("儿子");

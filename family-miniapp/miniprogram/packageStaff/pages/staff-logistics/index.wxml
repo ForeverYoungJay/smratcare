@@ -13,15 +13,12 @@
     <view class="mode-tab {{activeTab === 'MEAL' ? 'active' : ''}}" data-tab="MEAL" bindtap="switchTab">送餐任务（{{mealPending}}）</view>
   </view>
 
-  <view class="surface state-card" wx:if="{{loading}}">
-    <view class="state-title">正在加载后勤任务</view>
-  </view>
-
-  <view class="surface state-card" wx:if="{{!loading && loadError}}">
-    <view class="state-title">后勤任务加载失败</view>
-    <view class="section-subtitle">{{loadError}}</view>
-    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
-  </view>
+  <state-view
+    loading="{{loading}}"
+    error="{{loadError}}"
+    skeleton-rows="{{3}}"
+    bindretry="loadData"
+  />
 
   <view class="surface panel" wx:if="{{!loading && !loadError && activeTab === 'LOGISTICS'}}">
     <view class="panel-title">维修工单</view>

@@ -2,15 +2,12 @@
   <view class="section-title">我的排班</view>
   <view class="section-subtitle">查看班次、责任区域和移动端打卡状态</view>
 
-  <view class="surface state-card" wx:if="{{loading}}">
-    <view class="state-title">正在加载排班</view>
-  </view>
-
-  <view class="surface state-card" wx:if="{{!loading && loadError}}">
-    <view class="state-title">排班加载失败</view>
-    <view class="section-subtitle">{{loadError}}</view>
-    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
-  </view>
+  <state-view
+    loading="{{loading}}"
+    error="{{loadError}}"
+    skeleton-rows="{{3}}"
+    bindretry="loadData"
+  />
 
   <view class="surface attendance-card" wx:if="{{!loading && !loadError && attendance}}">
     <view class="attendance-head">

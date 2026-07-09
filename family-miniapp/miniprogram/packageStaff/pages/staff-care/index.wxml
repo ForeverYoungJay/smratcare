@@ -28,15 +28,12 @@
     <button class="ghost-btn quick-btn" bindtap="goHandover">交接班</button>
   </view>
 
-  <view class="surface state-card" wx:if="{{loading}}">
-    <view class="state-title">正在加载护理任务</view>
-  </view>
-
-  <view class="surface state-card" wx:if="{{!loading && loadError}}">
-    <view class="state-title">护理任务加载失败</view>
-    <view class="section-subtitle">{{loadError}}</view>
-    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
-  </view>
+  <state-view
+    loading="{{loading}}"
+    error="{{loadError}}"
+    skeleton-rows="{{3}}"
+    bindretry="loadData"
+  />
 
   <view class="surface panel" wx:if="{{!loading && !loadError}}">
     <view class="panel-title">今日护理任务</view>

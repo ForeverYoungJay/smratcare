@@ -133,7 +133,11 @@ async function main() {
   }
 
   console.log('\nSUMMARY:', results.filter(r => r.ok).length + '/' + results.length, 'passed')
-  await mini.disconnect()
+  const failed = results.filter(r => !r.ok).length
+  // disconnect() 偶发挂起：3 秒兜底强制退出
+  setTimeout(() => process.exit(failed ? 1 : 0), 3000).unref?.()
+  try { await mini.disconnect() } catch (e) {}
+  process.exit(failed ? 1 : 0)
 }
 
 main().catch(e => { console.error('FATAL:', e.message); process.exit(1) })

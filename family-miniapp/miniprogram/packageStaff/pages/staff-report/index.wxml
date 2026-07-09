@@ -61,20 +61,15 @@
     </block>
   </view>
 
-  <view class="surface state-card" wx:if="{{loading}}">
-    <view class="state-title">正在加载工作日报</view>
-  </view>
-
-  <view class="surface state-card" wx:if="{{!loading && loadError}}">
-    <view class="state-title">日报加载失败</view>
-    <view class="section-subtitle">{{loadError}}</view>
-    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
-  </view>
-
-  <view class="surface empty-card" wx:if="{{!loading && !loadError && reports.length === 0}}">
-    <view class="state-title">暂无日报</view>
-    <view class="section-subtitle">提交后可在这里查看本人历史日报。</view>
-  </view>
+  <state-view
+    loading="{{loading}}"
+    error="{{loadError}}"
+    empty="{{!loading && !loadError && reports.length === 0}}"
+    empty-text="暂无日报"
+    empty-hint="提交后可在这里查看本人历史日报。"
+    skeleton-rows="{{3}}"
+    bindretry="loadData"
+  />
 
   <view wx:if="{{!loading && !loadError && reports.length}}">
     <block wx:for="{{reports}}" wx:key="id">

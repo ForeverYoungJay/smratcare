@@ -2,20 +2,15 @@
   <view class="section-title">维修处理</view>
   <view class="section-subtitle">到场确认 → 处理登记 → 拍照验收，三步完成后勤维修闭环</view>
 
-  <view class="surface state-card" wx:if="{{loading}}">
-    <view class="state-title">正在加载维修工单</view>
-  </view>
-
-  <view class="surface state-card" wx:if="{{!loading && loadError}}">
-    <view class="state-title">维修工单加载失败</view>
-    <view class="section-subtitle">{{loadError}}</view>
-    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
-  </view>
-
-  <view class="surface empty-card" wx:if="{{!loading && !loadError && tasks.length === 0}}">
-    <view class="state-title">暂无维修工单</view>
-    <view class="section-subtitle">设备、设施和环境维修任务派发后会出现在这里。</view>
-  </view>
+  <state-view
+    loading="{{loading}}"
+    error="{{loadError}}"
+    empty="{{!loading && !loadError && tasks.length === 0}}"
+    empty-text="暂无维修工单"
+    empty-hint="设备、设施和环境维修任务派发后会出现在这里。"
+    skeleton-rows="{{3}}"
+    bindretry="loadData"
+  />
 
   <view wx:if="{{!loading && !loadError && tasks.length}}">
     <view class="surface task-card">

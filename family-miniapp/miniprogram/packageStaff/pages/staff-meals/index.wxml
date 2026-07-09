@@ -2,20 +2,15 @@
   <view class="section-title">送餐签收</view>
   <view class="section-subtitle">餐别核对、禁忌确认、扫码/拍照留痕和餐量反馈，一线送餐闭环在这里完成</view>
 
-  <view class="surface state-card" wx:if="{{loading}}">
-    <view class="state-title">正在加载送餐任务</view>
-  </view>
-
-  <view class="surface state-card" wx:if="{{!loading && loadError}}">
-    <view class="state-title">送餐任务加载失败</view>
-    <view class="section-subtitle">{{loadError}}</view>
-    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
-  </view>
-
-  <view class="surface empty-card" wx:if="{{!loading && !loadError && tasks.length === 0}}">
-    <view class="state-title">暂无送餐任务</view>
-    <view class="section-subtitle">午餐、晚餐或特殊餐生成后会出现在这里。</view>
-  </view>
+  <state-view
+    loading="{{loading}}"
+    error="{{loadError}}"
+    empty="{{!loading && !loadError && tasks.length === 0}}"
+    empty-text="暂无送餐任务"
+    empty-hint="午餐、晚餐或特殊餐生成后会出现在这里。"
+    skeleton-rows="{{3}}"
+    bindretry="loadData"
+  />
 
   <view wx:if="{{!loading && !loadError && tasks.length}}">
     <view class="surface task-card">

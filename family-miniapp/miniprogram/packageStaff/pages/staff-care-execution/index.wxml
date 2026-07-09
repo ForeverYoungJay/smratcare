@@ -2,20 +2,15 @@
   <view class="section-title">护理执行</view>
   <view class="section-subtitle">床号核对、护理项目、皮肤/精神状态、风险观察、耗材和交接提示一并留痕</view>
 
-  <view class="surface state-card" wx:if="{{loading}}">
-    <view class="state-title">正在加载护理任务</view>
-  </view>
-
-  <view class="surface state-card" wx:if="{{!loading && loadError}}">
-    <view class="state-title">护理任务加载失败</view>
-    <view class="section-subtitle">{{loadError}}</view>
-    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
-  </view>
-
-  <view class="surface empty-card" wx:if="{{!loading && !loadError && tasks.length === 0}}">
-    <view class="state-title">暂无护理任务</view>
-    <view class="section-subtitle">护理计划生成或派发后会出现在这里。</view>
-  </view>
+  <state-view
+    loading="{{loading}}"
+    error="{{loadError}}"
+    empty="{{!loading && !loadError && tasks.length === 0}}"
+    empty-text="暂无护理任务"
+    empty-hint="护理计划生成或派发后会出现在这里。"
+    skeleton-rows="{{3}}"
+    bindretry="loadData"
+  />
 
   <view wx:if="{{!loading && !loadError && tasks.length}}">
     <view class="surface task-card">

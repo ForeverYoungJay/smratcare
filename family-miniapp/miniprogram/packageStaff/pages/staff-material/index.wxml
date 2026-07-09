@@ -51,20 +51,15 @@
     <button class="primary-btn submit-btn" loading="{{submitting}}" bindtap="submitMaterial">提交申领</button>
   </view>
 
-  <view class="surface state-card" wx:if="{{loading}}">
-    <view class="state-title">正在加载申领记录</view>
-  </view>
-
-  <view class="surface state-card" wx:if="{{!loading && loadError}}">
-    <view class="state-title">申领记录加载失败</view>
-    <view class="section-subtitle">{{loadError}}</view>
-    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
-  </view>
-
-  <view class="surface empty-card" wx:if="{{!loading && !loadError && approvals.length === 0}}">
-    <view class="state-title">暂无申领记录</view>
-    <view class="section-subtitle">提交后可在这里查看审批状态。</view>
-  </view>
+  <state-view
+    loading="{{loading}}"
+    error="{{loadError}}"
+    empty="{{!loading && !loadError && approvals.length === 0}}"
+    empty-text="暂无申领记录"
+    empty-hint="提交后可在这里查看审批状态。"
+    skeleton-rows="{{3}}"
+    bindretry="loadData"
+  />
 
   <view wx:if="{{!loading && !loadError && approvals.length}}">
     <block wx:for="{{approvals}}" wx:key="id">

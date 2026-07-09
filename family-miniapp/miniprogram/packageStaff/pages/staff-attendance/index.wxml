@@ -11,15 +11,12 @@
     <view class="month-picker">月份：{{month || overview.month || '当前月'}}</view>
   </picker>
 
-  <view class="surface state-card" wx:if="{{loading}}">
-    <view class="state-title">正在加载考勤</view>
-  </view>
-
-  <view class="surface state-card" wx:if="{{!loading && loadError}}">
-    <view class="state-title">加载失败</view>
-    <view class="section-subtitle">{{loadError}}</view>
-    <button class="ghost-btn retry-btn" bindtap="loadData">重新加载</button>
-  </view>
+  <state-view
+    loading="{{loading}}"
+    error="{{loadError}}"
+    skeleton-rows="{{3}}"
+    bindretry="loadData"
+  />
 
   <view wx:if="{{!loading && !loadError && overview}}">
     <view class="surface today-card">
