@@ -99,7 +99,7 @@
 
           <div class="command-column">
             <div class="command-column__head">
-              <strong>今日风险闭环</strong>
+              <strong>风险闭环</strong>
               <span>护理、健康、后勤与审批 SLA</span>
             </div>
             <button
@@ -539,9 +539,10 @@ function birthdayMonthMatches(item?: BirthdayReminder | null, month = dayjs().mo
   return parsed.isValid() && parsed.month() + 1 === month
 }
 
-const todayAlertCount = computed(() => {
+// 未闭环风险：体检异常/跟进中 + 未闭环事故 + 维修超时工单，口径与「运营统计-安全风险」页一致
+const openRiskCount = computed(() => {
   return numberValue(portal.value?.healthAbnormalCount) +
-    numberValue(portal.value?.elderAbnormalCount) +
+    numberValue(portal.value?.incidentOpenCount) +
     numberValue(logistics.value?.maintenanceOverdueCount)
 })
 
@@ -566,7 +567,7 @@ const occupancyHealth = computed(() => {
 })
 
 const commandCenterStatus = computed(() => {
-  if (todayAlertCount.value > 0 || numberValue(portal.value?.overdueTodoCount) > 0) {
+  if (openRiskCount.value > 0 || numberValue(portal.value?.overdueTodoCount) > 0) {
     return { text: '今日需闭环', tone: 'warning' as const }
   }
   return { text: '运行平稳', tone: 'normal' as const }
@@ -619,10 +620,10 @@ const commandScoreCards = computed(() => ([
   },
   {
     key: 'risk',
-    label: '风险事件',
-    value: displayNumber(todayAlertCount.value),
-    helper: '健康异常、长者异常、逾期工单',
-    tone: todayAlertCount.value > 0 ? 'danger' as const : 'success' as const,
+    label: '未闭环风险',
+    value: displayNumber(openRiskCount.value),
+    helper: '体检异常、未闭环事故、维修超时工单',
+    tone: openRiskCount.value > 0 ? 'danger' as const : 'success' as const,
     path: '/stats/operations?tab=safety'
   }
 ]))
@@ -668,7 +669,7 @@ const riskClosureItems = computed(() => ([
   },
   {
     title: '健康复核',
-    desc: `异常生命体征 ${displayNumber(portal.value?.healthAbnormalCount)} 条，需要医护复核与交班记录。`,
+    desc: `体检异常未闭环 ${displayNumber(portal.value?.healthAbnormalCount)} 条，需要医护复核与交班记录。`,
     tag: numberValue(portal.value?.healthAbnormalCount) > 0 ? '待复核' : '已清空',
     tone: numberValue(portal.value?.healthAbnormalCount) > 0 ? 'warning' as const : 'offline' as const,
     path: '/medical-care/handovers'
@@ -694,7 +695,7 @@ const fallbackBusinessLandingFlow = computed(() => ([
   { index: '02', title: '能力评估', desc: 'ADL、认知、自理和持续评估驱动护理等级。', tag: '评估', tone: 'normal' as const, path: '/elder/assessment' },
   { index: '03', title: '护理计划执行', desc: '计划、任务、打卡、异常、质检和交接班闭环。', tag: `${displayNumber(dashboard.value?.careTasksToday)} 项`, tone: 'pending' as const, path: '/medical-care/care-task-board' },
   { index: '04', title: '健康用药', desc: '生命体征、医嘱、发药、漏服提醒和慢病趋势。', tag: `${displayNumber(portal.value?.healthAbnormalCount)} 异常`, tone: numberValue(portal.value?.healthAbnormalCount) > 0 ? 'warning' as const : 'offline' as const, path: '/health/management/data' },
-  { index: '05', title: '安全事件', desc: '跌倒、离床、走失、压疮、感染和应急预案。', tag: `${displayNumber(todayAlertCount.value)} 件`, tone: todayAlertCount.value > 0 ? 'danger' as const : 'offline' as const, path: '/stats/operations?tab=safety' },
+  { index: '05', title: '安全事件', desc: '跌倒、离床、走失、压疮、感染和应急预案。', tag: `${displayNumber(openRiskCount.value)} 件`, tone: openRiskCount.value > 0 ? 'danger' as const : 'offline' as const, path: '/stats/operations?tab=safety' },
   { index: '06', title: '家属连接', desc: '探访、缴费、动态、投诉建议和生日关怀。', tag: `${displayNumber(birthdayStats.value.next7Days)} 生日`, tone: birthdayStats.value.next7Days > 0 ? 'pending' as const : 'offline' as const, path: '/oa/life/birthday' },
   { index: '07', title: '经营复盘', desc: '床位、收入、服务质量、人效和风险月报。', tag: '复盘', tone: 'normal' as const, path: '/stats/org/monthly-operation' }
 ]))
@@ -739,13 +740,13 @@ const pendingTotal = computed(() =>
 // 首屏只突出四组最关键的经营与安全指标，其余下沉到「更多机构概览」。
 const primaryMetrics = computed(() => ([
   {
-    label: '今日风险',
-    value: displayNumber(todayAlertCount.value),
-    helper: '生命体征异常 · 长者异常 · 逾期工单',
-    tone: todayAlertCount.value > 0 ? 'danger' as const : 'success' as const,
+    label: '未闭环风险',
+    value: displayNumber(openRiskCount.value),
+    helper: '体检异常 · 未闭环事故 · 维修超时工单',
+    tone: openRiskCount.value > 0 ? 'danger' as const : 'success' as const,
     path: '/stats/operations?tab=safety',
-    statusText: todayAlertCount.value > 0 ? '需立即处理' : '平稳',
-    statusTone: todayAlertCount.value > 0 ? 'danger' as const : 'normal' as const
+    statusText: openRiskCount.value > 0 ? '需闭环处理' : '平稳',
+    statusTone: openRiskCount.value > 0 ? 'danger' as const : 'normal' as const
   },
   {
     label: '待处理事项',
@@ -800,7 +801,7 @@ const secondaryMetrics = computed(() => ([
     value: '--',
     helper: '待设备遥测接入',
     tone: 'default' as const,
-    path: '/logistics/equipment',
+    path: '/logistics/maintenance/assets',
     statusText: '待接入',
     statusTone: 'offline' as const
   }
@@ -811,15 +812,15 @@ const alertFocusCards = computed(() => ([
     avatar: '高',
     title: '高风险长者',
     subtitle: '重点关注跌倒、离床、异常波动等高风险对象。',
-    meta: [`当前关注 ${displayNumber(portal.value?.elderAbnormalCount)}`, '名单待具体接口接入'],
+    meta: [`当前关注 ${displayNumber(portal.value?.elderAbnormalCount)}`, '按未闭环体检异常涉及长者去重统计'],
     tagText: numberValue(portal.value?.elderAbnormalCount) > 0 ? '高优先级' : '暂平稳',
     tagTone: numberValue(portal.value?.elderAbnormalCount) > 0 ? 'danger' as const : 'normal' as const,
-    path: '/elder/resident-360'
+    path: '/health/inspection?status=OPEN'
   },
   {
     avatar: '体',
-    title: '今日异常生命体征',
-    subtitle: '聚焦今日体温、血压、血氧等异常记录。',
+    title: '体检异常未闭环',
+    subtitle: '聚焦体温、血压、血氧等异常与跟进中记录。',
     meta: [`异常 ${displayNumber(portal.value?.healthAbnormalCount)}`, '需护理与医生复核'],
     tagText: numberValue(portal.value?.healthAbnormalCount) > 0 ? '待复核' : '正常',
     tagTone: numberValue(portal.value?.healthAbnormalCount) > 0 ? 'warning' as const : 'normal' as const,
@@ -829,9 +830,9 @@ const alertFocusCards = computed(() => ([
     avatar: '护',
     title: '跌倒 / 离床 / 呼叫预警',
     subtitle: '行为类预警统一收束到处置视线，不再散落在不同模块。',
-    meta: [`预警 ${displayNumber(todayAlertCount.value)}`, '缺少名单时保持占位显示'],
-    tagText: todayAlertCount.value > 0 ? '待处置' : '已清空',
-    tagTone: todayAlertCount.value > 0 ? 'danger' as const : 'normal' as const,
+    meta: [`预警 ${displayNumber(openRiskCount.value)}`, '缺少名单时保持占位显示'],
+    tagText: openRiskCount.value > 0 ? '待处置' : '已清空',
+    tagTone: openRiskCount.value > 0 ? 'danger' as const : 'normal' as const,
     path: '/stats/operations?tab=safety'
   }
 ]))
@@ -988,11 +989,13 @@ function openBirthdayProfile(record: BirthdayReminder) {
     router.push(`/elder/detail/${record.elderId}`)
     return
   }
-  router.push(`/elder/list?keyword=${encodeURIComponent(record.elderName || '')}`)
+  router.push(`/elder/list?fullName=${encodeURIComponent(record.elderName || '')}`)
 }
 
 function openBirthdayMaterialForRecord(record: BirthdayReminder) {
-  router.push(`/inventory/outbound?scene=birthday&elderName=${encodeURIComponent(record.elderName || '')}`)
+  // 出库页按 elderId 过滤并直接打开出库单（elderName/scene 参数目标页不识别）
+  const elderQuery = record.elderId != null ? `elderId=${record.elderId}&` : ''
+  router.push(`/logistics/storage/outbound?${elderQuery}openCreate=1`)
 }
 
 function openBirthdayActivityForRecord(record: BirthdayReminder) {
@@ -1009,9 +1012,9 @@ function launchMonthlyBirthdayActivity() {
 }
 
 function openBirthdayMaterialPrep() {
-  const firstName = birthdayMonthList.value[0]?.elderName || birthdayPreviewList.value[0]?.elderName
-  const query = firstName ? `&elderName=${encodeURIComponent(firstName)}` : ''
-  router.push(`/inventory/outbound?scene=birthday${query}`)
+  const firstElderId = birthdayMonthList.value[0]?.elderId ?? birthdayPreviewList.value[0]?.elderId
+  const query = firstElderId != null ? `?elderId=${firstElderId}` : ''
+  router.push(`/logistics/storage/outbound${query}`)
 }
 
 function printBirthdayRows(title: string, rows: BirthdayReminder[]) {

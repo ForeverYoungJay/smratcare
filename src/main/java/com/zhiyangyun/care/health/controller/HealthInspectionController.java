@@ -37,6 +37,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/health/inspection")
 public class HealthInspectionController {
   private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+  /** 查询状态 OPEN 表示未闭环聚合：异常 + 跟进中。 */
+  private static final List<String> OPEN_FILTER_STATUSES = List.of("ABNORMAL", "FOLLOWING");
   private final HealthInspectionMapper mapper;
   private final HealthNursingLogMapper nursingLogMapper;
   private final ElderResolveSupport elderResolveSupport;
@@ -70,7 +72,7 @@ public class HealthInspectionController {
         AuthContext.getOrgId(),
         inspectionId,
         elderId,
-        normalizeStatusFilter(status),
+        normalizeQueryStatusFilter(status),
         inspectionFrom,
         inspectionTo,
         normalizeText(keyword));
@@ -87,7 +89,7 @@ public class HealthInspectionController {
       @RequestParam(required = false) String inspectionTo,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
-    String normalizedStatus = normalizeStatusFilter(status);
+    String normalizedStatus = normalizeQueryStatusFilter(status);
     String normalizedKeyword = normalizeText(keyword);
     LocalDate from = parseDate(inspectionFrom);
     LocalDate to = parseDate(inspectionTo);
@@ -114,7 +116,8 @@ public class HealthInspectionController {
         .eq(orgId != null, "org_id", orgId)
         .eq(inspectionId != null, "id", inspectionId)
         .eq(elderId != null, "elder_id", elderId)
-        .eq(normalizedStatus != null && !normalizedStatus.isBlank(), "status", normalizedStatus)
+        .in("OPEN".equals(normalizedStatus), "status", OPEN_FILTER_STATUSES)
+        .eq(normalizedStatus != null && !normalizedStatus.isBlank() && !"OPEN".equals(normalizedStatus), "status", normalizedStatus)
         .ge(from != null, "inspection_date", from)
         .le(to != null, "inspection_date", to)
         .groupBy("status")
@@ -230,7 +233,8 @@ public class HealthInspectionController {
         .eq(orgId != null, HealthInspection::getOrgId, orgId)
         .eq(inspectionId != null, HealthInspection::getId, inspectionId)
         .eq(elderId != null, HealthInspection::getElderId, elderId)
-        .eq(status != null && !status.isBlank(), HealthInspection::getStatus, status)
+        .in("OPEN".equals(status), HealthInspection::getStatus, OPEN_FILTER_STATUSES)
+        .eq(status != null && !status.isBlank() && !"OPEN".equals(status), HealthInspection::getStatus, status)
         .ge(from != null, HealthInspection::getInspectionDate, from)
         .le(to != null, HealthInspection::getInspectionDate, to);
     if (keyword != null && !keyword.isBlank()) {
@@ -267,6 +271,15 @@ public class HealthInspectionController {
       return "ABNORMAL";
     }
     return "NORMAL";
+  }
+
+  /** 列表/汇总查询专用：在具体状态之外额外支持 OPEN（= ABNORMAL + FOLLOWING）聚合筛选。 */
+  private String normalizeQueryStatusFilter(String status) {
+    String normalized = normalizeText(status);
+    if (normalized != null && "OPEN".equalsIgnoreCase(normalized)) {
+      return "OPEN";
+    }
+    return normalizeStatusFilter(status);
   }
 
   private String normalizeStatusFilter(String status) {

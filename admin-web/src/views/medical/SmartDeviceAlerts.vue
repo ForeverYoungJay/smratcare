@@ -138,6 +138,7 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
@@ -395,6 +396,17 @@ function statusText(status: string) {
 
 function statusColor(status: string) {
   return ({ OPEN: 'red', ACKNOWLEDGED: 'blue', RESOLVED: 'green' } as Record<string, string>)[status] || 'default'
+}
+
+// 支持从安全风险页带 ?status= / ?level= 直达对应筛选
+const route = useRoute()
+const initialAlertStatus = String(route.query.status || '').toUpperCase()
+if (['OPEN', 'ACKNOWLEDGED', 'RESOLVED'].includes(initialAlertStatus)) {
+  alertQuery.status = initialAlertStatus
+}
+const initialAlertLevel = String(route.query.level || '').toUpperCase()
+if (['CRITICAL', 'HIGH', 'WARNING'].includes(initialAlertLevel)) {
+  alertQuery.level = initialAlertLevel
 }
 
 onMounted(fetchAll)

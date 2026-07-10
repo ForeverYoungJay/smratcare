@@ -1,6 +1,5 @@
 package com.zhiyangyun.care;
 
-import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -44,14 +43,20 @@ class OaPortalControllerTest {
   void summary_uses_elder_contract_and_medical_counts() throws Exception {
     String token = loginAndGetToken("admin", "123456");
 
-    mockMvc.perform(get("/api/oa/portal/summary")
+    String body = mockMvc.perform(get("/api/oa/portal/summary")
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code", is(0)))
-        .andExpect(jsonPath("$.data.pendingMedicalOrderCount", greaterThanOrEqualTo(1)))
-        .andExpect(jsonPath("$.data.elderContractExpiringCount", greaterThanOrEqualTo(1)))
-        .andExpect(jsonPath("$.data.healthAbnormalCount", greaterThanOrEqualTo(1)))
-        .andExpect(jsonPath("$.data.elderAbnormalCount", is(0)));
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+
+    // Long 字段经 JacksonLongToStringConfig 序列化为字符串，需解析后做数值断言
+    JsonNode data = objectMapper.readTree(body).path("data");
+    org.junit.jupiter.api.Assertions.assertTrue(data.path("pendingMedicalOrderCount").asLong() >= 1, "pendingMedicalOrderCount");
+    org.junit.jupiter.api.Assertions.assertTrue(data.path("elderContractExpiringCount").asLong() >= 1, "elderContractExpiringCount");
+    org.junit.jupiter.api.Assertions.assertTrue(data.path("healthAbnormalCount").asLong() >= 1, "healthAbnormalCount");
+    org.junit.jupiter.api.Assertions.assertTrue(data.path("elderAbnormalCount").asLong() >= 1, "elderAbnormalCount");
   }
 
   private String loginAndGetToken(String username, String password) throws Exception {

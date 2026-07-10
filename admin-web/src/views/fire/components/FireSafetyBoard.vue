@@ -370,6 +370,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import dayjs, { Dayjs } from 'dayjs'
 import QRCode from 'qrcode'
 import { message, Modal } from 'ant-design-vue'
@@ -1243,5 +1244,11 @@ onUnmounted(() => {
   }
 })
 
+// 支持从安全风险页带 ?status=OPEN|RUNNING|CLOSED 直达对应筛选
+const route = useRoute()
+const initialStatus = String(route.query.status || '').toUpperCase()
+if (statusOptions.some((item) => item.value === initialStatus)) {
+  query.status = initialStatus as FireSafetyStatus
+}
 fetchData()
 </script>

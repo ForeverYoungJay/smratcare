@@ -74,7 +74,7 @@
 
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="长者"><ElderNameAutocomplete v-model:value="query.keyword" placeholder="姓名(编号)" width="220px" /></a-form-item>
-      <a-form-item label="状态"><a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 180px" /></a-form-item>
+      <a-form-item label="状态"><a-select v-model:value="query.status" :options="filterStatusOptions" allow-clear style="width: 180px" /></a-form-item>
       <a-form-item label="日期">
         <a-range-picker v-model:value="query.inspectionRange" style="width: 280px" />
       </a-form-item>
@@ -518,6 +518,11 @@ const statusOptions = [
   { label: '异常', value: 'ABNORMAL' },
   { label: '跟进中', value: 'FOLLOWING' },
   { label: '已关闭', value: 'CLOSED' }
+]
+// 列表筛选比录入表单多一个「未闭环」聚合项（异常+跟进中），供首页风险卡片下钻
+const filterStatusOptions = [
+  { label: '未闭环（异常+跟进中）', value: 'OPEN' },
+  ...statusOptions
 ]
 const board = reactive({
   floor: '',
@@ -1330,6 +1335,11 @@ async function loadExportRecords() {
   }
 }
 
+// 支持从首页/安全风险页带 ?status=OPEN|ABNORMAL|... 直达对应筛选
+const initialStatusFilter = String(route.query.status || '').toUpperCase()
+if (filterStatusOptions.some((item) => item.value === initialStatusFilter)) {
+  query.status = initialStatusFilter
+}
 fetchData()
 searchElders('')
 loadVitalThresholds()

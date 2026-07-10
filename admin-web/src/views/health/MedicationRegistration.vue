@@ -593,6 +593,10 @@ async function loadExportRecords() {
   }
 }
 
+// 支持从安全风险/员工台账页带 ?date=today 直达今日登记记录
+if (String(route.query.date || '').toLowerCase() === 'today') {
+  query.registerRange = [dayjs(), dayjs()]
+}
 fetchData()
 fetchMedicationTasks()
 searchElders('')

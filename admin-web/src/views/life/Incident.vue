@@ -134,6 +134,7 @@
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
@@ -355,6 +356,16 @@ async function exportRows() {
   })
 }
 
+// 支持从首页/安全风险页带 ?status=OPEN|CLOSED、?level=NORMAL|MAJOR 直达对应筛选
+const route = useRoute()
+const initialStatus = String(route.query.status || '').toUpperCase()
+if (statusOptions.some((item) => item.value === initialStatus)) {
+  query.status = initialStatus as IncidentStatus
+}
+const initialLevel = String(route.query.level || '').toUpperCase()
+if (levelOptions.some((item) => item.value === initialLevel)) {
+  query.level = initialLevel as IncidentLevel
+}
 fetchData()
 searchElders('')
 </script>
