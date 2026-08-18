@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="财务提醒中心" subTitle="下月代养费、押金未缴清、电费未登记/未缴的统一处置入口">
+  <div class="reminder-panel">
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline" :model="query">
         <a-form-item label="状态">
@@ -104,14 +104,13 @@
         />
       </div>
     </a-card>
-  </PageContainer>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
-import PageContainer from '../../components/PageContainer.vue'
 import {
   generateReminders,
   getReminderPage,
@@ -120,8 +119,8 @@ import {
   handleReminder,
   type FinanceReminderItem,
   type FinanceReminderSummary
-} from '../../api/financeReminder'
-import type { PageResult } from '../../types'
+} from '../../../api/financeReminder'
+import type { PageResult } from '../../../types'
 
 const router = useRouter()
 const loading = ref(false)

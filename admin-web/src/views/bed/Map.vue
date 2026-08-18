@@ -66,6 +66,7 @@
         <a-space wrap>
           <a-radio-group v-model:value="viewMode" button-style="solid">
             <a-radio-button value="grid">楼栋分层图</a-radio-button>
+            <a-radio-button value="plan">楼层平面图</a-radio-button>
             <a-radio-button value="list">卡片列表</a-radio-button>
           </a-radio-group>
           <a-button @click="openBedManage">床位管理</a-button>
@@ -157,6 +158,9 @@
           </section>
         </div>
       </div>
+
+      <!-- 平面图与分层图共用本页筛选与入口，仅布局与着色维度不同 -->
+      <FloorPlanBoard v-else-if="viewMode === 'plan'" />
 
       <template v-else>
         <a-row :gutter="16">
@@ -269,6 +273,7 @@ import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import BedInfoCard from '../../components/bed/BedInfoCard.vue'
+import FloorPlanBoard from './components/FloorPlanBoard.vue'
 import { updateRoomSort } from '../../api/bed'
 import { getElderDetail } from '../../api/elder'
 import { useBedMapDataset } from '../../composables/useBedMapDataset'
@@ -328,7 +333,12 @@ const roomDrag = reactive({
   overKey: '',
   saving: false
 })
-const viewMode = ref<'grid' | 'list'>('grid')
+const viewMode = ref<'grid' | 'plan' | 'list'>(
+  ((): 'grid' | 'plan' | 'list' => {
+    const raw = String(route.query.view || '').trim().toLowerCase()
+    return raw === 'plan' || raw === 'list' ? raw : 'grid'
+  })()
+)
 const matrixQuickFilter = ref<'all' | 'idle' | 'occupied'>('all')
 const selectedBuilding = ref('')
 const selectedFloor = ref('')

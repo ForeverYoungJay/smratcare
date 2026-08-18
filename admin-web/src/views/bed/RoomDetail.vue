@@ -19,6 +19,39 @@
       </div>
     </a-card>
 
+    <a-card class="card-elevated room-ops-card" :bordered="false" style="margin-top: 16px;">
+      <div class="room-ops-card__head">
+        <div>
+          <strong>房间经营</strong>
+          <small>该房间在所选账期的收入、成本与净额；跨房间对比见财务报表的「楼层房间收支」。</small>
+        </div>
+        <a-date-picker v-model:value="opsMonth" picker="month" :allow-clear="false" style="width: 150px" />
+      </div>
+      <a-spin :spinning="opsLoading">
+        <a-row :gutter="[16, 16]">
+          <a-col :xs="24" :sm="12" :xl="6">
+            <a-statistic title="收入" :value="Number(ops?.income || 0)" :precision="2" suffix="元" />
+          </a-col>
+          <a-col :xs="24" :sm="12" :xl="6">
+            <a-statistic title="成本" :value="Number(ops?.cost || 0)" :precision="2" suffix="元" />
+          </a-col>
+          <a-col :xs="24" :sm="12" :xl="6">
+            <a-statistic
+              title="净额"
+              :value="Number(ops?.netAmount || 0)"
+              :precision="2"
+              suffix="元"
+              :value-style="Number(ops?.netAmount || 0) < 0 ? { color: '#cf1322' } : undefined"
+            />
+          </a-col>
+          <a-col :xs="24" :sm="12" :xl="6">
+            <a-statistic title="在住 / 空床" :value="`${Number(ops?.occupiedBeds || 0)} / ${Number(ops?.emptyBeds || 0)}`" />
+          </a-col>
+        </a-row>
+        <a-empty v-if="!ops" description="该账期没有这间房的经营数据" :image="undefined" />
+      </a-spin>
+    </a-card>
+
     <a-row :gutter="16" style="margin-top: 16px;">
       <a-col :xs="24" :md="7" :xl="6">
         <a-card class="card-elevated" title="在住长者" :bordered="false">
@@ -212,6 +245,7 @@ import { getRoomList, updateRoom } from '../../api/bed'
 import { getElderDetail, uploadElderFile } from '../../api/elder'
 import { getFamilyRelations } from '../../api/family'
 import { getBillPage } from '../../api/bill'
+import { getFinanceRoomOpsDetail } from '../../api/finance'
 import { getFloorPlan, type FloorPlanResident, type FloorPlanRoom } from '../../api/floorPlan'
 import {
   createElderFileArchive,
@@ -221,12 +255,15 @@ import {
 } from '../../api/elderFileArchive'
 import { getDepositTransactions } from '../../api/deposit'
 import request from '../../utils/request'
-import type { Id, RoomItem } from '../../types'
+import type { FinanceRoomOpsDetailRow, Id, RoomItem } from '../../types'
 
 const route = useRoute()
 const router = useRouter()
 
 const roomId = computed(() => String(route.query.roomId || ''))
+const opsMonth = ref<any>(dayjs().startOf('month'))
+const opsLoading = ref(false)
+const ops = ref<FinanceRoomOpsDetailRow | null>(null)
 const loading = ref(false)
 const room = ref<RoomItem | null>(null)
 const planRoom = ref<FloorPlanRoom | null>(null)
@@ -311,6 +348,29 @@ function categoryColor(category: string) {
   }
 }
 
+/** 房间经营：复用财务 room-ops 接口，按楼栋+房间取本房间那一行 */
+async function loadRoomOps() {
+  const current = room.value
+  if (!current) {
+    ops.value = null
+    return
+  }
+  opsLoading.value = true
+  try {
+    const res = await getFinanceRoomOpsDetail({
+      period: dayjs(opsMonth.value).format('YYYY-MM'),
+      building: current.building || undefined,
+      room: current.roomNo || undefined
+    })
+    const rows = res?.rows || []
+    ops.value = rows.find((item) => String(item.roomNo || '') === String(current.roomNo || '')) || rows[0] || null
+  } catch {
+    ops.value = null
+  } finally {
+    opsLoading.value = false
+  }
+}
+
 async function loadRoom() {
   if (!roomId.value) return
   loading.value = true
@@ -330,6 +390,7 @@ async function loadRoom() {
     } else {
       activeElderId.value = undefined
     }
+    await loadRoomOps()
   } finally {
     loading.value = false
   }
@@ -475,6 +536,8 @@ async function submitRoomEdit() {
 
 watch(roomId, () => loadRoom())
 
+watch(opsMonth, () => loadRoomOps())
+
 onMounted(loadRoom)
 </script>
 
@@ -543,5 +606,20 @@ onMounted(loadRoom)
   flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 12px;
+}
+
+.room-ops-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.room-ops-card__head small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-tertiary, #999);
 }
 </style>

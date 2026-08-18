@@ -7,6 +7,13 @@ import { resetBedMapDatasetState } from '../../composables/useBedMapDataset'
 const getBedMap = vi.hoisted(() => vi.fn())
 const getBaseConfigItemList = vi.hoisted(() => vi.fn())
 
+vi.mock('./components/FloorPlanBoard.vue', () => ({
+  default: {
+    name: 'FloorPlanBoard',
+    template: '<div class="floor-plan-board-stub"></div>'
+  }
+}))
+
 vi.mock('../../api/bed', () => ({
   getBedMap
 }))

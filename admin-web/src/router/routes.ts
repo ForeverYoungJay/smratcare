@@ -390,10 +390,11 @@ export const routes: RouteRecordRaw[] = [
                 meta: { title: '房态图' }
               },
               {
+                // 平面图已并入房态图，作为其「楼层平面图」布局；旧入口保留为重定向，不破坏书签与既有跳转
                 path: 'floor-plan',
                 name: 'LogisticsFloorPlan',
-                component: () => import('../views/bed/FloorPlan.vue'),
-                meta: { title: '楼栋平面图' }
+                redirect: { name: 'LogisticsRoomStateMap', query: { view: 'plan' } },
+                meta: { title: '楼栋平面图（已并入房态图）', hidden: true }
               },
               {
                 path: 'room-detail',
@@ -869,16 +870,18 @@ export const routes: RouteRecordRaw[] = [
                 meta: { title: '押金管理' }
               },
               {
+                // 提醒中心已与催缴跟进合并为「欠费与提醒中心」，旧入口保留为重定向
                 path: '/finance/reminder-center',
                 name: 'FinanceReminderCenter',
-                component: () => import('../views/finance/ReminderCenter.vue'),
-                meta: { title: '财务提醒中心' }
+                redirect: { path: '/finance/bills/follow-up', query: { tab: 'reminder' } },
+                meta: { title: '财务提醒中心（已并入欠费与提醒中心）', hidden: true }
               },
               {
+                // Excel 报表已并入经营分析的标签导航，旧入口保留为重定向
                 path: '/finance/excel-reports',
                 name: 'FinanceExcelReports',
-                component: () => import('../views/finance/ExcelReports.vue'),
-                meta: { title: 'Excel 报表' }
+                redirect: '/finance/reports/excel',
+                meta: { title: 'Excel 报表（已并入经营分析）', hidden: true }
               },
               {
                 path: '/finance/accounts/warning-rules',
@@ -1008,8 +1011,8 @@ export const routes: RouteRecordRaw[] = [
               {
                 path: '/finance/bills/follow-up',
                 name: 'FinanceBillsFollowUp',
-                component: () => import('../views/finance/FinanceCollectionFollowUp.vue'),
-                meta: { title: '欠费催缴跟进' }
+                component: () => import('../views/finance/CollectionCenter.vue'),
+                meta: { title: '欠费与提醒中心' }
               },
               {
                 path: '/finance/bills/auto-deduct',
@@ -1118,16 +1121,16 @@ export const routes: RouteRecordRaw[] = [
                 meta: { title: '楼层房间收支' }
               },
               {
-                path: 'room-ops-detail',
-                name: 'FinanceReportsRoomOpsDetail',
-                component: () => import('../views/finance/RoomOpsDetail.vue'),
-                meta: { title: '房间经营详情' }
-              },
-              {
                 path: 'occupancy-consumption',
                 name: 'FinanceReportsOccupancyConsumption',
                 component: () => import('../views/finance/Report.vue'),
                 meta: { title: '入住与消费' }
+              },
+              {
+                path: 'excel',
+                name: 'FinanceReportsExcel',
+                component: () => import('../views/finance/Report.vue'),
+                meta: { title: 'Excel 报表' }
               },
               {
                 path: 'monthly-ops',

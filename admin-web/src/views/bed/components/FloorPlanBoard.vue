@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="楼栋平面图" subTitle="按楼层还原房间布局，走廊分隔南北朝向，颜色区分正常/欠费/空房/未启用">
+  <div class="floor-plan-board">
     <a-card class="card-elevated" :bordered="false">
       <div class="plan-toolbar">
         <a-space wrap>
@@ -149,15 +149,14 @@
         </a-space>
       </div>
     </a-modal>
-  </PageContainer>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { computed, h, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
-import PageContainer from '../../components/PageContainer.vue'
-import { getFloorPlan, type FloorPlanResponse, type FloorPlanRoom } from '../../api/floorPlan'
+import { getFloorPlan, type FloorPlanResponse, type FloorPlanRoom } from '../../../api/floorPlan'
 
 const router = useRouter()
 const loading = ref(false)

@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="Excel 报表" subTitle="四种 xlsx 报表，带表头标题、明细与合计行，可直接打印或上报">
+  <div class="excel-report-panel">
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline" :model="query">
         <a-form-item label="账期">
@@ -34,15 +34,14 @@
         </a-card>
       </a-col>
     </a-row>
-  </PageContainer>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import PageContainer from '../../components/PageContainer.vue'
-import { exportXlsxByRequest } from '../../utils/export'
+import { exportXlsxByRequest } from '../../../utils/export'
 
 type ReportItem = {
   key: string

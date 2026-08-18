@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="欠费催缴跟进" subTitle="按风险、账期和续约状态组织催缴动作">
+  <div class="collection-followup-panel">
     <div class="follow-shell">
       <a-card class="follow-hero card-elevated" :bordered="false">
         <div>
@@ -164,7 +164,7 @@
         </a-timeline-item>
       </a-timeline>
     </a-modal>
-  </PageContainer>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -172,10 +172,9 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
-import PageContainer from '../../components/PageContainer.vue'
-import StatefulBlock from '../../components/StatefulBlock.vue'
-import { exportFinanceCollectionFollowUpCsv, getFinanceCollectionFollowUpLogs, getFinanceCollectionFollowUpPage, handleFinanceCollectionFollowUp } from '../../api/finance'
-import type { FinanceCollectionFollowUpItem, FinanceHandleLogItem, PageResult } from '../../types'
+import StatefulBlock from '../../../components/StatefulBlock.vue'
+import { exportFinanceCollectionFollowUpCsv, getFinanceCollectionFollowUpLogs, getFinanceCollectionFollowUpPage, handleFinanceCollectionFollowUp } from '../../../api/finance'
+import type { FinanceCollectionFollowUpItem, FinanceHandleLogItem, PageResult } from '../../../types'
 
 const router = useRouter()
 const route = useRoute()

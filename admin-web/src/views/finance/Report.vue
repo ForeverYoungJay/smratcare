@@ -52,7 +52,10 @@
         </div>
       </section>
 
-      <StatefulBlock :loading="loading" :error="errorMessage" @retry="loadCharts">
+      <!-- Excel 报表并入本页作为一个标签，与图表报表共用同一导航 -->
+      <ExcelReportPanel v-if="isExcelTab" />
+
+      <StatefulBlock v-else :loading="loading" :error="errorMessage" @retry="loadCharts">
         <section class="metric-strip fade-up">
           <div v-for="item in metricCards" :key="item.label" class="metric-tile">
             <span>{{ item.label }}</span>
@@ -188,9 +191,9 @@
                 <strong>欠费催缴</strong>
                 <span>把欠费排行直接转成催缴跟进动作。</span>
               </button>
-              <button class="action-card" type="button" @click="go('/finance/reports/room-ops-detail?period=this_month')">
+              <button class="action-card" type="button" @click="go('/logistics/assets/room-state-map?view=plan')">
                 <strong>房间经营详情</strong>
-                <span>继续下钻到房间、楼栋和床位表现。</span>
+                <span>到房态图定位房间，单间的收入与净额在房间详情页里看。</span>
               </button>
             </div>
           </article>
@@ -293,6 +296,7 @@ import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import ExcelReportPanel from './components/ExcelReportPanel.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
 import { getFinanceArrearsTop, getFinanceCategoryConsumptionAnalysis, getFinanceMonthlyRevenue, getFinanceReportEntrySummary, getFinanceStoreSales } from '../../api/finance'
 import type {
@@ -362,8 +366,10 @@ const reportTabs = [
   { name: 'FinanceReportsRevenueStructure', path: '/finance/reports/revenue-structure', label: '营收结构', hint: '费用类目、营收占比、退款影响' },
   { name: 'FinanceReportsFloorRoom', path: '/finance/reports/floor-room-profit', label: '楼层房间', hint: '楼层、房间、空床损失和收支表现' },
   { name: 'FinanceReportsOccupancyConsumption', path: '/finance/reports/occupancy-consumption', label: '入住消费', hint: '入住、床位和消费联动情况' },
-  { name: 'FinanceReportsMonthlyOps', path: '/finance/reports/monthly-ops', label: '月运营', hint: '机构经营趋势和本月运营摘要' }
+  { name: 'FinanceReportsMonthlyOps', path: '/finance/reports/monthly-ops', label: '月运营', hint: '机构经营趋势和本月运营摘要' },
+  { name: 'FinanceReportsExcel', path: '/finance/reports/excel', label: 'Excel 报表', hint: '代养费登记表、押金台账、电费月报、催缴清单' }
 ]
+const isExcelTab = computed(() => route.name === 'FinanceReportsExcel')
 const rangePresets = [
   { key: 'thisMonth', label: '本月' },
   { key: 'last3', label: '近3个月' },
