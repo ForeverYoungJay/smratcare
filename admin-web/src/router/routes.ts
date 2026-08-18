@@ -851,6 +851,12 @@ export const routes: RouteRecordRaw[] = [
                 meta: { title: '电费管理' }
               },
               {
+                path: '/finance/deposit-management',
+                name: 'FinanceDepositManagement',
+                component: () => import('../views/finance/DepositManagement.vue'),
+                meta: { title: '押金管理' }
+              },
+              {
                 path: '/finance/accounts/warning-rules',
                 name: 'FinanceAccountsWarningRules',
                 component: () => import('../views/finance/BalanceWarningRules.vue'),
