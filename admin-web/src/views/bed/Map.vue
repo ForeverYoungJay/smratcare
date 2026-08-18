@@ -64,12 +64,136 @@
 
       <div class="view-switch">
         <a-space wrap>
+          <a-radio-group v-model:value="viewMode" button-style="solid">
+            <a-radio-button value="grid">楼栋分层图</a-radio-button>
+            <a-radio-button value="plan">楼层平面图</a-radio-button>
+            <a-radio-button value="list">卡片列表</a-radio-button>
+          </a-radio-group>
           <a-button @click="openBedManage">床位管理</a-button>
+        </a-space>
+        <a-radio-group v-if="viewMode === 'grid'" v-model:value="matrixQuickFilter" size="small" class="matrix-filter-switch">
+          <a-radio-button value="all">全部</a-radio-button>
+          <a-radio-button value="idle">仅空床</a-radio-button>
+          <a-radio-button value="occupied">仅入住</a-radio-button>
+        </a-radio-group>
+      </div>
+
+      <div v-if="viewMode === 'grid'" class="matrix-selection-bar">
+        <a-space wrap>
+          <a-tag color="blue" v-if="selectedBuilding">楼栋：{{ selectedBuilding }}</a-tag>
+          <a-tag color="cyan" v-if="selectedFloor">楼层：{{ selectedFloor }}</a-tag>
+          <span v-if="!selectedBuilding && !selectedFloor" class="matrix-tip">可点击楼栋头部与楼层条快速聚焦，不同楼层结构不会再混排</span>
+          <a-button size="small" v-if="selectedBuilding || selectedFloor" @click="clearMatrixSelection">清除楼层筛选</a-button>
         </a-space>
       </div>
 
-      <!-- 床位可视化统一为楼层平面图：矩阵与卡片列表布局已下线，其能力（房型/床位状态筛选、床位点击、二维码打印、房间拖拽排序）已并入平面图 -->
-      <FloorPlanBoard />
+      <div v-if="viewMode === 'grid'" class="tower-board">
+        <a-empty v-if="!displayBuildings.length" description="当前筛选下暂无房态数据" />
+        <div v-else class="tower-grid">
+          <section v-for="building in displayBuildings" :key="building.key" class="tower-building" :class="{ active: selectedBuilding === building.name }">
+            <button type="button" class="tower-building-head" @click="toggleBuilding(building.name)">
+              <div>
+                <div class="building-name">{{ building.name }}</div>
+                <div class="building-kpi">{{ building.floors.length }} 层 · {{ building.roomCount }} 间 · {{ building.bedCount }} 床</div>
+              </div>
+              <div class="building-trend">按楼独立加载</div>
+              <div v-if="resolveVisibleRemark(building.remark)" class="building-remark">{{ resolveVisibleRemark(building.remark) }}</div>
+            </button>
+            <div class="tower-building-body">
+              <div v-for="floor in building.floors" :key="floor.key" class="tower-floor" :class="{ active: selectedFloor === floor.label }">
+                <button type="button" class="tower-floor-badge" @click="toggleFloor(floor.label)">
+                  <span>{{ floor.label }}</span>
+                  <small>{{ floor.rooms.length }} 间</small>
+                </button>
+                <div class="tower-floor-content">
+                  <div
+                    v-for="room in floor.rooms"
+                    :key="room.key"
+                    class="room-cube"
+                    :class="{
+                      'is-drag-enabled': canDragFunctionalRoom(room),
+                      'is-drag-source': roomDrag.dragKey === room.key,
+                      'is-drop-target': roomDrag.overKey === room.key && roomDrag.dragKey !== room.key
+                    }"
+                    :draggable="canDragFunctionalRoom(room)"
+                    @dragstart="onFunctionalRoomDragStart(room)"
+                    @dragover.prevent="onFunctionalRoomDragOver(room)"
+                    @drop.prevent="onFunctionalRoomDrop(building.name, floor.label, room)"
+                    @dragend="onFunctionalRoomDragEnd"
+                    @dblclick="openRoomSceneDetail(room)"
+                  >
+                    <div class="room-head">
+                      <div>
+                        <div class="room-title">
+                          <span v-if="room.isFunctionalRoom" class="room-function-icon" aria-hidden="true">{{ resolveFunctionalRoomIcon(room.roomType) }}</span>
+                          <span>{{ room.roomNo }}</span>
+                        </div>
+                        <div v-if="room.isFunctionalRoom" class="room-function-name">{{ resolveRoomTypeLabel(room.roomType) }}</div>
+                      </div>
+                      <div class="room-meta" :class="{ functional: room.isFunctionalRoom }">
+                        {{ room.isFunctionalRoom ? '功能房' : room.wholeRoomRented ? `${room.occupiedBeds}/${room.totalBeds} 床 · 整租` : `${room.occupiedBeds}/${room.totalBeds} 床 · ${room.elderCount} 人` }}
+                      </div>
+                    </div>
+                    <div v-if="resolveVisibleRemark(room.remark)" class="room-remark">{{ resolveVisibleRemark(room.remark) }}</div>
+                    <div v-if="room.isFunctionalRoom" class="functional-room-panel">
+                      <div class="functional-room-badge">{{ resolveRoomTypeLabel(room.roomType) }}</div>
+                    </div>
+                    <div v-else class="bed-grid">
+                      <button
+                        v-for="bed in room.beds"
+                        :key="bed.id"
+                        type="button"
+                        class="bed-pill"
+                        :class="statusClass(bed.status, bed.elderId, bed.occupancySource)"
+                        @click="openBed(bed)"
+                      >
+                        {{ bed.bedNo }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- 平面图与分层图共用本页筛选与入口，仅布局与着色维度不同 -->
+      <FloorPlanBoard v-else-if="viewMode === 'plan'" />
+
+      <template v-else>
+        <a-row :gutter="16">
+          <a-col v-for="item in pagedListItems" :key="item.key" :xs="24" :sm="12" :md="8" :lg="6" :xl="4">
+            <template v-if="item.kind === 'bed'">
+              <BedInfoCard :bed="item.bed" @click="openBed(item.bed)" />
+            </template>
+            <template v-else>
+              <button type="button" class="functional-room-card" @click="openRoomSceneDetail(item.room)">
+                <div class="functional-room-card-head">
+                  <div class="functional-room-card-title">
+                    <span class="functional-room-card-icon" aria-hidden="true">{{ resolveFunctionalRoomIcon(item.room.roomType) }}</span>
+                    <span>{{ item.room.roomNo }}</span>
+                  </div>
+                  <div class="functional-room-card-chip">功能房</div>
+                </div>
+                <div class="functional-room-card-type">{{ resolveRoomTypeLabel(item.room.roomType) }}</div>
+                <div class="functional-room-card-copy">位置：{{ selectedBuilding || item.building }} / {{ selectedFloor || item.floor }}</div>
+                <div v-if="resolveVisibleRemark(item.room.remark)" class="functional-room-card-remark">{{ resolveVisibleRemark(item.room.remark) }}</div>
+              </button>
+            </template>
+          </a-col>
+        </a-row>
+
+        <a-pagination
+          style="margin-top: 16px; text-align: right;"
+          :current="query.pageNo"
+          :page-size="query.pageSize"
+          :total="listItems.length"
+          show-size-changer
+          @change="onPageChange"
+          @showSizeChange="onPageSizeChange"
+        />
+      </template>
     </a-card>
 
     <a-modal v-model:open="detailOpen" title="床位与老人详情" width="560px" @cancel="() => (detailOpen = false)">
