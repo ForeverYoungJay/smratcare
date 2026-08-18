@@ -377,6 +377,7 @@ public class ElderServiceImpl implements ElderService {
       String fullName,
       String idCardNo,
       String bedNo,
+      String roomNo,
       String careLevel,
       String sortBy,
       String sortOrder) {
@@ -402,15 +403,21 @@ public class ElderServiceImpl implements ElderService {
     String normalizedFullName = normalizeText(fullName);
     String normalizedIdCardNo = normalizeText(idCardNo);
     String normalizedBedNo = normalizeText(bedNo);
+    String normalizedRoomNo = normalizeText(roomNo);
     String normalizedCareLevel = normalizeText(careLevel);
+    // 房间号挂在床位关联的房间上，先一次性取回房间以免逐行查库
+    Map<Long, com.zhiyangyun.care.elder.entity.Room> pageRoomMap =
+        resolveRoomMap(new ArrayList<>(bedMap.values()));
     List<ElderProfile> filtered = allRows.stream()
         .filter(elder -> matchesPageFilters(
             elder,
             bedMap.get(elder.getId()),
+            resolveRoomOfBed(pageRoomMap, bedMap.get(elder.getId())),
             normalizedKeyword,
             normalizedFullName,
             normalizedIdCardNo,
             normalizedBedNo,
+            normalizedRoomNo,
             normalizedCareLevel))
         .sorted(buildPageComparator(sortBy, sortOrder, bedMap))
         .collect(Collectors.toCollection(ArrayList::new));
@@ -816,15 +823,17 @@ public class ElderServiceImpl implements ElderService {
   private boolean matchesPageFilters(
       ElderProfile elder,
       Bed bed,
+      com.zhiyangyun.care.elder.entity.Room room,
       String keyword,
       String fullName,
       String idCardNo,
       String bedNo,
+      String roomNo,
       String careLevel) {
     if (fullName != null && !matchByPinyinOrText(elder, fullName)) {
       return false;
     }
-    if (keyword != null && !matchesSearchKeyword(elder, bed, keyword)) {
+    if (keyword != null && !matchesSearchKeyword(elder, bed, room, keyword)) {
       return false;
     }
     if (idCardNo != null && !containsIgnoreCase(elder.getIdCardNo(), idCardNo)) {
@@ -833,16 +842,29 @@ public class ElderServiceImpl implements ElderService {
     if (bedNo != null && !containsIgnoreCase(bed == null ? null : bed.getBedNo(), bedNo)) {
       return false;
     }
+    if (roomNo != null && !containsIgnoreCase(room == null ? null : room.getRoomNo(), roomNo)) {
+      return false;
+    }
     if (careLevel != null && !containsIgnoreCase(elder.getCareLevel(), careLevel)) {
       return false;
     }
     return true;
   }
 
-  private boolean matchesSearchKeyword(ElderProfile elder, Bed bed, String keyword) {
+  private com.zhiyangyun.care.elder.entity.Room resolveRoomOfBed(
+      Map<Long, com.zhiyangyun.care.elder.entity.Room> roomMap, Bed bed) {
+    if (bed == null || bed.getRoomId() == null) {
+      return null;
+    }
+    return roomMap.get(bed.getRoomId());
+  }
+
+  private boolean matchesSearchKeyword(
+      ElderProfile elder, Bed bed, com.zhiyangyun.care.elder.entity.Room room, String keyword) {
     if (containsIgnoreCase(elder.getIdCardNo(), keyword)
         || containsIgnoreCase(elder.getCareLevel(), keyword)
-        || containsIgnoreCase(bed == null ? null : bed.getBedNo(), keyword)) {
+        || containsIgnoreCase(bed == null ? null : bed.getBedNo(), keyword)
+        || containsIgnoreCase(room == null ? null : room.getRoomNo(), keyword)) {
       return true;
     }
     return matchByPinyinOrText(elder, keyword);

@@ -299,8 +299,60 @@ class ElderServiceTest {
 
   @Test
   void page_query() {
-    var page = elderService.page(null, 1, 10, "Elder", false, null, null, null, null, null, null, null, null);
+    var page = elderService.page(null, 1, 10, "Elder", false, null, null, null, null, null, null, null, null, null);
     assertNotNull(page);
     assertEquals(1, page.getCurrent());
+  }
+
+  @Test
+  void page_query_filters_by_room_no() {
+    // 用独立机构号，避免往 org 1 里塞数据污染门户/看板等聚合断言（H2 内存库整轮共享）
+    final Long orgId = 9201L;
+
+    Room room = new Room();
+    room.setTenantId(orgId);
+    room.setOrgId(orgId);
+    room.setRoomNo("RM-FILTER-901");
+    room.setCapacity(2);
+    room.setStatus(1);
+    roomMapper.insert(room);
+
+    Bed bed = new Bed();
+    bed.setTenantId(orgId);
+    bed.setOrgId(orgId);
+    bed.setRoomId(room.getId());
+    bed.setBedNo("RM-FILTER-901-1");
+    bed.setBedQrCode("QR-RM-FILTER-901-1");
+    bed.setStatus(BedStatus.OCCUPIED);
+    bedMapper.insert(bed);
+
+    ElderProfile elder = new ElderProfile();
+    elder.setTenantId(orgId);
+    elder.setOrgId(orgId);
+    elder.setFullName("房间筛选测试");
+    elder.setStatus(1);
+    elder.setBedId(bed.getId());
+    elderMapper.insert(elder);
+
+    bed.setElderId(elder.getId());
+    bedMapper.updateById(bed);
+
+    ElderBedRelation relation = new ElderBedRelation();
+    relation.setTenantId(orgId);
+    relation.setOrgId(orgId);
+    relation.setElderId(elder.getId());
+    relation.setBedId(bed.getId());
+    relation.setStartDate(LocalDate.now());
+    relation.setActiveFlag(1);
+    relationMapper.insert(relation);
+
+    var matched = elderService.page(
+        orgId, 1, 10, null, false, null, null, null, null, null, "RM-FILTER-901", null, null, null);
+    assertEquals(1, matched.getRecords().size());
+    assertEquals(elder.getId(), matched.getRecords().get(0).getId());
+
+    var unmatched = elderService.page(
+        orgId, 1, 10, null, false, null, null, null, null, null, "RM-FILTER-NOPE", null, null, null);
+    assertEquals(0, unmatched.getRecords().size());
   }
 }

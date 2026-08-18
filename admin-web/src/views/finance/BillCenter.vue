@@ -127,6 +127,7 @@
           :loading="loading"
           :data="displayRows"
           :column-config="{ resizable: true }"
+          :row-class-name="billRowClassName"
         >
           <vxe-column field="billMonth" title="账单月份" width="120" />
           <vxe-column field="elderName" title="老人" min-width="180">
@@ -667,6 +668,11 @@ const riskSummaryText = computed(() => (
 const riskSummaryDescription = computed(() => (
   `今日收款 ${formatAmount(summary.value.todayAmount)} 元，累计欠费 ${formatAmount(summary.value.monthAmount)} 元`
 ))
+
+// 欠费整行标红，让催缴对象在长列表里一眼可见
+function billRowClassName({ row }: { row: BillItem }) {
+  return Number(row?.outstandingAmount || 0) > 0 ? 'is-overdue-row' : ''
+}
 
 function formatAmount(value?: number | string) {
   return Number(value || 0).toFixed(2)
@@ -1389,5 +1395,19 @@ onMounted(async () => {
   margin-top: 6px;
   font-size: 12px;
   color: #cf1322;
+}
+
+/* 欠费行整行标红：vxe-table 的行类挂在 tr 上，需要覆盖到单元格背景 */
+.finance-vxe-table :deep(.vxe-body--row.is-overdue-row) td,
+.finance-vxe-table :deep(.vxe-body--row.is-overdue-row.row--stripe) td {
+  background-color: rgba(207, 19, 34, 0.08) !important;
+}
+
+.finance-vxe-table :deep(.vxe-body--row.is-overdue-row:hover) td {
+  background-color: rgba(207, 19, 34, 0.14) !important;
+}
+
+.finance-vxe-table :deep(.vxe-body--row.is-overdue-row) td:first-child {
+  box-shadow: inset 3px 0 0 #cf1322;
 }
 </style>

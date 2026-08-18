@@ -15,7 +15,7 @@
     <SearchForm
       :model="query"
       title="快速查找长者"
-      description="按姓名、床位、护理等级或入住状态筛选，输入后回车即可查询。"
+      description="按姓名、床位、房间、护理等级或入住状态筛选，输入后回车即可查询。"
       @search="runSearch"
       @reset="reset"
     >
@@ -27,6 +27,9 @@
       </a-form-item>
       <a-form-item label="床位号">
         <a-input v-model:value="query.bedNo" placeholder="床位号" allow-clear />
+      </a-form-item>
+      <a-form-item label="房间号">
+        <a-input v-model:value="query.roomNo" placeholder="房间号" allow-clear />
       </a-form-item>
       <a-form-item label="护理等级">
         <a-input v-model:value="query.careLevel" placeholder="护理等级" allow-clear />
@@ -57,8 +60,8 @@
       <div v-if="selectedCount" class="selection-bar">
         <span class="selection-bar__count">已选 {{ selectedCount }} 位</span>
         <template v-if="selectedCount === 1">
-          <a-button size="small" @click="goDetailSelected">详情</a-button>
-          <a-button size="small" @click="goEditSelected">编辑</a-button>
+          <a-button size="small" @click="openQuickDetailSelected">详情</a-button>
+          <a-button size="small" @click="openQuickEditSelected">编辑</a-button>
           <a-button size="small" @click="openChangeBedSelected">换床</a-button>
           <a-button size="small" @click="openCheckoutSelected">退住申请</a-button>
           <a-button size="small" @click="openBindFamilySelected">绑定家属</a-button>
@@ -131,10 +134,12 @@
                 <a-button type="link" size="small">更多 <DownOutlined /></a-button>
                 <template #overlay>
                   <a-menu>
-                    <a-menu-item key="detail" @click="goDetail(record.id)">查看详情</a-menu-item>
+                    <a-menu-item key="quick-detail" @click="openQuickDetail(record)">详情弹窗</a-menu-item>
+                    <a-menu-item key="quick-edit" @click="openQuickEdit(record)">编辑弹窗</a-menu-item>
+                    <a-menu-item key="detail" @click="goDetail(record.id)">完整档案页</a-menu-item>
                     <a-menu-item key="assessment" @click="goAssessmentArchive(record)">评估档案</a-menu-item>
                     <a-menu-item key="contracts" @click="goContractsInvoices(record)">合同票据</a-menu-item>
-                    <a-menu-item key="edit" @click="goEdit(record.id)">编辑档案</a-menu-item>
+                    <a-menu-item key="edit" @click="goEdit(record.id)">完整编辑页</a-menu-item>
                     <a-menu-item key="bed" @click="openChangeBed(record)">换床</a-menu-item>
                     <a-menu-item key="checkout" @click="openCheckout(record)">退住申请</a-menu-item>
                     <a-menu-item key="family" @click="openBindFamily(record)">绑定家属</a-menu-item>
@@ -207,6 +212,84 @@
       </div>
     </a-modal>
 
+    <a-drawer v-model:open="quickDetailOpen" width="640" :title="`长者详情 · ${quickDetailRow?.fullName || ''}`">
+      <a-spin :spinning="quickDetailLoading">
+        <a-descriptions bordered :column="2" size="small">
+          <a-descriptions-item label="姓名">{{ quickDetail?.fullName || '-' }}</a-descriptions-item>
+          <a-descriptions-item label="编号">{{ quickDetail?.elderCode || '-' }}</a-descriptions-item>
+          <a-descriptions-item label="性别">{{ genderText(quickDetail?.gender) }}</a-descriptions-item>
+          <a-descriptions-item label="年龄 / 生日">
+            {{ quickDetail?.birthDate ? `${ageOf(quickDetail.birthDate)} 岁 · ${quickDetail.birthDate}` : '-' }}
+          </a-descriptions-item>
+          <a-descriptions-item label="房间 / 床位">
+            {{ (quickDetail?.roomNo || '-') + ' / ' + (quickDetail?.bedNo || '未分配床位') }}
+          </a-descriptions-item>
+          <a-descriptions-item label="在院状态">{{ statusText(quickDetail || {}) }}</a-descriptions-item>
+          <a-descriptions-item label="护理等级">{{ quickDetail?.careLevel || '-' }}</a-descriptions-item>
+          <a-descriptions-item label="入住日期">{{ quickDetail?.admissionDate || '-' }}</a-descriptions-item>
+          <a-descriptions-item label="联系电话">{{ quickDetail?.phone || '-' }}</a-descriptions-item>
+          <a-descriptions-item label="身份证">{{ quickDetail?.idCardNo || '-' }}</a-descriptions-item>
+          <a-descriptions-item label="家庭住址" :span="2">{{ quickDetail?.homeAddress || '-' }}</a-descriptions-item>
+          <a-descriptions-item label="备注" :span="2">{{ quickDetail?.remark || '-' }}</a-descriptions-item>
+        </a-descriptions>
+      </a-spin>
+      <template #footer>
+        <a-space>
+          <a-button @click="quickDetailOpen = false">关闭</a-button>
+          <a-button @click="openQuickEditFromDetail">编辑</a-button>
+          <a-button type="primary" @click="goDetailFromQuick">打开完整档案页</a-button>
+        </a-space>
+      </template>
+    </a-drawer>
+
+    <a-modal
+      v-model:open="quickEditOpen"
+      :title="`编辑档案 · ${quickEditRow?.fullName || ''}`"
+      width="620"
+      :confirm-loading="quickEditSaving"
+      @ok="submitQuickEdit"
+    >
+      <a-spin :spinning="quickEditLoading">
+        <a-form layout="vertical" :model="quickEditForm" :rules="quickEditRules" ref="quickEditFormRef">
+          <a-row :gutter="12">
+            <a-col :span="12">
+              <a-form-item label="姓名" name="fullName">
+                <a-input v-model:value="quickEditForm.fullName" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="联系电话">
+                <a-input v-model:value="quickEditForm.phone" allow-clear />
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-row :gutter="12">
+            <a-col :span="12">
+              <a-form-item label="护理等级">
+                <a-input v-model:value="quickEditForm.careLevel" allow-clear placeholder="如：三级护理" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="入住日期">
+                <a-date-picker v-model:value="quickEditForm.admissionDate" style="width: 100%" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-form-item label="家庭住址">
+            <a-input v-model:value="quickEditForm.homeAddress" allow-clear />
+          </a-form-item>
+          <a-form-item label="备注">
+            <a-textarea v-model:value="quickEditForm.remark" :rows="3" allow-clear />
+          </a-form-item>
+        </a-form>
+        <div class="quick-edit-hint">
+          床位、合同、附件等档案项请到
+          <a-button type="link" size="small" style="padding: 0" @click="goEditFromQuick">完整编辑页</a-button>
+          处理。
+        </div>
+      </a-spin>
+    </a-modal>
+
     <ExportConfirmModal
       v-model:open="exportConfirmOpen"
       module="ELDER_LIST"
@@ -224,6 +307,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { DownOutlined } from '@ant-design/icons-vue'
+import dayjs from 'dayjs'
 import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
@@ -240,7 +324,7 @@ import {
   ageOf
 } from '../../utils/elderStatus'
 import { completeExport } from '../../api/complianceSecurity'
-import { getElderPage, assignBed, bindFamily, deleteElder } from '../../api/elder'
+import { getElderPage, getElderDetail, updateElder, assignBed, bindFamily, deleteElder } from '../../api/elder'
 import { getBedList } from '../../api/bed'
 import { getFamilyUserPage } from '../../api/family'
 import type { BedItem, ElderItem, FamilyBindRequest, PageResult, FamilyUserItem, Id } from '../../types/api'
@@ -253,12 +337,13 @@ const total = ref(0)
 const selectedRowKeys = ref<Id[]>([])
 const skipNextRouteWatch = ref(false)
 const routeSignature = ref('')
-const ELDER_LIST_ROUTE_KEYS = ['fullName', 'idCardNo', 'bedNo', 'careLevel', 'lifecycleStatus', 'status', 'sortBy', 'sortOrder', 'pageNo', 'pageSize'] as const
+const ELDER_LIST_ROUTE_KEYS = ['fullName', 'idCardNo', 'bedNo', 'roomNo', 'careLevel', 'lifecycleStatus', 'status', 'sortBy', 'sortOrder', 'pageNo', 'pageSize'] as const
 
 const query = reactive({
   fullName: undefined as string | undefined,
   idCardNo: undefined as string | undefined,
   bedNo: undefined as string | undefined,
+  roomNo: undefined as string | undefined,
   careLevel: undefined as string | undefined,
   lifecycleStatus: undefined as string | undefined,
   sortBy: undefined as string | undefined,
@@ -297,6 +382,7 @@ const activeFilterTags = computed(() => {
   if (query.fullName) tags.push(`姓名: ${query.fullName}`)
   if (query.idCardNo) tags.push(`身份证: ${query.idCardNo}`)
   if (query.bedNo) tags.push(`床位: ${query.bedNo}`)
+  if (query.roomNo) tags.push(`房间: ${query.roomNo}`)
   if (query.careLevel) tags.push(`护理等级: ${query.careLevel}`)
   if (query.lifecycleStatus) tags.push(`状态: ${statusText({ lifecycleStatus: query.lifecycleStatus })}`)
   return tags
@@ -342,6 +428,136 @@ const bindRules: FormRules = {
 const familyOptions = ref<Array<{ label: string; value: Id }>>([])
 
 const qrOpen = ref(false)
+
+// 详情/编辑弹窗：列表页里做高频轻量查看与改档，重档案项仍走完整页
+const quickDetailOpen = ref(false)
+const quickDetailLoading = ref(false)
+const quickDetailRow = ref<ElderItem | null>(null)
+const quickDetail = ref<any | null>(null)
+
+const quickEditOpen = ref(false)
+const quickEditLoading = ref(false)
+const quickEditSaving = ref(false)
+const quickEditRow = ref<ElderItem | null>(null)
+const quickEditFormRef = ref<FormInstance>()
+const quickEditForm = reactive({
+  fullName: '',
+  phone: '',
+  careLevel: '',
+  admissionDate: undefined as any,
+  homeAddress: '',
+  remark: ''
+})
+const quickEditRules: FormRules = {
+  fullName: [{ required: true, message: '请输入姓名' }]
+}
+
+function genderText(gender?: number | null) {
+  if (gender === 1) return '男'
+  if (gender === 2) return '女'
+  return '-'
+}
+
+async function openQuickDetail(row: ElderItem) {
+  quickDetailRow.value = row
+  quickDetail.value = { ...row }
+  quickDetailOpen.value = true
+  quickDetailLoading.value = true
+  try {
+    const detail = await getElderDetail(row.id)
+    quickDetail.value = {
+      ...detail,
+      bedNo: (detail as any)?.bedNo ?? (detail as any)?.currentBed?.bedNo ?? row.bedNo,
+      roomNo: (detail as any)?.roomNo ?? (detail as any)?.currentBed?.roomNo ?? row.roomNo
+    }
+  } catch {
+    // 拉取失败时保留列表行数据，弹窗仍可用
+  } finally {
+    quickDetailLoading.value = false
+  }
+}
+
+function openQuickDetailSelected() {
+  const row = requireSingleSelection('查看详情')
+  if (!row) return
+  openQuickDetail(row)
+}
+
+async function openQuickEdit(row: ElderItem) {
+  quickEditRow.value = row
+  quickEditOpen.value = true
+  quickEditLoading.value = true
+  quickEditForm.fullName = row.fullName || ''
+  quickEditForm.phone = (row as any).phone || ''
+  quickEditForm.careLevel = row.careLevel || ''
+  quickEditForm.admissionDate = (row as any).admissionDate ? dayjs((row as any).admissionDate) : undefined
+  quickEditForm.homeAddress = (row as any).homeAddress || ''
+  quickEditForm.remark = (row as any).remark || ''
+  try {
+    const detail: any = await getElderDetail(row.id)
+    quickEditForm.fullName = detail?.fullName || quickEditForm.fullName
+    quickEditForm.phone = detail?.phone || ''
+    quickEditForm.careLevel = detail?.careLevel || ''
+    quickEditForm.admissionDate = detail?.admissionDate ? dayjs(detail.admissionDate) : undefined
+    quickEditForm.homeAddress = detail?.homeAddress || ''
+    quickEditForm.remark = detail?.remark || ''
+  } catch {
+    // 拉取失败时用列表行数据兜底
+  } finally {
+    quickEditLoading.value = false
+  }
+}
+
+function openQuickEditSelected() {
+  const row = requireSingleSelection('编辑')
+  if (!row) return
+  openQuickEdit(row)
+}
+
+function openQuickEditFromDetail() {
+  const row = quickDetailRow.value
+  if (!row) return
+  quickDetailOpen.value = false
+  openQuickEdit(row)
+}
+
+function goDetailFromQuick() {
+  const row = quickDetailRow.value
+  if (!row) return
+  quickDetailOpen.value = false
+  goDetail(row.id)
+}
+
+function goEditFromQuick() {
+  const row = quickEditRow.value
+  if (!row) return
+  quickEditOpen.value = false
+  goEdit(row.id)
+}
+
+async function submitQuickEdit() {
+  const row = quickEditRow.value
+  if (!row || quickEditSaving.value) return
+  await quickEditFormRef.value?.validate?.()
+  quickEditSaving.value = true
+  try {
+    await updateElder(row.id, {
+      fullName: quickEditForm.fullName.trim(),
+      phone: quickEditForm.phone.trim() || undefined,
+      careLevel: quickEditForm.careLevel.trim() || undefined,
+      admissionDate: quickEditForm.admissionDate
+        ? dayjs(quickEditForm.admissionDate).format('YYYY-MM-DD')
+        : undefined,
+      homeAddress: quickEditForm.homeAddress.trim() || undefined,
+      remark: quickEditForm.remark.trim() || undefined
+    })
+    message.success('档案已更新')
+    quickEditOpen.value = false
+    await fetchData()
+  } finally {
+    quickEditSaving.value = false
+  }
+}
 const qrDataUrl = ref('')
 const qrText = ref('')
 
@@ -387,6 +603,7 @@ async function fetchData() {
       fullName: query.fullName,
       idCardNo: query.idCardNo,
       bedNo: query.bedNo,
+      roomNo: query.roomNo,
       careLevel: query.careLevel,
       lifecycleStatus: query.lifecycleStatus,
       sortBy: query.sortBy,
@@ -469,6 +686,7 @@ function applyQueryFromRoute() {
   query.fullName = firstRouteQueryText(route.query.fullName) || undefined
   query.idCardNo = firstRouteQueryText(route.query.idCardNo) || undefined
   query.bedNo = firstRouteQueryText(route.query.bedNo) || undefined
+  query.roomNo = firstRouteQueryText(route.query.roomNo) || undefined
   query.careLevel = firstRouteQueryText(route.query.careLevel) || undefined
   const lifecycleStatus = firstRouteQueryText(route.query.lifecycleStatus).toUpperCase()
   if (lifecycleStatus) {
@@ -493,6 +711,7 @@ function buildQueryRouteQuery() {
   if (query.fullName) nextQuery.fullName = query.fullName
   if (query.idCardNo) nextQuery.idCardNo = query.idCardNo
   if (query.bedNo) nextQuery.bedNo = query.bedNo
+  if (query.roomNo) nextQuery.roomNo = query.roomNo
   if (query.careLevel) nextQuery.careLevel = query.careLevel
   if (query.lifecycleStatus) nextQuery.lifecycleStatus = query.lifecycleStatus
   if (query.sortBy) nextQuery.sortBy = query.sortBy
@@ -530,6 +749,7 @@ function reset() {
   query.fullName = undefined
   query.idCardNo = undefined
   query.bedNo = undefined
+  query.roomNo = undefined
   query.careLevel = undefined
   query.lifecycleStatus = undefined
   query.sortBy = undefined
@@ -946,5 +1166,11 @@ watch(
   .elder-workspace {
     padding: 12px;
   }
+}
+
+.quick-edit-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-tertiary, #999);
 }
 </style>
