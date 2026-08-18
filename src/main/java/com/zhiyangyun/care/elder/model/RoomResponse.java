@@ -13,6 +13,8 @@ public class RoomResponse {
   private String floorNo;
   private String roomNo;
   private String roomType;
+  /** 朝向 SOUTH / NORTH / EAST / WEST。 */
+  private String orientation;
   private Integer sortNo;
   private Integer capacity;
   private Integer status;

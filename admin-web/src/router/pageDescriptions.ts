@@ -180,6 +180,8 @@ export const PAGE_DESCRIPTIONS: Record<string, string> = {
   FinanceDepositManagement: '押金标准、缴纳/扣款/退还登记与在押余额台账',
   FinanceReminderCenter: '代养费/押金/电费提醒的统一处置与一键处理',
   FinanceExcelReports: '代养费登记表/押金台账/电费月报/欠费催缴清单四种 xlsx 导出',
+  LogisticsFloorPlan: '按楼层还原房间布局，走廊分隔南北，颜色区分正常/欠费/空房/未启用',
+  LogisticsRoomDetail: '单房间的在住长者、入住档案、身体情况与电子文件存档',
   FinanceAccountsWarningRules: '账户余额预警规则',
   FinanceAdmissionFeeAudit: '入住费用审核',
   FinanceSources: '各类消费与费用分摊来源',

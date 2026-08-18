@@ -1,0 +1,2 @@
+-- 房间朝向（主库定义见 V280）
+ALTER TABLE room ADD COLUMN IF NOT EXISTS orientation VARCHAR(16) DEFAULT NULL;

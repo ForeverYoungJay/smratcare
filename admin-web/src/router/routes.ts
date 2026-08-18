@@ -390,6 +390,18 @@ export const routes: RouteRecordRaw[] = [
                 meta: { title: '房态图' }
               },
               {
+                path: 'floor-plan',
+                name: 'LogisticsFloorPlan',
+                component: () => import('../views/bed/FloorPlan.vue'),
+                meta: { title: '楼栋平面图' }
+              },
+              {
+                path: '/bed/room-detail',
+                name: 'LogisticsRoomDetail',
+                component: () => import('../views/bed/RoomDetail.vue'),
+                meta: { title: '房间详情', hidden: true }
+              },
+              {
                 path: 'bed-management',
                 name: 'LogisticsBedManagement',
                 component: () => import('../views/bed/Manage.vue'),

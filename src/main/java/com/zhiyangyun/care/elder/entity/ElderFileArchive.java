@@ -8,27 +8,22 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDateTime;
 import lombok.Data;
 
+/** 长者电子文件存档：CONTRACT 合同 / MEDICAL 医疗 / CERTIFICATE 证件 / OTHER 其他。 */
 @Data
-@TableName("room")
-public class Room {
+@TableName("elder_file_archive")
+public class ElderFileArchive {
   @TableId(type = IdType.ASSIGN_ID)
   private Long id;
   private Long tenantId;
   private Long orgId;
-  private Long buildingId;
-  private Long floorId;
-  private String building;
-  private String floorNo;
-  private String roomNo;
-  private String roomType;
-  /** 朝向 SOUTH / NORTH / EAST / WEST，用于平面图按走廊分列南北两侧。 */
-  private String orientation;
-  private Integer sortNo;
-  private Integer capacity;
-  private Integer status;
-  private String roomQrCode;
+  private Long elderId;
+  private String category;
+  private String fileName;
+  private String fileUrl;
+  private Long fileSize;
   private String remark;
-  private Long createdBy;
+  private Long uploadedBy;
+  private LocalDateTime uploadedAt;
   @TableField(value = "create_time", fill = FieldFill.INSERT)
   private LocalDateTime createTime;
   @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE)

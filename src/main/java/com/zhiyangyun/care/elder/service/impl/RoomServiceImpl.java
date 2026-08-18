@@ -78,6 +78,7 @@ public class RoomServiceImpl implements RoomService {
     room.setFloorNo(request.getFloorNo());
     room.setRoomNo(request.getRoomNo());
     room.setRoomType(normalizedRoomType);
+    room.setOrientation(normalizeOrientation(request.getOrientation()));
     room.setSortNo(normalizeSortNo(request.getSortNo(), request.getTenantId(), request.getFloorId()));
     room.setCapacity(normalizedCapacity);
     room.setStatus(request.getStatus());
@@ -117,6 +118,7 @@ public class RoomServiceImpl implements RoomService {
     room.setFloorNo(request.getFloorNo());
     room.setRoomNo(request.getRoomNo());
     room.setRoomType(normalizedRoomType);
+    room.setOrientation(normalizeOrientation(request.getOrientation()));
     room.setSortNo(normalizeSortNo(request.getSortNo(), room.getTenantId(), request.getFloorId(), room.getSortNo()));
     room.setCapacity(normalizedCapacity);
     room.setStatus(request.getStatus());
@@ -262,6 +264,7 @@ public class RoomServiceImpl implements RoomService {
     response.setFloorNo(room.getFloorNo());
     response.setRoomNo(room.getRoomNo());
     response.setRoomType(room.getRoomType());
+    response.setOrientation(room.getOrientation());
     response.setSortNo(room.getSortNo());
     response.setCapacity(room.getCapacity());
     response.setStatus(room.getStatus());
@@ -690,6 +693,18 @@ public class RoomServiceImpl implements RoomService {
       number = (number - 1) / 26;
     }
     return builder.toString();
+  }
+
+  /** 朝向只接受 SOUTH/NORTH/EAST/WEST，其余按未设置处理。 */
+  private String normalizeOrientation(String orientation) {
+    if (orientation == null || orientation.isBlank()) {
+      return null;
+    }
+    String normalized = orientation.trim().toUpperCase(java.util.Locale.ROOT);
+    return switch (normalized) {
+      case "SOUTH", "NORTH", "EAST", "WEST" -> normalized;
+      default -> null;
+    };
   }
 
   private Integer normalizeSortNo(Integer requestedSortNo, Long tenantId, Long floorId) {

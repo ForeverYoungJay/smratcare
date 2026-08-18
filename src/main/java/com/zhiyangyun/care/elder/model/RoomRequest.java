@@ -15,6 +15,8 @@ public class RoomRequest {
   private String floorNo;
   private String roomNo;
   private String roomType;
+  /** 朝向 SOUTH / NORTH / EAST / WEST。 */
+  private String orientation;
   private Integer sortNo;
   private Integer capacity = 1;
   private Integer status = 1;
