@@ -89,6 +89,13 @@ public class PaymentRecordController {
       row.setId(item.getId());
       row.setBillMonthlyId(item.getBillMonthlyId());
       row.setAmount(item.getAmount());
+      row.setPayableAmount(item.getPayableAmount());
+      row.setLtciDeductAmount(item.getLtciDeductAmount());
+      row.setDiscountAmount(item.getDiscountAmount());
+      row.setDiscountReason(item.getDiscountReason());
+      row.setVoucherAmount(item.getVoucherAmount());
+      // 历史数据没有抵账合计，退回到实收口径
+      row.setSettledAmount(item.getSettledAmount() == null ? item.getAmount() : item.getSettledAmount());
       row.setPayMethod(item.getPayMethod());
       row.setPaidAt(item.getPaidAt());
       row.setOperatorStaffId(item.getOperatorStaffId());

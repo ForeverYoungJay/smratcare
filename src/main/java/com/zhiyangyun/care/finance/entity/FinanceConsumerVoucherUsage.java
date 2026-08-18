@@ -9,26 +9,20 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.Data;
 
+/** 消费券核销流水：USE 为核销，RELEASE 为收款被改小/作废后的额度退回。 */
 @Data
-@TableName("payment_record")
-public class PaymentRecord {
+@TableName("finance_consumer_voucher_usage")
+public class FinanceConsumerVoucherUsage {
   @TableId(type = IdType.ASSIGN_ID)
   private Long id;
+  private Long tenantId;
   private Long orgId;
+  private Long voucherId;
+  private Long elderId;
   private Long billMonthlyId;
-  /** 实收现金，不含任何抵扣。 */
+  private Long paymentRecordId;
   private BigDecimal amount;
-  /** 登记时的应收余额快照。 */
-  private BigDecimal payableAmount;
-  private BigDecimal ltciDeductAmount;
-  private BigDecimal discountAmount;
-  private String discountReason;
-  private BigDecimal voucherAmount;
-  /** 本次抵账合计 = 实收 + 长护险 + 折扣 + 消费券。 */
-  private BigDecimal settledAmount;
-  private String payMethod;
-  private String externalTxnId;
-  private LocalDateTime paidAt;
+  private String direction;
   private Long operatorStaffId;
   private String remark;
   @TableField(value = "create_time", fill = FieldFill.INSERT)

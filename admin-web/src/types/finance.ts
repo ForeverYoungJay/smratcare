@@ -3,7 +3,15 @@ import type { Id } from './common'
 export interface PaymentRecordItem {
   id: Id
   billMonthlyId: Id
+  /** 实收现金 */
   amount: number
+  payableAmount?: number
+  ltciDeductAmount?: number
+  discountAmount?: number
+  discountReason?: string
+  voucherAmount?: number
+  /** 抵账合计 = 实收 + 三项抵扣 */
+  settledAmount?: number
   payMethod: 'CASH' | 'CARD' | 'BANK' | 'WECHAT_OFFLINE' | 'ALIPAY' | 'WECHAT' | 'QR_CODE'
   paidAt: string
   operatorStaffId?: number

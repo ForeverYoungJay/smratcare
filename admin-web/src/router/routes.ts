@@ -839,6 +839,12 @@ export const routes: RouteRecordRaw[] = [
                 meta: { title: '预存充值' }
               },
               {
+                path: '/finance/consumer-voucher',
+                name: 'FinanceConsumerVoucher',
+                component: () => import('../views/finance/ConsumerVoucher.vue'),
+                meta: { title: '消费券管理' }
+              },
+              {
                 path: '/finance/accounts/warning-rules',
                 name: 'FinanceAccountsWarningRules',
                 component: () => import('../views/finance/BalanceWarningRules.vue'),

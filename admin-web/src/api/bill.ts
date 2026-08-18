@@ -1,5 +1,5 @@
 import request, { fetchPage } from '../utils/request'
-import type { BillItem, BillPageQuery, Id, PayRequest } from '../types'
+import type { BillDeductionPreview, BillItem, BillPageQuery, Id, PayRequest } from '../types'
 
 export function getBillPage(params: BillPageQuery) {
   return fetchPage<BillItem>('/api/bill/page', params)
@@ -11,6 +11,10 @@ export function getBillDetail(elderId: Id, month: string) {
 
 export function generateBill(month: string) {
   return request.post<void>('/api/bill/generate', null, { params: { month } })
+}
+
+export function getBillDeductionPreview(billId: Id) {
+  return request.get<BillDeductionPreview>(`/api/bill/${billId}/deduction-preview`)
 }
 
 export function payBill(billId: Id, data: PayRequest) {

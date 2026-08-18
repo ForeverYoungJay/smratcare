@@ -28,7 +28,7 @@
         :avatar-url="headerSettings.avatarUrl || undefined"
         :breadcrumbs="breadcrumbs"
         :collapsed="manualCollapsed"
-        :notification-count="quickNotifyItems.length"
+        :notification-count="notificationBadgeCount"
         :page-title="currentTitle || '工作台'"
         platform-name="龟峰颐养中心运营管理平台"
         search-placeholder="搜索页面、常用动作或最近访问"
@@ -1334,6 +1334,12 @@ const quickChatTodoPendingCount = computed(() => quickChatTodoItems.value.filter
 const quickChatTodoOverdueCount = computed(() =>
   quickChatTodoItems.value.filter((item) => !item.done && isQuickChatTodoOverdue(item)).length
 )
+// 铃铛徽章必须反映真实未处理量（未读消息 + 逾期待办），
+// 不能再等于下拉里固定快捷入口的条数，否则永远显示同一个数字
+const notificationBadgeCount = computed(() => {
+  if (!headerSettings.quickNotifyEnabled) return 0
+  return quickChatUnreadCount.value + quickChatTodoOverdueCount.value
+})
 const quickChatTodoCompletionRate = computed(() => {
   const total = quickChatTodoItems.value.length
   if (!total) return 100
