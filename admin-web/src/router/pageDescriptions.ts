@@ -179,6 +179,7 @@ export const PAGE_DESCRIPTIONS: Record<string, string> = {
   FinanceElectricityFee: '按房间登记电表读数，自动核算电费并跟踪缴费状态',
   FinanceDepositManagement: '押金标准、缴纳/扣款/退还登记与在押余额台账',
   FinanceReminderCenter: '代养费/押金/电费提醒的统一处置与一键处理',
+  FinanceExcelReports: '代养费登记表/押金台账/电费月报/欠费催缴清单四种 xlsx 导出',
   FinanceAccountsWarningRules: '账户余额预警规则',
   FinanceAdmissionFeeAudit: '入住费用审核',
   FinanceSources: '各类消费与费用分摊来源',

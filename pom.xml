@@ -14,6 +14,7 @@
     <mybatis-plus.version>3.5.5</mybatis-plus.version>
     <mybatis-spring.version>3.0.3</mybatis-spring.version>
     <lombok.version>1.18.36</lombok.version>
+    <poi.version>5.2.5</poi.version>
   </properties>
 
   <dependencyManagement>
@@ -34,6 +35,12 @@
   </dependencyManagement>
 
   <dependencies>
+    <!-- xlsx 报表导出：SXSSF 流式写出，避免大报表占内存 -->
+    <dependency>
+      <groupId>org.apache.poi</groupId>
+      <artifactId>poi-ooxml</artifactId>
+      <version>${poi.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>

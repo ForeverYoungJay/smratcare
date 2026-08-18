@@ -169,6 +169,70 @@
       </SectionPanel>
     </section>
 
+    <section v-if="financeHome" class="portal-grid portal-grid--main">
+      <SectionPanel
+        title="收费与押金总览"
+        :description="`账期 ${financeHome.billMonth}：在住规模、代养费结清率、押金与电费的未收口径集中在这里。`"
+      >
+        <div class="portal-grid portal-grid--operating">
+          <OverviewMetricCard
+            clickable
+            label="在住老人数"
+            :value="financeHome.residentCount"
+            suffix="人"
+            :helper="`占用床位 ${financeHome.occupiedBedCount} / ${financeHome.bedTotal}`"
+            tone="brand"
+            @click="router.push('/elder/list')"
+          />
+          <OverviewMetricCard
+            clickable
+            label="代养费结清率"
+            :value="percentText(financeHome.careFeeSettleRate)"
+            :helper="`已结清 ${financeHome.settledBillCount} / ${financeHome.billCount} 单 · 按金额 ${percentText(financeHome.careFeeAmountRate)}`"
+            :tone="financeHome.careFeeSettleRate >= 90 ? 'success' : 'warning'"
+            @click="router.push('/finance/bills/detail-query')"
+          />
+          <OverviewMetricCard
+            clickable
+            label="押金预警"
+            :value="financeHome.depositShortfallCount"
+            suffix="人未缴清"
+            :helper="`合计差额 ${financeAmount(financeHome.depositShortfallAmount)} 元 · 在押 ${financeAmount(financeHome.depositTotalBalance)} 元`"
+            :tone="financeHome.depositShortfallCount > 0 ? 'danger' : 'success'"
+            @click="router.push('/finance/deposit-management')"
+          />
+          <OverviewMetricCard
+            clickable
+            label="电费未缴房间"
+            :value="financeHome.electricityUnpaidRoomCount"
+            suffix="间"
+            :helper="`未缴 ${financeAmount(financeHome.electricityUnpaidFee)} 元 · 未登记 ${financeHome.electricityUnrecordedRoomCount} 间`"
+            :tone="financeHome.electricityUnpaidRoomCount > 0 ? 'warning' : 'success'"
+            @click="router.push('/finance/electricity-fee')"
+          />
+        </div>
+      </SectionPanel>
+
+      <SectionPanel
+        title="最近操作记录"
+        description="收款、押金、电费与提醒处置的最新动作，按时间倒序取最近 12 条。"
+      >
+        <div v-if="financeHome.recentOperations.length" class="recent-ops">
+          <div v-for="item in financeHome.recentOperations" :key="String(item.id)" class="recent-ops__row">
+            <div class="recent-ops__main">
+              <strong>{{ item.actionTypeText || item.actionType }}</strong>
+              <span>{{ item.detail }}</span>
+            </div>
+            <div class="recent-ops__meta">
+              <span>{{ item.actorName || '系统' }}</span>
+              <small>{{ item.createTime ? dayjs(item.createTime).format('MM-DD HH:mm') : '-' }}</small>
+            </div>
+          </div>
+        </div>
+        <a-empty v-else description="暂无操作记录" />
+      </SectionPanel>
+    </section>
+
     <section class="portal-grid portal-grid--main">
       <SectionPanel
         title="运营概览"
@@ -467,6 +531,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
+import { getFinanceHomeSummary, type FinanceHomeSummary } from '../api/financeHome'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import VChart from 'vue-echarts'
@@ -520,6 +585,22 @@ function displayNumber(value?: number | null) {
 function displayCurrency(value?: number | null) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '--'
   return `¥${Number(value).toLocaleString('zh-CN')}`
+}
+
+// 首页财务卡：非财务角色调用会被后端拦掉，静默降级为空，整块卡片不渲染
+const financeHome = ref<FinanceHomeSummary | null>(null)
+
+async function loadFinanceHome() {
+  try {
+    financeHome.value = await getFinanceHomeSummary()
+  } catch {
+    financeHome.value = null
+  }
+}
+
+function financeAmount(value?: number | null) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '0.00'
+  return Number(value).toFixed(2)
 }
 
 function percentText(value?: number | null) {
@@ -1191,6 +1272,7 @@ async function loadOverview() {
 
 onMounted(() => {
   loadOverview()
+  loadFinanceHome()
 })
 </script>
 
@@ -1570,5 +1652,51 @@ onMounted(() => {
     align-items: flex-start;
     flex-direction: column;
   }
+}
+
+.recent-ops {
+  display: flex;
+  flex-direction: column;
+}
+
+.recent-ops__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--border-soft, #eee);
+}
+
+.recent-ops__row:last-child {
+  border-bottom: none;
+}
+
+.recent-ops__main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.recent-ops__main strong {
+  font-size: 13px;
+}
+
+.recent-ops__main span {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-ops__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-tertiary, #999);
 }
 </style>

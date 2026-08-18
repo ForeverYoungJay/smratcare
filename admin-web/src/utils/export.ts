@@ -22,6 +22,40 @@ export function exportExcel(data: Record<string, any>[], filename: string) {
   downloadBlob(blob, filename.endsWith('.xls') ? filename : `${filename}.xls`)
 }
 
+/**
+ * 下载后端生成的 xlsx 报表（真 Excel，带表头标题与合计行）。
+ * 与 exportCsvByRequest 的区别是不做 UTF-8 BOM 处理——二进制流不能被改写。
+ */
+export async function exportXlsxByRequest(
+  path: string,
+  params?: Record<string, string | number | boolean | undefined | null>,
+  fallbackFilename?: string
+) {
+  const url = new URL(path, window.location.origin)
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.set(key, String(value))
+    }
+  })
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${getToken()}`
+    }
+  })
+  if (!response.ok) {
+    throw new Error('导出失败')
+  }
+  const blob = await response.blob()
+  const contentDisposition = response.headers.get('content-disposition') || ''
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
+  const plainMatch = contentDisposition.match(/filename="?([^";]+)"?/i)
+  const filename = utf8Match?.[1]
+    ? decodeURIComponent(utf8Match[1])
+    : (plainMatch?.[1] || fallbackFilename || 'report.xlsx')
+  downloadBlob(blob, filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`)
+}
+
 export async function exportCsvByRequest(
   path: string,
   params?: Record<string, string | number | boolean | undefined | null>,

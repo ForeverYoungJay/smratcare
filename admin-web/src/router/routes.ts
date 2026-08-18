@@ -863,6 +863,12 @@ export const routes: RouteRecordRaw[] = [
                 meta: { title: '财务提醒中心' }
               },
               {
+                path: '/finance/excel-reports',
+                name: 'FinanceExcelReports',
+                component: () => import('../views/finance/ExcelReports.vue'),
+                meta: { title: 'Excel 报表' }
+              },
+              {
                 path: '/finance/accounts/warning-rules',
                 name: 'FinanceAccountsWarningRules',
                 component: () => import('../views/finance/BalanceWarningRules.vue'),
