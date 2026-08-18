@@ -155,6 +155,13 @@ public class FinanceHomeController {
       case "FIN_DEPOSIT_STANDARD_DELETE" -> "删除押金标准";
       case "FIN_REMINDER_HANDLE" -> "处理提醒";
       case "FIN_REMINDER_HANDLE_ALL" -> "一键处理提醒";
+      case "ELDER_FILE_ARCHIVE_ADD" -> "归档文件";
+      case "ELDER_FILE_ARCHIVE_DELETE" -> "删除归档文件";
+      // 首页面向院长，通用动作也别露原始 code
+      case "CREATE" -> "新增";
+      case "UPDATE" -> "修改";
+      case "DELETE" -> "删除";
+      case "EXPORT" -> "导出";
       default -> actionType;
     };
   }

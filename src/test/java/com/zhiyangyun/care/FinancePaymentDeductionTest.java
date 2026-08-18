@@ -1,6 +1,7 @@
 package com.zhiyangyun.care;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -13,6 +14,9 @@ import com.zhiyangyun.care.finance.entity.PaymentRecord;
 import com.zhiyangyun.care.finance.mapper.FinanceConsumerVoucherMapper;
 import com.zhiyangyun.care.finance.mapper.FinanceConsumerVoucherUsageMapper;
 import com.zhiyangyun.care.finance.mapper.PaymentRecordMapper;
+import com.zhiyangyun.care.elder.entity.ElderProfile;
+import com.zhiyangyun.care.finance.model.FinanceVoucherIssueRequest;
+import com.zhiyangyun.care.finance.model.FinanceVoucherView;
 import com.zhiyangyun.care.finance.model.PaymentRequest;
 import com.zhiyangyun.care.finance.model.PaymentVoucherUse;
 import com.zhiyangyun.care.finance.service.FinanceService;
@@ -26,6 +30,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -52,6 +58,12 @@ class FinancePaymentDeductionTest {
 
   @Autowired
   private LtciSettlementMapper ltciSettlementMapper;
+
+  @Autowired
+  private com.zhiyangyun.care.finance.service.FinanceVoucherService financeVoucherService;
+
+  @Autowired
+  private com.zhiyangyun.care.elder.mapper.ElderMapper elderMapper;
 
   @AfterEach
   void clearAuth() {
@@ -250,6 +262,58 @@ class FinancePaymentDeductionTest {
     assertEquals(0, BigDecimal.valueOf(75).compareTo(preview.getLtciAvailableAmount()));
     assertTrue(preview.getUsableVouchers().stream()
         .anyMatch(item -> item.getElderId() != null && item.getElderId().equals(3013L)));
+  }
+
+  @Test
+  void issue_generic_voucher_without_elder_binding() {
+    // 发放通用券（elderIds 为空）曾因 List.of 不接受 null 元素直接 NPE，这里锁住该路径
+    mockFinanceAuth(ORG_ID);
+    FinanceVoucherIssueRequest request = new FinanceVoucherIssueRequest();
+    request.setVoucherName("通用券回归");
+    request.setFaceAmount(new BigDecimal("50"));
+    request.setValidTo(LocalDate.now().plusMonths(1));
+
+    List<FinanceVoucherView> created = financeVoucherService.issue(request, 500L);
+
+    assertEquals(1, created.size());
+    assertNull(created.get(0).getElderId(), "通用券不绑定长者");
+    assertEquals(0, new BigDecimal("50.00").compareTo(created.get(0).getBalanceAmount()));
+    assertTrue(financeVoucherService.listUsable(null, BigDecimal.ZERO, LocalDate.now()).stream()
+        .anyMatch(item -> "通用券回归".equals(item.getVoucherName())));
+  }
+
+  @Test
+  void issue_voucher_for_each_selected_elder() {
+    mockFinanceAuth(ORG_ID);
+    ElderProfile first = insertElder("发券对象甲");
+    ElderProfile second = insertElder("发券对象乙");
+    FinanceVoucherIssueRequest request = new FinanceVoucherIssueRequest();
+    request.setVoucherName("批量发券回归");
+    request.setFaceAmount(new BigDecimal("80"));
+    request.setElderIds(List.of(first.getId(), second.getId()));
+
+    List<FinanceVoucherView> created = financeVoucherService.issue(request, 500L);
+
+    assertEquals(2, created.size(), "选中 N 位长者应各生成 1 张");
+    assertEquals(2, created.stream().map(FinanceVoucherView::getVoucherNo).distinct().count(),
+        "券号必须各自独立");
+  }
+
+  private ElderProfile insertElder(String fullName) {
+    ElderProfile elder = new ElderProfile();
+    elder.setTenantId(ORG_ID);
+    elder.setOrgId(ORG_ID);
+    elder.setFullName(fullName);
+    elder.setStatus(1);
+    elderMapper.insert(elder);
+    return elder;
+  }
+
+  private void mockFinanceAuth(Long orgId) {
+    var auth = new UsernamePasswordAuthenticationToken(
+        String.valueOf(orgId), "N/A", List.of(new SimpleGrantedAuthority("ROLE_FINANCE_EMPLOYEE")));
+    auth.setDetails(java.util.Map.of("orgId", orgId, "username", "voucher-tester"));
+    SecurityContextHolder.getContext().setAuthentication(auth);
   }
 
   private BillMonthly insertBill(Long elderId, String billMonth, int totalAmount) {

@@ -396,7 +396,7 @@ export const routes: RouteRecordRaw[] = [
                 meta: { title: '楼栋平面图' }
               },
               {
-                path: '/bed/room-detail',
+                path: 'room-detail',
                 name: 'LogisticsRoomDetail',
                 component: () => import('../views/bed/RoomDetail.vue'),
                 meta: { title: '房间详情', hidden: true }
@@ -1186,12 +1186,6 @@ export const routes: RouteRecordRaw[] = [
                 meta: { title: '配置变更记录' }
               }
             ]
-          },
-          {
-            path: 'deposit-management',
-            name: 'FinanceDepositManagement',
-            redirect: '/finance/accounts/list',
-            meta: { title: '押金管理（兼容）', hidden: true }
           },
           {
             path: 'accounts',

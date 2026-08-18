@@ -88,7 +88,7 @@ public class FinanceVoucherServiceImpl implements FinanceVoucherService {
     IPage<FinanceVoucherView> viewPage = new Page<>(pageNo, pageSize);
     viewPage.setTotal(page.getTotal());
     viewPage.setRecords(page.getRecords().stream()
-        .map(item -> toView(item, elderNames.get(item.getElderId())))
+        .map(item -> toView(item, item.getElderId() == null ? null : elderNames.get(item.getElderId())))
         .toList());
     return viewPage;
   }
@@ -125,7 +125,11 @@ public class FinanceVoucherServiceImpl implements FinanceVoucherService {
     }
 
     LocalDateTime now = LocalDateTime.now();
-    List<Long> elderTargets = targets.isEmpty() ? List.of((Long) null) : targets;
+    // 发放通用券时没有绑定对象，用可含 null 的列表占一个位置；
+    // List.of 不接受 null 元素，这里必须用 Collections.singletonList。
+    List<Long> elderTargets = targets.isEmpty()
+        ? java.util.Collections.singletonList((Long) null)
+        : targets;
     List<FinanceVoucherView> created = new ArrayList<>();
     for (Long elderId : elderTargets) {
       FinanceConsumerVoucher voucher = new FinanceConsumerVoucher();
@@ -196,7 +200,7 @@ public class FinanceVoucherServiceImpl implements FinanceVoucherService {
         .filter(item -> withinValidity(item, targetDate))
         .filter(item -> amount.compareTo(BigDecimal.ZERO) <= 0
             || scale(item.getMinBillAmount()).compareTo(amount) <= 0)
-        .map(item -> toView(item, elderNames.get(item.getElderId())))
+        .map(item -> toView(item, item.getElderId() == null ? null : elderNames.get(item.getElderId())))
         .toList();
   }
 
@@ -451,15 +455,17 @@ public class FinanceVoucherServiceImpl implements FinanceVoucherService {
     return view;
   }
 
+  /** 返回可变 HashMap：通用券的 elderId 为空，而 Map.of() 的 get(null) 会抛 NPE。 */
   private Map<Long, String> loadElderNames(Set<Long> elderIds) {
     if (elderIds == null || elderIds.isEmpty()) {
-      return Map.of();
+      return new java.util.HashMap<>();
     }
     return elderMapper.selectList(
             Wrappers.lambdaQuery(ElderProfile.class).in(ElderProfile::getId, elderIds))
         .stream()
         .filter(item -> item.getId() != null && item.getFullName() != null)
-        .collect(Collectors.toMap(ElderProfile::getId, ElderProfile::getFullName, (a, b) -> a));
+        .collect(Collectors.toMap(
+            ElderProfile::getId, ElderProfile::getFullName, (a, b) -> a, java.util.HashMap::new));
   }
 
   private Map<Long, String> loadBillMonths(Set<Long> billIds) {

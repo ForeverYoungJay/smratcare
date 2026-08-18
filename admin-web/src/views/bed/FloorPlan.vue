@@ -250,7 +250,7 @@ function openRoom(room: FloorPlanRoom) {
 function goRoomDetail() {
   if (!activeRoom.value) return
   roomOpen.value = false
-  router.push({ path: '/bed/room-detail', query: { roomId: String(activeRoom.value.roomId) } })
+  router.push({ path: '/logistics/assets/room-detail', query: { roomId: String(activeRoom.value.roomId) } })
 }
 
 function goElectricity() {
