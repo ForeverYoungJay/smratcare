@@ -921,7 +921,7 @@ const NON_CACHED_ROUTE_PATH_PATTERNS = [
   /^\/oa\/(approval|todo|calendar|portal|task)(\/|$)/,
   /^\/logistics\/(workbench|task-center)(\/|$)/,
   /^\/marketing\/workbench(\/|$)/,
-  /^\/elder\/(resident-360|in-hospital-overview|bed-panorama)(\/|$)/,
+  /^\/elder\/(resident-360|in-hospital-overview)(\/|$)/,
   /^\/elder\/status-change\/center(\/|$)/,
   /^\/medical\/(workbench|unified-task-center|medical-health-center|nursing-quality-center)(\/|$)/
 ]

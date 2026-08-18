@@ -70,7 +70,6 @@
             <a-radio-button value="list">卡片列表</a-radio-button>
           </a-radio-group>
           <a-button @click="openBedManage">床位管理</a-button>
-          <a-button v-if="!isMarketingMode" type="primary" @click="openElderBedPanorama">后勤房态图入口</a-button>
         </a-space>
         <a-radio-group v-if="viewMode === 'grid'" v-model:value="matrixQuickFilter" size="small" class="matrix-filter-switch">
           <a-radio-button value="all">全部</a-radio-button>
@@ -1012,10 +1011,6 @@ function printBedQr() {
 
 function openBedManage() {
   router.push('/logistics/assets/bed-management')
-}
-
-function openElderBedPanorama() {
-  router.push('/logistics/assets/room-state-map')
 }
 
 useLiveSyncRefresh({

@@ -3079,7 +3079,7 @@ function openBedMap() {
 }
 
 function openElderBedPanorama() {
-  router.push('/elder/bed-panorama')
+  router.push('/logistics/assets/room-state-map?view=plan')
 }
 
 function onWorkspaceModeChange(event: any) {

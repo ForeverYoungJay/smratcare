@@ -245,7 +245,7 @@
             :value="percentText(dashboard?.bedOccupancyRate)"
             helper="在住 / 总床位"
             tone="brand"
-            @click="router.push('/elder/bed-panorama')"
+            @click="router.push('/logistics/assets/room-state-map?view=plan')"
           />
           <OverviewMetricCard
             clickable
@@ -681,7 +681,7 @@ const commandScoreCards = computed(() => ([
     value: percentText(dashboard.value?.bedOccupancyRate),
     helper: `空床 ${displayNumber(dashboard.value?.availableBeds)} 张`,
     tone: numberValue(dashboard.value?.bedOccupancyRate) >= 85 ? 'success' as const : 'warning' as const,
-    path: '/elder/bed-panorama'
+    path: '/logistics/assets/room-state-map?view=plan'
   },
   {
     key: 'service',

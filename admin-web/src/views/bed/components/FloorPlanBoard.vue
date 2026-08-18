@@ -135,16 +135,25 @@
             <strong>{{ item.elderName }}</strong>
             <small>{{ item.bedNo || '未分配床位' }}{{ item.careLevel ? ' · ' + item.careLevel : '' }}</small>
           </div>
-          <span :class="Number(item.outstandingAmount || 0) > 0 ? 'is-danger-text' : ''">
-            欠费 {{ amount(item.outstandingAmount) }} 元
-          </span>
+          <div class="resident-row__right">
+            <span :class="Number(item.outstandingAmount || 0) > 0 ? 'is-danger-text' : ''">
+              欠费 {{ amount(item.outstandingAmount) }} 元
+            </span>
+            <a-space size="small">
+              <a-button type="link" size="small" @click="goElderProfile(item.elderId)">档案</a-button>
+              <a-button type="link" size="small" @click="goAssessment(item.elderId)">评估</a-button>
+              <a-button type="link" size="small" @click="goContracts(item.elderId)">合同票据</a-button>
+              <a-button type="link" size="small" @click="goStatusChange(item.elderId)">状态变更</a-button>
+            </a-space>
+          </div>
         </div>
       </div>
       <a-empty v-else description="该房间当前没有在住长者" />
 
       <div class="modal-actions">
-        <a-space>
+        <a-space wrap>
           <a-button @click="goRoomDetail">进入房间详情</a-button>
+          <a-button v-if="hasEmptyBed" @click="goAdmission">安排入住</a-button>
           <a-button type="primary" @click="goElectricity">去登记电费</a-button>
         </a-space>
       </div>
@@ -250,6 +259,32 @@ function goRoomDetail() {
   if (!activeRoom.value) return
   roomOpen.value = false
   router.push({ path: '/logistics/assets/room-detail', query: { roomId: String(activeRoom.value.roomId) } })
+}
+
+const hasEmptyBed = computed(() =>
+  Number(activeRoom.value?.totalBeds || 0) > Number(activeRoom.value?.occupiedBeds || 0)
+)
+
+// 下面几个跳转承接原 3D 床态全景页的导航能力（该页只读、动作全是跳转，故随 3D 一并下线）。
+// 统一用路由 name，避免手写路径与真实路由不一致。
+function goElderProfile(elderId: string | number) {
+  router.push({ name: 'ElderDetail', params: { id: String(elderId) } })
+}
+
+function goAssessment(elderId: string | number) {
+  router.push({ name: 'ElderAssessmentAdmission', query: { elderId: String(elderId) } })
+}
+
+function goContracts(elderId: string | number) {
+  router.push({ name: 'ElderContractsInvoices', query: { residentId: String(elderId) } })
+}
+
+function goStatusChange(elderId: string | number) {
+  router.push({ name: 'ElderStatusChangeOverview', query: { residentId: String(elderId) } })
+}
+
+function goAdmission() {
+  router.push({ name: 'ElderAdmissionProcessing' })
 }
 
 function goElectricity() {
@@ -470,5 +505,12 @@ onMounted(load)
 .modal-actions {
   margin-top: 16px;
   text-align: right;
+}
+
+.resident-row__right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
 }
 </style>
