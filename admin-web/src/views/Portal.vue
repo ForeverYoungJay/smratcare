@@ -665,7 +665,7 @@ const commandScoreCards = computed(() => ([
     value: percentText(dashboard.value?.bedOccupancyRate),
     helper: `空床 ${displayNumber(dashboard.value?.availableBeds)} 张`,
     tone: numberValue(dashboard.value?.bedOccupancyRate) >= 85 ? 'success' as const : 'warning' as const,
-    path: '/logistics/assets/room-state-map?view=plan'
+    path: '/elder/bed-panorama'
   },
   {
     key: 'service',

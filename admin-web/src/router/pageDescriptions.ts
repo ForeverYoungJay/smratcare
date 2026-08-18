@@ -23,6 +23,7 @@ export const PAGE_DESCRIPTIONS: Record<string, string> = {
   // ===== 长者管理 =====
   Elder: '长者档案、在院状态与服务全生命周期管理',
   ElderInHospitalOverview: '单个长者的护理/膳食/医疗/费用一体化视图',
+  ElderBedPanorama: '楼栋-楼层-房间-床位的可视化床态总览',
   ElderList: '长者档案总表：查询、建档与集中操作',
   ElderAssessment: '长者能力与各类量表评估的管理入口',
   ElderAssessmentAdmission: '入住时的能力初评',
@@ -403,7 +404,8 @@ export const PAGE_DESCRIPTIONS: Record<string, string> = {
 export const PAGE_ALIASES: Record<string, string[]> = {
   FinancePaymentsCashierDesk: ['收钱', '收款', '结账', '开票'],
   FinanceBillsFollowUp: ['催费', '要钱', '欠钱', '催缴', '提醒'],
-  LogisticsRoomStateMap: ['找床', '床位图', '空床', '房间图', '房态', '平面图'],
+  ElderBedPanorama: ['找床', '床位图', '空床'],
+  LogisticsRoomStateMap: ['房间图', '房态', '平面图'],
   ElderAdmissionProcessing: ['入住', '办入院', '安排床位'],
   ElderStatusChangeDischargeApply: ['退住', '退院', '离院'],
   WorkbenchAttendance: ['打卡', '请假', '考勤'],

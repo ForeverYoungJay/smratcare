@@ -135,11 +135,10 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '在院服务总览' }
           },
           {
-            // 3D 床态全景已下线，床位可视化统一到房态图的楼层平面图布局；旧入口保留为重定向
             path: 'bed-panorama',
             name: 'ElderBedPanorama',
-            redirect: { path: '/logistics/assets/room-state-map', query: { view: 'plan' } },
-            meta: { title: '床态全景（已并入房态图）', hidden: true }
+            component: () => import('../views/elder/resident360/BedPanorama.vue'),
+            meta: { title: '床态全景' }
           },
           {
             path: 'list',
@@ -434,7 +433,7 @@ export const routes: RouteRecordRaw[] = [
               {
                 path: 'bed-panorama',
                 name: 'LogisticsBedPanorama',
-                redirect: { path: '/logistics/assets/room-state-map', query: { view: 'plan' } },
+                redirect: '/elder/bed-panorama',
                 meta: { title: '床态全景', hidden: true }
               },
               {
