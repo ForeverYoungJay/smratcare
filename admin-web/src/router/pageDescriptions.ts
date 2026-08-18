@@ -9,7 +9,7 @@
  */
 export const PAGE_DESCRIPTIONS: Record<string, string> = {
   // ===== 核心 / 首页与工作台 =====
-  Portal: '机构经营与安全总览，管理者的第一落脚点',
+  Portal: '院长视角汇总结论：入住率、服务完成、回款、风险与收费押金总览',
   FunctionMap: '全站功能目录，按业务板块查“哪个页面干什么”',
   Workbench: '个人待办中心：打卡、待办、审批、日程集中处理',
   WorkbenchOverview: '我的当日待办、审批与协同事项一屏处理',
@@ -159,7 +159,7 @@ export const PAGE_DESCRIPTIONS: Record<string, string> = {
 
   // ===== 财务运营中心 =====
   Finance: '收费、账单、对账与经营分析中心',
-  FinanceWorkbench: '财务当日收费、欠费、对账重点一屏',
+  FinanceWorkbench: '财务当班要处理的收费、欠费、退款与对账动作入口',
   FinancePayments: '收银、收费登记与收款流水',
   FinancePaymentsCashierDesk: '当面收款、开票、打印小票',
   FinancePaymentsRegister: '收费项目登记',

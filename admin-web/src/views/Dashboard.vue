@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="运营看板" subTitle="实时掌握机构运行情况">
+  <PageContainer title="运营看板" subTitle="实时运行明细与趋势下钻；首页只给院长视角的汇总结论">
     <StatefulBlock :loading="loading" :error="errorMessage" @retry="loadSummary">
       <a-row :gutter="16">
         <a-col :xs="24" :sm="12" :lg="6" v-for="card in coreCards" :key="card.title">
