@@ -40,7 +40,36 @@
         @toggle-sidebar="toggleSidebar"
       >
         <template #notification-overlay>
-          <a-menu>
+          <a-menu class="notify-menu">
+            <a-menu-item-group :title="`未处理提醒 ${financeReminderPending}`">
+              <a-menu-item
+                v-for="item in financeReminderItems"
+                :key="`reminder-${item.id}`"
+                class="notify-menu__reminder"
+              >
+                <div class="notify-reminder">
+                  <div class="notify-reminder__text" @click="goReminderAction(item)">
+                    <strong>{{ item.title }}</strong>
+                    <small>{{ item.reminderTypeText }}{{ item.bizMonth ? ' · ' + item.bizMonth : '' }}</small>
+                  </div>
+                  <a-button type="link" size="small" @click.stop="markReminderHandled(item)">已处理</a-button>
+                </div>
+              </a-menu-item>
+              <a-menu-item v-if="!financeReminderItems.length" key="reminder-empty" disabled>
+                暂无未处理提醒
+              </a-menu-item>
+              <a-menu-item
+                v-if="financeReminderPending > 0"
+                key="reminder-handle-all"
+                @click="markAllRemindersHandled"
+              >
+                一键全部处理（{{ financeReminderPending }} 条）
+              </a-menu-item>
+              <a-menu-item key="reminder-center" @click="router.push('/finance/reminder-center')">
+                进入提醒中心
+              </a-menu-item>
+            </a-menu-item-group>
+            <a-menu-divider />
             <a-menu-item v-for="item in quickNotifyItems" :key="item.title" @click="onQuickNotifyClick(item)">
               {{ item.title }}
             </a-menu-item>
@@ -857,6 +886,13 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { getMenuTree, isFocusedEmployeeRole } from './menu'
 import { getMe } from '../api/auth'
+import {
+  getReminderPage,
+  getReminderSummary,
+  handleAllReminders,
+  handleReminder,
+  type FinanceReminderItem
+} from '../api/financeReminder'
 import { getStaffPage } from '../api/rbac'
 import { updateStaff } from '../api/staff'
 import { createOaTask, fanoutQuickChatState, getQuickChatState, publishQuickChatEventBatch, saveQuickChatState, uploadOaFile } from '../api/oa'
@@ -1334,11 +1370,54 @@ const quickChatTodoPendingCount = computed(() => quickChatTodoItems.value.filter
 const quickChatTodoOverdueCount = computed(() =>
   quickChatTodoItems.value.filter((item) => !item.done && isQuickChatTodoOverdue(item)).length
 )
-// 铃铛徽章必须反映真实未处理量（未读消息 + 逾期待办），
+// 财务提醒（下月代养费/押金未缴清/电费未登记与未缴）驱动铃铛。
+// 非财务角色调用会被后端拦掉，这里静默降级为 0，不影响其它头部功能。
+const financeReminderPending = ref(0)
+const financeReminderItems = ref<FinanceReminderItem[]>([])
+
+async function loadFinanceReminders() {
+  try {
+    const [summary, page] = await Promise.all([
+      getReminderSummary(),
+      getReminderPage({ pageNo: 1, pageSize: 5, status: 'PENDING' })
+    ])
+    financeReminderPending.value = Number(summary?.pendingCount || 0)
+    financeReminderItems.value = page?.list || []
+  } catch {
+    financeReminderPending.value = 0
+    financeReminderItems.value = []
+  }
+}
+
+async function markReminderHandled(item: FinanceReminderItem) {
+  try {
+    await handleReminder(item.id)
+    message.success('已标记处理')
+    await loadFinanceReminders()
+  } catch {
+    // 失败信息由请求层统一提示
+  }
+}
+
+async function markAllRemindersHandled() {
+  try {
+    const res = await handleAllReminders(undefined, '铃铛一键处理')
+    message.success(`已处理 ${res?.handled || 0} 条`)
+    await loadFinanceReminders()
+  } catch {
+    // 失败信息由请求层统一提示
+  }
+}
+
+function goReminderAction(item: FinanceReminderItem) {
+  router.push(item.actionPath || '/finance/reminder-center')
+}
+
+// 铃铛徽章必须反映真实未处理量：财务提醒未处理数 + 未读消息 + 逾期待办，
 // 不能再等于下拉里固定快捷入口的条数，否则永远显示同一个数字
 const notificationBadgeCount = computed(() => {
   if (!headerSettings.quickNotifyEnabled) return 0
-  return quickChatUnreadCount.value + quickChatTodoOverdueCount.value
+  return financeReminderPending.value + quickChatUnreadCount.value + quickChatTodoOverdueCount.value
 })
 const quickChatTodoCompletionRate = computed(() => {
   const total = quickChatTodoItems.value.length
@@ -5654,6 +5733,7 @@ onMounted(() => {
       ensureActiveQuickChatVisible()
       refreshQuickChatAttendanceOverview().catch(() => {})
       refreshActiveQuickChatMemberWorkStatuses().catch(() => {})
+      loadFinanceReminders()
     })
     .finally(() => {
       restoreRouteTabs()
@@ -6781,5 +6861,41 @@ function onQuickChatStorageChange(event: StorageEvent) {
     font-size: 14px;
     padding: 12px 14px;
   }
+}
+
+.notify-menu {
+  max-width: 380px;
+}
+
+.notify-menu__reminder {
+  height: auto !important;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+  line-height: 1.4 !important;
+}
+
+.notify-reminder {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.notify-reminder__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.notify-reminder__text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.notify-reminder__text small {
+  color: var(--text-tertiary, #999);
+  font-size: 12px;
 }
 </style>

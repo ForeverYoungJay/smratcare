@@ -178,6 +178,7 @@ export const PAGE_DESCRIPTIONS: Record<string, string> = {
   FinanceConsumerVoucher: '消费券发放、作废与核销流水追溯',
   FinanceElectricityFee: '按房间登记电表读数，自动核算电费并跟踪缴费状态',
   FinanceDepositManagement: '押金标准、缴纳/扣款/退还登记与在押余额台账',
+  FinanceReminderCenter: '代养费/押金/电费提醒的统一处置与一键处理',
   FinanceAccountsWarningRules: '账户余额预警规则',
   FinanceAdmissionFeeAudit: '入住费用审核',
   FinanceSources: '各类消费与费用分摊来源',

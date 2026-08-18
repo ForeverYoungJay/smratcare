@@ -417,14 +417,15 @@ public class DepositServiceImpl implements DepositService {
             .last("LIMIT 1"));
   }
 
+  /** 返回可变 HashMap：Map.of() 的 get(null) 会抛 NPE。 */
   private Map<Long, ElderProfile> loadElders(Set<Long> elderIds) {
     if (elderIds == null || elderIds.isEmpty()) {
-      return Map.of();
+      return new HashMap<>();
     }
     return elderMapper.selectList(
             Wrappers.lambdaQuery(ElderProfile.class).in(ElderProfile::getId, elderIds))
         .stream()
-        .collect(Collectors.toMap(ElderProfile::getId, Function.identity(), (a, b) -> a));
+        .collect(Collectors.toMap(ElderProfile::getId, Function.identity(), (a, b) -> a, HashMap::new));
   }
 
   /** elderId -> [roomNo, bedNo]。 */

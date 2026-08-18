@@ -857,6 +857,12 @@ export const routes: RouteRecordRaw[] = [
                 meta: { title: '押金管理' }
               },
               {
+                path: '/finance/reminder-center',
+                name: 'FinanceReminderCenter',
+                component: () => import('../views/finance/ReminderCenter.vue'),
+                meta: { title: '财务提醒中心' }
+              },
+              {
                 path: '/finance/accounts/warning-rules',
                 name: 'FinanceAccountsWarningRules',
                 component: () => import('../views/finance/BalanceWarningRules.vue'),
