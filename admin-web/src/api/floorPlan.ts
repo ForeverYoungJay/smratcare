@@ -9,6 +9,17 @@ export interface FloorPlanResident {
   outstandingAmount: number
 }
 
+export interface FloorPlanBed {
+  bedId: Id
+  bedNo?: string
+  bedType?: string
+  status?: number
+  statusText?: string
+  bedQrCode?: string
+  elderId?: Id
+  elderName?: string
+}
+
 export interface FloorPlanRoom {
   roomId: Id
   roomNo: string
@@ -25,6 +36,9 @@ export interface FloorPlanRoom {
   overdueAmount: number
   electricityUnpaid: boolean
   electricityFee: number
+  floorId?: Id
+  sortNo?: number
+  beds?: FloorPlanBed[]
   residents: FloorPlanResident[]
 }
 

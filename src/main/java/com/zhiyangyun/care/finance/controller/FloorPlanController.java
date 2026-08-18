@@ -162,6 +162,34 @@ public class FloorPlanController {
       view.setElderCount(roomElderIds.size());
       boolean enabled = !Integer.valueOf(0).equals(room.getStatus());
       view.setEnabled(enabled);
+      view.setFloorId(room.getFloorId());
+      view.setSortNo(room.getSortNo());
+
+      // 逐床位明细：平面图上的床位点击与二维码打印都要用，避免前端再单独取一份床位数据
+      Map<Long, Long> elderIdByBedId = new HashMap<>();
+      for (Map.Entry<Long, Bed> occupied : occupiedBedByElder.entrySet()) {
+        Bed occupiedBed = occupied.getValue();
+        if (occupiedBed != null && occupiedBed.getId() != null) {
+          elderIdByBedId.put(occupiedBed.getId(), occupied.getKey());
+        }
+      }
+      List<Bed> sortedRoomBeds = roomBeds.stream()
+          .sorted(Comparator.comparing(item -> normalizeText(item.getBedNo())))
+          .toList();
+      for (Bed roomBed : sortedRoomBeds) {
+        FloorPlanResponse.BedCell cell = new FloorPlanResponse.BedCell();
+        cell.setBedId(roomBed.getId());
+        cell.setBedNo(roomBed.getBedNo());
+        cell.setBedType(roomBed.getBedType());
+        cell.setStatus(roomBed.getStatus());
+        cell.setStatusText(bedStatusText(roomBed.getStatus()));
+        cell.setBedQrCode(roomBed.getBedQrCode());
+        Long bedElderId = elderIdByBedId.get(roomBed.getId());
+        cell.setElderId(bedElderId);
+        ElderProfile bedElder = bedElderId == null ? null : elderMap.get(bedElderId);
+        cell.setElderName(bedElder == null ? null : bedElder.getFullName());
+        view.getBeds().add(cell);
+      }
 
       BigDecimal roomOverdue = BigDecimal.ZERO;
       for (Long elderId : roomElderIds) {
@@ -249,6 +277,20 @@ public class FloorPlanController {
             .multiply(BigDecimal.valueOf(100))
             .divide(BigDecimal.valueOf(totalBeds), 1, RoundingMode.HALF_UP));
     return Result.ok(response);
+  }
+
+  private static String bedStatusText(Integer status) {
+    if (status == null) {
+      return "-";
+    }
+    return switch (status) {
+      case 1 -> "空床";
+      case 2 -> "入住";
+      case 3 -> "维修";
+      case 4 -> "清洁";
+      case 5 -> "锁定";
+      default -> "状态" + status;
+    };
   }
 
   private static String orientationText(String orientation) {

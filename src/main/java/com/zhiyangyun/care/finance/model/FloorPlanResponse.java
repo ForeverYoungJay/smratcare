@@ -60,7 +60,23 @@ public class FloorPlanResponse {
     private BigDecimal overdueAmount = BigDecimal.ZERO;
     private Boolean electricityUnpaid = false;
     private BigDecimal electricityFee = BigDecimal.ZERO;
+    private Long floorId;
+    private Integer sortNo;
+    /** 逐床位明细：支撑平面图上的床位点击与床位二维码打印。 */
+    private List<BedCell> beds = new ArrayList<>();
     private List<Resident> residents = new ArrayList<>();
+  }
+
+  @Data
+  public static class BedCell {
+    private Long bedId;
+    private String bedNo;
+    private String bedType;
+    private Integer status;
+    private String statusText;
+    private String bedQrCode;
+    private Long elderId;
+    private String elderName;
   }
 
   @Data
