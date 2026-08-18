@@ -176,6 +176,7 @@ export const PAGE_DESCRIPTIONS: Record<string, string> = {
   FinanceAccountsLedger: '账户资金流水',
   FinancePrepaidRecharge: '账户预存充值',
   FinanceConsumerVoucher: '消费券发放、作废与核销流水追溯',
+  FinanceElectricityFee: '按房间登记电表读数，自动核算电费并跟踪缴费状态',
   FinanceAccountsWarningRules: '账户余额预警规则',
   FinanceAdmissionFeeAudit: '入住费用审核',
   FinanceSources: '各类消费与费用分摊来源',

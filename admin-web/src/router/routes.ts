@@ -845,6 +845,12 @@ export const routes: RouteRecordRaw[] = [
                 meta: { title: '消费券管理' }
               },
               {
+                path: '/finance/electricity-fee',
+                name: 'FinanceElectricityFee',
+                component: () => import('../views/finance/ElectricityFee.vue'),
+                meta: { title: '电费管理' }
+              },
+              {
                 path: '/finance/accounts/warning-rules',
                 name: 'FinanceAccountsWarningRules',
                 component: () => import('../views/finance/BalanceWarningRules.vue'),
