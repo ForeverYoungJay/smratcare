@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="首页" subTitle="院长视角的经营与安全总览；要看实时运行明细去「运营看板」，要处理收费去「财务工作台」" mode="showcase" kicker="机构总览">
+  <PageContainer title="首页" subTitle="机构经营与安全总览" mode="showcase" kicker="机构总览">
     <template #meta>
       <a-space wrap>
         <StatusTag text="经营总览" tone="pending" />
@@ -236,9 +236,17 @@
     <section class="portal-grid portal-grid--main">
       <SectionPanel
         title="运营概览"
-        description="咨询转化与本月收入趋势；入住率和服务完成率见上方「院长运营指挥台」，同一口径不在首页重复展示。"
+        description="把入住、收入、咨询转化和服务完成率放在同一视图里，方便先看经营，再判断需要调度的业务。"
       >
         <div class="portal-grid portal-grid--operating">
+          <OverviewMetricCard
+            clickable
+            label="床位入住率"
+            :value="percentText(dashboard?.bedOccupancyRate)"
+            helper="在住 / 总床位"
+            tone="brand"
+            @click="router.push('/elder/bed-panorama')"
+          />
           <OverviewMetricCard
             clickable
             label="新增咨询 / 新增长者"
@@ -246,6 +254,14 @@
             helper="营销线索与入住净增"
             tone="success"
             @click="router.push('/stats/operations?tab=marketing')"
+          />
+          <OverviewMetricCard
+            clickable
+            label="服务完成率"
+            :value="percentText(serviceCompletionRate)"
+            helper="护理任务完成度"
+            tone="success"
+            @click="router.push('/medical-care/care-task-board')"
           />
           <SectionPanel dense title="本月收入趋势" description="最近 6 个月收费收入走势">
             <v-chart class="trend-chart" :option="revenueTrendOption" autoresize />
@@ -803,9 +819,16 @@ const pendingTotal = computed(() =>
 )
 
 // 首屏只突出四组最关键的经营与安全指标，其余下沉到「更多机构概览」。
-// 每个口径只在首页出现一次：入住率/服务完成/本月回款/未闭环风险由上方
-// 「院长运营指挥台」承担，这里只保留指挥台没有的两项，避免同一个数字在首屏出现两遍。
 const primaryMetrics = computed(() => ([
+  {
+    label: '未闭环风险',
+    value: displayNumber(openRiskCount.value),
+    helper: '体检异常 · 未闭环事故 · 维修超时工单',
+    tone: openRiskCount.value > 0 ? 'danger' as const : 'success' as const,
+    path: '/stats/operations?tab=safety',
+    statusText: openRiskCount.value > 0 ? '需闭环处理' : '平稳',
+    statusTone: openRiskCount.value > 0 ? 'danger' as const : 'normal' as const
+  },
   {
     label: '待处理事项',
     value: displayNumber(pendingTotal.value),
@@ -818,17 +841,33 @@ const primaryMetrics = computed(() => ([
   {
     label: '在住 / 空床',
     value: `${displayNumber(dashboard.value?.inHospitalCount)} / ${displayNumber(dashboard.value?.availableBeds)}`,
-    // 与「收费与押金总览」的在住老人数口径不同：这里按床位占用统计，那里按长者档案在住状态统计
-    helper: '按床位占用统计：在住长者 / 空置床位',
+    helper: '在住长者 / 空置床位',
     tone: 'brand' as const,
     path: '/elder/in-hospital-overview',
     statusText: '核心',
     statusTone: 'pending' as const
+  },
+  {
+    label: '本月收入 / 欠费',
+    value: displayCurrency(revenue.value?.totalRevenue ?? dashboard.value?.totalRevenue),
+    helper: '本月收费与回款，可下钻欠费与结算',
+    tone: 'success' as const,
+    path: '/finance/workbench',
+    statusText: '经营',
+    statusTone: 'normal' as const
   }
 ]))
 
-// 今日护理任务由下方「今日工作」区块承担，这里不再重复
 const secondaryMetrics = computed(() => ([
+  {
+    label: '今日护理任务',
+    value: displayNumber(dashboard.value?.careTasksToday),
+    helper: '护理执行与巡诊跟踪',
+    tone: 'brand' as const,
+    path: '/medical-care/care-task-board',
+    statusText: '任务',
+    statusTone: 'pending' as const
+  },
   {
     label: '员工在岗数',
     value: displayNumber(hr.value?.onJobCount),
