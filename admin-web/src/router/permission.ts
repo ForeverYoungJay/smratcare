@@ -1,6 +1,7 @@
 import type { Router } from 'vue-router'
-import { getPagePermissions, getRoles, getToken } from '../utils/auth'
+import { getPagePermissions, getPermissions, getRoles, getToken } from '../utils/auth'
 import { resolveRouteAccess } from '../utils/routeAccess'
+import { resolveDefaultHome } from '../access/policy'
 
 function normalizeRedirectPath(path?: string | null) {
   const raw = String(path || '').trim()
@@ -35,7 +36,7 @@ export function setupPermission(router: Router) {
 
     if (to.path === '/login' && token) {
       const redirect = typeof to.query.redirect === 'string' ? to.query.redirect : ''
-      next(normalizeRedirectPath(redirect))
+      next(redirect ? normalizeRedirectPath(redirect) : resolveDefaultHome(getRoles()))
       return
     }
 
@@ -48,7 +49,7 @@ export function setupPermission(router: Router) {
 
     const roles = getRoles()
     const pagePermissions = getPagePermissions()
-    const access = resolveRouteAccess(router, roles, to.path, pagePermissions)
+    const access = resolveRouteAccess(router, roles, to.path, pagePermissions, getPermissions())
     if (!access.canAccess) {
       next('/403')
       return

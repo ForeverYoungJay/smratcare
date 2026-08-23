@@ -145,7 +145,7 @@
         <a-col :xs="24" :xl="12" style="margin-bottom: 12px">
           <a-card class="card-elevated" :bordered="false" title="执行任务总览">
             <a-space wrap>
-              <a-button @click="go('/medical-care/orders', { status: 'PENDING' })">待执行医嘱 {{ summary.medicalOrderPendingCount || 0 }}</a-button>
+              <a-button @click="go('/medical-care/order-risk-overview', { status: 'PENDING' })">待执行医嘱 {{ summary.medicalOrderPendingCount || 0 }}</a-button>
               <a-button @click="go('/medical-care/care-task-board', { status: 'OVERDUE' })">超时护理 {{ summary.overdueCareTaskCount || 0 }}</a-button>
               <a-button @click="go('/medical-care/inspection', { status: 'ABNORMAL' })">异常巡检 {{ summary.abnormalInspectionOpenCount || 0 }}</a-button>
               <a-button @click="go('/medical-care/nursing-log', { status: 'PENDING' })">日志待补录 {{ summary.nursingLogPendingCount || 0 }}</a-button>
@@ -385,7 +385,7 @@ const keyStats = computed(() => [
     label: '医嘱待执行',
     value: summary.value.medicalOrderPendingCount || 0,
     hint: `异常 ${summary.value.medicalOrderAbnormalCount || 0}`,
-    route: '/medical-care/orders?status=PENDING'
+    route: '/medical-care/order-risk-overview?status=PENDING'
   },
   {
     key: 'care-overdue',

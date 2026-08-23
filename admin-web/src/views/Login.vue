@@ -98,6 +98,7 @@ import brandLogoUrl from '../assets/guifeng-logo.png'
 import { login } from '../api/auth'
 import { verifyTwoFactor, resendTwoFactorCode } from '../api/complianceSecurity'
 import { useUserStore } from '../stores/user'
+import { resolveDefaultHome } from '../access/policy'
 
 const route = useRoute()
 const router = useRouter()
@@ -222,15 +223,8 @@ function fillDemo(username: string) {
   form.password = '123456'
 }
 
-function normalizeRoleList(roles: string[]) {
-  return roles.map((role) => String(role || '').trim().toUpperCase()).filter(Boolean)
-}
-
 function resolvePostLoginPath(roles: string[]) {
-  const normalized = normalizeRoleList(roles)
-  const hasManageRole = normalized.some((role) => ['ADMIN', 'SYS_ADMIN', 'DIRECTOR'].includes(role))
-  const hasEmployeeRole = normalized.some((role) => role.endsWith('_EMPLOYEE') || role.endsWith('_MINISTER'))
-  return hasEmployeeRole && !hasManageRole ? '/workbench/overview' : '/portal'
+  return resolveDefaultHome(roles)
 }
 
 async function onSubmit() {

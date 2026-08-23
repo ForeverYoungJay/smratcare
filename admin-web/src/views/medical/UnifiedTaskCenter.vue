@@ -437,7 +437,7 @@ function goDetail(record: MedicalUnifiedTaskItem) {
     return
   }
   if (record.module === 'ORDER') {
-    router.push({ path: '/medical-care/orders', query: { elderId: record.residentId, filter: 'to_execute' } })
+    router.push({ path: '/medical-care/order-risk-overview', query: { elderId: record.residentId, filter: 'to_execute' } })
     return
   }
   if (record.module === 'INSPECTION') {

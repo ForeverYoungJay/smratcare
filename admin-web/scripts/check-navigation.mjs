@@ -7,6 +7,8 @@ const ROOT = process.cwd()
 const ROUTES_FILE = path.join(ROOT, 'src/router/routes.ts')
 const LEGACY_FILE = path.join(ROOT, 'src/router/legacyRedirects.ts')
 const MARKETING_FILE = path.join(ROOT, 'src/router/marketingRoutes.ts')
+const ROUTE_ALIASES_FILE = path.join(ROOT, 'src/router/routeAliases.ts')
+const POLICY_FILE = path.join(ROOT, 'src/access/policy.ts')
 const SRC_DIR = path.join(ROOT, 'src')
 
 // 用 esbuild 把 TS 源码转成 CJS 后在沙箱执行；组件懒加载 () => import(...) 不会被调用，因此无需真实模块。
@@ -29,9 +31,18 @@ function loadModule(file, requireShim) {
 function loadRoutes() {
   const legacy = loadModule(LEGACY_FILE)
   const marketing = loadModule(MARKETING_FILE)
+  const routeAliases = loadModule(ROUTE_ALIASES_FILE, (id) => {
+    if (id.includes('route-aliases.json')) {
+      return JSON.parse(fs.readFileSync(path.join(ROOT, '../src/main/resources/security/route-aliases.json'), 'utf8'))
+    }
+    return {}
+  })
+  const policy = loadModule(POLICY_FILE)
   const requireShim = (id) => {
     if (id.includes('legacyRedirects')) return legacy
     if (id.includes('marketingRoutes')) return marketing
+    if (id.includes('routeAliases')) return routeAliases
+    if (id.includes('access/policy')) return policy
     return {}
   }
   return loadModule(ROUTES_FILE, requireShim).routes || []
@@ -103,7 +114,8 @@ function normalizePath(input) {
   return input
     .split('#')[0]
     .split('?')[0]
-    .replace(/\$\{[^}]+\}/g, 'DYNAMIC')
+    .replace(/\/\$\{[^}]+\}/g, '/DYNAMIC')
+    .replace(/\$\{[^}]+\}/g, '')
 }
 
 function toRouteRegex(routePath) {
@@ -145,4 +157,3 @@ if (unresolved.length) {
     })
   process.exit(1)
 }
-

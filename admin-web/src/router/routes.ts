@@ -1,10 +1,14 @@
 import type { RouteRecordRaw } from 'vue-router'
 import { legacyModuleRedirects } from './legacyRedirects'
 import { marketingRoutes } from './marketingRoutes'
+import { getRoles } from '../utils/auth'
+import { DEPARTMENT_ALL_ROLES, DEPARTMENT_MINISTER_ROLES, ROLE_CODES, resolveDefaultHome } from '../access/policy'
+import { redirectPreservingLocation } from './routeAliases'
 
 export const routes: RouteRecordRaw[] = [
   {
     path: '/enterprise',
+    component: () => import('../views/EnterpriseHome.vue'),
     beforeEnter() {
       window.location.replace('/')
       return false
@@ -13,6 +17,7 @@ export const routes: RouteRecordRaw[] = [
   },
   {
     path: '/home',
+    component: () => import('../views/EnterpriseHome.vue'),
     beforeEnter() {
       window.location.replace('/')
       return false
@@ -40,13 +45,13 @@ export const routes: RouteRecordRaw[] = [
     path: '/',
     name: 'Root',
     component: () => import('../layouts/BasicLayout.vue'),
-    redirect: '/portal',
+    redirect: () => resolveDefaultHome(getRoles()),
     children: [
       {
         path: 'portal',
         name: 'Portal',
         component: () => import('../views/Portal.vue'),
-        meta: { title: '首页', icon: 'HomeOutlined', navSection: 'entry', navOrder: 10, navPinned: true }
+        meta: { title: '经营总览', icon: 'HomeOutlined', navSection: 'entry', navOrder: 10, navPinned: true, roles: [ROLE_CODES.DIRECTOR, ROLE_CODES.ADMIN] }
       },
       {
         path: 'function-map',
@@ -101,7 +106,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'approvals',
             name: 'WorkbenchApprovals',
             component: () => import('../views/oa/Approval.vue'),
-            meta: { title: '我的审批' }
+            meta: { title: '待我审批', roles: [...DEPARTMENT_MINISTER_ROLES, ROLE_CODES.DIRECTOR, ROLE_CODES.ADMIN] }
           }
         ]
       },
@@ -563,7 +568,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'care',
         name: 'Care',
-        meta: { title: '照护管理', icon: 'ScheduleOutlined', hidden: true, roles: ['NURSING_EMPLOYEE', 'NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
+        meta: { title: '护理部业务', icon: 'ScheduleOutlined', navSection: 'care', navOrder: 35, navPinned: true, roles: ['NURSING_EMPLOYEE', 'NURSING_MINISTER', 'DIRECTOR', 'ADMIN'] },
         redirect: '/care/staff/caregiver-info',
         children: [
           {
@@ -703,7 +708,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'exception',
             name: 'CareException',
             component: () => import('../views/care/Exception.vue'),
-            meta: { title: '异常任务', hidden: true }
+            meta: { title: '异常任务' }
           },
           {
             path: 'audit',
@@ -721,7 +726,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'workbench/plan',
             name: 'CareWorkbenchPlan',
             component: () => import('../views/care/workbench/CarePlan.vue'),
-            meta: { title: '照护计划', hidden: true }
+            meta: { title: '长者护理计划' }
           },
           {
             path: 'workbench/qr',
@@ -1520,10 +1525,10 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '健康服务与医护账户一体化' }
           },
           {
-            path: 'orders',
-            name: 'MedicalCareOrders',
+            path: 'order-risk-overview',
+            name: 'MedicalCareOrderRiskOverview',
             component: () => import('../views/medical/MedicalOrderCenter.vue'),
-            meta: { title: '医嘱管理' }
+            meta: { title: '医嘱执行风险总览', hidden: true, searchable: false }
           },
           {
             path: 'nursing-quality',
@@ -1774,7 +1779,10 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'stats',
         name: 'Stats',
-        meta: { title: '统计分析', icon: 'BarChartOutlined', navSection: 'operations', navOrder: 70, navPinned: true },
+        meta: {
+          title: '统计分析', icon: 'BarChartOutlined', navSection: 'operations', navOrder: 70, navPinned: true,
+          roles: [...DEPARTMENT_ALL_ROLES, ROLE_CODES.DIRECTOR, ROLE_CODES.ADMIN, ROLE_CODES.SYS_ADMIN]
+        },
         children: [
           {
             path: '',
@@ -1871,7 +1879,7 @@ export const routes: RouteRecordRaw[] = [
             component: () => import('../views/compliance/SecurityPolicyConfig.vue'),
             meta: {
               title: '安全策略配置',
-              roles: ['SYS_ADMIN', 'DIRECTOR', 'ADMIN']
+              roles: ['SYS_ADMIN']
             }
           },
           {
@@ -2298,8 +2306,8 @@ export const routes: RouteRecordRaw[] = [
               {
                 path: 'calendar',
                 name: 'OaCalendar',
-                redirect: '/workbench/schedule',
-                meta: { title: '行政日历 / 协同日历', hidden: true }
+                redirect: redirectPreservingLocation('/workbench/schedule'),
+                meta: { title: '行政日历 / 协同日历', hidden: true, legacy: true, searchable: false }
               },
               {
                 path: 'daily-report',
@@ -2400,14 +2408,14 @@ export const routes: RouteRecordRaw[] = [
               {
                 path: 'manage',
                 name: 'OaSurveyManage',
-                redirect: '/oa/activity-center/survey-manage',
-                meta: { title: '问卷管理（兼容）', hidden: true }
+                redirect: redirectPreservingLocation('/oa/activity-center/survey-manage'),
+                meta: { title: '问卷管理（兼容）', hidden: true, legacy: true, searchable: false }
               },
               {
                 path: 'stats',
                 name: 'OaSurveyStats',
-                redirect: '/oa/activity-center/survey-stats',
-                meta: { title: '问卷统计（兼容）', hidden: true }
+                redirect: redirectPreservingLocation('/oa/activity-center/survey-stats'),
+                meta: { title: '问卷统计（兼容）', hidden: true, legacy: true, searchable: false }
               }
             ]
           },
@@ -2464,14 +2472,14 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'activity',
             name: 'OaActivity',
-            redirect: '/oa/activity-center/records',
-            meta: { title: '活动管理（兼容）', hidden: true }
+            redirect: redirectPreservingLocation('/oa/activity-center/records'),
+            meta: { title: '活动管理（兼容）', hidden: true, legacy: true, searchable: false }
           },
           {
             path: 'activity-plan',
             name: 'OaActivityPlan',
-            redirect: '/oa/activity-center/plan',
-            meta: { title: '活动计划（兼容）', hidden: true }
+            redirect: redirectPreservingLocation('/oa/activity-center/plan'),
+            meta: { title: '活动计划（兼容）', hidden: true, legacy: true, searchable: false }
           },
           {
             path: 'reward-punishment',
@@ -2488,20 +2496,20 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'portal',
             name: 'OaPortal',
-            component: () => import('../views/oa/Portal.vue'),
-            meta: { title: '门户与待办（兼容）', hidden: true }
+            redirect: redirectPreservingLocation('/workbench'),
+            meta: { title: '门户与待办（兼容）', hidden: true, legacy: true, searchable: false }
           },
           {
             path: 'my-info',
             name: 'OaMyInfo',
-            component: () => import('../views/oa/MyInfo.vue'),
-            meta: { title: '我的信息（兼容）', hidden: true }
+            redirect: redirectPreservingLocation('/workbench/my-info'),
+            meta: { title: '我的信息（兼容）', hidden: true, legacy: true, searchable: false }
           },
           {
             path: 'todo',
             name: 'OaTodo',
-            component: () => import('../views/oa/Todo.vue'),
-            meta: { title: '待办事项（兼容）', hidden: true }
+            redirect: redirectPreservingLocation('/workbench/todo'),
+            meta: { title: '待办事项（兼容）', hidden: true, legacy: true, searchable: false }
           },
           {
             path: 'approval',
@@ -2524,8 +2532,8 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'attendance-leave',
             name: 'OaAttendanceLeave',
-            component: () => import('../views/oa/AttendanceLeave.vue'),
-            meta: { title: '考勤与请假（兼容）', hidden: true }
+            redirect: redirectPreservingLocation('/workbench/attendance'),
+            meta: { title: '考勤与请假（兼容）', hidden: true, legacy: true, searchable: false }
           },
           {
             path: 'document',
@@ -2536,8 +2544,8 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'work-report',
             name: 'OaWorkReport',
-            component: () => import('../views/oa/WorkReport.vue'),
-            meta: { title: '工作总结（兼容）', hidden: true }
+            redirect: redirectPreservingLocation('/workbench/reports'),
+            meta: { title: '工作总结（兼容）', hidden: true, legacy: true, searchable: false }
           }
         ]
       },
@@ -2556,8 +2564,8 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'workbench',
             name: 'HrWorkbench',
-            redirect: '/hr/overview',
-            meta: { title: '人事行政工作台（兼容）', roles: ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'], hidden: true }
+            redirect: redirectPreservingLocation('/hr/overview'),
+            meta: { title: '人事行政工作台（兼容）', roles: ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'], hidden: true, legacy: true, searchable: false }
           },
           {
             path: 'recruitment',
@@ -2860,14 +2868,14 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'points',
             name: 'HrPoints',
-            redirect: '/hr/incentive/ledger',
-            meta: { title: '积分管理（兼容）', roles: ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'], hidden: true }
+            redirect: redirectPreservingLocation('/hr/incentive/ledger'),
+            meta: { title: '积分管理（兼容）', roles: ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'], hidden: true, legacy: true, searchable: false }
           },
           {
             path: 'points-rule',
             name: 'HrPointsRule',
-            redirect: '/hr/incentive/rules',
-            meta: { title: '积分规则（兼容）', roles: ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'], hidden: true }
+            redirect: redirectPreservingLocation('/hr/incentive/rules'),
+            meta: { title: '积分规则（兼容）', roles: ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'], hidden: true, legacy: true, searchable: false }
           },
           {
             path: 'performance-board',
@@ -2880,7 +2888,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'base-config',
         name: 'BaseConfig',
-        meta: { title: '基础数据配置', icon: 'DatabaseOutlined', navSection: 'system', navOrder: 120, navPinned: true, roles: ['ADMIN'] },
+        meta: { title: '基础数据配置', icon: 'DatabaseOutlined', navSection: 'system', navOrder: 120, navPinned: true, roles: ['SYS_ADMIN', 'ADMIN'] },
         children: [
           {
             path: '',
@@ -3073,7 +3081,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'role',
             name: 'SystemRoleManage',
             component: () => import('../views/System/RoleManage.vue'),
-            meta: { title: '角色管理', roles: ['ADMIN', 'HR_MINISTER'] }
+            meta: { title: '角色与权限', roles: ['SYS_ADMIN'] }
           },
           {
             path: 'department',

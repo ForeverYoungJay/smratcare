@@ -370,14 +370,14 @@ const cards = computed<WorkbenchCard[]>(() => {
       key: 'A',
       title: '我的待办',
       badge: `${summary.value.pendingCareTaskCount}`,
-      route: `/medical-care/orders?date=${summaryDate}&scope=todo`,
+      route: `/medical-care/order-risk-overview?date=${summaryDate}&scope=todo`,
       lines: [
         `待执行医嘱 ${summary.value.pendingMedicalOrderCount} · 待查对 ${summary.value.pendingReviewCount} · 待审核 ${summary.value.pendingAuditCount}`,
         `超时任务 ${summary.value.overdueCareTaskCount} · 未闭环异常 ${summary.value.unclosedAbnormalCount}`,
         `今日巡查待完成 ${summary.value.todayInspectionTodoCount}`
       ],
       actions: [
-        { label: '待执行医嘱', route: `/medical-care/orders?filter=to_execute&assignee=me&date=${summaryDate}` },
+        { label: '待执行医嘱', route: `/medical-care/order-risk-overview?filter=to_execute&assignee=me&date=${summaryDate}` },
         { label: '超时任务', route: `/medical-care/care-task-board?date=${summaryDate}&filter=overdue&assignee=me` },
         { label: '巡查待完成', route: `/medical-care/inspection?filter=pending&assignee=me&date=${summaryDate}` },
         { label: '统一任务中心', route: '/medical-care/unified-task-center' }
@@ -387,15 +387,15 @@ const cards = computed<WorkbenchCard[]>(() => {
       key: 'C',
       title: '医嘱执行概览',
       badge: `${summary.value.medicalOrderPendingCount}`,
-      route: `/medical-care/orders?date=${summaryDate}&filter=pending_or_abnormal`,
+      route: `/medical-care/order-risk-overview?date=${summaryDate}&filter=pending_or_abnormal`,
       lines: [
         `今日医嘱 应执行 ${summary.value.medicalOrderShouldCount} / 已执行 ${summary.value.medicalOrderDoneCount}`,
         `待执行 ${summary.value.medicalOrderPendingCount} · 异常 ${summary.value.medicalOrderAbnormalCount}`,
         `查对完成率 ${summary.value.orderCheckRate.toFixed(1)}%`
       ],
       actions: [
-        { label: '待执行/异常', route: `/medical-care/orders?date=${summaryDate}&filter=pending_or_abnormal` },
-        { label: '医嘱执行单', route: `/medical-care/orders?date=${summaryDate}&view=ward` }
+        { label: '待执行/异常', route: `/medical-care/order-risk-overview?date=${summaryDate}&filter=pending_or_abnormal` },
+        { label: '医嘱执行单', route: `/medical-care/order-risk-overview?date=${summaryDate}&view=ward` }
       ]
     },
     {
