@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "node --max-old-space-size=8192 node_modules/vite/bin/vite.js build",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "lint": "echo 'no lint configured'",
     "check:navigation": "node scripts/check-navigation.mjs",

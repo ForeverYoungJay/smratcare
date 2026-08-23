@@ -39,11 +39,10 @@ export const useUserStore = defineStore('user', {
     },
     setAuth(payload: LoginResponse) {
       const roles = normalizeRoles(payload.roles || [])
-      const inheritedPagePermissions = roles.flatMap((role) => getRecommendedPagePermissions(role))
-      const pagePermissions = normalizePagePermissions([
-        ...(payload.pagePermissions || []),
-        ...inheritedPagePermissions
-      ])
+      const explicitPagePermissions = normalizePagePermissions(payload.pagePermissions || [])
+      const pagePermissions = explicitPagePermissions.length > 0
+        ? explicitPagePermissions
+        : normalizePagePermissions(roles.flatMap((role) => getRecommendedPagePermissions(role)))
       this.token = payload.token
       this.roles = roles
       this.permissions = payload.permissions || []

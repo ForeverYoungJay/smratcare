@@ -1,0 +1,22 @@
+{
+  "/oa/portal": "/workbench",
+  "/oa/todo": "/workbench/todo",
+  "/oa/my-info": "/workbench/my-info",
+  "/oa/attendance-leave": "/workbench/attendance",
+  "/oa/work-execution/calendar": "/workbench/schedule",
+  "/oa/work-report": "/workbench/reports",
+  "/hr/workbench": "/hr/overview",
+  "/oa/activity": "/oa/activity-center/records",
+  "/oa/activity-plan": "/oa/activity-center/plan",
+  "/oa/survey/manage": "/oa/activity-center/survey-manage",
+  "/oa/survey/stats": "/oa/activity-center/survey-stats",
+  "/hr/points": "/hr/incentive/ledger",
+  "/hr/points-rule": "/hr/incentive/rules",
+  "/system/org-manage": "/system/site-config",
+  "/system/org-manage/intro": "/system/site-config",
+  "/system/org-manage/news": "/system/site-config",
+  "/system/org-manage/life": "/system/site-config",
+  "/system/app-version": "/system/site-config",
+  "/system/message": "/system/site-config",
+  "/system/dict": "/base-config"
+}

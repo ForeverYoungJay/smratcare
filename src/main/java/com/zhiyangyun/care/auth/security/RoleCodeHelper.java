@@ -42,9 +42,6 @@ public final class RoleCodeHelper {
         normalized.add(role.trim().toUpperCase());
       }
     }
-    if (normalized.contains(ROLE_SYS_ADMIN) || normalized.contains(ROLE_DIRECTOR)) {
-      normalized.add(ROLE_ADMIN);
-    }
     if (normalized.contains(LEGACY_ROLE_OPERATOR)) {
       normalized.add(ROLE_MARKETING_EMPLOYEE);
     }

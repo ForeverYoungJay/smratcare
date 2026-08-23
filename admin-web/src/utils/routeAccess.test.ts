@@ -1,10 +1,12 @@
+import { createMemoryHistory, createRouter } from 'vue-router'
 import { describe, expect, it } from 'vitest'
-import { canAccessPath } from './routeAccess'
+import { canAccessPath, resolveRouteAccess } from './routeAccess'
 
 describe('routeAccess utils', () => {
-  it('allows super roles to access any guarded route', () => {
-    expect(canAccessPath(['ADMIN'], ['HR_MINISTER'], '/hr/staff')).toBe(true)
-    expect(canAccessPath(['SYS_ADMIN'], ['MEDICAL_EMPLOYEE'], '/health/management/archive')).toBe(true)
+  it('does not treat ADMIN, SYS_ADMIN and DIRECTOR as interchangeable roles', () => {
+    expect(canAccessPath(['ADMIN'], ['HR_MINISTER'], '/hr/staff', ['/hr'])).toBe(false)
+    expect(canAccessPath(['SYS_ADMIN'], ['ADMIN'], '/system/business-admin', ['/system/business-admin'])).toBe(false)
+    expect(canAccessPath(['DIRECTOR'], ['SYS_ADMIN'], '/system/security', ['/system/security'])).toBe(false)
   })
 
   it('falls back to module roles for hidden health routes', () => {
@@ -19,10 +21,10 @@ describe('routeAccess utils', () => {
     expect(canAccessPath(['NURSING_EMPLOYEE'], [], '/stats/check-in')).toBe(false)
   })
 
-  it('treats explicit page permissions as the primary route allow rule', () => {
-    expect(canAccessPath(['MARKETING_EMPLOYEE'], ['ADMIN'], '/system/site-config', ['/system/site-config'])).toBe(true)
+  it('requires page access and route roles instead of letting either one override the other', () => {
+    expect(canAccessPath(['MARKETING_EMPLOYEE'], ['ADMIN'], '/system/site-config', ['/system/site-config'])).toBe(false)
     expect(canAccessPath(['MARKETING_EMPLOYEE'], ['ADMIN'], '/system/site-config', [])).toBe(false)
-    expect(canAccessPath(['HR_MINISTER'], ['ADMIN'], '/system/site-config', ['/system/site-config'])).toBe(true)
+    expect(canAccessPath(['ADMIN'], ['ADMIN'], '/system/site-config', ['/system/site-config'])).toBe(true)
   })
 
   it('does not let broad page permissions bypass stricter route roles', () => {
@@ -48,5 +50,43 @@ describe('routeAccess utils', () => {
     expect(canAccessPath(['MARKETING_EMPLOYEE'], [], '/crm/follow-up')).toBe(true)
     expect(canAccessPath(['GUARD'], [], '/fire/day-patrol')).toBe(true)
     expect(canAccessPath(['MARKETING_EMPLOYEE'], [], '/fire/day-patrol')).toBe(false)
+  })
+
+  it('requires every matched parent and child role constraint', () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        {
+          path: '/hr',
+          component: { template: '<router-view />' },
+          meta: { roles: ['HR_EMPLOYEE', 'HR_MINISTER'] },
+          children: [
+            {
+              path: 'approval',
+              component: { template: '<div />' },
+              meta: { roles: ['HR_MINISTER'] }
+            }
+          ]
+        }
+      ]
+    })
+
+    expect(resolveRouteAccess(router, ['HR_EMPLOYEE'], '/hr/approval', ['/hr']).canAccess).toBe(false)
+    expect(resolveRouteAccess(router, ['HR_MINISTER'], '/hr/approval', ['/hr']).canAccess).toBe(true)
+  })
+
+  it('defaults to deny when neither route metadata nor a page grant authorizes an unknown page', () => {
+    expect(canAccessPath(['HR_EMPLOYEE'], [], '/unclassified-page')).toBe(false)
+    expect(canAccessPath(['HR_EMPLOYEE'], [], '/unclassified-page', ['/unclassified-page'])).toBe(true)
+  })
+
+  it('allows a role-free page only when its route permission and page grant both match', () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/action-page', component: { template: '<div />' }, meta: { permissions: ['oa.todo.view'] } }]
+    })
+    expect(resolveRouteAccess(router, ['HR_EMPLOYEE'], '/action-page', ['/action-page'], []).canAccess).toBe(false)
+    expect(resolveRouteAccess(router, ['HR_EMPLOYEE'], '/action-page', ['/action-page'], ['oa.todo.view']).canAccess).toBe(true)
+    expect(resolveRouteAccess(router, ['HR_EMPLOYEE'], '/action-page', [], ['oa.todo.view']).canAccess).toBe(true)
   })
 })

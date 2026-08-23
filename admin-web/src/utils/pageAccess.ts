@@ -1,5 +1,7 @@
 import type { RouteRecordRaw } from 'vue-router'
 import { routes } from '../router/routes'
+import rolePagePresets from '../../../src/main/resources/security/role-page-presets.json'
+import { toCanonicalRoutePath } from '../router/routeAliases'
 
 export interface PagePermissionNode {
   title: string
@@ -15,29 +17,6 @@ export interface RolePagePreset {
 
 const LAYOUT_ROOT = '/'
 const HIDDEN_PATHS = new Set(['/403'])
-const LEGACY_PERMISSION_PATH_MAP: Record<string, string> = {
-  '/oa/portal': '/workbench',
-  '/oa/todo': '/workbench/todo',
-  '/oa/my-info': '/workbench/my-info',
-  '/oa/attendance-leave': '/workbench/attendance',
-  '/oa/work-execution/calendar': '/workbench/schedule',
-  '/oa/work-report': '/workbench/reports',
-  '/hr/workbench': '/hr/overview',
-  '/oa/activity': '/oa/activity-center/records',
-  '/oa/activity-plan': '/oa/activity-center/plan',
-  '/oa/survey/manage': '/oa/activity-center/survey-manage',
-  '/oa/survey/stats': '/oa/activity-center/survey-stats',
-  '/hr/points': '/hr/incentive/ledger',
-  '/hr/points-rule': '/hr/incentive/rules',
-  '/system/org-manage': '/system/site-config',
-  '/system/org-manage/intro': '/system/site-config',
-  '/system/org-manage/news': '/system/site-config',
-  '/system/org-manage/life': '/system/site-config',
-  '/system/app-version': '/system/site-config',
-  '/system/message': '/system/site-config',
-  '/system/dict': '/base-config'
-}
-
 function normalizePath(path: string): string {
   const base = String(path || '').split('?')[0].split('#')[0].trim()
   if (!base) return '/'
@@ -49,8 +28,7 @@ function normalizePath(path: string): string {
 }
 
 function toCanonicalPermissionPath(path: string): string {
-  const normalized = normalizePath(path)
-  return LEGACY_PERMISSION_PATH_MAP[normalized] || normalized
+  return toCanonicalRoutePath(path)
 }
 
 function joinPath(base: string, path: string): string {
@@ -73,6 +51,7 @@ function shouldIncludeRoute(route: RouteRecordRaw, fullPath: string) {
 function buildTree(routeList: RouteRecordRaw[], basePath = ''): PagePermissionNode[] {
   return (routeList || [])
     .map((route) => {
+      if (route.meta?.hidden || route.meta?.legacy) return null
       const fullPath = joinPath(basePath, String(route.path || ''))
       const children = Array.isArray(route.children) ? buildTree(route.children, fullPath) : []
       const includeSelf = shouldIncludeRoute(route, fullPath)
@@ -104,92 +83,7 @@ flattenTree(pagePermissionTree, pagePermissionFlat)
 const pageTitleMap = new Map(pagePermissionFlat.map((item) => [item.path, item.title]))
 const knownPagePaths = new Set(pagePermissionFlat.map((item) => item.path))
 
-const employeePersonalPaths = ['/workbench', '/workbench/overview', '/workbench/todo', '/workbench/my-info', '/workbench/attendance', '/workbench/schedule', '/workbench/reports', '/workbench/approvals']
-const managerPersonalPaths = ['/portal', ...employeePersonalPaths]
-const allKnownPagePaths = pagePermissionFlat.map((item) => item.path)
-
-export const ROLE_PAGE_PRESETS: Record<string, RolePagePreset> = {
-  NURSING_MINISTER: {
-    label: '护理部长',
-    description: '首页、医护健康服务、长者管理、护理审批、工作总结、基础数据配置',
-    paths: [...managerPersonalPaths, '/medical-care', '/elder', '/oa/approval', '/base-config']
-  },
-  NURSING_EMPLOYEE: {
-    label: '护理生活管家',
-    description: '个人首页、我的信息、医护健康服务中心、我的待办和快捷发起',
-    paths: [...employeePersonalPaths, '/medical-care', '/oa/approval']
-  },
-  HR_MINISTER: {
-    label: '行政人事部部长',
-    description: '工作台、人力资源、行政管理、统计分析、官网配置、角色管理、基础配置',
-    paths: [...managerPersonalPaths, '/hr', '/oa', '/stats', '/system/site-config', '/system/role', '/base-config']
-  },
-  HR_EMPLOYEE: {
-    label: '行政人事部员工',
-    description: '工作台、行政协同、人资总览与社保提醒，不包含账号权限和系统设置',
-    paths: [...employeePersonalPaths, '/hr/overview', '/hr/profile/social-security-reminders', '/oa']
-  },
-  LOGISTICS_MINISTER: {
-    label: '后勤主管',
-    description: '后勤保障和消防安全管理',
-    paths: [...managerPersonalPaths, '/logistics', '/fire']
-  },
-  LOGISTICS_EMPLOYEE: {
-    label: '后勤员工',
-    description: '后勤保障日常工作',
-    paths: [...employeePersonalPaths, '/logistics']
-  },
-  GUARD: {
-    label: '消防员工',
-    description: '仅消防安全管理',
-    paths: [...employeePersonalPaths, '/fire']
-  },
-  MEDICAL_MINISTER: {
-    label: '医务部长',
-    description: '医护健康服务、长者管理、相关审批与工作总结',
-    paths: [...managerPersonalPaths, '/medical-care', '/elder', '/oa/approval']
-  },
-  MEDICAL_EMPLOYEE: {
-    label: '医务员工',
-    description: '医护健康服务与长者相关工作',
-    paths: [...employeePersonalPaths, '/medical-care', '/elder']
-  },
-  FINANCE_MINISTER: {
-    label: '财务部长',
-    description: '财务管理、费用审批、统计分析',
-    paths: [...managerPersonalPaths, '/finance', '/oa/approval', '/stats']
-  },
-  FINANCE_EMPLOYEE: {
-    label: '财务员工',
-    description: '财务工作和相关审批',
-    paths: [...employeePersonalPaths, '/finance', '/oa/approval']
-  },
-  MARKETING_MINISTER: {
-    label: '营销部长',
-    description: '营销中心、统计和工作总结',
-    paths: [...managerPersonalPaths, '/marketing', '/stats']
-  },
-  MARKETING_EMPLOYEE: {
-    label: '营销员工',
-    description: '营销中心与个人工作台',
-    paths: [...employeePersonalPaths, '/marketing']
-  },
-  ADMIN: {
-    label: '管理员',
-    description: '拥有全平台业务和系统设置权限',
-    paths: allKnownPagePaths
-  },
-  SYS_ADMIN: {
-    label: '系统超管',
-    description: '最高权限，自动包含管理员全部页面和系统配置能力',
-    paths: allKnownPagePaths
-  },
-  DIRECTOR: {
-    label: '院长',
-    description: '跨部门经营管理和全局查看权限',
-    paths: allKnownPagePaths
-  }
-}
+export const ROLE_PAGE_PRESETS: Record<string, RolePagePreset> = rolePagePresets
 
 export function getPagePermissionTree(): PagePermissionNode[] {
   return pagePermissionTree

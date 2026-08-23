@@ -105,9 +105,7 @@ public class AuthContext {
     }
     Map<?, ?> details = extractDetails(authentication);
     if (details != null) {
-      // 优先使用真实角色（roleCodes）：grantedRoleCodes 可能包含按 URI 页面权限
-      // 临时提升的兼容 ADMIN（见 JwtAuthenticationFilter#shouldElevateToAdmin），
-      // 该提升仅用于 Spring Security 授权，不应放大 hasRole/isAdmin 的数据范围判断。
+      // 优先使用令牌中的真实角色；grantedRoleCodes 仅作为旧会话兼容回退。
       Object roleCodes = details.get("roleCodes");
       List<String> normalized = normalizeRoleCodes(roleCodes);
       if (!normalized.isEmpty()) {

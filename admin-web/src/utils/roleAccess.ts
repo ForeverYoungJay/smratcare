@@ -1,22 +1,9 @@
-export const SUPER_ROLES = ['ADMIN', 'SYS_ADMIN', 'DIRECTOR']
+import { DEPARTMENT_ALL_ROLES, DEPARTMENT_EMPLOYEE_ROLES, DEPARTMENT_MINISTER_ROLES, ROLE_CODES } from '../access/policy'
+
+/** @deprecated Never use this group as an authorization bypass. */
+export const SUPER_ROLES = [ROLE_CODES.ADMIN, ROLE_CODES.SYS_ADMIN, ROLE_CODES.DIRECTOR]
 export const LEGACY_MANAGER_ROLES = ['DEPT_LEADER', 'LEADER', 'MANAGER', 'SUPERVISOR']
-export const DEPARTMENT_EMPLOYEE_ROLES = [
-  'MEDICAL_EMPLOYEE',
-  'NURSING_EMPLOYEE',
-  'FINANCE_EMPLOYEE',
-  'LOGISTICS_EMPLOYEE',
-  'MARKETING_EMPLOYEE',
-  'HR_EMPLOYEE'
-]
-export const DEPARTMENT_MINISTER_ROLES = [
-  'MEDICAL_MINISTER',
-  'NURSING_MINISTER',
-  'FINANCE_MINISTER',
-  'LOGISTICS_MINISTER',
-  'MARKETING_MINISTER',
-  'HR_MINISTER'
-]
-export const DEPARTMENT_ALL_ROLES = [...DEPARTMENT_EMPLOYEE_ROLES, ...DEPARTMENT_MINISTER_ROLES]
+export { DEPARTMENT_ALL_ROLES, DEPARTMENT_EMPLOYEE_ROLES, DEPARTMENT_MINISTER_ROLES }
 
 const moduleRoleMap: Array<{ prefixes: string[]; employeeRoles: string[]; ministerRoles: string[] }> = [
   {
@@ -89,20 +76,9 @@ export function hasStaffOrHigher(userRoles: string[]): boolean {
 }
 
 export function hasRouteAccess(userRoles: string[], required: string[], path: string): boolean {
-  if (hasSuperRole(userRoles)) return true
-  if (!required || required.length === 0) return true
+  if (!required || required.length === 0) return false
   if (hasAnyRole(userRoles, required)) return true
   const moduleRoles = moduleRoleGroupByPath(path)
-
-  if (required.includes('ADMIN') && hasSuperRole(userRoles)) {
-    return true
-  }
-
-  if (required.includes('ADMIN') && moduleRoles) {
-    if (hasAnyRole(userRoles, moduleRoles.ministerRoles)) {
-      return true
-    }
-  }
 
   if (required.includes('STAFF') && hasStaffOrHigher(userRoles)) {
     return true
@@ -114,7 +90,7 @@ export function hasRouteAccess(userRoles: string[], required: string[], path: st
     }
   }
 
-  if (required.includes('MANAGER') && hasMinisterOrHigher(userRoles)) {
+  if (required.includes('MANAGER') && hasAnyRole(userRoles, [...LEGACY_MANAGER_ROLES, ...DEPARTMENT_MINISTER_ROLES])) {
     return true
   }
 
