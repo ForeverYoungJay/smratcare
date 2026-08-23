@@ -89,6 +89,14 @@
         @open="openPath"
       />
 
+      <FinanceWorkbenchPanel
+        v-else-if="workbenchProfile.department === 'FINANCE' && departmentDataStatus === 'ready' && departmentSnapshot?.finance"
+        :detail="departmentSnapshot.finance"
+        :management-view="workbenchProfile.hasManagementView"
+        :can-access="canAccess"
+        @open="openPath"
+      />
+
       <WorkbenchModuleCard
         v-else-if="workbenchProfile.department"
         class="department-summary-card"
@@ -286,6 +294,7 @@ import StatusTag from '../../components/smartcare/StatusTag.vue'
 import WorkbenchModuleCard from '../../components/smartcare/WorkbenchModuleCard.vue'
 import NursingWorkbenchPanel from '../../components/workbench/NursingWorkbenchPanel.vue'
 import MedicalWorkbenchPanel from '../../components/workbench/MedicalWorkbenchPanel.vue'
+import FinanceWorkbenchPanel from '../../components/workbench/FinanceWorkbenchPanel.vue'
 import { getOaTaskCalendar, getPortalSummary } from '../../api/oa'
 import { getAttendanceOverview, punchAttendance } from '../../api/schedule'
 import type { AttendanceDashboardOverview, OaPortalSummary, OaTask } from '../../types'
@@ -384,6 +393,11 @@ const attendanceOverview = reactive<AttendanceDashboardOverview>({
 function displayNumber(value?: number | null) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '--'
   return Number(value).toLocaleString('zh-CN')
+}
+
+function displayAmount(value?: number | null) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '--'
+  return `¥ ${Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function departmentMetricValue(item: WorkbenchMetricSnapshot) {
@@ -513,34 +527,37 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
     }
   }
   if (workbenchProfile.value.department === 'FINANCE') {
+    const managementView = workbenchProfile.value.hasManagementView
     return {
       key: 'finance',
       roleLabel: '财务运营角色',
       subline: '优先核对收费、账单和对账例外，避免回款与审批卡住。',
       modulePriority: ['todo', 'finance', 'approval', 'hr', 'customer', 'clinical', 'workorder'],
       primaryEntry: {
-        label: '财务中台',
-        value: displayNumber(portalSummary.value?.pendingApprovalCount),
-        helper: `超时 ${displayNumber(portalSummary.value?.approvalTimeoutCount)}，先处理收费审批与对账问题`,
-        path: '/finance/workbench'
+        label: managementView ? '待审核费用' : '机构今日实收',
+        value: managementView ? displayNumber(departmentMetricNumber('pending')) : displayAmount(departmentMetricNumber('collected')),
+        helper: managementView ? '先处理折扣、退款和退住结算审批' : '机构当日口径，完成收款后及时核对票据',
+        path: managementView ? '/workbench/approvals' : '/finance/payments/cashier-desk'
       },
       summaryMetrics: [
         {
-          label: '财务待审批',
-          value: displayNumber(portalSummary.value?.pendingApprovalCount),
-          helper: '收费、票据与例外处理',
+          label: managementView ? '欠费长者' : '票据未关联',
+          value: displayNumber(departmentMetricNumber(managementView ? 'arrears' : 'invoiceGap')),
+          helper: managementView ? '催缴和账户风险' : '交班前需要补齐',
           tone: 'warning',
-          path: '/finance/workbench'
+          path: managementView ? '/finance/bills/follow-up' : '/finance/fees/payment-and-invoice'
         },
         {
-          label: '超时审批',
-          value: displayNumber(portalSummary.value?.approvalTimeoutCount),
-          helper: '优先清理卡点流程',
+          label: managementView ? '对账异常' : '账务异常',
+          value: displayNumber(departmentMetricNumber('reconcile')),
+          helper: '收款、退款与账单差异',
           tone: 'warning',
-          path: '/workbench/approvals'
+          path: '/finance/reconcile/issue-center'
         }
       ],
-      preferredActions: ['/finance/workbench', '/finance/bills/in-resident', '/workbench/approvals']
+      preferredActions: managementView
+        ? ['/workbench/approvals', '/finance/bills/follow-up', '/finance/reconcile/issue-center']
+        : ['/finance/payments/cashier-desk', '/finance/payments/records', '/finance/payments/shift-close']
     }
   }
   if (workbenchProfile.value.department === 'HR') {
@@ -812,20 +829,27 @@ const clinicalModule = computed<PrimaryModule>(() => {
   }
 })
 
-const financeModule = computed<PrimaryModule>(() => ({
-  key: 'finance',
-  title: '我的财务工作',
-  eyebrow: '财务',
-  path: '/finance/workbench',
-  metricLabel: '收费与对账',
-  metricHelper: '账单、收款、例外与月结推进',
-  metricValue: displayNumber(portalSummary.value?.pendingApprovalCount),
-  tone: 'warning',
-  items: [
-    { title: '财务工作台', desc: '从收费、账单和回款总览继续下钻。', path: '/finance/workbench', tag: '主入口', tone: 'normal' },
-    { title: '在住账单', desc: '先核对当前账单、缴费和欠费风险。', path: '/finance/bills/in-resident', tag: `待审 ${displayNumber(portalSummary.value?.pendingApprovalCount)}`, tone: 'warning' }
-  ]
-}))
+const financeModule = computed<PrimaryModule>(() => {
+  const financePersona = workbenchPersona.value.key === 'finance'
+  const managementView = workbenchProfile.value.hasManagementView
+  return {
+    key: 'finance',
+    title: financePersona && managementView ? '财务部风险与审批' : '我的收费与账务',
+    eyebrow: '财务',
+    path: financePersona && !managementView ? '/finance/payments/cashier-desk' : '/finance/workbench',
+    metricLabel: managementView ? '待审核费用' : '机构今日实收',
+    metricHelper: managementView ? '折扣、退款与退住结算' : '当日机构收银口径，非个人业绩',
+    metricValue: managementView ? displayNumber(departmentMetricNumber('pending')) : displayAmount(departmentMetricNumber('collected')),
+    tone: 'warning',
+    items: managementView ? [
+      { title: '待审核费用', desc: '处理折扣、退款与退住结算审批。', path: '/workbench/approvals', tag: `待审 ${displayNumber(departmentMetricNumber('pending'))}`, tone: 'warning' },
+      { title: '欠费与对账', desc: '先收口欠费和账务异常，再推进月结。', path: '/finance/reconcile/issue-center', tag: `异常 ${displayNumber(departmentMetricNumber('reconcile'))}`, tone: 'danger' }
+    ] : [
+      { title: '收银与收费', desc: '核对长者、账期和金额后完成收款。', path: '/finance/payments/cashier-desk', tag: '开始处理', tone: 'normal' },
+      { title: '票据与交班', desc: '补齐票据并处理当日账务差异。', path: '/finance/payments/shift-close', tag: `异常 ${displayNumber(departmentMetricNumber('reconcile'))}`, tone: 'warning' }
+    ]
+  }
+})
 
 const hrModule = computed<PrimaryModule>(() => ({
   key: 'hr',
@@ -921,6 +945,7 @@ const recentVisits = computed<RecentVisitItem[]>(() => loadRecentVisits(recentVi
 
 const commonActions = computed(() => {
   const medicalEmployee = workbenchPersona.value.key === 'medical' && !hasManagement.value
+  const financeEmployee = workbenchPersona.value.key === 'finance' && !hasManagement.value
   const actions: QuickActionItem[] = [
     { title: '我的待办', description: '查看所有待办、提醒和逾期项。', icon: '办', path: '/workbench/todo' },
     { title: '我的审批', description: '处理审批流程和待确认事项。', icon: '审', path: '/workbench/approvals' },
@@ -935,7 +960,7 @@ const commonActions = computed(() => {
       path: medicalEmployee ? '/medical-care/rounds' : '/medical-care/unified-task-center'
     },
     { title: '后勤工单', description: '查看维修、巡检与保障任务。', icon: '工', path: '/logistics/task-center' },
-    { title: '财务工作台', description: '进入收费、账单和对账总览。', icon: '费', path: '/finance/workbench' },
+    { title: financeEmployee ? '进入收银台' : '财务工作台', description: financeEmployee ? '登记收费并核对当天收款。' : '进入收费、账单和对账总览。', icon: '费', path: financeEmployee ? '/finance/payments/cashier-desk' : '/finance/workbench' },
     { title: '人资中心', description: '进入档案、招聘、考勤与班组。', icon: '人', path: '/hr/overview' }
   ]
   const preferredOrder = new Map(workbenchPersona.value.preferredActions.map((path, index) => [path, index]))

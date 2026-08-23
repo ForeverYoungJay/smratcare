@@ -1,10 +1,8 @@
-import { getFinanceWorkbenchOverview } from '../api/finance'
 import { getHrWorkbenchSummary } from '../api/hr'
 import { getLogisticsWorkbenchSummary } from '../api/logistics'
 import { getMarketingWorkbenchSummary } from '../api/marketing'
 import type { DepartmentCode } from '../access/policy'
 import type {
-  FinanceWorkbenchOverview,
   HrWorkbenchSummary,
   Id,
   LogisticsWorkbenchSummary,
@@ -13,6 +11,7 @@ import type {
 import type { WorkbenchProfile } from './model'
 import { loadNursingWorkbench, type NursingWorkbenchDetail } from './nursing'
 import { loadMedicalWorkbench, type MedicalWorkbenchDetail } from './medical'
+import { loadFinanceWorkbench, type FinanceWorkbenchDetail } from './finance'
 
 export type WorkbenchDataStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'forbidden' | 'error'
 
@@ -33,6 +32,7 @@ export interface DepartmentWorkbenchSnapshot {
   metrics: WorkbenchMetricSnapshot[]
   nursing?: NursingWorkbenchDetail
   medical?: MedicalWorkbenchDetail
+  finance?: FinanceWorkbenchDetail
 }
 
 export interface WorkbenchDataResult {
@@ -105,16 +105,24 @@ const departmentSources: Record<DepartmentCode, DepartmentSource> = {
   },
   FINANCE: {
     accessPath: '/finance/workbench',
-    async load() {
-      const data = responseData<FinanceWorkbenchOverview>(await getFinanceWorkbenchOverview(silentConfig))
+    async load(profile) {
+      const result = await loadFinanceWorkbench(profile)
+      const data = result.overview
       const pending = data?.pending
       return {
         department: 'FINANCE', sourceLabel: '财务工作台汇总', generatedAt: data?.bizDate, metrics: [
-          { key: 'collected', label: '今日实收', value: data?.cashier?.todayCollectedTotal, suffix: '元', helper: '今日已确认收款金额', path: '/finance/payments/cashier-desk' },
-          { key: 'pending', label: '待审核费用', value: (pending?.pendingDiscountCount || 0) + (pending?.pendingRefundCount || 0), helper: '折扣与退款待审核事项', path: '/workbench/approvals' },
-          { key: 'arrears', label: '欠费长者', value: data?.risk?.overdueElderCount, helper: '存在逾期欠费的长者账户', path: '/finance/bills/follow-up', risk: true },
-          { key: 'reconcile', label: '对账异常', value: pending?.issueTodoCount, helper: '需要定位和处理的账务问题', path: '/finance/reconcile/issue-center', risk: true }
-        ]
+          { key: 'collected', label: profile.hasManagementView ? '今日实收' : '机构今日实收', value: data?.cashier?.todayCollectedTotal, suffix: '元', helper: profile.hasManagementView ? '今日已确认收款金额' : '机构当日口径，非个人业绩', path: '/finance/payments/cashier-desk' },
+          ...(profile.hasManagementView ? [
+            { key: 'pending', label: '待审核费用', value: (pending?.pendingDiscountCount || 0) + (pending?.pendingRefundCount || 0), helper: '折扣与退款待审核事项', path: '/workbench/approvals' },
+            { key: 'arrears', label: '欠费长者', value: data?.risk?.overdueElderCount, helper: '存在逾期欠费的长者账户', path: '/finance/bills/follow-up', risk: true },
+            { key: 'reconcile', label: '对账异常', value: pending?.issueTodoCount, helper: '需要定位和处理的账务问题', path: '/finance/reconcile/issue-center', risk: true }
+          ] : [
+            { key: 'refund', label: '机构今日退款', value: data?.cashier?.todayRefundAmount, suffix: '元', helper: '当日退款总额，交班前复核', path: '/finance/payments/refund-reversal' },
+            { key: 'invoiceGap', label: '票据未关联', value: data?.reconcile?.invoiceUnlinkedCount, helper: '交班前需要补齐的票据', path: '/finance/fees/payment-and-invoice', risk: true },
+            { key: 'reconcile', label: '账务异常', value: (data?.reconcile?.billPaidUnmatchedCount || 0) + (data?.reconcile?.duplicatedOrReversalPendingCount || 0), helper: '收款、退款与账单差异', path: '/finance/reconcile/issue-center', risk: true }
+          ])
+        ],
+        finance: result.detail
       }
     }
   },
