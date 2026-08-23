@@ -1,4 +1,3 @@
-import { getTaskSummary } from '../api/care'
 import { getFinanceWorkbenchOverview } from '../api/finance'
 import { getHrWorkbenchSummary } from '../api/hr'
 import { getLogisticsWorkbenchSummary } from '../api/logistics'
@@ -6,14 +5,15 @@ import { getMarketingWorkbenchSummary } from '../api/marketing'
 import { getMedicalCareWorkbenchSummary } from '../api/medicalCare'
 import type { DepartmentCode } from '../access/policy'
 import type {
-  CareTaskSummary,
   FinanceWorkbenchOverview,
   HrWorkbenchSummary,
+  Id,
   LogisticsWorkbenchSummary,
   MarketingWorkbenchSummary,
   MedicalCareWorkbenchSummary
 } from '../types'
 import type { WorkbenchProfile } from './model'
+import { loadNursingWorkbench, type NursingWorkbenchDetail } from './nursing'
 
 export type WorkbenchDataStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'forbidden' | 'error'
 
@@ -32,6 +32,7 @@ export interface DepartmentWorkbenchSnapshot {
   sourceLabel: string
   generatedAt?: string
   metrics: WorkbenchMetricSnapshot[]
+  nursing?: NursingWorkbenchDetail
 }
 
 export interface WorkbenchDataResult {
@@ -42,7 +43,11 @@ export interface WorkbenchDataResult {
 
 type DepartmentSource = {
   accessPath: string
-  load: (profile: WorkbenchProfile) => Promise<DepartmentWorkbenchSnapshot>
+  load: (profile: WorkbenchProfile, context: WorkbenchLoadContext) => Promise<DepartmentWorkbenchSnapshot>
+}
+
+export interface WorkbenchLoadContext {
+  staffId?: Id
 }
 
 const silentConfig = { silent403: true, silentError: true }
@@ -59,15 +64,19 @@ function responseData<T>(response: T | { data: T }): T {
 const departmentSources: Record<DepartmentCode, DepartmentSource> = {
   NURSING: {
     accessPath: '/care/today',
-    async load() {
-      const data = responseData<CareTaskSummary>(await getTaskSummary({ date: today() }))
+    async load(profile, context) {
+      const result = await loadNursingWorkbench(profile, { date: today(), staffId: context.staffId })
+      const data = result.summary
       return {
         department: 'NURSING', sourceLabel: '今日护理任务', metrics: [
           { key: 'pending', label: '待执行任务', value: data?.pendingCount, helper: '今天尚未完成的护理任务', path: '/care/today' },
           { key: 'overdue', label: '超时任务', value: data?.overdueCount, helper: '需要优先处理并说明原因', path: '/care/today', risk: true },
-          { key: 'exception', label: '异常任务', value: data?.exceptionCount, helper: '需要复核或闭环的护理异常', path: '/care/today', risk: true },
+          ...(profile.hasManagementView
+            ? [{ key: 'unassigned', label: '待分配任务', value: data?.unassignedCount, helper: '需要安排护理人员的任务', path: '/care/today', risk: true }]
+            : [{ key: 'exception', label: '异常任务', value: data?.exceptionCount, helper: '需要复核或闭环的护理异常', path: '/care/today', risk: true }]),
           { key: 'completion', label: '今日完成率', value: data?.completionRate, suffix: '%', helper: '按今日护理任务统计', path: '/care/today' }
-        ]
+        ],
+        nursing: result.detail
       }
     }
   },
@@ -150,13 +159,14 @@ function hasSnapshotValue(snapshot: DepartmentWorkbenchSnapshot) {
 
 export async function loadDepartmentWorkbenchSnapshot(
   profile: WorkbenchProfile,
-  canAccess: (path: string) => boolean
+  canAccess: (path: string) => boolean,
+  context: WorkbenchLoadContext = {}
 ): Promise<WorkbenchDataResult> {
   if (!profile.department) return { status: 'empty', message: '当前岗位不使用部门工作台数据源' }
   const source = departmentSources[profile.department]
   if (!canAccess(source.accessPath)) return { status: 'forbidden', message: '当前岗位没有该部门工作台的数据权限' }
   try {
-    const snapshot = await source.load(profile)
+    const snapshot = await source.load(profile, context)
     snapshot.metrics = snapshot.metrics.filter((item) => canAccess(item.path))
     return hasSnapshotValue(snapshot)
       ? { status: 'ready', snapshot }

@@ -73,8 +73,16 @@
     </section>
 
     <section v-if="!initialLoading" class="workbench-shell">
+      <NursingWorkbenchPanel
+        v-if="workbenchProfile.department === 'NURSING' && departmentDataStatus === 'ready' && departmentSnapshot?.nursing"
+        :detail="departmentSnapshot.nursing"
+        :management-view="workbenchProfile.hasManagementView"
+        :can-access="canAccess"
+        @open="openPath"
+      />
+
       <WorkbenchModuleCard
-        v-if="workbenchProfile.department"
+        v-else-if="workbenchProfile.department"
         class="department-summary-card"
         :title="`${workbenchProfile.departmentLabel}今日工作`"
         eyebrow="岗位数据"
@@ -268,6 +276,7 @@ import OverviewMetricCard from '../../components/smartcare/OverviewMetricCard.vu
 import QuickActionTile from '../../components/smartcare/QuickActionTile.vue'
 import StatusTag from '../../components/smartcare/StatusTag.vue'
 import WorkbenchModuleCard from '../../components/smartcare/WorkbenchModuleCard.vue'
+import NursingWorkbenchPanel from '../../components/workbench/NursingWorkbenchPanel.vue'
 import { getOaTaskCalendar, getPortalSummary } from '../../api/oa'
 import { getAttendanceOverview, punchAttendance } from '../../api/schedule'
 import type { AttendanceDashboardOverview, OaPortalSummary, OaTask } from '../../types'
@@ -406,27 +415,27 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
       modulePriority: ['todo', 'clinical', 'approval', 'workorder', 'hr', 'customer', 'finance'],
       primaryEntry: {
         label: '护理执行',
-        value: displayNumber(portalSummary.value?.pendingMedicalOrderCount),
-        helper: `异常 ${displayNumber(portalSummary.value?.healthAbnormalCount)}，先清护理任务与交接风险`,
-        path: '/medical-care/care-task-board'
+        value: displayNumber(departmentMetricNumber('pending')),
+        helper: `超时 ${displayNumber(departmentMetricNumber('overdue'))}，先清护理任务与交接风险`,
+        path: '/care/today'
       },
       summaryMetrics: [
         {
-          label: '护理任务',
-          value: displayNumber(portalSummary.value?.pendingMedicalOrderCount),
-          helper: '护理计划、执行与回执',
+          label: workbenchProfile.value.hasManagementView ? '部门待执行' : '我的待执行',
+          value: displayNumber(departmentMetricNumber('pending')),
+          helper: workbenchProfile.value.hasManagementView ? '护理部今日尚未完成的任务' : '今天分配给我的护理任务',
           tone: 'success',
-          path: '/medical-care/care-task-board'
+          path: '/care/today'
         },
         {
-          label: '异常复核',
-          value: displayNumber(portalSummary.value?.healthAbnormalCount),
-          helper: '生命体征与长者异常',
+          label: workbenchProfile.value.hasManagementView ? '待分配任务' : '异常任务',
+          value: displayNumber(departmentMetricNumber(workbenchProfile.value.hasManagementView ? 'unassigned' : 'exception')),
+          helper: workbenchProfile.value.hasManagementView ? '需要安排护理人员的任务' : '需要说明或协同处理的异常',
           tone: 'warning',
-          path: '/medical-care/unified-task-center'
+          path: '/care/today'
         }
       ],
-      preferredActions: ['/medical-care/care-task-board', '/medical-care/unified-task-center', '/workbench/attendance']
+      preferredActions: ['/care/today', '/care/service/nursing-records', '/workbench/attendance']
     }
   }
   if (workbenchProfile.value.department === 'MEDICAL') {
@@ -739,6 +748,22 @@ function agendaTimeText(startTime?: string, endTime?: string) {
 }
 
 const clinicalModule = computed<PrimaryModule>(() => {
+  if (workbenchPersona.value.key === 'nursing') {
+    return {
+      key: 'clinical',
+      title: workbenchProfile.value.hasManagementView ? '护理部任务与风险' : '我的护理执行',
+      eyebrow: '护理',
+      path: '/care/today',
+      metricLabel: workbenchProfile.value.hasManagementView ? '部门待执行任务' : '我的待执行任务',
+      metricHelper: '护理计划、执行记录、交接与异常跟踪',
+      metricValue: displayNumber(departmentMetricNumber('pending')),
+      tone: 'success',
+      items: [
+        { title: '超时任务', desc: '优先处理并补充超时原因。', path: '/care/today?metric=overdue', tag: `超时 ${displayNumber(departmentMetricNumber('overdue'))}`, tone: 'danger' },
+        { title: workbenchProfile.value.hasManagementView ? '待分配任务' : '异常任务', desc: workbenchProfile.value.hasManagementView ? '及时安排护理人员，避免任务滞留。' : '复核异常并完成交接。', path: workbenchProfile.value.hasManagementView ? '/care/today' : '/care/today?metric=exception', tag: `${workbenchProfile.value.hasManagementView ? '待分配' : '异常'} ${displayNumber(departmentMetricNumber(workbenchProfile.value.hasManagementView ? 'unassigned' : 'exception'))}`, tone: 'warning' }
+      ]
+    }
+  }
   if (workbenchPersona.value.key === 'medical') {
     return {
       key: 'clinical',
@@ -884,7 +909,8 @@ const commonActions = computed(() => {
     { title: '我的审批', description: '处理审批流程和待确认事项。', icon: '审', path: '/workbench/approvals' },
     { title: '我的考勤', description: '进入考勤、请假和打卡视图。', icon: '勤', path: '/workbench/attendance' },
     { title: '客户跟进', description: '查看待跟进客户和预约参观。', icon: '客', path: '/marketing/workbench' },
-    { title: '护理任务', description: '进入医护任务板与预警处理。', icon: '护', path: '/medical-care/care-task-board' },
+    { title: '护理任务', description: '查看今日护理执行、超时和异常事项。', icon: '护', path: '/care/today' },
+    { title: '护理记录', description: '补充服务执行记录与结果留痕。', icon: '录', path: '/care/service/nursing-records' },
     { title: '医护处置', description: '查看健康异常、医嘱和巡诊待办。', icon: '医', path: '/medical-care/unified-task-center' },
     { title: '后勤工单', description: '查看维修、巡检与保障任务。', icon: '工', path: '/logistics/task-center' },
     { title: '财务工作台', description: '进入收费、账单和对账总览。', icon: '费', path: '/finance/workbench' },
@@ -998,7 +1024,9 @@ async function loadWorkbench(options: { silent?: boolean } = {}) {
   try {
     const [portal, departmentResult, , calendarOk] = await Promise.all([
       getPortalSummary({ silent403: true, silentError: true }).catch(capture('工作待办')),
-      loadDepartmentWorkbenchSnapshot(workbenchProfile.value, canAccess),
+      loadDepartmentWorkbenchSnapshot(workbenchProfile.value, canAccess, {
+        staffId: userStore.staffInfo?.id
+      }),
       refreshAttendance().catch(capture('考勤')),
       loadCalendar(calendarCursor.value)
     ])
