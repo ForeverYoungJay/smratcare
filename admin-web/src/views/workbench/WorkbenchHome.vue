@@ -1,22 +1,15 @@
 <template>
-  <PageContainer title="工作台" subTitle="个人待办中心" mode="showcase" kicker="个人工作区">
+  <PageContainer title="我的工作台" subTitle="集中查看今天要完成的任务、风险提醒和常用操作" mode="showcase" kicker="今日工作">
     <template #meta>
       <a-space wrap>
         <StatusTag :text="roleLabel" tone="pending" />
-        <StatusTag :text="personaOverride === 'auto' ? '自动匹配视角' : '手动视角'" tone="normal" />
+        <StatusTag :text="audienceLabel" tone="normal" />
         <StatusTag :text="`最近刷新 ${refreshedAt}`" tone="offline" />
       </a-space>
     </template>
 
     <template #extra>
       <a-space wrap>
-        <a-select
-          :value="personaOverride"
-          size="small"
-          style="min-width: 148px"
-          :options="personaOptions"
-          @change="setPersonaOverride"
-        />
         <a-button
           v-for="action in attendanceActionButtons"
           :key="action"
@@ -80,6 +73,37 @@
     </section>
 
     <section v-if="!initialLoading" class="workbench-shell">
+      <WorkbenchModuleCard
+        v-if="workbenchProfile.department"
+        class="department-summary-card"
+        :title="`${workbenchProfile.departmentLabel}今日工作`"
+        eyebrow="岗位数据"
+      >
+        <template #extra>
+          <a-space size="small">
+            <StatusTag :text="departmentSourceStatusText" :tone="departmentSourceStatusTone" />
+            <a-button type="link" @click="openPath(workbenchProfile.primaryEntry)">进入部门业务</a-button>
+          </a-space>
+        </template>
+
+        <div v-if="departmentDataStatus === 'ready'" class="department-metric-grid">
+          <OverviewMetricCard
+            v-for="item in departmentSnapshot?.metrics"
+            :key="item.key"
+            clickable
+            :helper="item.helper"
+            :label="item.label"
+            :tone="item.risk ? 'warning' : 'brand'"
+            :value="departmentMetricValue(item)"
+            @click="openPath(item.path)"
+          />
+        </div>
+        <a-skeleton v-else-if="departmentDataStatus === 'loading'" active :title="false" :paragraph="{ rows: 2 }" />
+        <a-empty v-else :description="departmentDataMessage || '当前暂无需要处理的部门事项'">
+          <a-button v-if="departmentDataStatus === 'error'" @click="loadWorkbench()">重新加载</a-button>
+        </a-empty>
+      </WorkbenchModuleCard>
+
       <WorkbenchModuleCard title="我的日程" eyebrow="今日">
         <div class="schedule-head">
           <div>
@@ -244,14 +268,20 @@ import OverviewMetricCard from '../../components/smartcare/OverviewMetricCard.vu
 import QuickActionTile from '../../components/smartcare/QuickActionTile.vue'
 import StatusTag from '../../components/smartcare/StatusTag.vue'
 import WorkbenchModuleCard from '../../components/smartcare/WorkbenchModuleCard.vue'
-import { getLogisticsWorkbenchSummary } from '../../api/logistics'
 import { getOaTaskCalendar, getPortalSummary } from '../../api/oa'
 import { getAttendanceOverview, punchAttendance } from '../../api/schedule'
-import type { AttendanceDashboardOverview, OaPortalSummary, LogisticsWorkbenchSummary, OaTask } from '../../types'
+import type { AttendanceDashboardOverview, OaPortalSummary, OaTask } from '../../types'
 import { useUserStore } from '../../stores/user'
 import { useRouter } from 'vue-router'
 import { resolveRouteAccess } from '../../utils/routeAccess'
 import { loadRecentVisits, type RecentVisitItem } from '../../utils/recentVisits'
+import { resolveWorkbenchProfile, workbenchAudienceLabel } from '../../workbench/model'
+import {
+  loadDepartmentWorkbenchSnapshot,
+  type DepartmentWorkbenchSnapshot,
+  type WorkbenchDataStatus,
+  type WorkbenchMetricSnapshot
+} from '../../workbench/dataSources'
 
 type AttendanceAction = 'IN' | 'OUT' | 'START_LUNCH' | 'END_LUNCH' | 'START_OUTING' | 'END_OUTING'
 
@@ -321,7 +351,9 @@ const selectedDate = ref(dayjs())
 const calendarCursor = ref(dayjs().startOf('month'))
 const calendarRows = ref<OaTask[]>([])
 const portalSummary = ref<OaPortalSummary | null>(null)
-const logisticsSummary = ref<LogisticsWorkbenchSummary | null>(null)
+const departmentSnapshot = ref<DepartmentWorkbenchSnapshot | null>(null)
+const departmentDataStatus = ref<WorkbenchDataStatus>('idle')
+const departmentDataMessage = ref('')
 const attendanceOverview = reactive<AttendanceDashboardOverview>({
   todayStatusLabel: '',
   expectedWorkStart: '',
@@ -334,6 +366,15 @@ const attendanceOverview = reactive<AttendanceDashboardOverview>({
 function displayNumber(value?: number | null) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '--'
   return Number(value).toLocaleString('zh-CN')
+}
+
+function departmentMetricValue(item: WorkbenchMetricSnapshot) {
+  const value = displayNumber(item.value)
+  return item.suffix && value !== '--' ? `${value} ${item.suffix}` : value
+}
+
+function departmentMetricNumber(key: string) {
+  return departmentSnapshot.value?.metrics.find((item) => item.key === key)?.value
 }
 
 function canAccess(path: string) {
@@ -349,60 +390,15 @@ function openPath(path: string) {
 }
 
 const normalizedRoles = computed(() => (userStore.roles || []).map((role) => String(role || '').toUpperCase()))
+const workbenchProfile = computed(() => resolveWorkbenchProfile(userStore.roles || []))
+const audienceLabel = computed(() => workbenchAudienceLabel(workbenchProfile.value))
 
 function hasRoleFragment(fragment: string) {
   return normalizedRoles.value.some((role) => role.includes(fragment))
 }
 
-type PersonaKey = WorkbenchPersona['key']
-type PersonaOption = PersonaKey | 'auto'
-
-const PERSONA_STORAGE_PREFIX = 'workbench:persona:'
-const PERSONA_VALUES: PersonaOption[] = ['auto', 'nursing', 'medical', 'logistics', 'finance', 'hr', 'marketing', 'manager']
-
-const personaOptions: { value: PersonaOption; label: string }[] = [
-  { value: 'auto', label: '自动匹配视角' },
-  { value: 'nursing', label: '护理执行视角' },
-  { value: 'medical', label: '医务处置视角' },
-  { value: 'logistics', label: '后勤保障视角' },
-  { value: 'finance', label: '财务运营视角' },
-  { value: 'hr', label: '人事行政视角' },
-  { value: 'marketing', label: '营销转化视角' },
-  { value: 'manager', label: '综合管理视角' }
-]
-
-function personaStorageKey() {
-  const id = userStore.staffInfo?.id ?? userStore.staffInfo?.username ?? 'default'
-  return `${PERSONA_STORAGE_PREFIX}${id}`
-}
-
-function loadStoredPersona(): PersonaOption {
-  try {
-    const raw = localStorage.getItem(personaStorageKey())
-    return raw && PERSONA_VALUES.includes(raw as PersonaOption) ? (raw as PersonaOption) : 'auto'
-  } catch {
-    return 'auto'
-  }
-}
-
-const personaOverride = ref<PersonaOption>(loadStoredPersona())
-
-function setPersonaOverride(value: PersonaOption) {
-  personaOverride.value = value
-  try {
-    localStorage.setItem(personaStorageKey(), value)
-  } catch {
-    /* localStorage 不可用时仅保留本次会话选择 */
-  }
-}
-
-// 手动选定视角时以选择为准；auto 时回退到基于角色的自动匹配。无论哪种，下方模块仍按 canAccess 过滤，不会越权。
-function matchPersona(key: PersonaKey, autoCondition: boolean) {
-  return personaOverride.value === key || (personaOverride.value === 'auto' && autoCondition)
-}
-
 const workbenchPersona = computed<WorkbenchPersona>(() => {
-  if (matchPersona('nursing', hasRoleFragment('NURSING'))) {
+  if (workbenchProfile.value.department === 'NURSING') {
     return {
       key: 'nursing',
       roleLabel: '护理执行角色',
@@ -433,7 +429,7 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
       preferredActions: ['/medical-care/care-task-board', '/medical-care/unified-task-center', '/workbench/attendance']
     }
   }
-  if (matchPersona('medical', hasRoleFragment('MEDICAL'))) {
+  if (workbenchProfile.value.department === 'MEDICAL') {
     return {
       key: 'medical',
       roleLabel: '医务处置角色',
@@ -464,7 +460,7 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
       preferredActions: ['/medical-care/unified-task-center', '/medical-care/care-task-board', '/workbench/attendance']
     }
   }
-  if (matchPersona('logistics', hasRoleFragment('LOGISTICS') || hasRoleFragment('GUARD'))) {
+  if (workbenchProfile.value.department === 'LOGISTICS' || hasRoleFragment('GUARD')) {
     return {
       key: 'logistics',
       roleLabel: '后勤保障角色',
@@ -472,21 +468,21 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
       modulePriority: ['todo', 'workorder', 'approval', 'hr', 'customer', 'clinical', 'finance'],
       primaryEntry: {
         label: '保障工单',
-        value: displayNumber(logisticsSummary.value?.maintenancePendingCount),
-        helper: `逾期 ${displayNumber(logisticsSummary.value?.maintenanceOverdueCount)}，优先清设备与保障异常`,
+        value: displayNumber(departmentMetricNumber('maintenance')),
+        helper: `逾期 ${displayNumber(departmentMetricNumber('overdue'))}，优先清设备与保障异常`,
         path: '/logistics/task-center'
       },
       summaryMetrics: [
         {
           label: '待处理工单',
-          value: displayNumber(logisticsSummary.value?.maintenancePendingCount),
+          value: displayNumber(departmentMetricNumber('maintenance')),
           helper: '维修、巡检与保障任务',
           tone: 'warning',
           path: '/logistics/task-center'
         },
         {
           label: '逾期工单',
-          value: displayNumber(logisticsSummary.value?.maintenanceOverdueCount),
+          value: displayNumber(departmentMetricNumber('overdue')),
           helper: '超时项优先催办',
           tone: 'warning',
           path: '/logistics/task-center'
@@ -495,7 +491,7 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
       preferredActions: ['/logistics/task-center', '/workbench/attendance', '/workbench/todo']
     }
   }
-  if (matchPersona('finance', hasRoleFragment('FINANCE'))) {
+  if (workbenchProfile.value.department === 'FINANCE') {
     return {
       key: 'finance',
       roleLabel: '财务运营角色',
@@ -526,7 +522,7 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
       preferredActions: ['/finance/workbench', '/finance/bills/in-resident', '/workbench/approvals']
     }
   }
-  if (matchPersona('hr', hasRoleFragment('HR'))) {
+  if (workbenchProfile.value.department === 'HR') {
     return {
       key: 'hr',
       roleLabel: '人事行政角色',
@@ -557,7 +553,7 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
       preferredActions: ['/hr/overview', '/workbench/attendance', '/workbench/approvals']
     }
   }
-  if (matchPersona('marketing', hasRoleFragment('MARKETING'))) {
+  if (workbenchProfile.value.department === 'MARKETING') {
     return {
       key: 'marketing',
       roleLabel: '营销转化角色',
@@ -609,7 +605,7 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
       },
       {
         label: '我的工单',
-        value: displayNumber(logisticsSummary.value?.maintenancePendingCount),
+        value: displayNumber(departmentMetricNumber('maintenance')),
         helper: '维修、巡检与保障任务',
         tone: 'warning',
         path: '/logistics/task-center'
@@ -619,7 +615,22 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
   }
 })
 
-const roleLabel = computed(() => workbenchPersona.value.roleLabel)
+const roleLabel = computed(() => workbenchProfile.value.roleLabel)
+
+const departmentSourceStatusText = computed(() => {
+  if (departmentDataStatus.value === 'loading') return '正在加载'
+  if (departmentDataStatus.value === 'ready') return '真实业务数据'
+  if (departmentDataStatus.value === 'error') return '加载失败'
+  if (departmentDataStatus.value === 'forbidden') return '无数据权限'
+  return '暂无数据'
+})
+
+const departmentSourceStatusTone = computed(() => {
+  if (departmentDataStatus.value === 'ready') return 'normal'
+  if (departmentDataStatus.value === 'error') return 'danger'
+  if (departmentDataStatus.value === 'loading') return 'pending'
+  return 'offline'
+})
 
 const staffDisplayName = computed(() =>
   String(userStore.staffInfo?.realName || userStore.staffInfo?.username || '当前员工')
@@ -732,7 +743,7 @@ const clinicalModule = computed<PrimaryModule>(() => {
     return {
       key: 'clinical',
       title: '我的医护处置',
-      eyebrow: 'Medical',
+      eyebrow: '医务',
       path: '/medical-care/unified-task-center',
       metricLabel: '医嘱与异常',
       metricHelper: '异常复核、医嘱执行和巡诊安排',
@@ -747,7 +758,7 @@ const clinicalModule = computed<PrimaryModule>(() => {
   return {
     key: 'clinical',
     title: '我的护理执行',
-    eyebrow: 'Clinical',
+    eyebrow: '护理',
     path: '/medical-care/care-task-board',
     metricLabel: '护理与医护任务',
     metricHelper: '护理计划、巡视执行、交接与异常跟踪',
@@ -763,7 +774,7 @@ const clinicalModule = computed<PrimaryModule>(() => {
 const financeModule = computed<PrimaryModule>(() => ({
   key: 'finance',
   title: '我的财务工作',
-  eyebrow: 'Finance',
+  eyebrow: '财务',
   path: '/finance/workbench',
   metricLabel: '收费与对账',
   metricHelper: '账单、收款、例外与月结推进',
@@ -778,7 +789,7 @@ const financeModule = computed<PrimaryModule>(() => ({
 const hrModule = computed<PrimaryModule>(() => ({
   key: 'hr',
   title: '我的人事行政',
-  eyebrow: 'HR',
+  eyebrow: '行政人事',
   path: '/hr/overview',
   metricLabel: '考勤与档案',
   metricHelper: '班组排班、员工档案与行政协同',
@@ -794,7 +805,7 @@ const allModules = computed<PrimaryModule[]>(() => ([
   {
     key: 'todo',
     title: '我的待办',
-    eyebrow: 'Priority',
+    eyebrow: '优先处理',
     path: '/workbench/todo',
     metricLabel: '待办总览',
     metricHelper: '开放待办与逾期事项',
@@ -808,7 +819,7 @@ const allModules = computed<PrimaryModule[]>(() => ([
   {
     key: 'approval',
     title: '我的审批',
-    eyebrow: 'Approve',
+    eyebrow: '审批',
     path: '/workbench/approvals',
     metricLabel: '审批中心',
     metricHelper: '行政、财务、人事等审批',
@@ -823,7 +834,7 @@ const allModules = computed<PrimaryModule[]>(() => ([
   {
     key: 'customer',
     title: '我的客户跟进',
-    eyebrow: 'Marketing',
+    eyebrow: '市场',
     path: '/marketing/workbench',
     metricLabel: '客户跟进',
     metricHelper: '咨询线索、预约参观与转化',
@@ -837,15 +848,15 @@ const allModules = computed<PrimaryModule[]>(() => ([
   {
     key: 'workorder',
     title: '我的工单',
-    eyebrow: 'Logistics',
+    eyebrow: '后勤',
     path: '/logistics/task-center',
     metricLabel: '工单与保障',
     metricHelper: '维修、巡检、后勤保障',
-    metricValue: displayNumber(logisticsSummary.value?.maintenancePendingCount),
+    metricValue: displayNumber(departmentMetricNumber('maintenance')),
     tone: 'warning',
     items: [
-      { title: '待处理工单', desc: '当前需要响应的维修与保障任务。', path: '/logistics/task-center', tag: `待办 ${displayNumber(logisticsSummary.value?.maintenancePendingCount)}`, tone: 'warning' },
-      { title: '逾期工单', desc: '逾期项需要优先催办。', path: '/logistics/task-center', tag: `逾期 ${displayNumber(logisticsSummary.value?.maintenanceOverdueCount)}`, tone: 'danger' }
+      { title: '待处理工单', desc: '当前需要响应的维修与保障任务。', path: '/logistics/task-center', tag: `待办 ${displayNumber(departmentMetricNumber('maintenance'))}`, tone: 'warning' },
+      { title: '逾期工单', desc: '逾期项需要优先催办。', path: '/logistics/task-center', tag: `逾期 ${displayNumber(departmentMetricNumber('overdue'))}`, tone: 'danger' }
     ]
   },
   financeModule.value,
@@ -977,6 +988,7 @@ async function loadWorkbench(options: { silent?: boolean } = {}) {
   if (refreshInFlight) return
   refreshInFlight = true
   if (!options.silent) loading.value = true
+  if (workbenchProfile.value.department) departmentDataStatus.value = 'loading'
   const failures: string[] = []
   // 403 表示当前角色无该数据权限，属于正常裁剪，不计入“加载失败”；其余（网络/5xx）才提示
   const capture = (label: string) => (error: any) => {
@@ -984,14 +996,17 @@ async function loadWorkbench(options: { silent?: boolean } = {}) {
     return null
   }
   try {
-    const [portal, logistics, , calendarOk] = await Promise.all([
+    const [portal, departmentResult, , calendarOk] = await Promise.all([
       getPortalSummary({ silent403: true, silentError: true }).catch(capture('工作待办')),
-      getLogisticsWorkbenchSummary(undefined, { silent403: true, silentError: true }).catch(capture('后勤工单')),
+      loadDepartmentWorkbenchSnapshot(workbenchProfile.value, canAccess),
       refreshAttendance().catch(capture('考勤')),
       loadCalendar(calendarCursor.value)
     ])
     portalSummary.value = portal
-    logisticsSummary.value = logistics
+    departmentDataStatus.value = departmentResult.status
+    departmentSnapshot.value = departmentResult.snapshot || null
+    departmentDataMessage.value = departmentResult.message || ''
+    if (departmentResult.status === 'error') failures.push(`${workbenchProfile.value.departmentLabel}业务数据`)
     if (calendarOk === false) failures.push('日程')
     loadFailures.value = failures
     refreshedAt.value = new Date().toLocaleString('zh-CN', {
@@ -1169,6 +1184,16 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
+}
+
+.department-summary-card {
+  grid-column: 1 / -1;
+}
+
+.department-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .schedule-head,
@@ -1399,6 +1424,7 @@ onUnmounted(() => {
   .workbench-hero,
   .workbench-summary-grid,
   .workbench-shell,
+  .department-metric-grid,
   .common-actions-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1412,6 +1438,7 @@ onUnmounted(() => {
   .workbench-hero,
   .workbench-summary-grid,
   .workbench-shell,
+  .department-metric-grid,
   .workbench-chip-grid,
   .workbench-focus-grid,
   .common-actions-grid {
