@@ -1,17 +1,13 @@
-import { getHrWorkbenchSummary } from '../api/hr'
-import { getLogisticsWorkbenchSummary } from '../api/logistics'
-import { getMarketingWorkbenchSummary } from '../api/marketing'
 import type { DepartmentCode } from '../access/policy'
-import type {
-  HrWorkbenchSummary,
-  Id,
-  LogisticsWorkbenchSummary,
-  MarketingWorkbenchSummary
-} from '../types'
+import type { Id } from '../types'
 import type { WorkbenchProfile } from './model'
 import { loadNursingWorkbench, type NursingWorkbenchDetail } from './nursing'
 import { loadMedicalWorkbench, type MedicalWorkbenchDetail } from './medical'
 import { loadFinanceWorkbench, type FinanceWorkbenchDetail } from './finance'
+import { loadLogisticsWorkbench } from './logistics'
+import { loadHrRoleWorkbench } from './hr'
+import { loadMarketingRoleWorkbench } from './marketing'
+import type { RoleDepartmentWorkbenchDetail } from './operational'
 
 export type WorkbenchDataStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'forbidden' | 'error'
 
@@ -33,6 +29,9 @@ export interface DepartmentWorkbenchSnapshot {
   nursing?: NursingWorkbenchDetail
   medical?: MedicalWorkbenchDetail
   finance?: FinanceWorkbenchDetail
+  logistics?: RoleDepartmentWorkbenchDetail
+  hr?: RoleDepartmentWorkbenchDetail
+  marketing?: RoleDepartmentWorkbenchDetail
 }
 
 export interface WorkbenchDataResult {
@@ -51,16 +50,7 @@ export interface WorkbenchLoadContext {
   username?: string
 }
 
-const silentConfig = { silent403: true, silentError: true }
 const today = () => new Date().toLocaleDateString('sv-SE')
-
-// TODO: request.get 的全仓类型目前仍声明为 AxiosResponse<T>，但响应拦截器在运行时返回 T。
-// 在修复公共请求类型前，只在数据适配边界兼容两种形态，避免把 Axios 结构扩散到工作台模型。
-function responseData<T>(response: T | { data: T }): T {
-  return response && typeof response === 'object' && 'data' in response
-    ? (response as { data: T }).data
-    : response as T
-}
 
 const departmentSources: Record<DepartmentCode, DepartmentSource> = {
   NURSING: {
@@ -128,43 +118,35 @@ const departmentSources: Record<DepartmentCode, DepartmentSource> = {
   },
   LOGISTICS: {
     accessPath: '/logistics/workbench',
-    async load() {
-      const data = responseData<LogisticsWorkbenchSummary>(await getLogisticsWorkbenchSummary(undefined, silentConfig))
+    async load(profile) {
+      const result = await loadLogisticsWorkbench(profile)
+      const data = result.summary
       return {
-        department: 'LOGISTICS', sourceLabel: '后勤工作台汇总', generatedAt: data?.generatedAt, metrics: [
-          { key: 'maintenance', label: '待处理报修', value: data?.maintenancePendingCount, helper: '待派单或待处理的维修任务', path: '/logistics/task-center' },
-          { key: 'overdue', label: '超时工单', value: data?.maintenanceOverdueCount, helper: '超过要求时限的维修任务', path: '/logistics/task-center', risk: true },
-          { key: 'stock', label: '库存预警', value: data?.lowStockCount, helper: '低于安全库存的物资', path: '/logistics/storage/alerts', risk: true },
-          { key: 'delivery', label: '待送餐', value: data?.undeliveredCount, helper: '今天尚未完成的送餐任务', path: '/logistics/dining/delivery-plan' }
-        ]
+        department: 'LOGISTICS', sourceLabel: '后勤工作台汇总', generatedAt: data?.generatedAt,
+        metrics: result.detail.metrics.map((item) => ({ ...item, risk: item.tone === 'danger' || item.tone === 'warning' })),
+        logistics: result.detail
       }
     }
   },
   HR: {
     accessPath: '/hr/overview',
-    async load() {
-      const data = responseData<HrWorkbenchSummary>(await getHrWorkbenchSummary(undefined, silentConfig))
+    async load(profile) {
+      const result = await loadHrRoleWorkbench(profile)
       return {
-        department: 'HR', sourceLabel: '行政人事工作台汇总', metrics: [
-          { key: 'attendance', label: '考勤异常', value: data?.attendanceAbnormalCount, helper: '需要核实或修正的考勤记录', path: '/hr/attendance/abnormal', risk: true },
-          { key: 'leave', label: '请假待审批', value: data?.pendingLeaveApprovalCount, helper: '等待当前部门处理的请假流程', path: '/hr/attendance/leave-approval' },
-          { key: 'contract', label: '合同即将到期', value: data?.contractExpiringCount, helper: `未来 ${data?.warningDays || 30} 天内到期`, path: '/hr/profile/contract-reminders', risk: true },
-          { key: 'training', label: '今日培训', value: data?.todayTrainingCount, helper: '今天安排的培训活动', path: '/hr/development/records' }
-        ]
+        department: 'HR', sourceLabel: '行政人事工作台汇总',
+        metrics: result.detail.metrics.map((item) => ({ ...item, risk: item.tone === 'danger' || item.tone === 'warning' })),
+        hr: result.detail
       }
     }
   },
   MARKETING: {
     accessPath: '/marketing/workbench',
-    async load() {
-      const data = responseData<MarketingWorkbenchSummary>(await getMarketingWorkbenchSummary())
+    async load(profile) {
+      const result = await loadMarketingRoleWorkbench(profile)
       return {
-        department: 'MARKETING', sourceLabel: '市场工作台汇总', metrics: [
-          { key: 'lead', label: '今日新增线索', value: data?.funnel?.todayConsultCount, helper: '今天进入跟进池的新客户', path: '/marketing/leads/all' },
-          { key: 'followup', label: '今日待跟进', value: data?.followup?.todayDue, helper: '今天需要联系或回访的客户', path: '/marketing/interactions/today' },
-          { key: 'overdue', label: '逾期未跟进', value: data?.followup?.overdue, helper: '已超过计划跟进时间', path: '/marketing/interactions/overdue', risk: true },
-          { key: 'sign', label: '待签约客户', value: data?.funnel?.pendingSignCount, helper: '已进入签约阶段的客户', path: '/marketing/contracts/pending' }
-        ]
+        department: 'MARKETING', sourceLabel: '市场工作台汇总',
+        metrics: result.detail.metrics.map((item) => ({ ...item, risk: item.tone === 'danger' || item.tone === 'warning' })),
+        marketing: result.detail
       }
     }
   }

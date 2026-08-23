@@ -152,8 +152,8 @@ export const systemRoutes: RouteRecordRaw[] = [
           {
             path: '',
             name: 'SystemHub',
-            component: () => import('../views/ModuleHub.vue'),
-            meta: { title: '系统导航', hidden: true }
+            component: () => import('../views/System/SystemAdminHome.vue'),
+            meta: { title: '系统管理首页', hidden: true }
           },
           {
             path: 'site-config',

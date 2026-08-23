@@ -97,6 +97,14 @@
         @open="openPath"
       />
 
+      <RoleDepartmentWorkbenchPanel
+        v-else-if="roleDepartmentDetail && departmentDataStatus === 'ready'"
+        :detail="roleDepartmentDetail"
+        :management-view="workbenchProfile.hasManagementView"
+        :can-access="canAccess"
+        @open="openPath"
+      />
+
       <WorkbenchModuleCard
         v-else-if="workbenchProfile.department"
         class="department-summary-card"
@@ -295,6 +303,7 @@ import WorkbenchModuleCard from '../../components/smartcare/WorkbenchModuleCard.
 import NursingWorkbenchPanel from '../../components/workbench/NursingWorkbenchPanel.vue'
 import MedicalWorkbenchPanel from '../../components/workbench/MedicalWorkbenchPanel.vue'
 import FinanceWorkbenchPanel from '../../components/workbench/FinanceWorkbenchPanel.vue'
+import RoleDepartmentWorkbenchPanel from '../../components/workbench/RoleDepartmentWorkbenchPanel.vue'
 import { getOaTaskCalendar, getPortalSummary } from '../../api/oa'
 import { getAttendanceOverview, punchAttendance } from '../../api/schedule'
 import type { AttendanceDashboardOverview, OaPortalSummary, OaTask } from '../../types'
@@ -381,6 +390,14 @@ const portalSummary = ref<OaPortalSummary | null>(null)
 const departmentSnapshot = ref<DepartmentWorkbenchSnapshot | null>(null)
 const departmentDataStatus = ref<WorkbenchDataStatus>('idle')
 const departmentDataMessage = ref('')
+const roleDepartmentDetail = computed(() => {
+  const snapshot = departmentSnapshot.value
+  if (!snapshot) return undefined
+  if (workbenchProfile.value.department === 'LOGISTICS') return snapshot.logistics
+  if (workbenchProfile.value.department === 'HR') return snapshot.hr
+  if (workbenchProfile.value.department === 'MARKETING') return snapshot.marketing
+  return undefined
+})
 const attendanceOverview = reactive<AttendanceDashboardOverview>({
   todayStatusLabel: '',
   expectedWorkStart: '',
@@ -496,34 +513,37 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
     }
   }
   if (workbenchProfile.value.department === 'LOGISTICS' || hasRoleFragment('GUARD')) {
+    const managementView = workbenchProfile.value.hasManagementView
     return {
       key: 'logistics',
       roleLabel: '后勤保障角色',
       subline: '先处理逾期维修、巡检和保障工单，再补充现场回执。',
       modulePriority: ['todo', 'workorder', 'approval', 'hr', 'customer', 'clinical', 'finance'],
       primaryEntry: {
-        label: '保障工单',
-        value: displayNumber(departmentMetricNumber('maintenance')),
-        helper: `逾期 ${displayNumber(departmentMetricNumber('overdue'))}，优先清设备与保障异常`,
+        label: managementView ? '逾期维修' : '待处理报修',
+        value: displayNumber(departmentMetricNumber(managementView ? 'overdue' : 'maintenance')),
+        helper: managementView ? `库存预警 ${displayNumber(departmentMetricNumber('stock'))}，先清保障风险` : '机构当班任务口径，先响应报修并完成现场回执',
         path: '/logistics/task-center'
       },
       summaryMetrics: [
         {
-          label: '待处理工单',
-          value: displayNumber(departmentMetricNumber('maintenance')),
-          helper: '维修、巡检与保障任务',
+          label: managementView ? '库存预警' : '今日出库',
+          value: displayNumber(departmentMetricNumber(managementView ? 'stock' : 'outbound')),
+          helper: managementView ? '低于安全库存的物资' : '机构当日出库数量，非个人绩效',
           tone: 'warning',
-          path: '/logistics/task-center'
+          path: managementView ? '/logistics/storage/alerts' : '/logistics/storage/outbound'
         },
         {
-          label: '逾期工单',
-          value: displayNumber(departmentMetricNumber('overdue')),
-          helper: '超时项优先催办',
-          tone: 'warning',
-          path: '/logistics/task-center'
+          label: managementView ? '设备临期' : '待送餐',
+          value: displayNumber(departmentMetricNumber(managementView ? 'equipment' : 'delivery')),
+          helper: managementView ? '需要安排保养的设备' : '机构当班协作任务',
+          tone: managementView ? 'warning' : 'success',
+          path: managementView ? '/logistics/maintenance/assets' : '/logistics/dining/delivery-plan'
         }
       ],
-      preferredActions: ['/logistics/task-center', '/workbench/attendance', '/workbench/todo']
+      preferredActions: managementView
+        ? ['/logistics/task-center', '/logistics/storage/alerts', '/workbench/approvals']
+        : ['/logistics/task-center', '/logistics/storage/inbound', '/logistics/dining/delivery-plan']
     }
   }
   if (workbenchProfile.value.department === 'FINANCE') {
@@ -561,65 +581,71 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
     }
   }
   if (workbenchProfile.value.department === 'HR') {
+    const managementView = workbenchProfile.value.hasManagementView
     return {
       key: 'hr',
       roleLabel: '人事行政角色',
       subline: '先看考勤异常、班组排班和档案动作，再推进招聘与入转调离。',
       modulePriority: ['todo', 'hr', 'approval', 'finance', 'customer', 'clinical', 'workorder'],
       primaryEntry: {
-        label: '人资中心',
-        value: displayNumber(attendanceOverview.abnormalCount),
-        helper: `今日日程 ${displayNumber(portalSummary.value?.todayScheduleCount)}，优先处理考勤和档案动作`,
-        path: '/hr/overview'
+        label: managementView ? '请假待审批' : '我的考勤',
+        value: managementView ? displayNumber(departmentMetricNumber('leave')) : displayNumber(attendanceOverview.abnormalCount),
+        helper: managementView ? `考勤异常 ${displayNumber(departmentMetricNumber('attendance'))}，优先处理人员风险` : '个人考勤来自本人数据；机构提醒不计为本人待办',
+        path: managementView ? '/hr/attendance/leave-approval' : '/workbench/attendance'
       },
       summaryMetrics: [
         {
-          label: '考勤异常',
-          value: displayNumber(attendanceOverview.abnormalCount),
-          helper: '打卡、请假与班组排班',
+          label: managementView ? '合同临期' : '机构今日培训',
+          value: displayNumber(departmentMetricNumber(managementView ? 'contract' : 'training')),
+          helper: managementView ? '未来预警周期内到期' : '机构协作参考，非本人绩效',
           tone: 'warning',
-          path: '/workbench/attendance'
+          path: managementView ? '/hr/profile/contract-reminders' : '/hr/overview'
         },
         {
-          label: '今日日程',
-          value: displayNumber(portalSummary.value?.todayScheduleCount),
-          helper: '招聘、面试与行政协同',
+          label: managementView ? '今日培训' : '社保事项',
+          value: displayNumber(departmentMetricNumber(managementView ? 'training' : 'social')),
+          helper: managementView ? '部门培训安排' : '进入已授权页面查看',
           tone: 'brand',
-          path: '/hr/overview'
+          path: managementView ? '/hr/development/records' : '/hr/profile/social-security-reminders'
         }
       ],
-      preferredActions: ['/hr/overview', '/workbench/attendance', '/workbench/approvals']
+      preferredActions: managementView
+        ? ['/hr/attendance/leave-approval', '/hr/attendance/abnormal', '/hr/profile/basic']
+        : ['/workbench/attendance', '/workbench/profile', '/hr/profile/social-security-reminders']
     }
   }
   if (workbenchProfile.value.department === 'MARKETING') {
+    const managementView = workbenchProfile.value.hasManagementView
     return {
       key: 'marketing',
       roleLabel: '营销转化角色',
       subline: '先推进线索回访、参观和试住转化，再补营销任务和计划。',
       modulePriority: ['todo', 'customer', 'approval', 'finance', 'clinical', 'workorder', 'hr'],
       primaryEntry: {
-        label: '客户跟进',
-        value: displayNumber(portalSummary.value?.suggestionCount),
-        helper: '优先跟进咨询、预约参观和试住转化',
-        path: '/marketing/workbench'
+        label: managementView ? '逾期未跟进' : '团队今日回访',
+        value: displayNumber(departmentMetricNumber(managementView ? 'overdue' : 'today')),
+        helper: managementView ? `高意向客户 ${displayNumber(departmentMetricNumber('intent'))}，先清回访风险` : '机构客户池口径，后端暂不支持按销售人员过滤',
+        path: managementView ? '/marketing/interactions/overdue' : '/marketing/interactions/today'
       },
       summaryMetrics: [
         {
-          label: '待回访客户',
-          value: displayNumber(portalSummary.value?.suggestionCount),
-          helper: '咨询、参观与试住推进',
+          label: managementView ? '待签约客户' : '今日新增咨询',
+          value: displayNumber(departmentMetricNumber(managementView ? 'sign' : 'consult')),
+          helper: managementView ? '需要推进合同签署' : '机构新增咨询，非个人业绩',
           tone: 'success',
-          path: '/marketing/workbench'
+          path: managementView ? '/marketing/contracts/pending' : '/marketing/leads/all'
         },
         {
-          label: '协同待办',
-          value: displayNumber(portalSummary.value?.openTodoCount),
-          helper: '合同、床位与跨部门衔接',
-          tone: 'brand',
-          path: '/workbench/todo'
+          label: managementView ? '本月成交' : '团队逾期回访',
+          value: displayNumber(departmentMetricNumber(managementView ? 'deal' : 'overdue')),
+          helper: managementView ? '部门成交口径' : '机构客户池风险',
+          tone: managementView ? 'brand' : 'warning',
+          path: managementView ? '/marketing/reports/conversion' : '/marketing/interactions/overdue'
         }
       ],
-      preferredActions: ['/marketing/workbench', '/workbench/todo', '/workbench/approvals']
+      preferredActions: managementView
+        ? ['/marketing/interactions/overdue', '/marketing/leads/intent', '/marketing/reports/conversion']
+        : ['/marketing/interactions/today', '/marketing/leads/all', '/marketing/reservation/records']
     }
   }
   return {

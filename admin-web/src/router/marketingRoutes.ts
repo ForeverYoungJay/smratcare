@@ -135,7 +135,7 @@ export const marketingRoutes: RouteRecordRaw[] = [
       {
         path: 'reports',
         name: 'MarketingReports',
-        meta: { title: '销售报表中心' },
+        meta: { title: '销售报表中心', roles: ['MARKETING_MINISTER', 'DIRECTOR', 'ADMIN'] },
         redirect: '/marketing/reports/conversion',
         children: [
           view('conversion', 'MarketingReportConversion', '转化率统计', () => import('../views/marketing/report/Conversion.vue')),
@@ -152,7 +152,12 @@ export const marketingRoutes: RouteRecordRaw[] = [
       { path: 'contract-signing', name: 'MarketingContractSigning', component: ContractSigning, meta: { title: '合同签约（兼容）', hidden: true } },
       { path: 'contract-management', name: 'MarketingContractManagement', component: () => import('../views/marketing/ContractManagement.vue'), meta: { title: '合同到期管理（兼容）', hidden: true } },
       { path: 'room-panorama', name: 'MarketingRoomPanorama', component: () => import('../views/marketing/RoomPanorama.vue'), meta: { title: '房态全景（兼容）', hidden: true } },
-      view('plan', 'MarketingPlan', '营销方案与审批', () => import('../views/marketing/MarketingPlan.vue')),
+      {
+        path: 'plan',
+        name: 'MarketingPlan',
+        component: () => import('../views/marketing/MarketingPlan.vue'),
+        meta: { title: '营销方案与审批', roles: ['MARKETING_MINISTER', 'DIRECTOR', 'ADMIN'] }
+      },
       {
         path: 'sales',
         name: 'MarketingSalesLegacy',

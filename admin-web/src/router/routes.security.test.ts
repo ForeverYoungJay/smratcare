@@ -101,4 +101,12 @@ describe('route security foundation', () => {
     expect(resolveRouteAccess(router, ['DIRECTOR'], '/stats/security-policy', getRecommendedPagePermissions('DIRECTOR')).canAccess).toBe(false)
     expect(resolveRouteAccess(router, ['DIRECTOR'], '/stats/org/monthly-operation', getRecommendedPagePermissions('DIRECTOR')).canAccess).toBe(true)
   })
+
+  it('keeps marketing reports and planning manager-only on direct navigation', () => {
+    const employeePermissions = getRecommendedPagePermissions('MARKETING_EMPLOYEE')
+    const ministerPermissions = getRecommendedPagePermissions('MARKETING_MINISTER')
+    expect(resolveRouteAccess(router, ['MARKETING_EMPLOYEE'], '/marketing/reports/channel', employeePermissions).canAccess).toBe(false)
+    expect(resolveRouteAccess(router, ['MARKETING_EMPLOYEE'], '/marketing/plan', employeePermissions).canAccess).toBe(false)
+    expect(resolveRouteAccess(router, ['MARKETING_MINISTER'], '/marketing/reports/channel', ministerPermissions).canAccess).toBe(true)
+  })
 })
