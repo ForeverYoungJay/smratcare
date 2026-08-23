@@ -16,7 +16,13 @@
     </div>
 
     <div class="global-header__right">
-      <button type="button" class="global-header__search" @click="$emit('open-search')">
+      <button
+        type="button"
+        class="global-header__search"
+        aria-label="搜索页面"
+        title="搜索页面"
+        @click="$emit('open-search')"
+      >
         <SearchOutlined class="global-header__search-icon" />
         <span class="global-header__search-label">{{ searchPlaceholder }}</span>
         <span class="global-header__search-shortcut">/</span>
@@ -292,6 +298,31 @@ defineEmits<{
   .global-header__right {
     gap: 8px;
     flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .global-header__right {
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+  }
+
+  .global-header__search {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .global-header__search-label,
+  .global-header__search-shortcut,
+  .global-header__user strong {
+    display: none;
+  }
+
+  .global-header__user {
+    padding: 2px;
   }
 }
 </style>
