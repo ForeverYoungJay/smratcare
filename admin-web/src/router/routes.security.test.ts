@@ -33,6 +33,22 @@ describe('route security foundation', () => {
     expect(new Set(paths).size).toBe(paths.length)
   })
 
+  it('keeps the application route composition stable across domain modules', () => {
+    const root = routes.find((route) => route.path === '/')
+    expect(collectRoutes(routes)).toHaveLength(634)
+    expect(root?.children?.map((route) => route.path)).toEqual([
+      'portal', 'function-map', 'workbench', 'dashboard', 'elder',
+      'marketing', 'bed', 'material', 'store', 'inventory',
+      'elder/admission-assessment', 'elder/discharge-settlement',
+      'elder/admission', 'elder/outing', 'elder/visit-register',
+      'elder/discharge-apply', 'elder/trial-stay', 'elder/medical-outing',
+      'elder/death-register',
+      'logistics', 'care', 'finance', 'health', 'medical-care', 'fire',
+      'ltci', 'stats', 'ai', 'card', 'life', 'dining', 'assessment',
+      'survey', 'oa', 'hr', 'base-config', 'system', 'demo'
+    ])
+  })
+
   it('preserves query and hash when redirecting a legacy URL', () => {
     expect(redirectPreservingLocation('/workbench/todo')({ query: { status: 'OVERDUE' }, hash: '#mine' } as any))
       .toEqual({ path: '/workbench/todo', query: { status: 'OVERDUE' }, hash: '#mine' })
