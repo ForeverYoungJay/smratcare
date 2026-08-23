@@ -81,6 +81,14 @@
         @open="openPath"
       />
 
+      <MedicalWorkbenchPanel
+        v-else-if="workbenchProfile.department === 'MEDICAL' && departmentDataStatus === 'ready' && departmentSnapshot?.medical"
+        :detail="departmentSnapshot.medical"
+        :management-view="workbenchProfile.hasManagementView"
+        :can-access="canAccess"
+        @open="openPath"
+      />
+
       <WorkbenchModuleCard
         v-else-if="workbenchProfile.department"
         class="department-summary-card"
@@ -277,6 +285,7 @@ import QuickActionTile from '../../components/smartcare/QuickActionTile.vue'
 import StatusTag from '../../components/smartcare/StatusTag.vue'
 import WorkbenchModuleCard from '../../components/smartcare/WorkbenchModuleCard.vue'
 import NursingWorkbenchPanel from '../../components/workbench/NursingWorkbenchPanel.vue'
+import MedicalWorkbenchPanel from '../../components/workbench/MedicalWorkbenchPanel.vue'
 import { getOaTaskCalendar, getPortalSummary } from '../../api/oa'
 import { getAttendanceOverview, punchAttendance } from '../../api/schedule'
 import type { AttendanceDashboardOverview, OaPortalSummary, OaTask } from '../../types'
@@ -439,34 +448,37 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
     }
   }
   if (workbenchProfile.value.department === 'MEDICAL') {
+    const managementView = workbenchProfile.value.hasManagementView
     return {
       key: 'medical',
       roleLabel: '医务处置角色',
       subline: '优先复核健康异常、医嘱执行和巡诊安排，避免问题跨班次积压。',
       modulePriority: ['todo', 'clinical', 'approval', 'customer', 'workorder', 'finance', 'hr'],
       primaryEntry: {
-        label: '医护处置',
-        value: displayNumber(portalSummary.value?.healthAbnormalCount),
-        helper: `待执行 ${displayNumber(portalSummary.value?.pendingMedicalOrderCount)}，先看异常与医嘱闭环`,
-        path: '/medical-care/unified-task-center'
+        label: managementView ? '未闭环异常' : '医务处置',
+        value: managementView ? displayNumber(departmentMetricNumber('abnormal')) : '--',
+        helper: managementView
+          ? `待执行医嘱 ${displayNumber(departmentMetricNumber('orders'))}，先看异常与医嘱闭环`
+          : '个人待办口径待后端接入，请进入巡诊或医嘱列表处理',
+        path: managementView ? '/medical-care/unified-task-center' : '/medical-care/rounds'
       },
       summaryMetrics: [
         {
-          label: '健康异常',
-          value: displayNumber(portalSummary.value?.healthAbnormalCount),
-          helper: '异常复核与交班跟进',
+          label: managementView ? '未闭环异常' : '我的巡诊待办',
+          value: managementView ? displayNumber(departmentMetricNumber('abnormal')) : '--',
+          helper: managementView ? '异常复核与交班跟进' : '个人统计接口尚未接入',
           tone: 'warning',
-          path: '/medical-care/unified-task-center'
+          path: managementView ? '/medical-care/unified-task-center' : '/medical-care/rounds'
         },
         {
-          label: '待执行医嘱',
-          value: displayNumber(portalSummary.value?.pendingMedicalOrderCount),
-          helper: '巡诊、医嘱与医护任务',
+          label: managementView ? '待执行医嘱' : '我的今日用药登记',
+          value: displayNumber(departmentMetricNumber(managementView ? 'orders' : 'medicationDone')),
+          helper: managementView ? '巡诊、医嘱与医护任务' : '按当前登录账号登记人统计',
           tone: 'success',
-          path: '/medical-care/care-task-board'
+          path: managementView ? '/medical-care/orders' : '/medical-care/medication-registration'
         }
       ],
-      preferredActions: ['/medical-care/unified-task-center', '/medical-care/care-task-board', '/workbench/attendance']
+      preferredActions: ['/medical-care/rounds', '/medical-care/orders', '/medical-care/medication-registration', '/workbench/attendance']
     }
   }
   if (workbenchProfile.value.department === 'LOGISTICS' || hasRoleFragment('GUARD')) {
@@ -765,18 +777,22 @@ const clinicalModule = computed<PrimaryModule>(() => {
     }
   }
   if (workbenchPersona.value.key === 'medical') {
+    const managementView = workbenchProfile.value.hasManagementView
     return {
       key: 'clinical',
-      title: '我的医护处置',
+      title: managementView ? '医务部任务与风险' : '我的医务处置',
       eyebrow: '医务',
-      path: '/medical-care/unified-task-center',
-      metricLabel: '医嘱与异常',
-      metricHelper: '异常复核、医嘱执行和巡诊安排',
-      metricValue: displayNumber(portalSummary.value?.healthAbnormalCount),
+      path: managementView ? '/medical-care/unified-task-center' : '/medical-care/rounds',
+      metricLabel: managementView ? '未闭环异常' : '个人待办数据',
+      metricHelper: managementView ? '异常复核、医嘱执行和巡诊安排' : '个人任务统计接口尚未接入',
+      metricValue: managementView ? displayNumber(departmentMetricNumber('abnormal')) : '--',
       tone: 'success',
-      items: [
-        { title: '异常复核', desc: '优先处理生命体征与长者异常。', path: '/medical-care/unified-task-center', tag: `异常 ${displayNumber(portalSummary.value?.healthAbnormalCount)}`, tone: 'danger' },
-        { title: '待执行医嘱', desc: '把医嘱、发药和巡诊动作收束在任务中心。', path: '/medical-care/care-task-board', tag: `待执行 ${displayNumber(portalSummary.value?.pendingMedicalOrderCount)}`, tone: 'pending' }
+      items: managementView ? [
+        { title: '异常复核', desc: '优先处理生命体征与长者异常。', path: '/medical-care/unified-task-center', tag: `异常 ${displayNumber(departmentMetricNumber('abnormal'))}`, tone: 'danger' },
+        { title: '待执行医嘱', desc: '协调医嘱、用药和巡诊动作。', path: '/medical-care/orders', tag: `待执行 ${displayNumber(departmentMetricNumber('orders'))}`, tone: 'pending' }
+      ] : [
+        { title: '今日巡诊', desc: '进入巡诊列表查看本人需要处理的事项。', path: '/medical-care/rounds', tag: '进入处理', tone: 'pending' },
+        { title: '医嘱与用药', desc: '核对医嘱并完成用药登记。', path: '/medical-care/medication-registration', tag: `已登记 ${displayNumber(departmentMetricNumber('medicationDone'))}`, tone: 'normal' }
       ]
     }
   }
@@ -904,6 +920,7 @@ function recentVisitScope() {
 const recentVisits = computed<RecentVisitItem[]>(() => loadRecentVisits(recentVisitScope()).slice(0, 6))
 
 const commonActions = computed(() => {
+  const medicalEmployee = workbenchPersona.value.key === 'medical' && !hasManagement.value
   const actions: QuickActionItem[] = [
     { title: '我的待办', description: '查看所有待办、提醒和逾期项。', icon: '办', path: '/workbench/todo' },
     { title: '我的审批', description: '处理审批流程和待确认事项。', icon: '审', path: '/workbench/approvals' },
@@ -911,7 +928,12 @@ const commonActions = computed(() => {
     { title: '客户跟进', description: '查看待跟进客户和预约参观。', icon: '客', path: '/marketing/workbench' },
     { title: '护理任务', description: '查看今日护理执行、超时和异常事项。', icon: '护', path: '/care/today' },
     { title: '护理记录', description: '补充服务执行记录与结果留痕。', icon: '录', path: '/care/service/nursing-records' },
-    { title: '医护处置', description: '查看健康异常、医嘱和巡诊待办。', icon: '医', path: '/medical-care/unified-task-center' },
+    {
+      title: medicalEmployee ? '今日巡诊' : '医护处置',
+      description: medicalEmployee ? '进入巡诊与巡检列表处理本人工作。' : '查看健康异常、医嘱和巡诊待办。',
+      icon: '医',
+      path: medicalEmployee ? '/medical-care/rounds' : '/medical-care/unified-task-center'
+    },
     { title: '后勤工单', description: '查看维修、巡检与保障任务。', icon: '工', path: '/logistics/task-center' },
     { title: '财务工作台', description: '进入收费、账单和对账总览。', icon: '费', path: '/finance/workbench' },
     { title: '人资中心', description: '进入档案、招聘、考勤与班组。', icon: '人', path: '/hr/overview' }
@@ -1025,7 +1047,8 @@ async function loadWorkbench(options: { silent?: boolean } = {}) {
     const [portal, departmentResult, , calendarOk] = await Promise.all([
       getPortalSummary({ silent403: true, silentError: true }).catch(capture('工作待办')),
       loadDepartmentWorkbenchSnapshot(workbenchProfile.value, canAccess, {
-        staffId: userStore.staffInfo?.id
+        staffId: userStore.staffInfo?.id,
+        username: userStore.staffInfo?.username
       }),
       refreshAttendance().catch(capture('考勤')),
       loadCalendar(calendarCursor.value)

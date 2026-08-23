@@ -2,37 +2,41 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { resolveWorkbenchProfile } from './model'
 
 vi.mock('../api/care', () => ({ getTaskSummary: vi.fn(), getTaskPage: vi.fn() }))
+vi.mock('../api/health', () => ({ getHealthMedicationRegistrationPage: vi.fn() }))
 vi.mock('../api/finance', () => ({ getFinanceWorkbenchOverview: vi.fn() }))
 vi.mock('../api/hr', () => ({ getHrWorkbenchSummary: vi.fn() }))
 vi.mock('../api/logistics', () => ({ getLogisticsWorkbenchSummary: vi.fn() }))
 vi.mock('../api/marketing', () => ({ getMarketingWorkbenchSummary: vi.fn() }))
-vi.mock('../api/medicalCare', () => ({ getMedicalCareWorkbenchSummary: vi.fn() }))
+vi.mock('../api/medicalCare', () => ({ getMedicalCareWorkbenchSummary: vi.fn(), getMedicalUnifiedTaskPage: vi.fn() }))
 
 import { getTaskPage, getTaskSummary } from '../api/care'
+import { getHealthMedicationRegistrationPage } from '../api/health'
 import { getFinanceWorkbenchOverview } from '../api/finance'
 import { getHrWorkbenchSummary } from '../api/hr'
 import { getLogisticsWorkbenchSummary } from '../api/logistics'
 import { getMarketingWorkbenchSummary } from '../api/marketing'
-import { getMedicalCareWorkbenchSummary } from '../api/medicalCare'
+import { getMedicalCareWorkbenchSummary, getMedicalUnifiedTaskPage } from '../api/medicalCare'
 import { loadDepartmentWorkbenchSnapshot } from './dataSources'
 
 describe('department workbench data source', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(getTaskPage).mockResolvedValue({ list: [], total: 0, pageNo: 1, pageSize: 10 })
+    vi.mocked(getHealthMedicationRegistrationPage).mockResolvedValue({ list: [], total: 0, pageNo: 1, pageSize: 6 })
+    vi.mocked(getMedicalUnifiedTaskPage).mockResolvedValue({ list: [], total: 0, pageNo: 1, pageSize: 8 })
   })
 
   it.each([
     ['NURSING_EMPLOYEE', getTaskSummary],
-    ['MEDICAL_EMPLOYEE', getMedicalCareWorkbenchSummary],
+    ['MEDICAL_EMPLOYEE', getHealthMedicationRegistrationPage],
     ['FINANCE_EMPLOYEE', getFinanceWorkbenchOverview],
     ['LOGISTICS_EMPLOYEE', getLogisticsWorkbenchSummary],
     ['HR_EMPLOYEE', getHrWorkbenchSummary],
     ['MARKETING_EMPLOYEE', getMarketingWorkbenchSummary]
   ])('loads only the department source assigned to %s', async (role, expectedLoader) => {
-    const loaders = [getTaskSummary, getMedicalCareWorkbenchSummary, getFinanceWorkbenchOverview, getLogisticsWorkbenchSummary, getHrWorkbenchSummary, getMarketingWorkbenchSummary]
+    const loaders = [getTaskSummary, getHealthMedicationRegistrationPage, getMedicalCareWorkbenchSummary, getFinanceWorkbenchOverview, getLogisticsWorkbenchSummary, getHrWorkbenchSummary, getMarketingWorkbenchSummary]
     loaders.forEach((loader) => vi.mocked(loader as any).mockResolvedValue({}))
-    await loadDepartmentWorkbenchSnapshot(resolveWorkbenchProfile([role]), () => true, { staffId: '88' })
+    await loadDepartmentWorkbenchSnapshot(resolveWorkbenchProfile([role]), () => true, { staffId: '88', username: 'doctor_a' })
     expect(expectedLoader).toHaveBeenCalledTimes(1)
     expect(loaders.reduce((total, loader) => total + vi.mocked(loader as any).mock.calls.length, 0)).toBe(1)
   })

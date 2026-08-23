@@ -2,18 +2,17 @@ import { getFinanceWorkbenchOverview } from '../api/finance'
 import { getHrWorkbenchSummary } from '../api/hr'
 import { getLogisticsWorkbenchSummary } from '../api/logistics'
 import { getMarketingWorkbenchSummary } from '../api/marketing'
-import { getMedicalCareWorkbenchSummary } from '../api/medicalCare'
 import type { DepartmentCode } from '../access/policy'
 import type {
   FinanceWorkbenchOverview,
   HrWorkbenchSummary,
   Id,
   LogisticsWorkbenchSummary,
-  MarketingWorkbenchSummary,
-  MedicalCareWorkbenchSummary
+  MarketingWorkbenchSummary
 } from '../types'
 import type { WorkbenchProfile } from './model'
 import { loadNursingWorkbench, type NursingWorkbenchDetail } from './nursing'
+import { loadMedicalWorkbench, type MedicalWorkbenchDetail } from './medical'
 
 export type WorkbenchDataStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'forbidden' | 'error'
 
@@ -33,6 +32,7 @@ export interface DepartmentWorkbenchSnapshot {
   generatedAt?: string
   metrics: WorkbenchMetricSnapshot[]
   nursing?: NursingWorkbenchDetail
+  medical?: MedicalWorkbenchDetail
 }
 
 export interface WorkbenchDataResult {
@@ -48,6 +48,7 @@ type DepartmentSource = {
 
 export interface WorkbenchLoadContext {
   staffId?: Id
+  username?: string
 }
 
 const silentConfig = { silent403: true, silentError: true }
@@ -82,15 +83,23 @@ const departmentSources: Record<DepartmentCode, DepartmentSource> = {
   },
   MEDICAL: {
     accessPath: '/medical-care/workbench',
-    async load() {
-      const data = responseData<MedicalCareWorkbenchSummary>(await getMedicalCareWorkbenchSummary({ date: today() }, silentConfig))
+    async load(profile, context) {
+      const result = await loadMedicalWorkbench(profile, { date: today(), username: context.username })
+      const data = result.summary
       return {
         department: 'MEDICAL', sourceLabel: '医务工作台汇总', generatedAt: data?.generatedAt, metrics: [
-          { key: 'inspection', label: '今日巡诊待办', value: data?.todayInspectionPendingCount, helper: '今天尚未完成的巡诊任务', path: '/medical-care/inspection' },
-          { key: 'orders', label: '待执行医嘱', value: data?.pendingMedicalOrderCount, helper: '需要执行或复核的医嘱', path: '/medical-care/orders' },
-          { key: 'medication', label: '今日用药待办', value: data?.todayMedicationPendingCount, helper: '待登记或待确认的用药事项', path: '/medical-care/medication-registration' },
-          { key: 'abnormal', label: '未闭环异常', value: data?.unclosedAbnormalCount, helper: '医疗异常和告警事项', path: '/medical-care/unified-task-center', risk: true }
-        ]
+          ...(profile.hasManagementView ? [
+            { key: 'inspection', label: '今日巡诊待办', value: data?.todayInspectionPendingCount, helper: '今天尚未完成的巡诊任务', path: '/medical-care/inspection' },
+            { key: 'orders', label: '待执行医嘱', value: data?.pendingMedicalOrderCount, helper: '需要执行或复核的医嘱', path: '/medical-care/orders' },
+            { key: 'medication', label: '今日用药待办', value: data?.todayMedicationPendingCount, helper: '待登记或待确认的用药事项', path: '/medical-care/medication-registration' },
+            { key: 'abnormal', label: '未闭环异常', value: data?.unclosedAbnormalCount, helper: '医疗异常和告警事项', path: '/medical-care/unified-task-center', risk: true }
+          ] : [
+            { key: 'medicationDone', label: '我的今日用药登记', value: data?.medicationDoneCount, helper: '按当前登录账号登记人统计', path: '/medical-care/medication-registration' },
+            { key: 'inspection', label: '我的巡诊待办', helper: '后端尚未提供个人巡诊口径', path: '/medical-care/inspection' },
+            { key: 'orders', label: '我的医嘱待办', helper: '后端尚未提供个人医嘱口径', path: '/medical-care/order-executions' }
+          ]),
+        ],
+        medical: result.detail
       }
     }
   },
