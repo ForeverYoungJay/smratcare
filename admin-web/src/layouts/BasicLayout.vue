@@ -878,13 +878,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { message, notification } from 'ant-design-vue'
 import type { UploadProps } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
-import { getMenuTree, isFocusedEmployeeRole } from './menu'
+import { getMenuTree, supportsJobNavigation } from './menu'
 import { getMe } from '../api/auth'
 import {
   getReminderPage,
@@ -911,6 +911,8 @@ import QuickChatDrawer from './components/QuickChatDrawer.vue'
 import RouteTabsBar from './components/RouteTabsBar.vue'
 import { buildGroupedMenuItems } from './navigation'
 import { loadRecentVisits, saveRecentVisit, type RecentVisitItem } from '../utils/recentVisits'
+import { resolveRouteAccess } from '../utils/routeAccess'
+import { resolveDefaultHome } from '../access/policy'
 
 const MAX_RESTORED_ROUTE_TABS = 8
 const MAX_ALIVE_VIEW_CACHE = 3
@@ -1718,42 +1720,31 @@ const quickChatSyncConflictDesc = computed(() => {
   return `本地更新时间 ${localText}，云端更新时间 ${remoteText}。请先确认同步策略。`
 })
 
-const menuShowAll = ref(localStorage.getItem('menu-show-all') === '1')
-const canToggleMenuScope = computed(() => isFocusedEmployeeRole(userStore.roles || []))
+const menuShowAll = ref(false)
+const canToggleMenuScope = computed(() => supportsJobNavigation(userStore.roles || []))
 
 function toggleMenuScope() {
   menuShowAll.value = !menuShowAll.value
-  localStorage.setItem('menu-show-all', menuShowAll.value ? '1' : '0')
 }
+
+const accessibleMenu = computed(() => getMenuTree(userStore.roles || [], userStore.pagePermissions || [], {
+  permissions: userStore.permissions || []
+}))
 
 const filteredMenu = computed(() => {
   const roles = userStore.roles || []
   // 按角色收敛默认导航：一线员工/部长默认只看与岗位相关的模块（可手动“显示全部”）；管理员/院长始终全量。
-  return getMenuTree(roles, userStore.pagePermissions || [], { focused: !menuShowAll.value })
+  return getMenuTree(roles, userStore.pagePermissions || [], {
+    focused: !menuShowAll.value,
+    permissions: userStore.permissions || []
+  })
 })
 
-function renderMenuLabel(label: string) {
-  return h(
-    'span',
-    {
-      class: 'side-menu-label',
-      title: label
-    },
-    label
-  )
+function canOpenPath(path: string) {
+  return resolveRouteAccess(router, userStore.roles || [], path, userStore.pagePermissions || [], userStore.permissions || []).canAccess
 }
 
-const menuItems = computed(() => {
-  const map = (items: any[]): any[] =>
-    items.map((item) => ({
-      key: item.path || item.key,
-      label: renderMenuLabel(String(item.label || '')),
-      title: String(item.label || ''),
-      icon: item.icon,
-      children: item.children ? map(item.children) : undefined
-    }))
-  return buildGroupedMenuItems(filteredMenu.value)
-})
+const menuItems = computed(() => buildGroupedMenuItems(filteredMenu.value))
 
 // 详情/编辑等未出现在菜单里的深层页面，也按最长前缀高亮所属菜单项
 const menuSelectablePaths = computed(() => {
@@ -1817,7 +1808,7 @@ const searchPageItems = computed<SearchPaletteItem[]>(() => {
       }]
     })
   const keyword = globalSearchKeyword.value.trim().toLowerCase()
-  const list = collect(filteredMenu.value)
+  const list = collect(accessibleMenu.value)
   if (!keyword) return list.slice(0, 16)
   return list.filter((item) => `${item.title} ${item.description} ${item.keywords || ''}`.toLowerCase().includes(keyword)).slice(0, 16)
 })
@@ -1830,26 +1821,26 @@ const searchActionItems = computed<SearchPaletteItem[]>(() => {
     { key: 'action-search-profile', title: '打开个人设置', description: '查看头像、手机号与主题设置', group: '常用动作', action: 'openHeaderSettings' }
   ]
   const keyword = globalSearchKeyword.value.trim().toLowerCase()
-  if (!keyword) return items
-  return items.filter((item) => `${item.title} ${item.description}`.toLowerCase().includes(keyword))
+  const accessible = items.filter((item) => !item.path || canOpenPath(item.path))
+  if (!keyword) return accessible
+  return accessible.filter((item) => `${item.title} ${item.description}`.toLowerCase().includes(keyword))
 })
 const searchRecentItems = computed<SearchPaletteItem[]>(() => {
   const keyword = globalSearchKeyword.value.trim().toLowerCase()
-  const base = recentVisitItems.value.map((item) => ({
-    key: item.key,
-    title: item.title,
-    description: item.path,
-    group: '最近访问',
-    path: item.path
-  }))
+  const base = recentVisitItems.value
+    .filter((item) => canOpenPath(item.path))
+    .map((item) => ({ key: item.key, title: item.title, description: item.path, group: '最近访问', path: item.path }))
   if (!keyword) return base.slice(0, 8)
   return base.filter((item) => `${item.title} ${item.description}`.toLowerCase().includes(keyword)).slice(0, 8)
 })
 const breadcrumbs = computed(() => {
+  const homeTitle = (userStore.roles || []).includes('SYS_ADMIN')
+    ? '系统管理首页'
+    : (userStore.roles || []).some((role) => ['DIRECTOR', 'ADMIN'].includes(role)) ? '经营总览' : '我的工作台'
   const titles = route.matched
     .map((r) => r.meta?.title as string | undefined)
-    .filter((t) => t && t.length > 0) as string[]
-  return ['首页', ...titles]
+    .filter((title) => title && title.length > 0 && title !== '工作台' && title !== homeTitle) as string[]
+  return Array.from(new Set([homeTitle, ...titles]))
 })
 
 const todayLabel = computed(() => {
@@ -2103,7 +2094,7 @@ function syncRouteTab(pathKey: string, fullPath: string) {
     persistRouteTabs()
     return
   }
-  const isHomeTab = key === '/portal'
+  const isHomeTab = key === normalizeTabKey(resolveDefaultHome(userStore.roles || []))
   routeTabs.value.push({
     key,
     path: fullPath,
@@ -2147,7 +2138,7 @@ function closeTab(targetKey: string) {
   persistRouteTabs()
   if (activeTabKey.value !== targetKey) return
   const fallback = routeTabs.value[idx] || routeTabs.value[idx - 1]
-  router.push(fallback?.key || '/portal')
+  router.push(fallback?.key || resolveDefaultHome(userStore.roles || []))
 }
 
 function onTabDragStart(key: string) {
@@ -2209,7 +2200,7 @@ function closeAllTabs() {
   pruneTabRefreshSeeds()
   persistRouteTabs()
   closeTabContextMenu()
-  router.push('/portal')
+  router.push(resolveDefaultHome(userStore.roles || []))
 }
 
 function refreshCurrentTab() {
@@ -2267,7 +2258,7 @@ function ensureActiveTabAvailable() {
   const active = activeTabKey.value || route.fullPath
   if (routeTabs.value.some((item) => item.key === active)) return
   const fallback = routeTabs.value[routeTabs.value.length - 1]
-  router.push(fallback?.key || '/portal')
+  router.push(fallback?.key || resolveDefaultHome(userStore.roles || []))
 }
 
 function routeTabsStorageKey() {
@@ -2294,9 +2285,9 @@ function restoreRouteTabs() {
         key: normalizeTabKey(String(item?.path || item?.key || '')),
         path: String(item?.path || item?.key || ''),
         title: String(item?.title || '未命名页面'),
-        closable: normalizeTabKey(String(item?.path || item?.key || '')) !== '/portal'
+        closable: normalizeTabKey(String(item?.path || item?.key || '')) !== normalizeTabKey(resolveDefaultHome(userStore.roles || []))
       }))
-      .filter((item: any) => !!item.key && !!item.path)
+      .filter((item: any) => !!item.key && !!item.path && canOpenPath(item.path))
       .reduce((acc: Array<{ key: string; path: string; title: string; closable: boolean }>, item: any) => {
         if (acc.some((x) => x.key === item.key)) return acc
         acc.push(item)

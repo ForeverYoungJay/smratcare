@@ -1,7 +1,8 @@
 import type { RouteRecordRaw } from 'vue-router'
 import { routes } from '../router/routes'
-import { canAccessPath } from '../utils/routeAccess'
+import { canAccessRoleGroups, hasExplicitPageAccess } from '../utils/routeAccess'
 import { getPageDescription, getPageAliases } from '../router/pageDescriptions'
+import { buildJobNavigation, supportsJobNavigation } from './jobNavigation'
 
 export interface MenuItem {
   key: string
@@ -11,11 +12,15 @@ export interface MenuItem {
   roles?: string[]
   desc?: string
   aliases?: string[]
+  navSection?: 'entry' | 'care' | 'operations' | 'compliance' | 'support' | 'system'
+  navOrder?: number
+  navPinned?: boolean
   children?: MenuItem[]
 }
 
 type MenuBuildOptions = {
   focused?: boolean
+  permissions?: string[]
 }
 
 function joinPath(base: string, path: string) {
@@ -24,25 +29,37 @@ function joinPath(base: string, path: string) {
   return `${base}/${path}`.replace(/\/+/g, '/')
 }
 
-function hasAccess(route: RouteRecordRaw, roles: string[], pagePermissions: string[], fullPath: string) {
-  const required = (route.meta?.roles as string[] | undefined) || []
-  return canAccessPath(roles, required, fullPath, pagePermissions)
-}
-
-function buildMenu(routes: RouteRecordRaw[], roles: string[], pagePermissions: string[], basePath = ''): MenuItem[] {
+function buildMenu(
+  routes: RouteRecordRaw[],
+  roles: string[],
+  pagePermissions: string[],
+  permissions: string[],
+  basePath = '',
+  ancestorRoleGroups: string[][] = [],
+  ancestorPermissionGroups: string[][] = []
+): MenuItem[] {
   return (
     routes
       .filter((r) => !r.meta?.hidden)
       .map((r) => {
         const routePath = joinPath(basePath, r.path || '')
-        const selfAccessible = hasAccess(r, roles, pagePermissions, routePath)
+        const ownRoles = (r.meta?.roles || []).filter(Boolean)
+        const roleGroups = ownRoles.length > 0 ? [...ancestorRoleGroups, ownRoles] : ancestorRoleGroups
+        const ownPermissions = (r.meta?.permissions || []).filter(Boolean)
+        const permissionGroups = ownPermissions.length > 0 ? [...ancestorPermissionGroups, ownPermissions] : ancestorPermissionGroups
+        const permissionAllowed = permissionGroups.every((group) => group.some((code) => permissions.includes(code)))
+        const pageAllowed = pagePermissions.length === 0 || hasExplicitPageAccess(pagePermissions, routePath)
+        const roleAllowed = roleGroups.length > 0
+          ? canAccessRoleGroups(roles, roleGroups, routePath, pagePermissions)
+          : permissionGroups.length > 0 ? pageAllowed : canAccessRoleGroups(roles, roleGroups, routePath, pagePermissions)
+        const selfAccessible = permissionAllowed && roleAllowed
         const children = r.children?.length
-          ? buildMenu(r.children, roles, pagePermissions, routePath)
+          ? buildMenu(r.children, roles, pagePermissions, permissions, routePath, roleGroups, permissionGroups)
           : []
         if (!selfAccessible && children.length === 0) {
           return null
         }
-        const fullPath = r.children ? undefined : joinPath(basePath, r.path || '')
+        const fullPath = r.children && children.length > 0 ? undefined : joinPath(basePath, r.path || '')
         const routeName = r.name ? String(r.name) : ''
         const node: MenuItem = {
           key: String(r.name || fullPath || r.path),
@@ -50,7 +67,10 @@ function buildMenu(routes: RouteRecordRaw[], roles: string[], pagePermissions: s
           icon: r.meta?.icon as string | undefined,
           roles: r.meta?.roles as string[] | undefined,
           desc: getPageDescription(routeName),
-          aliases: getPageAliases(routeName)
+          aliases: getPageAliases(routeName),
+          navSection: r.meta?.navSection as MenuItem['navSection'],
+          navOrder: r.meta?.navOrder,
+          navPinned: r.meta?.navPinned
         }
         if (children.length > 0) {
           if (selfAccessible) {
@@ -67,119 +87,21 @@ function buildMenu(routes: RouteRecordRaw[], roles: string[], pagePermissions: s
   ) as MenuItem[]
 }
 
-export function isFocusedEmployeeRole(roles: string[]) {
-  const normalized = roles.map((role) => String(role || '').toUpperCase())
-  const hasManagementRole = normalized.some((role) => ['ADMIN', 'SYS_ADMIN', 'DIRECTOR'].includes(role))
-  if (hasManagementRole) return false
-  return normalized.some((role) => role.endsWith('_EMPLOYEE') || role.endsWith('_MINISTER') || role.includes('GUARD'))
-}
+export { supportsJobNavigation }
 
-function matchFocusedRoots(roles: string[]) {
-  const normalized = roles.map((role) => String(role || '').toUpperCase())
-  const roots = new Set<string>(['/portal', '/workbench'])
-  if (normalized.some((role) => role.includes('NURSING') || role.includes('MEDICAL'))) {
-    roots.add('/medical-care')
-    roots.add('/elder')
-  }
-  if (normalized.some((role) => role.includes('LOGISTICS') || role.includes('GUARD'))) {
-    roots.add('/logistics')
-  }
-  if (normalized.some((role) => role.includes('FINANCE'))) {
-    roots.add('/finance')
-  }
-  if (normalized.some((role) => role.includes('MARKETING'))) {
-    roots.add('/marketing')
-  }
-  if (normalized.some((role) => role.includes('HR'))) {
-    roots.add('/hr')
-  }
-  return roots
-}
-
-const focusedChildPresets: Record<string, string[]> = {
-  '/workbench': [
-    '/workbench/overview',
-    '/workbench/todo',
-    '/workbench/attendance',
-    '/workbench/approvals'
-  ],
-  '/elder': [
-    '/elder/in-hospital-overview',
-    '/elder/list',
-    '/elder/assessment',
-    '/elder/status-change'
-  ],
-  '/medical-care': [
-    '/medical-care/care-task-board',
-    '/medical-care/unified-task-center',
-    '/medical-care/inspection',
-    '/medical-care/medication-registration',
-    '/medical-care/nursing-log',
-    '/medical-care/handovers'
-  ],
-  '/marketing': [
-    '/marketing/workbench',
-    '/marketing/leads',
-    '/marketing/interactions',
-    '/marketing/contracts'
-  ],
-  '/finance': [
-    '/finance/workbench',
-    '/finance/payments',
-    '/finance/bills',
-    '/finance/reconcile'
-  ],
-  '/logistics': [
-    '/logistics/workbench',
-    '/logistics/task-center',
-    '/logistics/assets/maintenance-record',
-    '/logistics/dining/delivery-plan',
-    '/logistics/storage/outbound'
-  ],
-  '/hr': [
-    '/hr/overview',
-    '/hr/staff',
-    '/hr/scheduling',
-    '/hr/profile'
-  ]
-}
-
-function filterFocusedChildren(items: MenuItem[], parentPath?: string): MenuItem[] {
-  const preset = parentPath ? focusedChildPresets[parentPath] || [] : []
-  const nextItems = items
-    .map((item) => {
-      const nextChildren = item.children?.length ? filterFocusedChildren(item.children, item.path || item.key) : undefined
-      return {
-        ...item,
-        children: nextChildren
-      }
-    })
-    .filter((item) => item.path || item.children?.length)
-
-  if (!preset.length) return nextItems
-  const prioritized = nextItems.filter((item) =>
-    preset.some((candidate) => item.path === candidate || candidate.startsWith(`${item.path || ''}/`))
-  )
-  if (prioritized.length >= 3) return prioritized
-  const fallback = nextItems.filter((item) => !prioritized.includes(item)).slice(0, Math.max(0, 4 - prioritized.length))
-  return [...prioritized, ...fallback]
-}
-
-function buildFocusedMenu(items: MenuItem[], roles: string[]) {
-  const roots = matchFocusedRoots(roles)
-  return items
-    .filter((item) => item.path && roots.has(item.path))
-    .map((item) => ({
-      ...item,
-      children: item.children?.length ? filterFocusedChildren(item.children, item.path) : item.children
-    }))
+function collectMenuPaths(items: MenuItem[], result = new Set<string>()) {
+  items.forEach((item) => {
+    if (item.path) result.add(item.path)
+    if (item.children?.length) collectMenuPaths(item.children, result)
+  })
+  return result
 }
 
 export function getMenuTree(roles: string[], pagePermissions: string[] = [], options: MenuBuildOptions = {}) {
   const layout = routes.find((r) => r.path === '/' && r.children)
-  const tree = buildMenu(layout?.children || [], roles, pagePermissions, '')
-  if (options.focused && isFocusedEmployeeRole(roles)) {
-    return buildFocusedMenu(tree, roles)
+  const tree = buildMenu(layout?.children || [], roles, pagePermissions, options.permissions || [], '')
+  if (options.focused && supportsJobNavigation(roles)) {
+    return buildJobNavigation(roles, collectMenuPaths(tree))
   }
   return tree
 }

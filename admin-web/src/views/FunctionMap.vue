@@ -47,7 +47,6 @@ import { useRouter } from 'vue-router'
 import PageContainer from '../components/PageContainer.vue'
 import { getMenuTree, type MenuItem } from '../layouts/menu'
 import { NAV_SECTION_LABELS, type NavSectionKey } from '../layouts/navigation'
-import { routeNavMeta } from '../layouts/navigation'
 import { useUserStore } from '../stores/user'
 
 const router = useRouter()
@@ -60,7 +59,10 @@ type Group = { section: NavSectionKey; label: string; modules: FlatModule[] }
 
 // 全量菜单（不聚焦），作为功能地图数据源
 const fullMenu = computed<MenuItem[]>(() =>
-  getMenuTree(userStore.roles || [], userStore.pagePermissions || [], { focused: false })
+  getMenuTree(userStore.roles || [], userStore.pagePermissions || [], {
+    focused: false,
+    permissions: userStore.permissions || []
+  })
 )
 
 function flattenChildren(items: MenuItem[] = []): FlatPage[] {
@@ -73,8 +75,7 @@ function flattenChildren(items: MenuItem[] = []): FlatPage[] {
 }
 
 function sectionOf(item: MenuItem): NavSectionKey {
-  const path = item.path || `/${item.key}`
-  return (routeNavMeta[path]?.section as NavSectionKey) || 'support'
+  return item.navSection || 'support'
 }
 
 const groups = computed<Group[]>(() => {

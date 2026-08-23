@@ -32,7 +32,7 @@
 
     <div v-if="canToggleScope && !collapsed" class="primary-sider__scope">
       <a-button size="small" block @click="$emit('toggle-menu-scope')">
-        {{ showAllMenu ? '仅看本岗位常用' : '显示全部功能' }}
+        {{ showAllMenu ? '返回岗位导航' : '查看全部授权功能' }}
       </a-button>
     </div>
   </a-layout-sider>
@@ -170,6 +170,13 @@ defineEmits<{
 .primary-sider__menu :deep(.ant-menu-submenu-title:hover) {
   color: var(--ink);
   background: rgba(var(--primary-rgb), 0.07);
+}
+
+.primary-sider__menu :deep(.ant-menu-item:focus-visible),
+.primary-sider__menu :deep(.ant-menu-submenu-title:focus-visible),
+.primary-sider__scope :deep(.ant-btn:focus-visible) {
+  outline: 3px solid rgba(var(--primary-rgb), 0.28);
+  outline-offset: 2px;
 }
 
 .primary-sider__menu :deep(.ant-menu-item-selected)::before,
