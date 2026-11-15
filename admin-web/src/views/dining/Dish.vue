@@ -88,6 +88,8 @@
     </a-card>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -114,7 +116,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" title="菜品信息" :confirm-loading="saving" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="菜品信息" :confirm-loading="saving" @ok="submit">
       <a-form layout="vertical">
         <a-form-item label="菜品名称" required>
           <a-input v-model:value="form.dishName" />

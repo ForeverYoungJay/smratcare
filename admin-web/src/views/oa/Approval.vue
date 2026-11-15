@@ -1,6 +1,10 @@
 <template>
-  <PageContainer title="审批流程" subTitle="请假/加班/报销/采购/收入证明/物资申请/用章审批/营销方案审批">
-    <template #stats>
+  <PageContainer title="审批中心" subTitle="请假/加班/报销/采购/收入证明/物资申请/用章审批/营销方案审批" mode="content">
+    <ScenicHeader
+      eyebrow="统一审批中心"
+      title="今天需要你决策的事项"
+      description="审批来源、超时风险和处理进度集中呈现，选中记录后可继续批量处理。"
+    >
       <div class="approval-overview-grid">
         <div class="overview-card">
           <span>审批总单</span>
@@ -23,9 +27,9 @@
           <small>{{ canApproveFlow ? '已选待审批记录可直接批量处理' : '当前账号以我的申请与跟进为主' }}</small>
         </div>
       </div>
-    </template>
+    </ScenicHeader>
 
-    <SearchForm :model="query" @search="fetchData" @reset="onReset">
+    <SearchForm class="approval-filters" :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="标题/申请人/备注" allow-clear style="width: 240px" />
       </a-form-item>
@@ -127,7 +131,7 @@
       </template>
     </a-alert>
 
-    <StatefulBlock :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
+    <StatefulBlock class="approval-summary-block" :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
       <a-space v-if="canApproveFlow" wrap style="margin-bottom: 10px">
         <a-tag :color="!query.currentApproverRole ? 'blue' : 'default'" style="cursor: pointer" @click="setApproverRole(undefined)">
           全部角色
@@ -202,11 +206,14 @@
       />
     </StatefulBlock>
 
+    <div class="approval-master-detail">
     <StatefulBlock :loading="loading" :error="tableError" :empty="!loading && !tableError && rows.length === 0" empty-text="暂无审批记录" @retry="fetchData">
       <DataTable
+        :filter-model="query"
+        @clear-filters="fetchData"
         rowKey="id"
         :row-selection="rowSelection"
-        :columns="columns"
+        :columns="previewColumns"
         :data-source="rows"
         :row-class-name="approvalRowClassName"
         :loading="false"
@@ -224,9 +231,30 @@
               <a-tag color="default">共 {{ pagination.total }} 条</a-tag>
             </a-space>
           </div>
+          <div class="approval-list-tabs" role="group" aria-label="审批状态筛选">
+            <button v-for="tab in listTabs" :key="tab.key" type="button" :aria-pressed="activeSummaryFilter === tab.key" :class="{ active: activeSummaryFilter === tab.key }" @click="applySummaryFilter(tab.key)">{{ tab.label }} <span>{{ tab.count }}</span></button>
+          </div>
         </template>
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'approvalType'">
+          <template v-if="column.key === 'action'">
+            <div class="row-actions">
+              <a-button type="link" size="small" @click="previewId = String(record.id)">详情</a-button>
+              <a-dropdown>
+                <a-button type="link" size="small">更多</a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item v-if="canDecideRecord(record)" @click="approve(record)">同意</a-menu-item>
+                    <a-menu-item v-if="canDecideRecord(record)" danger @click="reject(record)">驳回</a-menu-item>
+                    <a-menu-item v-if="canResubmitRecord(record)" @click="resubmit(record)">重提</a-menu-item>
+                    <a-menu-item @click="openTimeline(record)">时间线</a-menu-item>
+                    <a-menu-item v-if="canEditRecord(record)" @click="openEdit(record)">编辑</a-menu-item>
+                    <a-menu-item v-if="canRemoveRecord(record)" danger @click="removeRecord(record)">删除</a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
+            </div>
+          </template>
+          <template v-else-if="column.key === 'approvalType'">
             {{ typeLabel(record.approvalType) }}
           </template>
           <template v-else-if="column.key === 'title'">
@@ -266,6 +294,19 @@
       </DataTable>
     </StatefulBlock>
 
+    <aside class="approval-preview" aria-label="审批详情">
+      <div class="approval-preview__head"><h2>审批详情</h2><span v-if="recordForPreview">工单号：{{ recordForPreview.id }}</span></div>
+      <template v-if="recordForPreview">
+        <div class="approval-preview__title"><strong>{{ recordForPreview.title || '未命名申请' }}</strong><a-tag :color="recordForPreview.status === 'APPROVED' ? 'green' : recordForPreview.status === 'REJECTED' ? 'red' : 'orange'">{{ statusLabel(recordForPreview.status) }}</a-tag></div>
+        <dl class="approval-preview__facts"><div><dt>申请人</dt><dd>{{ recordForPreview.applicantName || '未登记' }}</dd></div><div><dt>申请类型</dt><dd>{{ typeLabel(recordForPreview.approvalType) }}</dd></div><div><dt>申请时间</dt><dd>{{ approvalPeriodText(recordForPreview) || '未设置' }}</dd></div><div><dt>当前节点</dt><dd>{{ currentNode(recordForPreview) }}</dd></div><div><dt>当前审批人</dt><dd>{{ currentApprover(recordForPreview) }}</dd></div><div v-if="recordForPreview.amount != null"><dt>金额</dt><dd>{{ formatApprovalAmount(recordForPreview.amount) }}</dd></div></dl>
+        <div class="approval-preview__section"><h3>申请说明</h3><p>{{ recordForPreview.remark || '暂无补充说明。' }}</p></div>
+        <div class="approval-preview__section"><h3>审批流程</h3><p>申请提交 → {{ currentNode(recordForPreview) }} → 完成归档</p><a-button type="link" @click="openTimeline(recordForPreview)">查看完整时间线 →</a-button></div>
+        <div v-if="canDecideRecord(recordForPreview)" class="approval-preview__actions"><a-button type="primary" @click="approve(recordForPreview)">同意</a-button><a-button danger @click="reject(recordForPreview)">驳回</a-button></div>
+      </template>
+      <a-empty v-else description="选择左侧申请查看详情" />
+    </aside>
+    </div>
+
     <a-drawer
       v-model:open="timelineOpen"
       :title="`审批时间线 · ${timelineRecord?.title || ''}`"
@@ -281,7 +322,7 @@
       </a-timeline>
     </a-drawer>
 
-    <a-modal v-model:open="editOpen" title="审批" @ok="submit" :confirm-loading="saving" width="700px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="审批" @ok="submit" :confirm-loading="saving" width="700px">
       <a-form layout="vertical">
         <a-form-item label="类型" required>
           <a-select v-model:value="form.approvalType" :options="typeOptions" />
@@ -542,7 +583,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="rejectDialogOpen"
       :title="rejectDialogIds.length > 1 ? `批量驳回（${rejectDialogIds.length} 条）` : '驳回审批'"
       :confirm-loading="rejectDialogSubmitting"
@@ -565,6 +606,7 @@ import dayjs from 'dayjs'
 import { useRoute } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
+import ScenicHeader from '../../components/smartcare/ScenicHeader.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
@@ -628,6 +670,7 @@ const focusApprovalId = ref('')
 const focusedOnce = ref(false)
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const selectedRowKeys = ref<string[]>([])
+const previewId = ref('')
 const summary = reactive<OaApprovalSummary>({
   totalCount: 0,
   pendingCount: 0,
@@ -649,8 +692,18 @@ const columns = [
   { title: '金额', dataIndex: 'amount', key: 'amount', width: 120 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
   { title: '审批意见', key: 'approvalOpinion', width: 220 },
-  { title: '年度请假次数', key: 'annualLeaveCount', width: 130 }
+  { title: '年度请假次数', key: 'annualLeaveCount', width: 130 },
+  // 行内操作：原来所有动作都在顶部命令栏，批一张假要“找到行 → 勾选 → 往上滚过 11 张统计卡 → 点同意”
+  { title: '操作', key: 'action', width: 190, fixed: 'right' as const }
 ]
+const previewWidths: Record<string, number> = { title: 180, applicantName: 90, approvalType: 90, currentNode: 100, status: 85, action: 110 }
+const previewColumns = columns.filter((column) => column.key in previewWidths).map((column) => ({ ...column, width: previewWidths[column.key] }))
+const listTabs = computed(() => [
+  { key: 'total' as const, label: '全部', count: summary.totalCount || 0 },
+  { key: 'pending' as const, label: '待审批', count: summary.pendingCount || 0 },
+  { key: 'approved' as const, label: '已通过', count: summary.approvedCount || 0 },
+  { key: 'timeoutPending' as const, label: '超时', count: summary.timeoutPendingCount || 0 }
+])
 
 const editOpen = ref(false)
 const timelineOpen = ref(false)
@@ -741,6 +794,7 @@ const rowSelection = computed(() => ({
 const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.id))))
 const selectedCount = computed(() => selectedRowKeys.value.length)
 const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
+const recordForPreview = computed(() => selectedSingleRecord.value || rows.value.find((item) => String(item.id) === previewId.value) || rows.value.find((item) => item.status === 'PENDING') || rows.value[0] || null)
 const isSelectedSinglePending = computed(() => selectedSingleRecord.value?.status === 'PENDING')
 const isSelectedSingleRejected = computed(() => selectedSingleRecord.value?.status === 'REJECTED')
 const selectedPendingCount = computed(() => selectedRecords.value.filter((item) => item.status === 'PENDING').length)
@@ -1085,7 +1139,10 @@ async function fetchData() {
       return true
     })
     pagination.total = res.total || res.list.length
-    selectedRowKeys.value = []
+    // 60 秒一次的自动刷新以前会清空勾选，用户勾到一半就白勾了。
+    // 这里只剔除刷新后已经不在列表里的项，其余保留。
+    const visibleIds = new Set(rows.value.map((item) => String(item.id)))
+    selectedRowKeys.value = selectedRowKeys.value.filter((key) => visibleIds.has(String(key)))
     if (focusApprovalId.value && !focusedOnce.value) {
       const matched = rows.value.find((item) => String(item.id) === String(focusApprovalId.value))
       if (matched) {
@@ -1549,6 +1606,35 @@ async function submit() {
   }
 }
 
+/** 一条审批当前能做哪些动作——命令栏和行内操作共用，避免两套规则各说各话 */
+function canEditRecord(record: OaApproval) {
+  if (record.status !== 'PENDING') return false
+  return canApproveFlow.value || String(record.applicantId || '') === String(userStore.staffInfo?.id || '')
+}
+
+function canDecideRecord(record: OaApproval) {
+  return canApproveFlow.value && record.status === 'PENDING'
+}
+
+function canResubmitRecord(record: OaApproval) {
+  return record.status === 'REJECTED'
+}
+
+function canRemoveRecord(record: OaApproval) {
+  return canApproveFlow.value || String(record.applicantId || '') === String(userStore.staffInfo?.id || '')
+}
+
+async function removeRecord(record: OaApproval) {
+  const confirmed = await confirmAction({
+    title: '确认删除该审批？',
+    content: `将删除「${record.title || '未命名审批'}」，删除后不可恢复。`,
+    okText: '确认删除',
+    okType: 'danger'
+  })
+  if (!confirmed) return
+  await remove(record)
+}
+
 function isCurrentUserApprover(record: OaApproval) {
   const parsed = parseFormData(record.formData)
   const approverId = String(parsed?.currentApproverId || '').trim()
@@ -1701,6 +1787,20 @@ async function reject(record: OaApproval) {
   openRejectDialog([String(record.id)])
 }
 
+function confirmAction(options: { title: string; content: string; okText: string; okType?: 'primary' | 'danger' }) {
+  return new Promise<boolean>((resolve) => {
+    Modal.confirm({
+      title: options.title,
+      content: options.content,
+      okText: options.okText,
+      okType: options.okType || 'primary',
+      cancelText: '取消',
+      onOk: () => resolve(true),
+      onCancel: () => resolve(false)
+    })
+  })
+}
+
 async function remove(record: OaApproval) {
   try {
     await deleteApproval(String(record.id))
@@ -1786,7 +1886,6 @@ async function batchUrge() {
   let successCount = 0
   for (const item of list) {
     try {
-      // eslint-disable-next-line no-await-in-loop
       await urge(item, true)
       successCount += 1
     } catch {}
@@ -1860,7 +1959,7 @@ async function removeSelected() {
     message.warning('仅可删除本人申请')
     return
   }
-  await remove(record)
+  await removeRecord(record)
 }
 
 async function batchApprove() {
@@ -1873,20 +1972,19 @@ async function batchApprove() {
     return
   }
   const count = selectedPendingIds.value.length
-  const confirmed = await new Promise<boolean>((resolve) => {
-    Modal.confirm({
-      title: '确认批量通过？',
-      content: `将批量通过 ${count} 条待审批记录，通过后流程不可回退。`,
-      okText: '确认通过',
-      cancelText: '取消',
-      onOk: () => resolve(true),
-      onCancel: () => resolve(false)
-    })
+  const confirmed = await confirmAction({
+    title: '确认批量通过？',
+    content: `将批量通过 ${count} 条待审批记录，通过后流程不可回退。`,
+    okText: '确认通过'
   })
   if (!confirmed) return
-  const affected = await batchApproveApproval(selectedPendingIds.value)
-  message.success(`批量通过完成，共处理 ${affected || 0} 条`)
-  fetchData()
+  try {
+    const affected = await batchApproveApproval(selectedPendingIds.value)
+    message.success(`批量通过完成，共处理 ${affected || 0} 条`)
+    await fetchData()
+  } catch (error: any) {
+    message.error(error?.message || '批量通过失败，请重试')
+  }
 }
 
 async function batchReject() {
@@ -1902,10 +2000,25 @@ async function batchReject() {
 }
 
 async function batchRemove() {
-  if (selectedRowKeys.value.length === 0) return
-  const affected = await batchDeleteApproval(selectedRowKeys.value)
-  message.success(`批量删除完成，共处理 ${affected || 0} 条`)
-  fetchData()
+  if (selectedRowKeys.value.length === 0) {
+    message.info('请先勾选要删除的审批')
+    return
+  }
+  const count = selectedRowKeys.value.length
+  const confirmed = await confirmAction({
+    title: '确认批量删除？',
+    content: `将删除已勾选的 ${count} 条审批记录，删除后不可恢复。`,
+    okText: `确认删除 ${count} 条`,
+    okType: 'danger'
+  })
+  if (!confirmed) return
+  try {
+    const affected = await batchDeleteApproval(selectedRowKeys.value)
+    message.success(`批量删除完成，共处理 ${affected || 0} 条`)
+    await fetchData()
+  } catch (error: any) {
+    message.error(error?.message || '批量删除失败，请重试')
+  }
 }
 
 async function downloadExport() {
@@ -2055,6 +2168,32 @@ useLiveSyncRefresh({
 </script>
 
 <style scoped>
+.approval-master-detail { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr); align-items: start; gap: 12px; }
+.approval-master-detail { order: 1; }
+.approval-filters { order: 2; }
+.approval-toolbar { order: 3; }
+.approval-summary-block { order: 4; }
+.approval-master-detail > * { min-width: 0; }
+.approval-list-tabs { display: flex; gap: 5px; margin: 13px 0 8px; overflow-x: auto; }
+.approval-list-tabs button { flex: 0 0 auto; padding: 7px 10px; border: 0; border-radius: 7px; background: #f3f5f3; color: #66736a; cursor: pointer; }
+.approval-list-tabs button.active { background: #dcefe7; color: #176b52; font-weight: 700; }
+.approval-list-tabs button:focus-visible { outline: 3px solid #24876d; outline-offset: 2px; }
+.approval-preview { position: sticky; top: 16px; min-width: 0; padding: 17px; border: 1px solid #e7ece8; border-radius: 12px; background: #fff; box-shadow: 0 6px 20px rgba(35, 52, 43, .045); }
+.approval-preview__head, .approval-preview__title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.approval-preview__head { margin-bottom: 16px; }
+.approval-preview__head h2, .approval-preview__section h3 { margin: 0; padding-left: 10px; border-left: 3px solid #188265; color: #203229; font-size: 17px; }
+.approval-preview__head > span { color: #859189; font-size: 12px; }
+.approval-preview__title { padding: 12px; border-radius: 9px; background: #f3faf6; }
+.approval-preview__title strong { font-size: 16px; }
+.approval-preview__facts { display: grid; margin: 14px 0; }
+.approval-preview__facts div { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 10px; padding: 10px 4px; border-bottom: 1px solid #edf0ed; font-size: 13px; }
+.approval-preview__facts dt { color: #87938a; }
+.approval-preview__facts dd { margin: 0; color: #35443a; overflow-wrap: anywhere; }
+.approval-preview__section { padding: 12px 0; border-top: 1px solid #edf0ed; }
+.approval-preview__section h3 { font-size: 15px; }
+.approval-preview__section p { margin: 12px 0 0; color: #536159; font-size: 13px; line-height: 1.6; }
+.approval-preview__actions { display: flex; gap: 10px; padding-top: 15px; border-top: 1px solid #edf0ed; }
+.approval-preview__actions .ant-btn { flex: 1; }
 .approval-overview-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2205,6 +2344,8 @@ useLiveSyncRefresh({
 }
 
 @media (max-width: 1200px) {
+  .approval-master-detail { grid-template-columns: 1fr; }
+  .approval-preview { position: static; }
   .approval-overview-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2224,5 +2365,15 @@ useLiveSyncRefresh({
   .command-group {
     width: 100%;
   }
+}
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+
+.row-actions :deep(.ant-btn-link) {
+  padding-inline: 4px;
 }
 </style>

@@ -20,7 +20,7 @@ describe('two-level job navigation', () => {
     ['MEDICAL_EMPLOYEE', '医务部业务', '长者查询'],
     ['FINANCE_EMPLOYEE', '财务部业务', '财务查询'],
     ['LOGISTICS_EMPLOYEE', '后勤部业务', '房态查询'],
-    ['HR_EMPLOYEE', '行政人事业务', '员工查询'],
+    ['HR_EMPLOYEE', '行政人事业务', '部门工作台'],
     ['MARKETING_EMPLOYEE', '市场部业务', '客户查询']
   ])('%s receives the five employee entry types', (role, businessLabel, objectLabel) => {
     const menu = jobMenu(role)
@@ -53,6 +53,19 @@ describe('two-level job navigation', () => {
       '经营总览', '部门运行', '风险与异常', '长者查询', '待我审批', '经营报表', '我的信息'
     ])
     expect(paths(menu)).not.toContain('/system')
+  })
+
+  it('exposes one customer follow-up entry with in-page views', () => {
+    const business = jobMenu('MARKETING_EMPLOYEE').find((item) => item.label === '市场部业务')
+    const followupEntries = business?.children?.filter((item) => item.path?.startsWith('/marketing/interactions/')) || []
+    expect(followupEntries).toEqual([
+      expect.objectContaining({ label: '客户跟进', path: '/marketing/interactions/today' })
+    ])
+  })
+
+  it('links employee navigation to medical and logistics department workbenches', () => {
+    expect(paths(jobMenu('MEDICAL_EMPLOYEE'))).toContain('/medical-care/center')
+    expect(paths(jobMenu('LOGISTICS_EMPLOYEE'))).toContain('/logistics/workbench')
   })
 
   it('keeps system administration separate from daily business', () => {

@@ -99,6 +99,8 @@ import { login } from '../api/auth'
 import { verifyTwoFactor, resendTwoFactorCode } from '../api/complianceSecurity'
 import { useUserStore } from '../stores/user'
 import { resolveDefaultHome } from '../access/policy'
+import { resolveAuthorizedLoginTarget } from '../router/permission'
+import { resetBedMapDatasetState } from '../composables/useBedMapDataset'
 
 const route = useRoute()
 const router = useRouter()
@@ -276,10 +278,13 @@ async function onSubmit() {
 }
 
 async function finishLogin(res: any) {
+  resetBedMapDatasetState()
   userStore.setAuth(res)
   const redirect = normalizeRedirectPath(typeof route.query.redirect === 'string' ? route.query.redirect : '')
   const fallbackPath = resolvePostLoginPath(res.roles || [])
-  const nextPath = redirect || fallbackPath
+  const nextPath = redirect
+    ? resolveAuthorizedLoginTarget(router, redirect, userStore.roles || [], userStore.pagePermissions || [], userStore.permissions || [])
+    : fallbackPath
   await router.replace(nextPath)
   message.success(nextPath.startsWith('/workbench') ? '登录成功，已进入个人工作台' : '登录成功')
 }

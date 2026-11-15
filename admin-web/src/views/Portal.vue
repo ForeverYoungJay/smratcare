@@ -119,54 +119,7 @@
         </div>
       </SectionPanel>
 
-      <SectionPanel
-        title="业务落地清单"
-        description="按养老机构真实运营顺序串起七个闭环：咨询入住、照护执行、健康用药、安全事件、家属服务、收费合同、后勤人力。"
-      >
-        <template #extra>
-          <a-space wrap>
-            <StatusTag :text="capabilitySummaryText" :tone="capabilitySummaryTone" />
-            <a-button size="small" @click="router.push('/stats/operations?tab=quality')">服务月报</a-button>
-            <a-button size="small" @click="router.push('/workbench/todo')">转为待办</a-button>
-          </a-space>
-        </template>
-
-        <div class="landing-flow">
-          <button
-            v-for="item in businessLandingFlow"
-            :key="item.title"
-            type="button"
-            class="landing-flow-step"
-            @click="router.push(item.path)"
-          >
-            <b>{{ item.index }}</b>
-            <div>
-              <strong>{{ item.title }}</strong>
-              <span>{{ item.desc }}</span>
-            </div>
-            <StatusTag :text="item.tag" :tone="item.tone" />
-          </button>
-        </div>
-
-        <div class="capability-lane">
-          <div class="capability-lane__head">
-            <strong>智能化落地路线</strong>
-            <span>先接入数据和规则，再进入 AI 摘要、IoT 告警、智能排班和家属问答。</span>
-          </div>
-          <a-button size="small" class="capability-lane__entry" @click="router.push('/stats/operations?tab=intelligence')">查看智能化落地</a-button>
-          <button
-            v-for="item in intelligenceRoadmap"
-            :key="item.title"
-            type="button"
-            class="capability-chip"
-            @click="router.push(item.path)"
-          >
-            <strong>{{ item.title }}</strong>
-            <span>{{ item.desc }}</span>
-            <StatusTag :text="item.tag" :tone="item.tone" />
-          </button>
-        </div>
-      </SectionPanel>
+      
     </section>
 
     <section v-if="financeHome" class="portal-grid portal-grid--main">
@@ -215,7 +168,7 @@
 
       <SectionPanel
         title="最近操作记录"
-        description="收款、押金、电费与提醒处置的最新动作，按时间倒序取最近 12 条。"
+        description="最近改动过数据的业务操作（不含查询、导出等只读动作），按时间倒序取最近 12 条。"
       >
         <div v-if="financeHome.recentOperations.length" class="recent-ops">
           <div v-for="item in financeHome.recentOperations" :key="String(item.id)" class="recent-ops__row">
@@ -234,40 +187,9 @@
     </section>
 
     <section class="portal-grid portal-grid--main">
-      <SectionPanel
-        title="运营概览"
-        description="把入住、收入、咨询转化和服务完成率放在同一视图里，方便先看经营，再判断需要调度的业务。"
-      >
-        <div class="portal-grid portal-grid--operating">
-          <OverviewMetricCard
-            clickable
-            label="床位入住率"
-            :value="percentText(dashboard?.bedOccupancyRate)"
-            helper="在住 / 总床位"
-            tone="brand"
-            @click="router.push('/elder/bed-panorama')"
-          />
-          <OverviewMetricCard
-            clickable
-            label="新增咨询 / 新增长者"
-            :value="consultationGrowthLabel"
-            helper="营销线索与入住净增"
-            tone="success"
-            @click="router.push('/stats/operations?tab=marketing')"
-          />
-          <OverviewMetricCard
-            clickable
-            label="服务完成率"
-            :value="percentText(serviceCompletionRate)"
-            helper="护理任务完成度"
-            tone="success"
-            @click="router.push('/medical-care/care-task-board')"
-          />
-          <SectionPanel dense title="本月收入趋势" description="最近 6 个月收费收入走势">
+      <SectionPanel title="本月收入趋势" description="最近 6 个月收费收入走势">
             <v-chart class="trend-chart" :option="revenueTrendOption" autoresize />
           </SectionPanel>
-        </div>
-      </SectionPanel>
 
       <SectionPanel
         title="安全与健康预警"
@@ -293,45 +215,11 @@
     </section>
 
     <section class="portal-grid portal-grid--more">
-      <SectionPanel
-        title="更多机构概览"
-        description="护理执行、人力在岗与设备接入等运行指标，作为二级概览随时下钻。"
-      >
-        <div class="portal-grid portal-grid--more-metrics">
-          <OverviewMetricCard
-            v-for="item in secondaryMetrics"
-            :key="item.label"
-            clickable
-            :helper="item.helper"
-            :label="item.label"
-            :status-text="item.statusText"
-            :status-tone="item.statusTone"
-            :tone="item.tone"
-            :value="item.value"
-            @click="router.push(item.path)"
-          />
-        </div>
-      </SectionPanel>
+      
     </section>
 
     <section class="portal-grid portal-grid--secondary">
-      <SectionPanel
-        title="今日工作"
-        description="以今日护理任务、审批、后勤工单和客户回访作为四个工作优先面板。"
-      >
-        <div class="portal-grid portal-grid--work">
-          <OverviewMetricCard
-            v-for="item in todayWorkItems"
-            :key="item.label"
-            clickable
-            :helper="item.helper"
-            :label="item.label"
-            :tone="item.tone"
-            :value="item.value"
-            @click="router.push(item.path)"
-          />
-        </div>
-      </SectionPanel>
+      
 
       <SectionPanel
         title="快捷入口"
@@ -351,105 +239,7 @@
     </section>
 
     <section class="portal-grid portal-grid--support">
-      <SectionPanel
-        title="老人生日计划"
-        description="把今日关怀、7 天内提醒和本月名单前置到首页，方便活动准备、物资安排和家属关怀一起闭环。"
-      >
-        <template #extra>
-          <a-space wrap>
-            <a-button size="small" @click="router.push('/oa/life/birthday')">查看全部</a-button>
-            <a-button size="small" @click="router.push('/workbench/schedule')">同步到我的日程</a-button>
-          </a-space>
-        </template>
-
-        <div class="portal-grid portal-grid--birthday-metrics">
-          <OverviewMetricCard
-            clickable
-            label="今日生日"
-            :value="displayNumber(birthdayStats.today)"
-            helper="优先安排祝福、探访与活动"
-            :tone="Number(birthdayStats.today) > 0 ? 'brand' : 'default'"
-            @click="router.push('/oa/life/birthday?scope=today')"
-          />
-          <OverviewMetricCard
-            clickable
-            label="未来 7 天"
-            :value="displayNumber(birthdayStats.next7Days)"
-            helper="提前准备活动与物资"
-            tone="brand"
-            @click="router.push('/oa/life/birthday?scope=next7')"
-          />
-          <OverviewMetricCard
-            clickable
-            label="本月生日"
-            :value="displayNumber(birthdayStats.thisMonth)"
-            helper="适合统筹月度集体庆生"
-            tone="success"
-            @click="router.push('/oa/life/birthday?scope=month')"
-          />
-          <OverviewMetricCard
-            clickable
-            label="80+ / 90+"
-            :value="birthdayAgeBandLabel"
-            helper="高龄长者关怀优先级"
-            tone="default"
-            @click="router.push('/oa/life/birthday')"
-          />
-        </div>
-
-        <div class="birthday-highlight-row">
-          <div class="birthday-highlight-copy">
-            <strong>{{ birthdayHeadline.title }}</strong>
-            <p>{{ birthdayHeadline.description }}</p>
-          </div>
-          <a-space wrap>
-            <StatusTag :text="`今日 ${birthdayStats.today}`" :tone="Number(birthdayStats.today) > 0 ? 'pending' : 'normal'" />
-            <StatusTag :text="`7天内 ${birthdayStats.next7Days}`" tone="pending" />
-            <StatusTag :text="`本月 ${birthdayStats.thisMonth}`" tone="normal" />
-          </a-space>
-        </div>
-
-        <div class="birthday-action-row">
-          <button type="button" class="birthday-action-card" @click="openBirthdayModal('today')">
-            <strong>今日生日弹窗名单</strong>
-            <span>现场确认今天需要祝福、探访和家属联络的长者名单。</span>
-          </button>
-          <button type="button" class="birthday-action-card" @click="launchMonthlyBirthdayActivity">
-            <strong>本月集体庆生快捷发起</strong>
-            <span>自动带入当前月份和预计人数，直接进入活动创建。</span>
-          </button>
-          <button type="button" class="birthday-action-card" @click="openBirthdayMaterialPrep">
-            <strong>生日物资准备快捷入口</strong>
-            <span>直接进入出库/备料场景，减少活动当天临时找物资。</span>
-          </button>
-        </div>
-
-        <div class="birthday-list">
-          <button
-            v-for="item in birthdayPreviewList"
-            :key="`${item.elderId}_${item.nextBirthday}`"
-            type="button"
-            class="birthday-item"
-            @click="router.push(`/oa/life/birthday?elderName=${encodeURIComponent(item.elderName || '')}`)"
-          >
-            <div>
-              <strong>{{ item.elderName }}</strong>
-              <span>{{ birthdayMetaText(item) }}</span>
-            </div>
-            <StatusTag :text="birthdayDueText(item.daysUntil)" :tone="birthdayDueTone(item.daysUntil)" />
-          </button>
-          <a-empty v-if="!birthdayPreviewList.length" description="近期暂无生日提醒" />
-        </div>
-
-        <div class="birthday-footer-actions">
-          <a-space wrap>
-            <a-button size="small" @click="router.push('/oa/life/birthday?minAge=80')">查看 80+ 生日名单</a-button>
-            <a-button size="small" @click="router.push('/oa/life/birthday?minAge=90')">查看 90+ 生日名单</a-button>
-            <a-button size="small" @click="router.push('/workbench/todo?keyword=生日提醒')">生日待办</a-button>
-            <a-button size="small" @click="printBirthdayPreview">打印近期名单</a-button>
-          </a-space>
-        </div>
-      </SectionPanel>
+      
 
       <SectionPanel
         title="协同与待办速览"
@@ -818,7 +608,19 @@ const pendingTotal = computed(() =>
   numberValue(logistics.value?.maintenancePendingCount)
 )
 
-// 首屏只突出四组最关键的经营与安全指标，其余下沉到「更多机构概览」。
+/**
+ * 待办这个数字在首页出现过四次、四种口径（38 / 28 / 10 / 逾期 7），
+ * 数值本身自洽，但页面从没说明它们的关系，看起来像数据打架。
+ * 这里把构成直接写进副标题。
+ */
+const pendingBreakdownText = computed(() => {
+  const todo = numberValue(portal.value?.openTodoCount)
+  const approval = numberValue(portal.value?.pendingApprovalCount)
+  const maintenance = numberValue(logistics.value?.maintenancePendingCount)
+  return `待办 ${todo} + 审批 ${approval} + 后勤工单 ${maintenance}`
+})
+
+// 首屏只突出四组最关键的经营与安全指标。
 const primaryMetrics = computed(() => ([
   {
     label: '未闭环风险',
@@ -832,7 +634,7 @@ const primaryMetrics = computed(() => ([
   {
     label: '待处理事项',
     value: displayNumber(pendingTotal.value),
-    helper: '待办 · 审批 · 后勤工单',
+    helper: pendingBreakdownText.value,
     tone: pendingTotal.value > 0 ? 'warning' as const : 'success' as const,
     path: '/workbench/todo',
     statusText: pendingTotal.value > 0 ? '待处理' : '已清空',

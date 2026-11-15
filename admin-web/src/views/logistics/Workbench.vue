@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="后勤工作台" subTitle="资产、物资、餐饮、维修的一体化运营看板" mode="showcase" kicker="机构保障">
+  <PageContainer title="后勤部工作台" subTitle="用细致的保障，守护长者安心、舒适、有温度的生活。" mode="scenic">
     <template #meta>
       <span class="soft-pill">统计窗口 {{ configuredQuery.windowDays }} 天</span>
       <span class="soft-pill">值班模式 {{ dutyMode ? '高密度' : '标准' }}</span>
@@ -16,7 +16,22 @@
       </a-space>
     </template>
 
-    <a-card class="card-elevated filter-panel" :bordered="false" style="margin-bottom: 12px">
+    <DepartmentHomeOverview
+      department="LOGISTICS"
+      :show-header="false"
+      :show-catalog="false"
+      :metrics="departmentMetrics"
+      :data-state="departmentDataState"
+      :data-message="errorMessage"
+      scope-label="当前账号后勤业务范围"
+      :period-label="summary?.snapshotStartDate ? `${summary.snapshotStartDate} 至 ${summary.snapshotEndDate || summary.snapshotStartDate}` : `统计窗口 ${configuredQuery.windowDays} 天`"
+      :updated-at="lastLoadedAt"
+      :refreshing="loading"
+      show-refresh
+      @refresh="loadSummary"
+    />
+
+    <a-card class="card-elevated filter-panel" :bordered="false" style="margin: 16px 0 12px">
       <div class="filter-top-row">
         <a-space wrap>
           <a-tag color="blue">统计窗口 {{ configuredQuery.windowDays }} 天</a-tag>
@@ -25,9 +40,15 @@
           <a-tag color="cyan">维保临近 {{ configuredQuery.maintenanceDueDays }} 天</a-tag>
         </a-space>
         <a-space wrap>
-          <a-button size="small" @click="applyPreset('stable')">稳健预设</a-button>
-          <a-button size="small" @click="applyPreset('balanced')">平衡预设</a-button>
-          <a-button size="small" @click="applyPreset('sensitive')">敏感预设</a-button>
+          <a-tooltip title="口径最宽：统计近 60 天，临期 45 天、维修超时 4 天才算。报警最少，风险指数最低。">
+            <a-button size="small" @click="applyPreset('stable')">稳健预设</a-button>
+          </a-tooltip>
+          <a-tooltip title="默认口径：统计近 30 天，临期 30 天、维修超时 2 天。">
+            <a-button size="small" @click="applyPreset('balanced')">平衡预设</a-button>
+          </a-tooltip>
+          <a-tooltip title="口径最严：统计近 14 天，临期 15 天、维修超时 1 天就算。同样的现场情况会算出更高的风险指数。">
+            <a-button size="small" @click="applyPreset('sensitive')">敏感预设</a-button>
+          </a-tooltip>
           <a-button size="small" type="primary" @click="applyFilters">应用参数</a-button>
           <a-button size="small" @click="resetFilters">恢复默认</a-button>
         </a-space>
@@ -69,7 +90,21 @@
       <a-card class="card-elevated workbench-hero" :bordered="false" style="margin-bottom: 12px">
         <a-row :gutter="[12, 12]" align="middle">
           <a-col :xs="24" :xl="9">
-            <div class="hero-title">后勤风险指数</div>
+            <div class="hero-title">
+              后勤风险指数
+              <a-tooltip placement="bottomLeft" :overlay-style="{ maxWidth: '360px' }">
+                <template #title>
+                  <div>由五项加权累加，满分 100，分数越高越需要处理：</div>
+                  <div>· 库存风险（低库存 + 临期）最多 32 分</div>
+                  <div>· 维修超时率最多 32 分</div>
+                  <div>· 送餐未送达率最多 24 分</div>
+                  <div>· 设备维保临近率最多 16 分</div>
+                  <div>· 维保待办近 7 天失败次数最多 12 分</div>
+                  <div style="margin-top:6px">下方的阈值参数会改变“算不算超时/临期”的口径，因此调参会直接改变这个分数——分数变高不等于现场变差。</div>
+                </template>
+                <span class="hero-title__help" role="img" aria-label="风险指数说明">?</span>
+              </a-tooltip>
+            </div>
             <div class="hero-score-row">
               <span class="hero-score">{{ riskIndex }}</span>
               <a-tag :color="riskTagColor">{{ riskLevelLabel }}</a-tag>
@@ -149,6 +184,7 @@ import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
+import DepartmentHomeOverview from '../../components/workbench/DepartmentHomeOverview.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
 import {
   generateEquipmentMaintenanceTodos,
@@ -162,6 +198,7 @@ import {
   normalizeLogisticsWorkbenchQuery,
   parseLogisticsWorkbenchQueryPatch
 } from '../../utils/logisticsWorkbenchQuery'
+import type { DepartmentHomeDataState, DepartmentHomeMetric } from '../../workbench/departmentHome'
 
 interface WorkbenchAction {
   label: string
@@ -242,6 +279,21 @@ const activeQuery = ref<LogisticsWorkbenchSummaryQuery>({})
 const draftQuery = ref<Required<LogisticsWorkbenchSummaryQuery>>({ ...LOGISTICS_WORKBENCH_QUERY_DEFAULTS })
 const loadedQuerySignature = ref('')
 const hasLoadedSummary = ref(false)
+const departmentForbidden = ref(false)
+
+const departmentDataState = computed<DepartmentHomeDataState>(() => {
+  if (loading.value) return 'loading'
+  if (departmentForbidden.value) return 'forbidden'
+  if (errorMessage.value) return 'error'
+  return summary.value ? 'ready' : 'empty'
+})
+
+const departmentMetrics = computed<DepartmentHomeMetric[]>(() => summary.value ? [
+  { key: 'maintenance', label: '待处理维修', value: summary.value.maintenancePendingCount, helper: '待响应报修事项', path: '/logistics/assets/maintenance-record', tone: 'warning' },
+  { key: 'overdue', label: '逾期维修', value: summary.value.maintenanceOverdueCount, helper: '需要优先处理', path: '/logistics/task-center', tone: 'danger' },
+  { key: 'stock', label: '库存预警', value: summary.value.lowStockCount, helper: '低于安全库存', path: '/logistics/storage/alerts', tone: 'warning' },
+  { key: 'delivery', label: '今日送餐任务', value: summary.value.todayDeliveryTaskCount, helper: `尚未送达 ${summary.value.undeliveredCount} 项`, path: '/logistics/dining/delivery-plan', tone: 'success' }
+] : [])
 const signedLinkageContext = computed(() => {
   const source = routeQueryText(route.query.source).toLowerCase()
   const entryScene = routeQueryText(route.query.entryScene).toLowerCase()
@@ -699,6 +751,7 @@ async function rerunLatestFailed() {
 async function loadSummary(options?: { silent?: boolean }) {
   loading.value = true
   errorMessage.value = ''
+  departmentForbidden.value = false
   try {
     const params = Object.keys(activeQuery.value).length > 0
       ? normalizeLogisticsWorkbenchQuery(activeQuery.value)
@@ -715,6 +768,7 @@ async function loadSummary(options?: { silent?: boolean }) {
     hasLoadedSummary.value = true
     lastLoadedAt.value = dayjs().format('MM-DD HH:mm:ss')
   } catch (error: any) {
+    departmentForbidden.value = Number(error?.response?.status) === 403
     errorMessage.value = error?.message || '加载后勤工作台失败'
     if (!options?.silent) {
       message.error(errorMessage.value)
@@ -783,6 +837,20 @@ onUnmounted(() => {
   background:
     radial-gradient(160% 120% at 0% 0%, rgba(var(--primary-rgb), 0.08) 0%, rgba(var(--primary-rgb), 0) 60%),
     linear-gradient(135deg, #f8fbff 0%, #f0f7ff 40%, #f7fcff 100%);
+}
+
+.hero-title__help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+  font-size: 11px;
+  cursor: help;
 }
 
 .hero-title {

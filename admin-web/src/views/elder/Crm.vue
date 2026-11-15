@@ -69,7 +69,7 @@
       />
     </a-card>
 
-    <a-modal v-model:open="open" title="线索信息" width="420px" :confirm-loading="submitting" @ok="submit" @cancel="() => (open = false)">
+    <a-modal :mask-closable="false" v-model:open="open" title="线索信息" width="420px" :confirm-loading="submitting" @ok="submit" @cancel="() => (open = false)">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="姓名" name="name">
           <a-input v-model:value="form.name" />

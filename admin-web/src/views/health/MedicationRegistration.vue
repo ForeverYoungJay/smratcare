@@ -135,7 +135,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" title="用药登记" @ok="submit" :confirm-loading="saving" width="680px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="用药登记" @ok="submit" :confirm-loading="saving" width="680px">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">

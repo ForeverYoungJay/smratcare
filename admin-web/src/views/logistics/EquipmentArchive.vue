@@ -21,7 +21,9 @@
       </a-row>
     </a-card>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
           <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
@@ -36,7 +38,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" :title="form.id ? '编辑设备' : '新增设备'" :confirm-loading="saving" width="760px" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="editOpen" :title="form.id ? '编辑设备' : '新增设备'" :confirm-loading="saving" width="760px" @ok="submit">
       <a-form layout="vertical">
         <a-row :gutter="12">
           <a-col :span="12">

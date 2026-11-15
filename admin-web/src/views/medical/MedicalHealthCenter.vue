@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="医护健康服务中心" subTitle="医嘱、护理、巡检与风险处置一体化入口">
+  <PageContainer title="医务部工作台" subTitle="用专业守护长者健康，用爱心传递生命温度。" mode="scenic">
     <template #extra>
       <a-space wrap>
         <a-tag color="blue">业务日期 {{ summary.snapshotDate || '-' }}</a-tag>
@@ -9,7 +9,22 @@
       </a-space>
     </template>
 
-    <a-card class="card-elevated medical-filter" :bordered="false">
+    <DepartmentHomeOverview
+      department="MEDICAL"
+      :show-header="false"
+      :show-catalog="false"
+      :metrics="departmentMetrics"
+      :data-state="departmentDataState"
+      :data-message="errorText"
+      scope-label="医务部业务范围"
+      :period-label="summary.snapshotDate ? `业务日期 ${summary.snapshotDate}` : ''"
+      :updated-at="generatedAtText === '-' ? '' : generatedAtText"
+      :refreshing="loading"
+      show-refresh
+      @refresh="loadSummary"
+    />
+
+    <a-card class="card-elevated medical-filter" :bordered="false" style="margin-top: 16px">
       <div class="medical-filter__head">
         <a-space wrap>
           <a-tag color="cyan">超时阈值 {{ configuredQuery.overdueHours }} 小时</a-tag>
@@ -17,9 +32,15 @@
           <a-tag color="gold">回溯 {{ configuredQuery.riskResidentLookbackDays }} 天</a-tag>
         </a-space>
         <a-space wrap>
-          <a-button size="small" @click="applyPreset('stable')">稳健</a-button>
-          <a-button size="small" @click="applyPreset('balanced')">平衡</a-button>
-          <a-button size="small" @click="applyPreset('sensitive')">敏感</a-button>
+          <a-tooltip title="口径最宽：事件统计近 45 天，超过 18 小时才算超时。报警最少，风险指数最低。">
+            <a-button size="small" @click="applyPreset('stable')">稳健</a-button>
+          </a-tooltip>
+          <a-tooltip title="默认口径：事件统计近 30 天，超过 12 小时算超时。">
+            <a-button size="small" @click="applyPreset('balanced')">平衡</a-button>
+          </a-tooltip>
+          <a-tooltip title="口径最严：事件统计近 14 天，超过 6 小时就算超时。同样的现场情况会算出更高的风险指数。">
+            <a-button size="small" @click="applyPreset('sensitive')">敏感</a-button>
+          </a-tooltip>
           <a-button size="small" type="primary" @click="applyFilters">应用参数</a-button>
           <a-button size="small" @click="resetFilters">重置</a-button>
         </a-space>
@@ -65,7 +86,22 @@
       <a-card class="card-elevated risk-hero" :bordered="false">
         <a-row :gutter="[14, 14]" align="middle">
           <a-col :xs="24" :xl="8">
-            <div class="risk-hero__title">医疗执行风险指数</div>
+            <div class="risk-hero__title">
+              医疗执行风险指数
+              <a-tooltip placement="bottomLeft" :overlay-style="{ maxWidth: '360px' }">
+                <template #title>
+                  <div>由六项加权累加，满分 100，分数越高越需要处理：</div>
+                  <div>· 护理任务超时率最多 32 分</div>
+                  <div>· 医嘱待执行率最多 24 分</div>
+                  <div>· 未闭环异常（巡检异常 + 事件）最多 24 分</div>
+                  <div>· 近期事件发生率最多 24 分</div>
+                  <div>· 整改任务逾期最多 12 分</div>
+                  <div>· 高风险长者人数最多 10 分</div>
+                  <div style="margin-top:6px">下方的阈值参数会改变“算不算超时/异常”的口径，因此调参会直接改变这个分数——分数变高不等于现场变差。</div>
+                </template>
+                <span class="risk-hero__help" role="img" aria-label="风险指数说明">?</span>
+              </a-tooltip>
+            </div>
             <div class="risk-hero__score-row">
               <span class="risk-hero__score">{{ riskIndex }}</span>
               <a-tag :color="riskTagColor">{{ riskLabel }}</a-tag>
@@ -177,20 +213,6 @@
         </a-col>
       </a-row>
 
-      <a-card class="card-elevated" :bordered="false" title="模块快捷入口" style="margin-top: 4px">
-        <a-space wrap>
-          <a-button type="primary" @click="go('/medical-care/orders')">医嘱管理</a-button>
-          <a-button type="primary" @click="go('/medical-care/unified-task-center')">统一任务中心</a-button>
-          <a-button @click="go('/medical-care/basic-diseases')">基础疾病维护</a-button>
-          <a-button @click="go('/medical-care/nursing-quality?tab=medication')">用药管理</a-button>
-          <a-button @click="go('/medical-care/inspection')">健康巡检</a-button>
-          <a-button @click="go('/medical-care/care-task-board')">护理任务看板</a-button>
-          <a-button @click="go('/medical-care/handovers')">交接班</a-button>
-          <a-button @click="go('/medical-care/nursing-quality?tab=quality')">质量与报表</a-button>
-          <a-button @click="go('/medical-care/ai-reports')">AI 健康报告</a-button>
-          <a-button @click="go('/medical-care/workbench')">高级工作台</a-button>
-        </a-space>
-      </a-card>
     </StatefulBlock>
   </PageContainer>
 </template>
@@ -201,6 +223,7 @@ import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import DepartmentHomeOverview from '../../components/workbench/DepartmentHomeOverview.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
 import { getMedicalHealthCenterSummary } from '../../api/medicalCare'
 import type { MedicalCareWorkbenchSummary, MedicalCareWorkbenchSummaryQuery } from '../../types'
@@ -219,6 +242,7 @@ import {
 } from '../../utils/medicalSummary'
 import { resolveMedicalError } from './medicalError'
 import { isAutoCarryResidentContextEnabled, syncMedicalAlertRules } from '../../utils/medicalAlertRule'
+import type { DepartmentHomeDataState, DepartmentHomeMetric } from '../../workbench/departmentHome'
 
 type PresetKey = 'stable' | 'balanced' | 'sensitive'
 
@@ -264,6 +288,22 @@ const route = useRoute()
 const loading = ref(false)
 const errorText = ref('')
 const summary = ref<MedicalCareWorkbenchSummary>(createMedicalWorkbenchSummaryDefaults())
+const hasLoadedSummary = ref(false)
+const departmentForbidden = ref(false)
+
+const departmentDataState = computed<DepartmentHomeDataState>(() => {
+  if (loading.value) return 'loading'
+  if (departmentForbidden.value) return 'forbidden'
+  if (errorText.value) return 'error'
+  return hasLoadedSummary.value ? 'ready' : 'empty'
+})
+
+const departmentMetrics = computed<DepartmentHomeMetric[]>(() => hasLoadedSummary.value ? [
+  { key: 'inspection', label: '今日巡诊计划', value: summary.value.todayInspectionPlanCount, helper: '今日计划巡诊', path: '/medical-care/inspection', tone: 'normal' },
+  { key: 'orders', label: '待执行医嘱', value: summary.value.medicalOrderPendingCount, helper: '需要执行或复核', path: '/medical-care/orders', tone: 'warning' },
+  { key: 'medication', label: '待完成用药', value: summary.value.medicationUndoneCount, helper: '今日用药执行', path: '/medical-care/medication-registration', tone: 'warning' },
+  { key: 'abnormal', label: '未闭环健康异常', value: summary.value.unclosedAbnormalCount, helper: '需要继续处置', path: '/medical-care/unified-task-center', tone: 'danger' }
+] : [])
 
 const activeQuery = ref<MedicalCareWorkbenchSummaryQuery>(normalizeMedicalWorkbenchQuery(MEDICAL_WORKBENCH_QUERY_DEFAULTS))
 const draftQuery = ref<MedicalCareWorkbenchSummaryQuery>(normalizeMedicalWorkbenchQuery(MEDICAL_WORKBENCH_QUERY_DEFAULTS))
@@ -499,13 +539,17 @@ function go(path: string, extra?: Record<string, string | number | undefined>) {
 async function loadSummary() {
   loading.value = true
   errorText.value = ''
+  departmentForbidden.value = false
   try {
     const data = await getMedicalHealthCenterSummary(activeQuery.value)
     summary.value = {
       ...createMedicalWorkbenchSummaryDefaults(),
       ...(data || {})
     }
+    hasLoadedSummary.value = true
   } catch (error: any) {
+    hasLoadedSummary.value = false
+    departmentForbidden.value = Number(error?.response?.status) === 403
     errorText.value = resolveMedicalError(error, '加载失败，请稍后重试')
   } finally {
     loading.value = false
@@ -585,6 +629,20 @@ onMounted(() => {
   background:
     radial-gradient(120% 110% at 100% 0%, rgba(var(--primary-rgb), 0.17) 0%, rgba(var(--primary-rgb), 0) 58%),
     linear-gradient(132deg, #f7fbff 0%, #ecf4ff 44%, #f8fcff 100%);
+}
+
+.risk-hero__help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+  font-size: 11px;
+  cursor: help;
 }
 
 .risk-hero__title {

@@ -23,6 +23,8 @@
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="taskDailyId"
       :columns="columns"
       :data-source="rows"
@@ -40,7 +42,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="generateOpen" title="生成任务" @ok="submitGenerate">
+    <a-modal :mask-closable="false" v-model:open="generateOpen" title="生成任务" @ok="submitGenerate">
       <a-form layout="vertical">
         <a-form-item label="日期" required>
           <a-date-picker v-model:value="generateForm.date" value-format="YYYY-MM-DD" style="width: 100%" />

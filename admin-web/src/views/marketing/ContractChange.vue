@@ -33,10 +33,10 @@
           <a-button :disabled="!canStartChangeSelected" @click="startChangeSelected">发起变更</a-button>
           <a-button :disabled="!canSubmitApprovalSelected" @click="submitApprovalSelected">提交审批</a-button>
           <a-button :disabled="!canBatchSubmitApproval" @click="batchSubmitApproval">批量提交审批</a-button>
-          <a-button :disabled="!canApproveSelected" @click="approveSelected">审批通过</a-button>
-          <a-button :disabled="!canBatchApprove" @click="batchApprove">批量审批通过</a-button>
-          <a-button :disabled="!canRejectSelected" danger @click="rejectSelected">审批驳回</a-button>
-          <a-button :disabled="!canBatchReject" danger @click="batchReject">批量审批驳回</a-button>
+          <a-button v-if="canApproveContract" :disabled="!canApproveSelected" @click="approveSelected">审批通过</a-button>
+          <a-button v-if="canApproveContract" :disabled="!canBatchApprove" @click="batchApprove">批量审批通过</a-button>
+          <a-button v-if="canApproveContract" :disabled="!canRejectSelected" danger @click="rejectSelected">审批驳回</a-button>
+          <a-button v-if="canApproveContract" :disabled="!canBatchReject" danger @click="batchReject">批量审批驳回</a-button>
         </a-space>
       </MarketingListToolbar>
       <a-table
@@ -98,6 +98,8 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import MarketingQuickNav from './components/MarketingQuickNav.vue'
 import MarketingListToolbar from './components/MarketingListToolbar.vue'
+import { useUserStore } from '../../stores/user'
+import { hasAnyRole } from '../../utils/roleAccess'
 import {
   approveContractChange,
   getContractPage,
@@ -109,6 +111,10 @@ import {
 import type { CrmContractItem, PageResult } from '../../types'
 
 const loading = ref(false)
+const userStore = useUserStore()
+const canApproveContract = computed(() => hasAnyRole(userStore.roles || [], [
+  'MARKETING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'
+]))
 const saving = ref(false)
 const rows = ref<CrmContractItem[]>([])
 const total = ref(0)

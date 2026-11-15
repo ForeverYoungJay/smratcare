@@ -18,6 +18,8 @@
       </template>
     </SearchForm>
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"

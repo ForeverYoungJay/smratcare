@@ -70,7 +70,7 @@
       />
     </a-card>
 
-    <a-modal v-model:open="createOpen" :title="editingId ? '更正死亡登记' : '新增死亡登记'" @ok="submitCreate" :confirm-loading="submitting" width="560px">
+    <a-modal :mask-closable="false" v-model:open="createOpen" :title="editingId ? '更正死亡登记' : '新增死亡登记'" @ok="submitCreate" :confirm-loading="submitting" width="560px">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人" name="elderId">
           <a-select

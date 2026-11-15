@@ -1,7 +1,8 @@
 <template>
   <PageContainer
-    title="员工协同中心"
+    title="跨部门协同流程"
     subTitle="把员工小程序提交的请假调班、物资申领、待办、日报和建议集中到后台，方便主管持续流转处理"
+    mode="content"
   >
     <template #extra>
       <a-space wrap>
@@ -12,7 +13,13 @@
       </a-space>
     </template>
 
-    <section class="summary-grid">
+    <ScenicHeader
+      class="collaboration-hero"
+      eyebrow="跨部门协同"
+      title="从提交、受理到执行归档，全程可追踪"
+      description="集中查看员工申请、待办、日报、建议与健康补录，让每一次跨部门协作都有负责人和下一步。"
+    >
+      <section class="summary-grid">
       <button class="summary-card" type="button" @click="openPath('/oa/approval')">
         <span>待审批流程</span>
         <strong>{{ approvalSummary.pendingCount || 0 }}</strong>
@@ -43,6 +50,13 @@
         <strong>{{ healthSummary.totalCount || 0 }}</strong>
         <small>今日异常 {{ healthSummary.abnormalCount || 0 }} · 最新 {{ healthLatestMeasuredText }}</small>
       </button>
+      </section>
+    </ScenicHeader>
+
+    <section class="admission-stage-strip" aria-label="入住跨部门流程">
+      <div class="admission-stage-strip__head"><div><span>入住协同</span><h2>从签约到正式入住</h2></div><a-button type="link" @click="openPath('/elder/admission-processing')">进入入住办理 →</a-button></div>
+      <ol><li v-for="(step, index) in admissionStages" :key="step"><span>{{ index + 1 }}</span><strong>{{ step }}</strong></li></ol>
+      <p>选择具体长者后，可在入住办理页查看实时节点、负责人和处理状态。</p>
     </section>
 
     <a-alert
@@ -249,6 +263,7 @@ import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import ScenicHeader from '../../components/smartcare/ScenicHeader.vue'
 import { getHealthDataSummary } from '../../api/health'
 import { getAttendanceOverview } from '../../api/schedule'
 import {
@@ -273,6 +288,7 @@ import type {
 } from '../../types'
 
 const router = useRouter()
+const admissionStages = ['市场签约', '床位确认', '财务缴费', '护理评估', '医务建档', '后勤准备', '正式入住']
 const loading = ref(false)
 const approvalSummary = reactive<OaApprovalSummary>({
   totalCount: 0,
@@ -506,6 +522,17 @@ useLiveSyncRefresh({
 </script>
 
 <style scoped>
+.admission-stage-strip { margin-bottom: 16px; padding: 18px; border: 1px solid #e7ece8; border-radius: 12px; background: #fff; }
+.admission-stage-strip__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
+.admission-stage-strip__head span { color: #1c8166; font-size: 12px; font-weight: 700; }
+.admission-stage-strip__head h2 { margin: 3px 0 0; color: #1f3228; font: 700 19px "Noto Serif SC", "Songti SC", serif; }
+.admission-stage-strip ol { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.admission-stage-strip li { display: grid; place-items: center; gap: 7px; min-width: 0; padding: 10px 4px; border-radius: 9px; background: #f5f8f5; color: #5f7065; font-size: 12px; text-align: center; }
+.admission-stage-strip li span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #e0efe6; color: #19755a; font-weight: 800; }
+.admission-stage-strip li strong { overflow: hidden; max-width: 100%; text-overflow: ellipsis; white-space: nowrap; }
+.admission-stage-strip p { margin: 13px 0 0; color: #7d8980; font-size: 12px; }
+@media (max-width: 900px) { .admission-stage-strip ol { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .admission-stage-strip ol { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .summary-grid,
 .panel-grid,
 .action-grid {
@@ -516,6 +543,10 @@ useLiveSyncRefresh({
 .summary-grid {
   grid-template-columns: repeat(6, minmax(0, 1fr));
   margin-bottom: 16px;
+}
+
+.collaboration-hero .summary-grid {
+  margin-bottom: 0;
 }
 
 .panel-grid {

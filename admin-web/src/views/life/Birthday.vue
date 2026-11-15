@@ -44,6 +44,8 @@
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="elderId"
       :columns="columns"
       :data-source="rows"

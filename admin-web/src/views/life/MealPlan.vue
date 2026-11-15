@@ -13,6 +13,8 @@
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -30,7 +32,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" title="膳食计划" @ok="submit" :confirm-loading="saving">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="膳食计划" @ok="submit" :confirm-loading="saving">
       <a-form layout="vertical">
         <a-form-item label="日期" required>
           <a-date-picker v-model:value="form.planDate" style="width: 100%" />

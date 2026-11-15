@@ -19,7 +19,9 @@
       </template>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" :row-class-name="resolveRowClassName" @change="onTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="loadReports" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" :row-class-name="resolveRowClassName" @change="onTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'typeLabel'">
           {{ typeLabel(record.type) }}

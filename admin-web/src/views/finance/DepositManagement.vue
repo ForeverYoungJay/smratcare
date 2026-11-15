@@ -118,7 +118,7 @@
       </div>
     </a-card>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="txnOpen"
       :title="txnTitle"
       width="600"
@@ -215,7 +215,7 @@
       </template>
     </a-drawer>
 
-    <a-modal v-model:open="standardOpen" title="押金标准" width="720" :footer="null">
+    <a-modal :mask-closable="false" v-model:open="standardOpen" title="押金标准" width="720" :footer="null">
       <a-form layout="inline" :model="standardForm" style="margin-bottom: 12px;">
         <a-form-item label="名称">
           <a-input v-model:value="standardForm.standardName" placeholder="如：三级护理押金" style="width: 160px" />

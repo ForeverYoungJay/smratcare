@@ -467,6 +467,13 @@ public class OaApprovalController {
     return value == null ? "" : String.valueOf(value);
   }
 
+  private String boundedText(String value, int maxLength) {
+    if (value == null || value.length() <= maxLength) {
+      return value;
+    }
+    return value.substring(0, maxLength);
+  }
+
   private String formatDateTime(LocalDateTime value) {
     if (value == null) {
       return "";
@@ -928,7 +935,7 @@ public class OaApprovalController {
     todo.setStatus("OPEN");
     todo.setDueTime(resolveApprovalTodoDueTime(approval));
     todo.setAssigneeId(assigneeId);
-    todo.setAssigneeName(approverName);
+    todo.setAssigneeName(boundedText(approverName, 64));
     if (todo.getId() == null) {
       todoMapper.insert(todo);
     } else {

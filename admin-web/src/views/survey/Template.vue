@@ -94,7 +94,7 @@
       />
     </a-card>
 
-    <a-modal v-model:open="open" title="模板" width="560px" :confirm-loading="submitting" @ok="submit" @cancel="() => (open = false)">
+    <a-modal :mask-closable="false" v-model:open="open" title="模板" width="560px" :confirm-loading="submitting" @ok="submit" @cancel="() => (open = false)">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="模板编码" name="templateCode">
           <a-input v-model:value="form.templateCode" placeholder="如 T_001" />

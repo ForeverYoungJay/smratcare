@@ -1,6 +1,7 @@
 package com.zhiyangyun.care.crm.service.impl;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhiyangyun.care.audit.service.AuditLogService;
@@ -16,6 +17,7 @@ import com.zhiyangyun.care.crm.mapper.CrmCallbackPlanMapper;
 import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
 import com.zhiyangyun.care.crm.model.CrmLeadAssignRequest;
+import com.zhiyangyun.care.crm.model.CrmLeadDuplicateResponse;
 import com.zhiyangyun.care.crm.model.CrmLeadRequest;
 import com.zhiyangyun.care.crm.model.CrmLeadResponse;
 import com.zhiyangyun.care.crm.service.CrmTraceService;
@@ -76,6 +78,7 @@ public class CrmLeadServiceImpl implements CrmLeadService {
 
   @Override
   public CrmLeadResponse create(CrmLeadRequest request) {
+    rejectDuplicate(request, null);
     CrmLead lead = new CrmLead();
     lead.setTenantId(request.getTenantId());
     lead.setOrgId(request.getOrgId());
@@ -135,6 +138,7 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     if (lead == null) {
       return null;
     }
+    rejectDuplicate(request, id);
     CrmLead before = cloneLead(lead);
     lead.setName(defaultLeadName(request));
     lead.setPhone(defaultLeadPhone(request));
@@ -193,12 +197,61 @@ public class CrmLeadServiceImpl implements CrmLeadService {
   }
 
   @Override
+  public List<CrmLeadDuplicateResponse> findDuplicates(Long tenantId, Long currentStaffId, boolean adminView,
+      String name, String phone, String idCardNo, Long excludeId) {
+    String normalizedName = normalizeDuplicateText(name);
+    String normalizedPhone = normalizePhone(phone);
+    String normalizedIdCard = normalizeDuplicateText(idCardNo);
+    if (normalizedPhone == null && normalizedIdCard == null) return List.of();
+    var query = Wrappers.lambdaQuery(CrmLead.class)
+        .eq(CrmLead::getTenantId, tenantId)
+        .eq(CrmLead::getIsDeleted, 0)
+        .ne(excludeId != null, CrmLead::getId, excludeId)
+        .and(w -> {
+          if (normalizedIdCard != null) w.eq(CrmLead::getIdCardNo, normalizedIdCard);
+          if (normalizedIdCard != null && normalizedPhone != null) w.or();
+          if (normalizedPhone != null) {
+            w.eq(CrmLead::getPhone, normalizedPhone)
+                .or().eq(CrmLead::getConsultantPhone, normalizedPhone)
+                .or().eq(CrmLead::getElderPhone, normalizedPhone);
+          }
+        })
+        .orderByDesc(CrmLead::getUpdateTime)
+        .last("LIMIT 10");
+    return leadMapper.selectList(query).stream().map(lead -> {
+      List<String> reasons = new java.util.ArrayList<>();
+      if (normalizedIdCard != null && normalizedIdCard.equalsIgnoreCase(normalizeDuplicateText(lead.getIdCardNo()))) {
+        reasons.add("证件号码相同");
+      }
+      boolean phoneMatches = normalizedPhone != null && (normalizedPhone.equals(normalizePhone(lead.getPhone()))
+          || normalizedPhone.equals(normalizePhone(lead.getConsultantPhone()))
+          || normalizedPhone.equals(normalizePhone(lead.getElderPhone())));
+      String leadName = firstNonBlank(lead.getElderName(), lead.getName(), lead.getConsultantName());
+      if (phoneMatches && normalizedName != null && normalizedName.equalsIgnoreCase(normalizeDuplicateText(leadName))) {
+        reasons.add("姓名和电话相同");
+      } else if (phoneMatches) {
+        reasons.add("联系电话相同");
+      }
+      boolean accessible = adminView || (currentStaffId != null && currentStaffId.equals(resolveAccessibleOwnerId(lead)));
+      CrmLeadDuplicateResponse response = new CrmLeadDuplicateResponse();
+      response.setAccessible(accessible);
+      response.setId(accessible ? lead.getId() : null);
+      response.setName(accessible ? leadName : maskName(leadName));
+      response.setPhone(maskPhone(firstNonBlank(lead.getElderPhone(), lead.getPhone(), lead.getConsultantPhone())));
+      response.setOwnerStaffName(accessible ? lead.getOwnerStaffName() : "其他市场员工");
+      response.setStatus(lead.getStatus());
+      response.setReasons(reasons);
+      return response;
+    }).filter(item -> !item.getReasons().isEmpty()).toList();
+  }
+
+  @Override
   public IPage<CrmLeadResponse> page(Long tenantId, Long currentStaffId, boolean adminView, long pageNo, long pageSize, String keyword, Integer status, String source, String customerTag,
                                      String consultantName, String consultantPhone, String elderName, String elderPhone,
                                      String consultDateFrom, String consultDateTo, String consultType, String mediaChannel,
                                      String infoSource, String marketerName, String followupStatus, String reservationChannel,
                                      String contractNo, String contractStatus, String flowStage, String currentOwnerDept, String mode, String callbackType,
-                                     String followupDateFrom, String followupDateTo, Boolean followupDueOnly) {
+                                     String followupDateFrom, String followupDateTo, Boolean followupDueOnly, String scenario) {
     pageNo = PageGuard.pageNo(pageNo);
     pageSize = PageGuard.pageSize(pageSize);
     String normalizedMode = normalizeLeadMode(mode);
@@ -321,6 +374,8 @@ public class CrmLeadServiceImpl implements CrmLeadService {
           .isNotNull(CrmLead::getNextFollowDate)
           .le(CrmLead::getNextFollowDate, LocalDate.now());
     }
+    applyModeFilter(wrapper, normalizedMode, normalizedCallbackType);
+    applyScenarioFilter(wrapper, scenario);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(CrmLead::getName, keyword)
           .or().like(CrmLead::getPhone, keyword)
@@ -330,23 +385,8 @@ public class CrmLeadServiceImpl implements CrmLeadService {
           .or().like(CrmLead::getElderPhone, keyword));
     }
     wrapper.orderByDesc(CrmLead::getConsultDate).orderByDesc(CrmLead::getCreateTime);
-    if (normalizedMode == null) {
-      IPage<CrmLead> page = leadMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
-      return page.convert(this::toResponse);
-    }
-
-    List<CrmLead> filtered = leadMapper.selectList(wrapper).stream()
-        .filter(lead -> matchesLeadMode(lead, normalizedMode, normalizedCallbackType))
-        .toList();
-    long total = filtered.size();
-    long fromIndex = Math.max((pageNo - 1L) * pageSize, 0L);
-    long toIndex = Math.min(fromIndex + pageSize, total);
-    List<CrmLeadResponse> pageRecords = fromIndex >= total
-        ? List.of()
-        : filtered.subList((int) fromIndex, (int) toIndex).stream().map(this::toResponse).toList();
-    Page<CrmLeadResponse> page = new Page<>(pageNo, pageSize, total);
-    page.setRecords(pageRecords);
-    return page;
+    IPage<CrmLead> page = leadMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+    return page.convert(this::toResponse);
   }
 
   @Override
@@ -994,57 +1034,67 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     };
   }
 
-  private boolean matchesLeadMode(CrmLead lead, String mode, String callbackType) {
-    if (lead == null || mode == null) {
-      return true;
+  private void applyModeFilter(LambdaQueryWrapper<CrmLead> wrapper, String mode, String callbackType) {
+    if (mode == null) return;
+    if ("invalid".equals(mode)) {
+      wrapper.eq(CrmLead::getStatus, 3);
+      return;
     }
-    return switch (mode) {
-      case "consultation" -> isConsultLead(lead);
-      case "intent" -> isIntentLead(lead);
-      case "reservation" -> hasReservationEvidence(lead);
-      case "invalid" -> Integer.valueOf(3).equals(lead.getStatus());
-      case "callback" -> !Integer.valueOf(3).equals(lead.getStatus())
-          && ("CHECKIN".equals(callbackType) || !isSignedLead(lead));
-      default -> true;
-    };
+    wrapper.and(w -> w.isNull(CrmLead::getStatus).or().ne(CrmLead::getStatus, 3));
+    if ("callback".equals(mode)) {
+      if (!"CHECKIN".equals(callbackType)) applyNotSignedFilter(wrapper);
+      return;
+    }
+    applyNotSignedFilter(wrapper);
+    if ("reservation".equals(mode)) {
+      applyReservationEvidenceFilter(wrapper);
+      return;
+    }
+    applyNoReservationEvidenceFilter(wrapper);
+    if ("intent".equals(mode)) wrapper.eq(CrmLead::getStatus, 1);
+    if ("consultation".equals(mode)) {
+      wrapper.and(w -> w.isNull(CrmLead::getStatus).or().ne(CrmLead::getStatus, 1));
+    }
   }
 
-  private boolean isConsultLead(CrmLead lead) {
-    return lead != null
-        && !Integer.valueOf(3).equals(lead.getStatus())
-        && !isSignedLead(lead)
-        && !hasReservationEvidence(lead)
-        && !Integer.valueOf(1).equals(lead.getStatus());
+  private void applyNotSignedFilter(LambdaQueryWrapper<CrmLead> wrapper) {
+    wrapper.and(w -> w.isNull(CrmLead::getContractSignedFlag).or().ne(CrmLead::getContractSignedFlag, 1))
+        .and(w -> w.isNull(CrmLead::getFlowStage).or().ne(CrmLead::getFlowStage, FLOW_SIGNED));
   }
 
-  private boolean isIntentLead(CrmLead lead) {
-    return lead != null
-        && !Integer.valueOf(3).equals(lead.getStatus())
-        && !isSignedLead(lead)
-        && !hasReservationEvidence(lead)
-        && Integer.valueOf(1).equals(lead.getStatus());
+  private void applyReservationEvidenceFilter(LambdaQueryWrapper<CrmLead> wrapper) {
+    wrapper.and(w -> w.isNotNull(CrmLead::getReservationBedId)
+        .or(x -> x.isNotNull(CrmLead::getReservationRoomNo).ne(CrmLead::getReservationRoomNo, ""))
+        .or().gt(CrmLead::getReservationAmount, BigDecimal.ZERO)
+        .or().in(CrmLead::getFlowStage, FLOW_PENDING_BED_SELECT, FLOW_PENDING_SIGN));
   }
 
-  private boolean isSignedLead(CrmLead lead) {
-    if (lead == null) {
-      return false;
-    }
-    return Integer.valueOf(1).equals(lead.getContractSignedFlag())
-        || FLOW_SIGNED.equalsIgnoreCase(blankToNull(lead.getFlowStage()));
+  private void applyNoReservationEvidenceFilter(LambdaQueryWrapper<CrmLead> wrapper) {
+    wrapper.isNull(CrmLead::getReservationBedId)
+        .and(w -> w.isNull(CrmLead::getReservationRoomNo).or().eq(CrmLead::getReservationRoomNo, ""))
+        .and(w -> w.isNull(CrmLead::getReservationAmount).or().le(CrmLead::getReservationAmount, BigDecimal.ZERO))
+        .and(w -> w.isNull(CrmLead::getFlowStage)
+            .or().notIn(CrmLead::getFlowStage, FLOW_PENDING_BED_SELECT, FLOW_PENDING_SIGN));
   }
 
-  private boolean hasReservationEvidence(CrmLead lead) {
-    if (lead == null || Integer.valueOf(3).equals(lead.getStatus()) || isSignedLead(lead)) {
-      return false;
+  private void applyScenarioFilter(LambdaQueryWrapper<CrmLead> wrapper, String scenario) {
+    String value = blankToNull(scenario);
+    if (value == null) return;
+    switch (value.trim().toLowerCase(Locale.ROOT)) {
+      case "blacklist" -> wrapper.like(CrmLead::getCustomerTag, "黑");
+      case "source_unknown" -> wrapper
+          .and(w -> w.isNull(CrmLead::getSource).or().eq(CrmLead::getSource, ""))
+          .and(w -> w.isNull(CrmLead::getInfoSource).or().eq(CrmLead::getInfoSource, ""));
+      case "source_medical" -> wrapper.and(w -> w.like(CrmLead::getInfoSource, "医")
+          .or().like(CrmLead::getInfoSource, "门诊").or().like(CrmLead::getMediaChannel, "医"));
+      case "follow_today" -> wrapper.eq(CrmLead::getNextFollowDate, LocalDate.now());
+      case "follow_overdue" -> wrapper.isNotNull(CrmLead::getNextFollowDate)
+          .lt(CrmLead::getNextFollowDate, LocalDate.now());
+      case "lock_bed" -> wrapper.like(CrmLead::getReservationStatus, "锁");
+      case "expiring_lock" -> wrapper.like(CrmLead::getReservationStatus, "锁")
+          .between(CrmLead::getNextFollowDate, LocalDate.now(), LocalDate.now().plusDays(3));
+      default -> { }
     }
-    if (lead.getReservationBedId() != null || blankToNull(lead.getReservationRoomNo()) != null) {
-      return true;
-    }
-    if (lead.getReservationAmount() != null && lead.getReservationAmount().compareTo(BigDecimal.ZERO) > 0) {
-      return true;
-    }
-    String flowStage = blankToNull(lead.getFlowStage());
-    return FLOW_PENDING_BED_SELECT.equalsIgnoreCase(flowStage) || FLOW_PENDING_SIGN.equalsIgnoreCase(flowStage);
   }
 
   private CrmLead cloneLead(CrmLead source) {
@@ -1174,5 +1224,46 @@ public class CrmLeadServiceImpl implements CrmLeadService {
         .orderByDesc(ElderProfile::getAdmissionDate)
         .orderByDesc(ElderProfile::getCreateTime)
         .last("LIMIT 1"));
+  }
+
+  private void rejectDuplicate(CrmLeadRequest request, Long excludeId) {
+    List<CrmLeadDuplicateResponse> duplicates = findDuplicates(
+        request.getTenantId(), request.getCreatedBy(), true,
+        firstNonBlank(request.getElderName(), request.getName(), request.getConsultantName()),
+        firstNonBlank(request.getElderPhone(), request.getPhone(), request.getConsultantPhone()),
+        request.getIdCardNo(), excludeId);
+    boolean duplicateIdCard = duplicates.stream()
+        .anyMatch(item -> item.getReasons().contains("证件号码相同"));
+    if (duplicateIdCard) {
+      throw new IllegalStateException("证件号码已存在，不能重复创建客户线索");
+    }
+    boolean exactDuplicate = duplicates.stream()
+        .anyMatch(item -> item.getReasons().contains("姓名和电话相同"));
+    if (exactDuplicate && !Boolean.TRUE.equals(request.getAllowDuplicate())) {
+      throw new IllegalStateException("发现姓名和电话相同的客户，请先查看疑似重复记录；确认属于不同咨询后可选择继续创建");
+    }
+  }
+
+  private String normalizePhone(String value) {
+    if (value == null) return null;
+    String normalized = value.replaceAll("[^0-9]", "");
+    return normalized.isBlank() ? null : normalized;
+  }
+
+  private String normalizeDuplicateText(String value) {
+    if (value == null) return null;
+    String normalized = value.trim().replaceAll("\\s+", "");
+    return normalized.isBlank() ? null : normalized;
+  }
+
+  private String maskName(String value) {
+    if (value == null || value.isBlank()) return "其他客户";
+    return value.length() == 1 ? "*" : value.substring(0, 1) + "**";
+  }
+
+  private String maskPhone(String value) {
+    String phone = normalizePhone(value);
+    if (phone == null || phone.length() < 7) return "***";
+    return phone.substring(0, 3) + "****" + phone.substring(phone.length() - 4);
   }
 }

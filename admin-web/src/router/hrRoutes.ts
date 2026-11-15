@@ -12,7 +12,7 @@ export const hrRoutes: RouteRecordRaw[] = [
             path: 'overview',
             name: 'HrOverview',
             component: () => import('../views/hr/HrCenter.vue'),
-            meta: { title: '人力资源中心', roles: ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
+            meta: { title: '行政人事部工作台', roles: ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
           },
           {
             path: 'workbench',

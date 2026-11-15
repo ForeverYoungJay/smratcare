@@ -68,7 +68,7 @@
       />
     </a-card>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="editorOpen"
       :title="editingId ? '编辑采购单' : '新建采购单'"
       width="900px"

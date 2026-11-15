@@ -171,6 +171,8 @@
 
     <StatefulBlock :loading="loading" :error="tableError" :empty="!loading && !tableError && rows.length === 0" empty-text="暂无待办记录" @retry="fetchData">
       <DataTable
+        :filter-model="query"
+        @clear-filters="fetchData"
         rowKey="id"
         :row-selection="rowSelection"
         :columns="columns"
@@ -195,17 +197,18 @@
           </template>
           <template v-else-if="column.key === 'sourceType'">
             <a-space size="small">
-              <a-tag v-if="isApprovalTodo(record)" color="blue">审批流</a-tag>
+              <a-tag v-if="todoSource(record)" :color="todoSource(record)?.color">{{ todoSource(record)?.label }}</a-tag>
               <a-tag v-else-if="isBirthdayReminder(record)" color="magenta">生日提醒</a-tag>
               <a-tag v-else color="default">普通待办</a-tag>
-              <a-button v-if="isApprovalTodo(record)" type="link" size="small" @click="openApprovalFromTodo(record)">查看审批</a-button>
+              <span v-if="todoSource(record)" class="source-no">{{ todoSource(record)?.sourceNo }}</span>
+              <a-button v-if="todoSource(record)" type="link" size="small" @click="openTodoSource(record)">查看来源</a-button>
             </a-space>
           </template>
         </template>
       </DataTable>
     </StatefulBlock>
 
-    <a-modal v-model:open="editOpen" title="待办" @ok="submit" :confirm-loading="saving" width="760px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="待办" @ok="submit" :confirm-loading="saving" width="760px">
       <a-form layout="vertical">
         <a-form-item label="标题" required>
           <a-input v-model:value="form.title" placeholder="请输入待办标题" />
@@ -318,6 +321,7 @@ import {
 } from '../../api/oa'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { useUserStore } from '../../stores/user'
+import { resolveTodoSource } from '../../utils/todoSource'
 import type { OaTodo, OaTodoSummary, PageResult } from '../../types'
 import type { SelectProps } from 'ant-design-vue'
 
@@ -773,14 +777,8 @@ function isBirthdayReminder(todo: OaTodo) {
   return String(todo?.content || '').includes('[BIRTHDAY_REMINDER:')
 }
 
-function isApprovalTodo(todo: OaTodo) {
-  return String(todo?.content || '').includes('[APPROVAL_FLOW:')
-}
-
-function parseApprovalIdFromTodo(todo: OaTodo) {
-  const content = String(todo?.content || '')
-  const match = content.match(/\[APPROVAL_FLOW:([0-9]+)\]/)
-  return match ? match[1] : ''
+function todoSource(todo: OaTodo) {
+  return resolveTodoSource(todo?.content)
 }
 
 function isOverdueTodo(todo: OaTodo) {
@@ -851,13 +849,9 @@ function decodeTodoMeta(rawContent: string) {
   }
 }
 
-function openApprovalFromTodo(todo: OaTodo) {
-  const approvalId = parseApprovalIdFromTodo(todo)
-  if (!approvalId) {
-    message.warning('未识别审批单ID')
-    return
-  }
-  router.push({ path: '/oa/approval', query: { focusId: approvalId } })
+function openTodoSource(todo: OaTodo) {
+  const source = todoSource(todo)
+  if (source) router.push({ path: source.path, query: source.query })
 }
 
 function openEdit(record: OaTodo) {

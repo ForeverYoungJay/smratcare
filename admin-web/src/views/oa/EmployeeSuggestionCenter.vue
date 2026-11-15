@@ -37,7 +37,7 @@
       description="这里优先处理流程优化、设备物资、培训排班和现场协同建议，涉及具体执行时可跳转审批、待办、维修或库存模块继续流转。"
     />
 
-    <StatefulBlock :loading="loading" :error="error" :empty="!loading && !error && rows.length === 0" empty-text="暂无员工建议记录" @retry="fetchData">
+    <StatefulBlock :filter-model="query" @clear-filters="clearListFilters" :loading="loading" :error="error" :empty="!loading && !error && rows.length === 0" empty-text="暂无员工建议记录" @retry="fetchData">
       <a-table
         row-key="id"
         :columns="columns"
@@ -46,6 +46,7 @@
         :row-selection="{ selectedRowKeys, type: 'radio', onChange: onSelectChange }"
         @change="onTableChange"
       >
+
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
             <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
@@ -71,7 +72,7 @@
       </a-table>
     </StatefulBlock>
 
-    <a-modal v-model:open="handleOpen" title="处理员工建议" :confirm-loading="handleSubmitting" @ok="submitHandle">
+    <a-modal :mask-closable="false" v-model:open="handleOpen" title="处理员工建议" :confirm-loading="handleSubmitting" @ok="submitHandle">
       <a-form :model="handleForm" layout="vertical">
         <a-form-item label="处理状态">
           <a-select v-model:value="handleForm.status">
@@ -96,6 +97,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { clearFilters } from '../../utils/filterState'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
@@ -283,6 +285,12 @@ function openSuggestedRoute(record: OaSuggestion) {
     return
   }
   router.push('/oa/staff-collaboration')
+}
+
+
+function clearListFilters() {
+  clearFilters(query)
+  fetchData()
 }
 </script>
 

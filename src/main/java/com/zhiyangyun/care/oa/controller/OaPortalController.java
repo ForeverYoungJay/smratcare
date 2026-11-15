@@ -142,6 +142,7 @@ public class OaPortalController {
     List<OaNotice> notices = noticeMapper.selectList(Wrappers.lambdaQuery(OaNotice.class)
         .eq(OaNotice::getIsDeleted, 0)
         .eq(orgId != null, OaNotice::getOrgId, orgId)
+        .eq(OaNotice::getStatus, "PUBLISHED")
         .orderByDesc(OaNotice::getPublishTime)
         .last("LIMIT 5"));
     List<OaTodo> todos = listScopedTodos(orgId, personalScope, staffId, username, 8);

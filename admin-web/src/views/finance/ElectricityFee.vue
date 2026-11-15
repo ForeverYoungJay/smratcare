@@ -134,7 +134,7 @@
       </div>
     </a-card>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="readingOpen"
       :title="`登记电表读数 · ${dayjs(query.month).format('YYYY年MM月')}`"
       width="600"
@@ -202,7 +202,7 @@
       </div>
     </a-modal>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="priceOpen"
       title="电价设置"
       width="620"

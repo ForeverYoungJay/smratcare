@@ -229,7 +229,7 @@
       </div>
     </a-drawer>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="editOpen"
       wrap-class-name="calendar-editor-modal"
       :title="modalTitle"

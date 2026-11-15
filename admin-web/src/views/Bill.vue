@@ -10,6 +10,8 @@
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -29,7 +31,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="payOpen" title="支付登记" @ok="submitPay">
+    <a-modal :mask-closable="false" v-model:open="payOpen" title="支付登记" @ok="submitPay">
       <a-form layout="vertical">
         <a-form-item label="金额" required>
           <a-input-number v-model:value="payForm.amount" style="width: 100%" />

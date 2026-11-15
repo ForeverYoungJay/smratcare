@@ -53,7 +53,7 @@
       />
     </a-card>
 
-    <a-modal v-model:open="open" title="量表模板" width="760px" :confirm-loading="saving" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="open" title="量表模板" width="760px" :confirm-loading="saving" @ok="submit">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">

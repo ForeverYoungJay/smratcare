@@ -128,7 +128,7 @@
       </a-tab-pane>
     </a-tabs>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="modalOpen"
       :title="editingId ? '编辑营销方案' : '新增营销方案'"
       :confirm-loading="submitLoading"
@@ -285,7 +285,7 @@
       </a-card>
     </a-drawer>
 
-    <a-modal v-model:open="confirmOpen" :title="confirmForm.action === 'AGREE' ? '确认同意方案' : '提交改进建议'" @ok="submitReadConfirm">
+    <a-modal :mask-closable="false" v-model:open="confirmOpen" :title="confirmForm.action === 'AGREE' ? '确认同意方案' : '提交改进建议'" @ok="submitReadConfirm">
       <a-form :model="confirmForm" layout="vertical">
         <a-form-item label="确认动作">
           <a-radio-group v-model:value="confirmForm.action">

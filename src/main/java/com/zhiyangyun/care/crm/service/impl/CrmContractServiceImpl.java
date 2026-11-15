@@ -188,6 +188,7 @@ public class CrmContractServiceImpl implements CrmContractService {
     var wrapper = Wrappers.lambdaQuery(CrmContract.class)
         .eq(CrmContract::getTenantId, tenantId)
         .eq(CrmContract::getIsDeleted, 0);
+    applyPersonalScope(wrapper, tenantId);
     if (contractNo != null && !contractNo.isBlank()) {
       wrapper.like(CrmContract::getContractNo, contractNo.trim());
     }
@@ -285,7 +286,7 @@ public class CrmContractServiceImpl implements CrmContractService {
         if (contract == null) {
           continue;
         }
-        if (isProtectedContractForDelete(contract)) {
+        if (!isOwnedContract(contract, tenantId) || isProtectedContractForDelete(contract)) {
           continue;
         }
         CrmContract before = cloneContract(contract);
@@ -1139,7 +1140,51 @@ public class CrmContractServiceImpl implements CrmContractService {
   }
 
   private boolean isOwnedContract(CrmContract contract, Long tenantId) {
-    return contract != null && Integer.valueOf(0).equals(contract.getIsDeleted()) && tenantId.equals(contract.getTenantId());
+    if (contract == null || !Integer.valueOf(0).equals(contract.getIsDeleted()) || !tenantId.equals(contract.getTenantId())) {
+      return false;
+    }
+    if (!requiresPersonalScope()) {
+      return true;
+    }
+    Long staffId = AuthContext.getStaffId();
+    if (staffId != null && staffId.equals(contract.getCreatedBy())) {
+      return true;
+    }
+    CrmLead lead = contract.getLeadId() == null ? null : leadMapper.selectById(contract.getLeadId());
+    return isAccessibleLead(lead, tenantId, staffId);
+  }
+
+  private void applyPersonalScope(
+      com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CrmContract> wrapper,
+      Long tenantId) {
+    if (!requiresPersonalScope()) {
+      return;
+    }
+    Long staffId = AuthContext.getStaffId();
+    List<Long> leadIds = leadMapper.selectList(Wrappers.lambdaQuery(CrmLead.class)
+            .select(CrmLead::getId)
+            .eq(CrmLead::getTenantId, tenantId)
+            .eq(CrmLead::getIsDeleted, 0)
+            .and(w -> w.eq(CrmLead::getOwnerStaffId, staffId).or().eq(CrmLead::getCreatedBy, staffId)))
+        .stream().map(CrmLead::getId).toList();
+    wrapper.and(w -> {
+      w.eq(CrmContract::getCreatedBy, staffId);
+      if (!leadIds.isEmpty()) {
+        w.or().in(CrmContract::getLeadId, leadIds);
+      }
+    });
+  }
+
+  private boolean isAccessibleLead(CrmLead lead, Long tenantId, Long staffId) {
+    return lead != null
+        && Integer.valueOf(0).equals(lead.getIsDeleted())
+        && tenantId.equals(lead.getTenantId())
+        && staffId != null
+        && (staffId.equals(lead.getOwnerStaffId()) || staffId.equals(lead.getCreatedBy()));
+  }
+
+  private boolean requiresPersonalScope() {
+    return AuthContext.hasRole("MARKETING_EMPLOYEE") && !AuthContext.isMinisterOrHigher();
   }
 
   private void auditContractMutation(

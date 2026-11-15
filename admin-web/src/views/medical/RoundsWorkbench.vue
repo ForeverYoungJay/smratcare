@@ -56,7 +56,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="planOpen" title="新建巡诊排班" :confirm-loading="saving" width="640px" @ok="submitPlan">
+    <a-modal :mask-closable="false" v-model:open="planOpen" title="新建巡诊排班" :confirm-loading="saving" width="640px" @ok="submitPlan">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="8"><a-form-item label="巡诊日期" required><a-date-picker v-model:value="planForm.planDate" value-format="YYYY-MM-DD" style="width:100%" /></a-form-item></a-col>
@@ -82,7 +82,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="recordOpen" title="登记巡诊记录" :confirm-loading="saving" width="720px" @ok="submitRecord">
+    <a-modal :mask-closable="false" v-model:open="recordOpen" title="登记巡诊记录" :confirm-loading="saving" width="720px" @ok="submitRecord">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">

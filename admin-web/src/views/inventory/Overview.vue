@@ -162,7 +162,7 @@
       </div>
     </section>
 
-    <a-modal v-model:open="adjustOpen" title="盘点调整" @ok="submitAdjust" :confirm-loading="adjusting">
+    <a-modal :mask-closable="false" v-model:open="adjustOpen" title="盘点调整" @ok="submitAdjust" :confirm-loading="adjusting">
       <a-form layout="vertical" :model="adjustForm" :rules="adjustRules" ref="adjustFormRef">
         <a-form-item label="商品" name="productId">
           <a-select

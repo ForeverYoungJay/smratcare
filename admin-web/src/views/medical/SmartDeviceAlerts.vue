@@ -97,7 +97,7 @@
       </a-row>
     </StatefulBlock>
 
-    <a-modal v-model:open="deviceModalOpen" :title="deviceForm.id ? '编辑设备' : '新增设备'" @ok="submitDevice" :confirm-loading="saving" width="720px">
+    <a-modal :mask-closable="false" v-model:open="deviceModalOpen" :title="deviceForm.id ? '编辑设备' : '新增设备'" @ok="submitDevice" :confirm-loading="saving" width="720px">
       <a-form layout="vertical">
         <a-row :gutter="12">
           <a-col :span="12"><a-form-item label="设备编码" required><a-input v-model:value="deviceForm.deviceCode" /></a-form-item></a-col>
@@ -113,7 +113,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="eventModalOpen" title="设备事件上报" @ok="submitEvent" :confirm-loading="saving" width="720px">
+    <a-modal :mask-closable="false" v-model:open="eventModalOpen" title="设备事件上报" @ok="submitEvent" :confirm-loading="saving" width="720px">
       <a-form layout="vertical">
         <a-row :gutter="12">
           <a-col :span="12"><a-form-item label="设备编码" required><a-input v-model:value="eventForm.deviceCode" /></a-form-item></a-col>
@@ -125,7 +125,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="resolveModalOpen" title="处置告警" @ok="submitResolve" :confirm-loading="saving">
+    <a-modal :mask-closable="false" v-model:open="resolveModalOpen" title="处置告警" @ok="submitResolve" :confirm-loading="saving">
       <a-form layout="vertical">
         <a-form-item label="处置说明">
           <a-textarea v-model:value="resolveForm.resolutionNote" :rows="4" placeholder="填写到场情况、处理结果、后续观察要求" />

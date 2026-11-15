@@ -67,7 +67,7 @@
       </StatefulBlock>
     </a-card>
 
-    <a-modal v-model:open="editOpen" :title="editingId ? '编辑来访预约' : '新增来访预约'" @ok="submitEdit" :confirm-loading="submitting" width="520px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" :title="editingId ? '编辑来访预约' : '新增来访预约'" @ok="submitEdit" :confirm-loading="submitting" width="520px">
         <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人" name="elderId">
           <a-select

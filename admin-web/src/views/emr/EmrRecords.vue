@@ -15,7 +15,9 @@
       </template>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="onSearch" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'recordType'">
           <a-tag>{{ typeText(record.recordType) }}</a-tag>
@@ -29,7 +31,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" :title="form.id ? '编辑病历' : '新建病历'" :confirm-loading="saving" width="720px" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="editOpen" :title="form.id ? '编辑病历' : '新建病历'" :confirm-loading="saving" width="720px" @ok="submit">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">

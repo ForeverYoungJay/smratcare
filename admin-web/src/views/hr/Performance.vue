@@ -69,7 +69,9 @@
       </a-col>
     </a-row>
 
-    <DataTable rowKey="rankNo" :columns="columns" :data-source="ranks" :loading="loading" :pagination="false">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData" rowKey="rankNo" :columns="columns" :data-source="ranks" :loading="loading" :pagination="false">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'rankNo'">
           <a-tag :color="record.rankNo <= 3 ? 'gold' : 'default'">#{{ record.rankNo }}</a-tag>
@@ -102,7 +104,7 @@
       </a-table>
     </a-card>
 
-    <a-modal v-model:open="redeemOpen" title="积分兑现金申请" @ok="submitRedeem" :confirm-loading="redeeming" width="520px">
+    <a-modal :mask-closable="false" v-model:open="redeemOpen" title="积分兑现金申请" @ok="submitRedeem" :confirm-loading="redeeming" width="520px">
       <a-form layout="vertical">
         <a-alert
           show-icon

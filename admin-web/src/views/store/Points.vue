@@ -67,7 +67,7 @@
       />
     </a-card>
 
-    <a-modal v-model:open="adjustOpen" title="积分调整" @ok="submitAdjust" :confirm-loading="adjusting">
+    <a-modal :mask-closable="false" v-model:open="adjustOpen" title="积分调整" @ok="submitAdjust" :confirm-loading="adjusting">
       <a-form layout="vertical" :model="adjustForm" :rules="adjustRules" ref="adjustFormRef">
         <a-form-item label="老人" name="elderId">
           <a-select

@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="销售运营工作台" sub-title="运营总览、风险预警、快捷动作与营销任务集中处理" mode="showcase" kicker="经营运营">
+  <PageContainer title="市场部工作台" sub-title="用专业与温度，让更多长者选择安心、舒适、有品质的晚年生活。" mode="scenic">
     <template #meta>
       <span class="soft-pill">统计范围 {{ quickRangeLabel }}</span>
       <span class="soft-pill">自动刷新 {{ autoRefresh ? '已开启' : '已关闭' }}</span>
@@ -22,7 +22,22 @@
       </div>
     </template>
 
-    <section class="workbench-shell">
+    <DepartmentHomeOverview
+      department="MARKETING"
+      :show-header="false"
+      :show-catalog="false"
+      :metrics="departmentMetrics"
+      :data-state="departmentDataState"
+      :data-message="dashboardError"
+      scope-label="当前账号市场业务范围"
+      :period-label="`统计范围 ${quickRangeLabel}`"
+      :updated-at="lastUpdated"
+      :refreshing="dashboardLoading"
+      show-refresh
+      @refresh="loadOverview"
+    />
+
+    <section class="workbench-shell" style="margin-top: 16px">
       <a-card class="card-elevated dashboard-control" :bordered="false">
         <div class="dashboard-control-bar">
           <div class="dashboard-control-copy">
@@ -291,6 +306,7 @@ import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import VChart from 'vue-echarts'
 import PageContainer from '../../components/PageContainer.vue'
+import DepartmentHomeOverview from '../../components/workbench/DepartmentHomeOverview.vue'
 import { buildReportRoute, hasReportCache } from '../../utils/marketingReportNav'
 import { getMarketingReportRoute, type MarketingReportEntry } from '../../utils/marketingReportRegistry'
 import {
@@ -307,10 +323,13 @@ import {
   getMarketingWorkbenchSummary
 } from '../../api/marketing'
 import type { CrmContractItem, CrmSalesReportSnapshotItem, MarketingWorkbenchSummary } from '../../types'
+import type { DepartmentHomeDataState, DepartmentHomeMetric } from '../../workbench/departmentHome'
 
 const router = useRouter()
 const dashboardLoading = ref(false)
 const dashboardError = ref('')
+const hasLoadedOverview = ref(false)
+const departmentForbidden = ref(false)
 const lastUpdated = ref('')
 const snapshotHints = ref<CrmSalesReportSnapshotItem[]>([])
 const quickRange = ref<'TODAY' | '7D' | '30D' | 'MONTH'>('MONTH')
@@ -318,6 +337,13 @@ const dateRange = ref<any[]>([dayjs().startOf('month').format('YYYY-MM-DD'), day
 const autoRefresh = ref(true)
 let refreshTimer: number | undefined
 const AUTO_REFRESH_INTERVAL_MS = 60 * 1000
+
+const departmentDataState = computed<DepartmentHomeDataState>(() => {
+  if (dashboardLoading.value) return 'loading'
+  if (departmentForbidden.value) return 'forbidden'
+  if (dashboardError.value) return 'error'
+  return hasLoadedOverview.value ? 'ready' : 'empty'
+})
 
 const funnel = reactive({
   todayConsultCount: 0,
@@ -333,6 +359,13 @@ const followup = reactive({
   highIntentCount: 0,
   lockExpiringCount: 0
 })
+
+const departmentMetrics = computed<DepartmentHomeMetric[]>(() => hasLoadedOverview.value ? [
+  { key: 'consult', label: '今日新增咨询', value: funnel.todayConsultCount, helper: '今日咨询线索', path: '/marketing/funnel/consultation', tone: 'success' },
+  { key: 'followup', label: '今日待跟进', value: followup.todayDue, helper: '今天需要联系', path: '/marketing/interactions/today', tone: 'normal' },
+  { key: 'evaluation', label: '待评估合同', value: funnel.evaluationCount, helper: '签约前评估未完成', path: '/marketing/contracts/pending?flowStage=PENDING_ASSESSMENT', tone: 'warning' },
+  { key: 'sign', label: '待签约客户', value: funnel.pendingSignCount, helper: '继续推进合同', path: '/marketing/contracts/pending', tone: 'warning' }
+] : [])
 const bedSales = reactive({
   emptyCount: 0,
   lockCount: 0,
@@ -420,7 +453,7 @@ const overviewTiles = computed(() => [
 const funnelStages = computed(() => [
   { label: '线索新增', value: funnel.todayConsultCount || 0, hint: '今日新增咨询' },
   { label: '初步沟通', value: followup.highIntentCount || 0, hint: '高意向客户' },
-  { label: '到访评估', value: funnel.evaluationCount || 0, hint: '待评估推进' },
+  { label: '合同待评估', value: funnel.evaluationCount || 0, hint: '签约前评估' },
   { label: '预定锁床', value: bedSales.lockCount || 0, hint: '锁床与预订证据' },
   { label: '签约入住', value: funnel.monthDealCount || 0, hint: `转化率 ${Number(funnel.monthConversionRate || 0).toFixed(1)}%` }
 ])
@@ -465,7 +498,7 @@ const quickActions = computed(() => [
 
 const signalCards = computed(() => [
   { label: '线索总量', value: opportunityCount.value, hint: '机会池总量', badge: '线索', tone: 'blue' },
-  { label: '到访评估', value: funnel.evaluationCount || 0, hint: '待评估客户', badge: '评估', tone: 'cyan' },
+  { label: '合同待评估', value: funnel.evaluationCount || 0, hint: '签约前评估', badge: '评估', tone: 'cyan' },
   { label: '预定中', value: bedSales.reservedUnsignedCount || 0, hint: '待签约预订', badge: '预订', tone: 'orange' },
   { label: '锁床中', value: bedSales.lockCount || 0, hint: '锁床客户', badge: '锁床', tone: 'amber' },
   { label: '签约中', value: contract.pendingSignCount || 0, hint: '待签合同', badge: '合同', tone: 'indigo' },
@@ -535,10 +568,10 @@ const taskRows = computed(() => [
   },
   {
     key: 'evaluation',
-    title: '待评估客户',
+    title: '待评估合同',
     desc: '签约前评估尚未完成，影响后续床位和合同推进。',
     stage: '合同前置',
-    metric: `${funnel.evaluationCount || 0} 人`,
+    metric: `${funnel.evaluationCount || 0} 份`,
     priority: '高',
     tone: 'cyan',
     actionLabel: '推进',
@@ -572,7 +605,7 @@ const reminderItems = computed(() => [
   { label: '待跟进（今天）', value: followup.todayDue || 0, tone: 'blue' },
   { label: '回访超期', value: followup.overdue || 0, tone: 'orange' },
   { label: '3天内需回访', value: callback.checkinCount || 0, tone: 'red' },
-  { label: '本周到访安排', value: funnel.evaluationCount || 0, tone: 'green' }
+  { label: '签约前待评估', value: funnel.evaluationCount || 0, tone: 'green' }
 ])
 
 const channelProgressItems = computed(() => {
@@ -649,7 +682,7 @@ const funnelOption = computed(() => ({
       },
       data: [
         { name: '咨询', value: funnel.todayConsultCount || 0 },
-        { name: '评估', value: funnel.evaluationCount || 0 },
+        { name: '合同待评估', value: funnel.evaluationCount || 0 },
         { name: '预定', value: bedSales.reservedUnsignedCount || 0 },
         { name: '锁床', value: bedSales.lockCount || 0 },
         { name: '签约入住', value: funnel.monthDealCount || 0 }
@@ -734,6 +767,7 @@ async function loadOverview() {
   const rangeEnd = String(dateRange.value?.[1] || dayjs().format('YYYY-MM-DD'))
   dashboardLoading.value = true
   dashboardError.value = ''
+  departmentForbidden.value = false
   try {
     const summary = await getMarketingWorkbenchSummary({
       dateFrom: rangeStart,
@@ -762,6 +796,7 @@ async function loadOverview() {
     channelUnknownCount.value = Number(summary.channelUnknownCount || 0)
     channelMonthDeals.value = Number(summary.channelMonthDeals || 0)
     lastUpdated.value = summary.generatedAt ? dayjs(summary.generatedAt).format('YYYY-MM-DD HH:mm:ss') : dayjs().format('YYYY-MM-DD HH:mm:ss')
+    hasLoadedOverview.value = true
     try {
       const snapshots = await getMarketingReportSnapshots({ snapshotType: 'MARKETING_WORKBENCH', limit: 3 })
       snapshotHints.value = Array.isArray(snapshots) ? snapshots : []
@@ -769,6 +804,8 @@ async function loadOverview() {
       snapshotHints.value = []
     }
   } catch (error: any) {
+    hasLoadedOverview.value = false
+    departmentForbidden.value = Number(error?.response?.status) === 403
     dashboardError.value = error?.message || '营销工作台数据加载失败'
   } finally {
     dashboardLoading.value = false

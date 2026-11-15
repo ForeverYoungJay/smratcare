@@ -66,6 +66,8 @@
     </div>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :row-selection="rowSelection"
       :columns="columns"
@@ -125,7 +127,7 @@
       </template>
     </DataTable>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="plannerOpen"
       :title="plannerForm.id ? '编辑活动' : '新增活动'"
       width="920px"

@@ -50,6 +50,8 @@
     />
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -129,7 +131,7 @@
       </template>
     </DataTable>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="editOpen"
       :title="form.id ? `编辑${title}` : `新增${title}`"
       @ok="submit"
@@ -344,7 +346,7 @@
       </a-space>
     </a-modal>
 
-    <a-modal v-if="viewConfig.supportsQr" v-model:open="scanOpen" :title="scanModalTitle" :footer="null" width="560px">
+    <a-modal :mask-closable="false" v-if="viewConfig.supportsQr" v-model:open="scanOpen" :title="scanModalTitle" :footer="null" width="560px">
       <a-form layout="vertical">
         <a-form-item label="二维码令牌" required>
           <a-input

@@ -21,6 +21,8 @@
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="staffId"
       :columns="columns"
       :data-source="rows"
@@ -94,7 +96,7 @@
       </template>
     </DataTable>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="applyOpen"
       title="发起企业社保申请"
       :confirm-loading="applySaving"

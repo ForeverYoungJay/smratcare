@@ -23,6 +23,8 @@
     </a-row>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -73,7 +75,7 @@
       </template>
     </DataTable>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="createOpen"
       title="新建退住结算单"
       :confirm-loading="creating"

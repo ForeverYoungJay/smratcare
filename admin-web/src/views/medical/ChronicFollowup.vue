@@ -66,7 +66,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="planOpen" :title="editingPlanId ? '编辑随访计划' : '新建随访计划'" :confirm-loading="saving" width="680px" @ok="submitPlan">
+    <a-modal :mask-closable="false" v-model:open="planOpen" :title="editingPlanId ? '编辑随访计划' : '新建随访计划'" :confirm-loading="saving" width="680px" @ok="submitPlan">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">
@@ -93,7 +93,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="recordOpen" title="记录随访" :confirm-loading="saving" width="680px" @ok="submitRecord">
+    <a-modal :mask-closable="false" v-model:open="recordOpen" title="记录随访" :confirm-loading="saving" width="680px" @ok="submitRecord">
       <a-alert v-if="currentPlan" type="info" show-icon style="margin-bottom: 12px"
         :message="`${currentPlan.elderName || ''} · ${diseaseText(currentPlan.diseaseType)} · 目标：${currentPlan.targetIndicators || '未设置'}`" />
       <a-form layout="vertical">

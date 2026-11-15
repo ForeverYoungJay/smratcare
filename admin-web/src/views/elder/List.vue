@@ -73,6 +73,8 @@
       </div>
 
       <DataTable
+        :filter-model="query"
+        @clear-filters="runSearch"
         row-key="id"
         :columns="columns"
         :data-source="rows"
@@ -166,7 +168,7 @@
       </div>
     </section>
 
-    <a-modal v-model:open="changeBedOpen" title="换床" width="420px" @ok="submitChangeBed" @cancel="() => (changeBedOpen = false)">
+    <a-modal :mask-closable="false" v-model:open="changeBedOpen" title="换床" width="420px" @ok="submitChangeBed" @cancel="() => (changeBedOpen = false)">
       <a-form ref="changeBedFormRef" :model="changeBedForm" :rules="changeBedRules" layout="vertical">
         <a-form-item label="选择床位" name="bedId">
           <a-select v-model:value="changeBedForm.bedId" placeholder="请选择床位">
@@ -179,7 +181,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="bindOpen" title="绑定家属" width="420px" @ok="submitBindFamily" @cancel="() => (bindOpen = false)">
+    <a-modal :mask-closable="false" v-model:open="bindOpen" title="绑定家属" width="420px" @ok="submitBindFamily" @cancel="() => (bindOpen = false)">
       <a-form ref="bindFormRef" :model="bindForm" :rules="bindRules" layout="vertical">
         <a-form-item label="家属" name="familyUserId">
           <a-select
@@ -242,7 +244,7 @@
       </template>
     </a-drawer>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="quickEditOpen"
       :title="`编辑档案 · ${quickEditRow?.fullName || ''}`"
       width="620"

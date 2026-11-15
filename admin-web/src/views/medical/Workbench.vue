@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="医护照护工作台" subTitle="护理、医疗、健康与用药一体化管理" mode="showcase" kicker="核心业务">
+  <PageContainer title="医务部工作台" subTitle="用专业守护长者健康，用爱心传递生命温度。" mode="scenic" kicker="医养健康">
     <template #meta>
       <span class="soft-pill">业务日期 {{ summary.snapshotDate || '-' }}</span>
       <span class="soft-pill">风险等级 {{ riskLevelLabel }}</span>
@@ -24,9 +24,9 @@
           <a-tag color="geekblue">风险评估回溯 {{ configuredQuery.riskResidentLookbackDays }} 天</a-tag>
         </a-space>
         <a-space wrap>
-          <a-button size="small" @click="applyPreset('stable')">稳健</a-button>
-          <a-button size="small" @click="applyPreset('balanced')">平衡</a-button>
-          <a-button size="small" @click="applyPreset('sensitive')">敏感</a-button>
+          <a-tooltip title="口径最宽：事件统计近 45 天，超过 18 小时才算超时。报警最少，风险指数最低。"><a-button size="small" @click="applyPreset('stable')">稳健</a-button></a-tooltip>
+          <a-tooltip title="默认口径：事件统计近 30 天，超过 12 小时算超时。"><a-button size="small" @click="applyPreset('balanced')">平衡</a-button></a-tooltip>
+          <a-tooltip title="口径最严：事件统计近 14 天，超过 6 小时就算超时。同样的现场情况会算出更高的风险指数。"><a-button size="small" @click="applyPreset('sensitive')">敏感</a-button></a-tooltip>
           <a-button size="small" type="primary" @click="applyFilters">应用参数</a-button>
           <a-button size="small" @click="resetFilters">恢复默认</a-button>
         </a-space>
@@ -54,7 +54,22 @@
       <a-card class="card-elevated hero-panel" :bordered="false" style="margin-bottom: 12px">
         <a-row :gutter="[12, 12]" align="middle">
           <a-col :xs="24" :xl="9">
-            <div class="hero-title">医护风险指数</div>
+            <div class="hero-title">
+              医护风险指数
+              <a-tooltip placement="bottomLeft" :overlay-style="{ maxWidth: '360px' }">
+                <template #title>
+                  <div>由六项加权累加，满分 100，分数越高越需要处理：</div>
+                  <div>· 护理任务超时率最多 32 分</div>
+                  <div>· 医嘱待执行率最多 24 分</div>
+                  <div>· 未闭环异常（巡检异常 + 事件）最多 24 分</div>
+                  <div>· 近期事件发生率最多 24 分</div>
+                  <div>· 整改任务逾期最多 12 分</div>
+                  <div>· 高风险长者人数最多 10 分</div>
+                  <div style="margin-top:6px">下方的阈值参数会改变“算不算超时/异常”的口径，因此调参会直接改变这个分数——分数变高不等于现场变差。</div>
+                </template>
+                <span class="risk-help" role="img" aria-label="风险指数说明">?</span>
+              </a-tooltip>
+            </div>
             <div class="hero-score-wrap">
               <span class="hero-score">{{ riskIndex }}</span>
               <a-tag :color="riskTagColor">{{ riskLevelLabel }}</a-tag>
@@ -635,6 +650,20 @@ watch(
   background:
     radial-gradient(150% 110% at 0% 0%, rgba(var(--primary-rgb), 0.09) 0%, rgba(var(--primary-rgb), 0) 58%),
     linear-gradient(140deg, var(--surface-2) 0%, var(--surface-3) 42%, var(--surface-2) 100%);
+}
+
+.risk-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+  font-size: 11px;
+  cursor: help;
 }
 
 .hero-title {

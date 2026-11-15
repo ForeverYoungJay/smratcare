@@ -46,13 +46,45 @@ import type {
   CrmContractItem,
   CrmContractStageSummary,
   CrmContractPayload,
-  ContractBatchDeleteRequest
+  ContractBatchDeleteRequest,
+  CrmVisitAppointmentItem,
+  CrmVisitAppointmentPayload,
+  CrmLeadDuplicateItem,
+  CrmContractReminderConfig
 } from '../types'
 
 export { createCrmLead, updateCrmLead, deleteCrmLead }
 
 export function getLeadPage(params: CrmLeadPageQuery, config?: Record<string, any>) {
   return getCrmLeadPage(params, config)
+}
+
+export function getLeadDuplicates(params: { name?: string; phone?: string; idCardNo?: string; excludeId?: Id }) {
+  return request.get<CrmLeadDuplicateItem[]>('/api/crm/leads/duplicates', { params })
+}
+
+export function getVisitAppointmentPage(params: Record<string, any>, config?: Record<string, any>) {
+  return fetchPage<CrmVisitAppointmentItem>('/api/crm/visit-appointments/page', params, config)
+}
+
+export function createVisitAppointment(data: CrmVisitAppointmentPayload) {
+  return request.post<CrmVisitAppointmentItem>('/api/crm/visit-appointments', data)
+}
+
+export function updateVisitAppointment(id: Id, data: CrmVisitAppointmentPayload) {
+  return request.put<CrmVisitAppointmentItem>(`/api/crm/visit-appointments/${id}`, data)
+}
+
+export function arriveVisitAppointment(id: Id) {
+  return request.post<CrmVisitAppointmentItem>(`/api/crm/visit-appointments/${id}/arrive`)
+}
+
+export function completeVisitAppointment(id: Id, data: { visitResult: string; nextFollowDate?: string; remark?: string }) {
+  return request.post<CrmVisitAppointmentItem>(`/api/crm/visit-appointments/${id}/complete`, data)
+}
+
+export function cancelVisitAppointment(id: Id, cancelReason: string) {
+  return request.post<CrmVisitAppointmentItem>(`/api/crm/visit-appointments/${id}/cancel`, { cancelReason })
 }
 
 export function assignCrmLead(id: Id, data: CrmLeadAssignRequest) {
@@ -73,6 +105,14 @@ export function getContractPage(params: CrmContractPageQuery, config?: Record<st
 
 export function getContractStageSummary(params?: { currentOwnerDept?: string }) {
   return request.get<CrmContractStageSummary>('/api/crm/contracts/stage-summary', { params })
+}
+
+export function getContractReminderConfig() {
+  return request.get<CrmContractReminderConfig>('/api/crm/contracts/reminder-config')
+}
+
+export function saveContractReminderConfig(data: CrmContractReminderConfig) {
+  return request.put<CrmContractReminderConfig>('/api/crm/contracts/reminder-config', data)
 }
 
 export function getCrmContract(id: Id) {
@@ -161,6 +201,12 @@ export function createLeadCallbackPlan(leadId: Id, data: CallbackPlanCreateReque
 
 export function getLeadCallbackPlans(leadId: Id) {
   return request.get<CallbackPlanItem[]>(`/api/crm/leads/${leadId}/callback-plans`)
+}
+
+export function getLeadCallbackPlansBatch(leadIds: Id[]) {
+  return request.get<Record<string, CallbackPlanItem[]>>('/api/crm/leads/callback-plans/batch', {
+    params: { leadIds: leadIds.map(String).join(',') }
+  })
 }
 
 export function executeCallbackPlan(planId: Id, data: CallbackExecuteRequest) {

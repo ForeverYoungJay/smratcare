@@ -58,7 +58,7 @@
       </a-row>
     </a-card>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="diseaseModalOpen"
       :title="editingDiseaseId ? '编辑疾病' : '新增疾病'"
       :confirm-loading="diseaseSaving"

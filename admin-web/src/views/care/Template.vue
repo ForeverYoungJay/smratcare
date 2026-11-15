@@ -31,7 +31,7 @@
       </a-table>
     </a-card>
 
-    <a-modal v-model:open="modalOpen" title="护理模板" :confirm-loading="submitting" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="modalOpen" title="护理模板" :confirm-loading="submitting" @ok="submit">
       <a-form ref="formRef" layout="vertical" :model="form" :rules="rules">
         <a-form-item name="taskName" label="任务名称" required>
           <a-input v-model:value="form.taskName" />

@@ -20,7 +20,7 @@
     </a-card>
 
     <!-- 参保登记 -->
-    <a-modal v-model:open="insuredOpen" title="参保登记" :confirm-loading="saving" @ok="submitInsured">
+    <a-modal :mask-closable="false" v-model:open="insuredOpen" title="参保登记" :confirm-loading="saving" @ok="submitInsured">
       <a-form layout="vertical">
         <a-form-item label="长者" required>
           <a-select v-model:value="insuredForm.elderId" show-search :filter-option="false" :options="elderOptions"
@@ -42,7 +42,7 @@
     </a-modal>
 
     <!-- 待遇核定 -->
-    <a-modal v-model:open="benefitOpen" title="待遇核定" :confirm-loading="saving" @ok="submitBenefit" width="640px">
+    <a-modal :mask-closable="false" v-model:open="benefitOpen" title="待遇核定" :confirm-loading="saving" @ok="submitBenefit" width="640px">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">
@@ -98,7 +98,7 @@
     </a-modal>
 
     <!-- 服务记录 -->
-    <a-modal v-model:open="recordOpen" title="录入护理服务记录" :confirm-loading="saving" @ok="submitRecord" width="600px">
+    <a-modal :mask-closable="false" v-model:open="recordOpen" title="录入护理服务记录" :confirm-loading="saving" @ok="submitRecord" width="600px">
       <a-form layout="vertical">
         <a-form-item label="长者" required>
           <a-select v-model:value="recordForm.elderId" show-search :filter-option="false" :options="elderOptions"

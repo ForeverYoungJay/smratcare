@@ -40,6 +40,8 @@
     </a-row>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -72,7 +74,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="adjustOpen" title="余额调整" @ok="submitAdjust" :confirm-loading="adjusting">
+    <a-modal :mask-closable="false" v-model:open="adjustOpen" title="余额调整" @ok="submitAdjust" :confirm-loading="adjusting">
       <a-form layout="vertical">
         <a-form-item label="老人姓名" required>
           <a-select
@@ -105,7 +107,7 @@
       <a-table :columns="warningColumns" :data-source="warnings" rowKey="id" :pagination="false" />
     </a-modal>
 
-    <a-modal v-model:open="configOpen" title="账户设置" @ok="submitConfig" :confirm-loading="configSaving">
+    <a-modal :mask-closable="false" v-model:open="configOpen" title="账户设置" @ok="submitConfig" :confirm-loading="configSaving">
       <a-form layout="vertical">
         <a-form-item label="老人姓名">
           <a-input v-model:value="configForm.elderName" disabled />

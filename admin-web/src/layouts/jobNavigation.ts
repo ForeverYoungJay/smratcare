@@ -32,6 +32,7 @@ const departmentNavigation: DepartmentNavigation[] = [
     department: 'NURSING', employeeRole: ROLE_CODES.NURSING_EMPLOYEE, ministerRole: ROLE_CODES.NURSING_MINISTER, section: 'care',
     businessLabel: '护理部业务', objectLabel: '长者查询', objectPath: '/elder/list',
     business: [
+      { label: '护理部首页', path: '/care/home' },
       { label: '今日护理任务', path: '/care/today' },
       { label: '长者护理计划', path: '/care/workbench/plan' },
       { label: '护理记录', path: '/care/service/nursing-records' },
@@ -52,6 +53,7 @@ const departmentNavigation: DepartmentNavigation[] = [
     department: 'MEDICAL', employeeRole: ROLE_CODES.MEDICAL_EMPLOYEE, ministerRole: ROLE_CODES.MEDICAL_MINISTER, section: 'care',
     businessLabel: '医务部业务', objectLabel: '长者查询', objectPath: '/medical-care/residents',
     business: [
+      { label: '医务部首页', path: '/medical-care/center' },
       { label: '今日巡诊', path: '/medical-care/rounds' },
       { label: '医嘱管理', path: '/medical-care/orders' },
       { label: '用药登记', path: '/medical-care/medication-registration' },
@@ -92,6 +94,7 @@ const departmentNavigation: DepartmentNavigation[] = [
     department: 'LOGISTICS', employeeRole: ROLE_CODES.LOGISTICS_EMPLOYEE, ministerRole: ROLE_CODES.LOGISTICS_MINISTER, section: 'support',
     businessLabel: '后勤部业务', objectLabel: '房态查询', objectPath: '/logistics/assets/room-state-map',
     business: [
+      { label: '后勤部首页', path: '/logistics/workbench' },
       { label: '报修与维修', path: '/logistics/assets/maintenance-record' },
       { label: '库存预警', path: '/logistics/storage/alerts' },
       { label: '采购管理', path: '/logistics/storage/purchase' },
@@ -110,7 +113,7 @@ const departmentNavigation: DepartmentNavigation[] = [
   },
   {
     department: 'HR', employeeRole: ROLE_CODES.HR_EMPLOYEE, ministerRole: ROLE_CODES.HR_MINISTER, section: 'support',
-    businessLabel: '行政人事业务', objectLabel: '员工查询', objectPath: '/hr/overview',
+    businessLabel: '行政人事业务', objectLabel: '部门工作台', objectPath: '/hr/overview',
     business: [
       { label: '通知公告', path: '/oa/notice' },
       { label: '制度与文档', path: '/oa/document' },
@@ -132,9 +135,8 @@ const departmentNavigation: DepartmentNavigation[] = [
     businessLabel: '市场部业务', objectLabel: '客户查询', objectPath: '/marketing/leads/all',
     business: [
       { label: '销售工作台', path: '/marketing/workbench' },
-      { label: '今日跟进', path: '/marketing/interactions/today' },
-      { label: '待回访客户', path: '/marketing/interactions/due' },
-      { label: '到访与床位预定', path: '/marketing/reservation/records' },
+      { label: '客户跟进', path: '/marketing/interactions/today' },
+      { label: '预约参观与床位预定', path: '/marketing/reservation/visits' },
       { label: '合同办理', path: '/marketing/contracts/pending' }
     ],
     managementLabel: '市场部管理',

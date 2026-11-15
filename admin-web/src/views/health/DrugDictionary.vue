@@ -14,6 +14,8 @@
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -34,7 +36,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" title="药品信息" @ok="submit" :confirm-loading="saving">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="药品信息" @ok="submit" :confirm-loading="saving">
       <a-form layout="vertical">
         <a-form-item label="药品编码">
           <a-input v-model:value="form.drugCode" />

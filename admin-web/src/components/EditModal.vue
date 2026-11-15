@@ -1,5 +1,5 @@
 <template>
-  <a-modal
+  <a-modal :mask-closable="false"
     :open="open"
     :title="title"
     :confirm-loading="confirmLoading"

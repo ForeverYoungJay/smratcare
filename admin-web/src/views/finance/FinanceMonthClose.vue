@@ -106,7 +106,7 @@
         </a-row>
       </StatefulBlock>
     </div>
-    <a-modal v-model:open="closeVisible" title="月结关账" :confirm-loading="submitLoading" @ok="submitClose">
+    <a-modal :mask-closable="false" v-model:open="closeVisible" title="月结关账" :confirm-loading="submitLoading" @ok="submitClose">
       <a-alert
         show-icon
         :type="summary?.canClose ? 'success' : 'warning'"
@@ -122,7 +122,7 @@
         </a-form-item>
       </a-form>
     </a-modal>
-    <a-modal v-model:open="unlockVisible" title="反锁账" :confirm-loading="submitLoading" @ok="submitUnlock">
+    <a-modal :mask-closable="false" v-model:open="unlockVisible" title="反锁账" :confirm-loading="submitLoading" @ok="submitUnlock">
       <a-form layout="vertical" :model="unlockForm">
         <a-form-item label="反锁原因">
           <a-input v-model:value="unlockForm.reason" allow-clear />
@@ -132,7 +132,7 @@
         </a-form-item>
       </a-form>
     </a-modal>
-    <a-modal v-model:open="crossPeriodVisible" title="跨期处理申请" :confirm-loading="submitLoading" @ok="submitCrossPeriod">
+    <a-modal :mask-closable="false" v-model:open="crossPeriodVisible" title="跨期处理申请" :confirm-loading="submitLoading" @ok="submitCrossPeriod">
       <a-form layout="vertical" :model="crossPeriodForm">
         <a-form-item label="动作类型">
           <a-select v-model:value="crossPeriodForm.actionType">

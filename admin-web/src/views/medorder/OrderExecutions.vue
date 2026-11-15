@@ -14,7 +14,9 @@
       </a-form-item>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="onSearch" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
           <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
@@ -29,7 +31,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="signOpen" :title="signForm.status === 'DONE' ? '执行签核' : '跳过执行'" :confirm-loading="saving" @ok="submitSign">
+    <a-modal :mask-closable="false" v-model:open="signOpen" :title="signForm.status === 'DONE' ? '执行签核' : '跳过执行'" :confirm-loading="saving" @ok="submitSign">
       <a-form layout="vertical">
         <a-form-item :label="signForm.status === 'DONE' ? '执行结果' : '跳过原因'">
           <a-textarea v-model:value="signForm.result" :rows="3" />

@@ -80,6 +80,8 @@
     </section>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="displayRows"
@@ -243,7 +245,7 @@
       </template>
     </a-drawer>
 
-    <a-modal v-model:open="roleOpen" title="分配角色" @ok="submitRole">
+    <a-modal :mask-closable="false" v-model:open="roleOpen" title="分配角色" @ok="submitRole">
       <a-form layout="vertical">
         <a-form-item label="角色" required>
           <a-select v-model:value="roleForm.roleIds" mode="multiple" :options="roleFilterOptions" />

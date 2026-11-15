@@ -47,7 +47,7 @@
       </a-table>
     </a-card>
 
-    <a-modal v-model:open="modalOpen" title="排班方案组" :confirm-loading="submitting" @ok="submit" width="980px">
+    <a-modal :mask-closable="false" v-model:open="modalOpen" title="排班方案组" :confirm-loading="submitting" @ok="submit" width="980px">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">
@@ -141,7 +141,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="applyOpen" title="实施排班方案组" :confirm-loading="applying" @ok="submitApply">
+    <a-modal :mask-closable="false" v-model:open="applyOpen" title="实施排班方案组" :confirm-loading="applying" @ok="submitApply">
       <a-form layout="vertical">
         <a-form-item label="方案名称">
           <a-input :value="applyTarget?.name" disabled />
@@ -263,7 +263,6 @@ const groupedRows = computed<SchemeRow[]>(() => {
       )
     )
   }
-  query.total = rows.length
   return rows.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
 })
 
@@ -275,7 +274,7 @@ const pagedRows = computed(() => {
 const pagination = computed(() => ({
   current: query.pageNo,
   pageSize: query.pageSize,
-  total: query.total,
+  total: groupedRows.value.length,
   showSizeChanger: true
 }))
 

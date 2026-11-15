@@ -45,6 +45,8 @@
     </div>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :row-selection="rowSelection"
       :columns="columns"
@@ -70,7 +72,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" :title="form.id ? '编辑相册' : '新增相册'" @ok="submit" :confirm-loading="saving" width="680px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" :title="form.id ? '编辑相册' : '新增相册'" @ok="submit" :confirm-loading="saving" width="680px">
       <a-form layout="vertical">
         <a-form-item label="相册标题" required>
           <a-input v-model:value="form.title" />

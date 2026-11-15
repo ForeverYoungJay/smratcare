@@ -80,6 +80,24 @@ describe('routeAccess utils', () => {
     expect(canAccessPath(['HR_EMPLOYEE'], [], '/unclassified-page', ['/unclassified-page'])).toBe(true)
   })
 
+  it('keeps publicForAuthenticated pages reachable no matter what the backend seeded', () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/function-map', component: { template: '<div />' }, meta: { publicForAuthenticated: true } },
+        { path: '/plain-page', component: { template: '<div />' } }
+      ]
+    })
+    // 后端 pagePermissions 白名单里没有这条路径时，通用页面仍然可达
+    const seededWithoutIt = ['/portal', '/workbench', '/care']
+    expect(resolveRouteAccess(router, ['ADMIN'], '/function-map', seededWithoutIt).canAccess).toBe(true)
+    expect(resolveRouteAccess(router, ['NURSING_EMPLOYEE'], '/function-map', seededWithoutIt).canAccess).toBe(true)
+    expect(resolveRouteAccess(router, [], '/function-map', seededWithoutIt).canAccess).toBe(true)
+    expect(resolveRouteAccess(router, ['ADMIN'], '/function-map', []).canAccess).toBe(true)
+    // 没有这个标记的页面仍然照旧被白名单拦住，避免标记被误当成全站放行
+    expect(resolveRouteAccess(router, ['ADMIN'], '/plain-page', seededWithoutIt).canAccess).toBe(false)
+  })
+
   it('allows a role-free page only when its route permission and page grant both match', () => {
     const router = createRouter({
       history: createMemoryHistory(),

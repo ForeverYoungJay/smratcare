@@ -32,6 +32,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -218,6 +220,22 @@ public class CrmLeadActionServiceImpl implements CrmLeadActionService {
         .eq(CrmCallbackPlan::getLeadId, leadId)
         .orderByDesc(CrmCallbackPlan::getPlanExecuteTime));
     return list.stream().map(this::toResponse).toList();
+  }
+
+  @Override
+  public Map<Long, List<CrmCallbackPlanResponse>> listCallbackPlans(Long tenantId, List<Long> leadIds) {
+    if (leadIds == null || leadIds.isEmpty()) return Map.of();
+    List<Long> normalizedIds = leadIds.stream().filter(java.util.Objects::nonNull).distinct().limit(200).toList();
+    if (normalizedIds.isEmpty()) return Map.of();
+    Map<Long, List<CrmCallbackPlanResponse>> result = new LinkedHashMap<>();
+    normalizedIds.forEach(id -> result.put(id, new ArrayList<>()));
+    callbackPlanMapper.selectList(Wrappers.lambdaQuery(CrmCallbackPlan.class)
+            .eq(CrmCallbackPlan::getIsDeleted, 0)
+            .eq(CrmCallbackPlan::getTenantId, tenantId)
+            .in(CrmCallbackPlan::getLeadId, normalizedIds)
+            .orderByDesc(CrmCallbackPlan::getPlanExecuteTime))
+        .forEach(plan -> result.computeIfAbsent(plan.getLeadId(), ignored -> new ArrayList<>()).add(toResponse(plan)));
+    return result;
   }
 
   @Override

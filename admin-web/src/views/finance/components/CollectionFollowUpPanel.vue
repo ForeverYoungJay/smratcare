@@ -111,7 +111,7 @@
         </a-card>
       </StatefulBlock>
     </div>
-    <a-modal v-model:open="followVisible" title="催缴跟进记录" :confirm-loading="submitLoading" @ok="submitFollow">
+    <a-modal :mask-closable="false" v-model:open="followVisible" title="催缴跟进记录" :confirm-loading="submitLoading" @ok="submitFollow">
       <a-form layout="vertical" :model="followForm">
         <a-form-item label="跟进阶段">
           <a-select v-model:value="followForm.stage">

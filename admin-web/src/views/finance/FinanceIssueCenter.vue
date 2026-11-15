@@ -105,7 +105,7 @@
         </a-card>
       </StatefulBlock>
     </div>
-    <a-modal v-model:open="handleVisible" title="异常处理留痕" :confirm-loading="submitLoading" @ok="submitHandle">
+    <a-modal :mask-closable="false" v-model:open="handleVisible" title="异常处理留痕" :confirm-loading="submitLoading" @ok="submitHandle">
       <a-form layout="vertical" :model="handleForm">
         <a-form-item label="处理状态">
           <a-select v-model:value="handleForm.status">

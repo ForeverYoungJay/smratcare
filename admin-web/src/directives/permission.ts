@@ -8,7 +8,7 @@ export const permission: Directive = {
     const roles = getRoles()
     const allowed = needRoles.length === 0 || hasAnyRole(roles, needRoles)
     if (!allowed) {
-      el.parentNode && el.parentNode.removeChild(el)
+      el.parentNode?.removeChild(el)
     }
   }
 }

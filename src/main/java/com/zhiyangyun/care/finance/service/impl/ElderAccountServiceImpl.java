@@ -300,6 +300,15 @@ public class ElderAccountServiceImpl implements ElderAccountService {
       return;
     }
     ElderAccount account = loadOrCreateAccountForUpdate(orgId, elderId, operatorId);
+    boolean charged = logMapper.selectCount(Wrappers.lambdaQuery(ElderAccountLog.class)
+        .eq(ElderAccountLog::getIsDeleted, 0)
+        .eq(orgId != null, ElderAccountLog::getOrgId, orgId)
+        .eq(ElderAccountLog::getElderId, elderId)
+        .eq(ElderAccountLog::getSourceType, "TASK")
+        .eq(ElderAccountLog::getSourceId, taskDailyId)) > 0;
+    if (charged) {
+      return;
+    }
     applyChange(account, amount, "DEBIT", FUND_TYPE_AUTO, "TASK", taskDailyId, remark, operatorId);
   }
 

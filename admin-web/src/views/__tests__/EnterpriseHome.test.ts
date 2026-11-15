@@ -29,8 +29,9 @@ describe('EnterpriseHome', () => {
       }
     })
 
-    expect(wrapper.text()).toContain('弋阳养老院')
+    expect(wrapper.text()).toContain('山水有情，颐养有爱')
     expect(wrapper.text()).toContain('预约参观')
-    expect(wrapper.text()).toContain('快速预约初评')
+    expect(wrapper.get('a[href="/admin"]').text()).toContain('后台管理')
+    expect(wrapper.text()).toContain('专业团队与安全保障')
   })
 })

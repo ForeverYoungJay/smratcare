@@ -1,5 +1,22 @@
 <template>
   <PageContainer title="入住办理" subTitle="分床、押金账户、合同信息与二维码配置">
+    <section class="admission-flow" aria-labelledby="admission-flow-title">
+      <div class="admission-flow__head">
+        <div>
+          <span>跨部门协同流程</span>
+          <h2 id="admission-flow-title">入住进度一图看清</h2>
+        </div>
+        <a-tag color="green">{{ guardContract?.contractNo || '待选择长者' }}</a-tag>
+      </div>
+      <ol>
+        <li v-for="(step, index) in admissionFlowSteps" :key="step.key" :class="`is-${step.state}`">
+          <span class="admission-flow__index">{{ step.state === 'done' ? '✓' : index + 1 }}</span>
+          <strong>{{ step.label }}</strong>
+          <small>{{ step.owner }}</small>
+        </li>
+      </ol>
+    </section>
+
     <a-card class="card-elevated" :bordered="false">
       <div class="admission-form-head">
         <div>
@@ -309,6 +326,7 @@ import { getElderDetail, getElderDiseases } from '../../api/elder'
 import { getContractAttachments, getContractPage } from '../../api/marketing'
 import { normalizeId, normalizeResidentId } from '../../utils/id'
 import { residentStatusText as statusText } from '../../utils/elderStatus'
+import { resolveAdmissionFlowSteps } from '../../utils/admissionFlow'
 import { useUserStore } from '../../stores/user'
 import type {
   AdmissionRecordDimensionItem,
@@ -348,6 +366,7 @@ const submitChecklistLoading = ref(false)
 const submitConfirmOpen = ref(false)
 const linkedLeadId = ref<Id>()
 const guardContract = ref<CrmContractItem | null>(null)
+const admissionFlowSteps = computed(() => resolveAdmissionFlowSteps(guardContract.value?.flowStage))
 const { elderOptions, elderLoading, searchElders, findElderName, ensureSelectedElder } = useElderOptions({
   pageSize: 120,
   inHospitalOnly: false
@@ -1185,6 +1204,29 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.admission-flow {
+  margin-bottom: 16px;
+  padding: 22px;
+  border: 1px solid rgba(178, 159, 113, .22);
+  border-radius: 18px;
+  background: linear-gradient(135deg, #fffdf8, #f6f7ef);
+  box-shadow: 0 12px 30px rgba(71, 62, 41, .06);
+}
+
+.admission-flow__head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.admission-flow__head span { color: #18705d; font-size: 12px; font-weight: 700; letter-spacing: .08em; }
+.admission-flow__head h2 { margin: 4px 0 0; color: #1b2b25; font-family: "Noto Serif SC", "Songti SC", serif; font-size: 22px; }
+.admission-flow ol { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.admission-flow li { position: relative; display: grid; gap: 6px; min-height: 92px; padding: 14px; border: 1px solid #e1e5df; border-radius: 14px; background: rgba(255, 255, 255, .78); }
+.admission-flow li:not(:last-child)::after { position: absolute; top: 28px; right: -17px; z-index: 1; content: '→'; color: #a9b1ad; }
+.admission-flow__index { display: grid; place-items: center; width: 27px; height: 27px; border-radius: 50%; background: #e7ebe8; color: #75817c; font-size: 12px; font-weight: 800; }
+.admission-flow li strong { color: #293832; }
+.admission-flow li small { color: #77817d; }
+.admission-flow li.is-done { border-color: rgba(30, 132, 103, .24); background: #f0f8f4; }
+.admission-flow li.is-done .admission-flow__index { background: #1f8a6b; color: #fff; }
+.admission-flow li.is-current { border-color: rgba(229, 135, 45, .48); background: #fff7ea; box-shadow: 0 8px 20px rgba(207, 127, 42, .12); }
+.admission-flow li.is-current .admission-flow__index { background: #e8882f; color: #fff; }
+
 .search-bar {
   margin-bottom: 12px;
 }
@@ -1353,5 +1395,12 @@ onMounted(async () => {
   border-radius: inherit;
   background: linear-gradient(90deg, #3d7fa6 0%, #36cfc9 100%);
   transition: width 0.35s ease;
+}
+
+@media (max-width: 900px) {
+  .admission-flow ol { grid-template-columns: 1fr; }
+  .admission-flow li { min-height: 0; grid-template-columns: auto 1fr; align-items: center; }
+  .admission-flow li small { grid-column: 2; }
+  .admission-flow li:not(:last-child)::after { display: none; }
 }
 </style>

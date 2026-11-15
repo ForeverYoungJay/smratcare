@@ -107,7 +107,7 @@
       />
     </a-card>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="bindOpen"
       title="绑定老人"
       width="420px"
@@ -137,7 +137,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="userEditorOpen"
       :title="userForm.id ? '编辑家属账号' : '新增家属账号'"
       width="460px"

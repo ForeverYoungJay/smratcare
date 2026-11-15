@@ -56,13 +56,13 @@ public class CareLevelController {
     return Result.ok(response);
   }
 
-  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/{id}")
   public Result<CareLevelResponse> get(@PathVariable Long id) {
     return Result.ok(careLevelService.get(id, AuthContext.getOrgId()));
   }
 
-  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/page")
   public Result<IPage<CareLevelResponse>> page(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -72,7 +72,7 @@ public class CareLevelController {
     return Result.ok(careLevelService.page(AuthContext.getOrgId(), pageNo, pageSize, keyword, enabled));
   }
 
-  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/list")
   public Result<List<CareLevelResponse>> list(@RequestParam(required = false) Integer enabled) {
     return Result.ok(careLevelService.list(AuthContext.getOrgId(), enabled));

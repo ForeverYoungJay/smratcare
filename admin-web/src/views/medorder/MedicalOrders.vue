@@ -22,7 +22,9 @@
       </template>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="onSearch" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'orderType'">
           <a-tag :color="record.orderType === 'TEMPORARY' ? 'gold' : 'blue'">{{ record.orderType === 'TEMPORARY' ? '临时' : '长期' }}</a-tag>
@@ -38,7 +40,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="createOpen" title="开立医嘱" :confirm-loading="saving" width="720px" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="createOpen" title="开立医嘱" :confirm-loading="saving" width="720px" @ok="submit">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">

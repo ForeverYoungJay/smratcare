@@ -205,7 +205,7 @@
       </a-col>
     </a-row>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="roomEditOpen"
       title="编辑房间信息"
       :confirm-loading="roomSaving"

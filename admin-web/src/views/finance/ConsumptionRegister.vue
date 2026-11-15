@@ -38,7 +38,9 @@
       </a-col>
     </a-row>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="filteredRows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData" rowKey="id" :columns="columns" :data-source="filteredRows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'riskLevel'">
           <a-tag :color="riskColor(record)">{{ riskLevel(record) }}</a-tag>
@@ -46,7 +48,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="createOpen" title="新增消费登记" :confirm-loading="creating" @ok="submitCreate">
+    <a-modal :mask-closable="false" v-model:open="createOpen" title="新增消费登记" :confirm-loading="creating" @ok="submitCreate">
       <a-form layout="vertical">
         <a-form-item label="老人" required>
           <a-select v-model:value="createForm.elderId" show-search :filter-option="false" :options="elderOptions" @search="searchElders" @focus="() => !elderOptions.length && searchElders('')" />

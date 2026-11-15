@@ -21,19 +21,14 @@
         <slot name="bodyCell" v-bind="slotProps" />
       </template>
       <template #emptyText>
-        <div class="empty-wrap">
-          <a-empty :description="null">
-            <template #description>
-              <div class="empty-copy">
-                <strong class="empty-copy__title">{{ emptyTitle || '暂无数据' }}</strong>
-                <span class="empty-copy__description">{{ emptyDescription || '当前还没有可展示的数据，稍后再来看看。' }}</span>
-              </div>
-            </template>
-            <div class="empty-extra" v-if="$slots.emptyExtra">
-              <slot name="emptyExtra" />
-            </div>
-          </a-empty>
-        </div>
+        <TableEmpty
+          :filtered="isFilteredEmpty"
+          :title="emptyTitle"
+          :description="emptyDescription"
+          @clear-filters="onClearFilters"
+        >
+          <slot name="emptyExtra" />
+        </TableEmpty>
       </template>
     </a-table>
   </section>
@@ -42,6 +37,8 @@
 <script setup lang="ts">
 import type { TablePaginationConfig } from 'ant-design-vue'
 import { computed } from 'vue'
+import { clearFilters, countActiveFilters } from '../utils/filterState'
+import TableEmpty from './TableEmpty.vue'
 
 const props = defineProps<{
   columns: any[]
@@ -57,7 +54,14 @@ const props = defineProps<{
   emptyTitle?: string
   emptyDescription?: string
   showStriped?: boolean
+  /** 传入页面的查询表单对象后，空状态会区分「被筛掉了」和「本来就没有」 */
+  filterModel?: Record<string, any> | null
 }>()
+
+/** 有筛选条件、且当前结果为空 —— 和「一条数据都还没建」是两件事 */
+const isFilteredEmpty = computed(
+  () => (props.dataSource || []).length === 0 && countActiveFilters(props.filterModel) > 0
+)
 
 const mergedPagination = computed<TablePaginationConfig | false>(() => {
   if (props.pagination === false) return false
@@ -82,10 +86,22 @@ const mergedRowClassName = (record: any, index: number) => {
   return `${striped} ${external}`.trim()
 }
 
-const emit = defineEmits<{ (e: 'change', pagination: TablePaginationConfig, filters: any, sorter: any): void }>()
+const emit = defineEmits<{
+  (e: 'change', pagination: TablePaginationConfig, filters: any, sorter: any): void
+  (e: 'clear-filters'): void
+}>()
 
 function onChange(pagination: TablePaginationConfig, filters: any, sorter: any) {
   emit('change', pagination, filters, sorter)
+}
+
+/**
+ * 先把筛选条件真正清掉，再让页面重新查询。
+ * 不能直接复用页面的「清空」按钮：那个是恢复初始值，而初始值本身常常就是筛选条件。
+ */
+function onClearFilters() {
+  clearFilters(props.filterModel)
+  emit('clear-filters')
 }
 </script>
 
@@ -106,29 +122,4 @@ function onChange(pagination: TablePaginationConfig, filters: any, sorter: any) 
   background: rgba(247, 251, 254, 0.88);
 }
 
-.empty-wrap {
-  padding: 12px 0;
-}
-
-.empty-copy {
-  display: grid;
-  gap: 6px;
-}
-
-.empty-copy__title {
-  color: #22332e;
-  font-size: 15px;
-}
-
-.empty-copy__description {
-  color: #5c6f69;
-  font-size: 12px;
-  line-height: 1.7;
-}
-
-.empty-extra {
-  display: flex;
-  justify-content: center;
-  margin-top: 14px;
-}
 </style>

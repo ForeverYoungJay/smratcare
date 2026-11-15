@@ -195,7 +195,7 @@ class FeeManagementServiceTest {
     req.setTargetCount(0);
     IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
         () -> feeManagementService.createMonthlyAllocation(1L, 500L, req));
-    assertEquals("totalAmount > 0 时 targetCount 不能为 0", ex.getMessage());
+    assertEquals("请选择分摊老人", ex.getMessage());
   }
 
   @Test
@@ -217,6 +217,7 @@ class FeeManagementServiceTest {
     bed.setOrgId(1L);
     bed.setRoomId(room.getId());
     bed.setBedNo("01");
+    bed.setBedQrCode("QR-ALLOC-" + System.nanoTime());
     bed.setStatus(1);
     bed.setElderId(null);
     bedMapper.insert(bed);
@@ -366,6 +367,23 @@ class FeeManagementServiceTest {
     assertEquals("AUTO", latest.getFundType());
     assertEquals(0, BigDecimal.valueOf(80).compareTo(latest.getDepositBalanceAfter()));
     assertEquals(0, BigDecimal.ZERO.compareTo(latest.getPrepaidBalanceAfter()));
+  }
+
+  @Test
+  void care_task_charge_is_idempotent() {
+    Long elderId = createElder("护理任务重复计费校验");
+    recharge(elderId, BigDecimal.valueOf(100));
+    Long taskId = System.nanoTime();
+
+    elderAccountService.chargeForTask(1L, elderId, taskId, BigDecimal.valueOf(12), "护理任务收费", 500L);
+    elderAccountService.chargeForTask(1L, elderId, taskId, BigDecimal.valueOf(12), "护理任务收费", 500L);
+
+    var account = elderAccountService.getOrCreate(1L, elderId, 500L);
+    assertEquals(0, BigDecimal.valueOf(88).compareTo(account.getBalance()));
+    long chargeLogs = elderAccountService.logPage(1L, 1L, 20L, elderId, null, null).getRecords().stream()
+        .filter(log -> "TASK".equals(log.getSourceType()) && taskId.equals(log.getSourceId()))
+        .count();
+    assertEquals(1L, chargeLogs);
   }
 
   private void approveSettlement(Long settlementId) {

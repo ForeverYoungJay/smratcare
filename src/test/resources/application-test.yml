@@ -29,3 +29,7 @@ security:
     secret: "test-secret-test-secret-test-secret"
     expiration-minutes: 60
     blacklist-enabled: false
+
+app:
+  file-storage:
+    base-dir: ${java.io.tmpdir}/smartcare-test-uploads

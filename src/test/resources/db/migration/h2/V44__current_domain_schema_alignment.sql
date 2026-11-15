@@ -1,0 +1,145 @@
+-- Keep the H2 integration-test schema aligned with the current MySQL domain
+-- model.  Production migrations are intentionally not reused here because
+-- several of them contain MySQL-only prepared DDL and generated columns.
+
+CREATE TABLE IF NOT EXISTS service_plan (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL DEFAULT 1,
+  org_id BIGINT NOT NULL,
+  elder_id BIGINT NOT NULL,
+  care_level_id BIGINT DEFAULT NULL,
+  service_item_id BIGINT NOT NULL,
+  plan_name VARCHAR(128) NOT NULL,
+  cycle_type VARCHAR(16) NOT NULL DEFAULT 'DAILY',
+  frequency INT NOT NULL DEFAULT 1,
+  start_date DATE NOT NULL,
+  end_date DATE DEFAULT NULL,
+  preferred_time TIME DEFAULT '09:00:00',
+  default_staff_id BIGINT DEFAULT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
+  remark VARCHAR(255) DEFAULT NULL,
+  created_by BIGINT DEFAULT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_service_plan_org_elder
+  ON service_plan (org_id, elder_id);
+
+CREATE TABLE IF NOT EXISTS service_booking (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL DEFAULT 1,
+  org_id BIGINT NOT NULL,
+  elder_id BIGINT NOT NULL,
+  plan_id BIGINT DEFAULT NULL,
+  service_item_id BIGINT NOT NULL,
+  booking_time DATETIME NOT NULL,
+  expected_duration INT DEFAULT NULL,
+  assigned_staff_id BIGINT DEFAULT NULL,
+  source VARCHAR(16) NOT NULL DEFAULT 'MANUAL',
+  status VARCHAR(16) NOT NULL DEFAULT 'BOOKED',
+  cancel_reason VARCHAR(255) DEFAULT NULL,
+  remark VARCHAR(255) DEFAULT NULL,
+  created_by BIGINT DEFAULT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS elder_package (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL DEFAULT 1,
+  org_id BIGINT NOT NULL,
+  elder_id BIGINT NOT NULL,
+  package_id BIGINT NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE DEFAULT NULL,
+  status TINYINT NOT NULL DEFAULT 1,
+  remark VARCHAR(255) DEFAULT NULL,
+  created_by BIGINT DEFAULT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS bill_item (
+  id BIGINT NOT NULL PRIMARY KEY,
+  org_id BIGINT NOT NULL,
+  bill_monthly_id BIGINT NOT NULL,
+  item_type VARCHAR(32) NOT NULL,
+  item_name VARCHAR(128) NOT NULL,
+  amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+  ref_order_id BIGINT DEFAULT NULL,
+  remark VARCHAR(255) DEFAULT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS elder_lifecycle_event (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL DEFAULT 1,
+  org_id BIGINT NOT NULL,
+  elder_id BIGINT NOT NULL,
+  event_type VARCHAR(32) NOT NULL,
+  from_lifecycle_status VARCHAR(32) DEFAULT NULL,
+  to_lifecycle_status VARCHAR(32) DEFAULT NULL,
+  from_departure_type VARCHAR(16) DEFAULT NULL,
+  to_departure_type VARCHAR(16) DEFAULT NULL,
+  biz_ref_type VARCHAR(32) DEFAULT NULL,
+  biz_ref_id BIGINT DEFAULT NULL,
+  reason VARCHAR(255) DEFAULT NULL,
+  created_by BIGINT DEFAULT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_elder_lifecycle_event_org_elder
+  ON elder_lifecycle_event (org_id, elder_id);
+
+ALTER TABLE health_inspection
+  ADD COLUMN IF NOT EXISTS attachment_urls VARCHAR(2000) DEFAULT NULL;
+ALTER TABLE health_inspection
+  ADD COLUMN IF NOT EXISTS other_note VARCHAR(1000) DEFAULT NULL;
+
+ALTER TABLE elder_discharge_apply
+  ADD COLUMN IF NOT EXISTS proof_file_url VARCHAR(500) DEFAULT NULL;
+
+ALTER TABLE elder_admission
+  ADD COLUMN IF NOT EXISTS source_type VARCHAR(32) DEFAULT NULL;
+
+ALTER TABLE finance_monthly_allocation ADD COLUMN IF NOT EXISTS elder_ids CLOB DEFAULT NULL;
+ALTER TABLE finance_monthly_allocation ADD COLUMN IF NOT EXISTS elder_snapshot_json CLOB DEFAULT NULL;
+ALTER TABLE finance_monthly_allocation ADD COLUMN IF NOT EXISTS avg_amount DECIMAL(12,2) DEFAULT NULL;
+ALTER TABLE finance_monthly_allocation ADD COLUMN IF NOT EXISTS rollback_by BIGINT DEFAULT NULL;
+ALTER TABLE finance_monthly_allocation ADD COLUMN IF NOT EXISTS rollback_reason VARCHAR(500) DEFAULT NULL;
+ALTER TABLE finance_monthly_allocation ADD COLUMN IF NOT EXISTS rollback_time DATETIME DEFAULT NULL;
+
+ALTER TABLE visit_booking
+  ADD COLUMN IF NOT EXISTS visitor_name VARCHAR(64) DEFAULT NULL;
+ALTER TABLE visit_booking
+  ADD COLUMN IF NOT EXISTS visitor_phone VARCHAR(32) DEFAULT NULL;
+ALTER TABLE visit_booking
+  ADD COLUMN IF NOT EXISTS visitor_relation VARCHAR(32) DEFAULT NULL;
+
+ALTER TABLE crm_contract ADD COLUMN IF NOT EXISTS name VARCHAR(64) DEFAULT NULL;
+ALTER TABLE crm_contract ADD COLUMN IF NOT EXISTS phone VARCHAR(32) DEFAULT NULL;
+ALTER TABLE crm_contract ADD COLUMN IF NOT EXISTS id_card_no VARCHAR(32) DEFAULT NULL;
+ALTER TABLE crm_contract ADD COLUMN IF NOT EXISTS home_address VARCHAR(255) DEFAULT NULL;
+ALTER TABLE crm_contract ADD COLUMN IF NOT EXISTS change_workflow_status VARCHAR(32) DEFAULT NULL;
+ALTER TABLE crm_contract ADD COLUMN IF NOT EXISTS change_workflow_remark VARCHAR(500) DEFAULT NULL;
+ALTER TABLE crm_contract ADD COLUMN IF NOT EXISTS marketer_name VARCHAR(64) DEFAULT NULL;
+ALTER TABLE crm_contract ADD COLUMN IF NOT EXISTS snapshot_json CLOB DEFAULT NULL;
+ALTER TABLE crm_contract ADD COLUMN IF NOT EXISTS reservation_room_no VARCHAR(64) DEFAULT NULL;
+ALTER TABLE crm_contract ADD COLUMN IF NOT EXISTS reservation_bed_id BIGINT DEFAULT NULL;
+ALTER TABLE crm_contract ADD COLUMN IF NOT EXISTS elder_name VARCHAR(64) DEFAULT NULL;
+ALTER TABLE crm_contract ADD COLUMN IF NOT EXISTS elder_phone VARCHAR(32) DEFAULT NULL;
+ALTER TABLE crm_contract ADD COLUMN IF NOT EXISTS gender TINYINT DEFAULT NULL;
+ALTER TABLE crm_contract ADD COLUMN IF NOT EXISTS age INT DEFAULT NULL;
+ALTER TABLE crm_contract ADD COLUMN IF NOT EXISTS contract_status VARCHAR(32) DEFAULT NULL;
+ALTER TABLE crm_contract ADD COLUMN IF NOT EXISTS flow_stage VARCHAR(32) DEFAULT NULL;
+ALTER TABLE crm_contract ADD COLUMN IF NOT EXISTS current_owner_dept VARCHAR(32) DEFAULT NULL;
+ALTER TABLE crm_contract ADD COLUMN IF NOT EXISTS org_name VARCHAR(64) DEFAULT NULL;
+ALTER TABLE crm_contract ADD COLUMN IF NOT EXISTS sms_send_count INT NOT NULL DEFAULT 0;
+ALTER TABLE crm_contract ADD COLUMN IF NOT EXISTS created_by BIGINT DEFAULT NULL;

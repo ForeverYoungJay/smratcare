@@ -15,7 +15,9 @@
       </template>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="onSearch" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'eventTime'">
           {{ formatEventTime(record.eventTime) }}
@@ -44,7 +46,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="createOpen" title="一键急救" :confirm-loading="saving" width="600px" @ok="submitCreate">
+    <a-modal :mask-closable="false" v-model:open="createOpen" title="一键急救" :confirm-loading="saving" width="600px" @ok="submitCreate">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">
@@ -61,7 +63,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="departOpen" title="送医登记" :confirm-loading="saving" width="520px" @ok="submitDepart">
+    <a-modal :mask-closable="false" v-model:open="departOpen" title="送医登记" :confirm-loading="saving" width="520px" @ok="submitDepart">
       <a-form layout="vertical">
         <a-form-item label="送医医院" required><a-input v-model:value="departForm.hospitalName" placeholder="如 市第一人民医院" /></a-form-item>
         <a-form-item label="陪同人"><a-input v-model:value="departForm.escortName" placeholder="陪同人员姓名" /></a-form-item>
@@ -69,7 +71,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="outcomeOpen" title="转归登记" :confirm-loading="saving" width="520px" @ok="submitOutcome">
+    <a-modal :mask-closable="false" v-model:open="outcomeOpen" title="转归登记" :confirm-loading="saving" width="520px" @ok="submitOutcome">
       <a-form layout="vertical">
         <a-form-item label="转归结果" required>
           <a-select v-model:value="outcomeForm.outcome">
@@ -82,7 +84,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="rescueOpen" title="抢救记录单" :confirm-loading="saving" width="720px" @ok="submitRescue">
+    <a-modal :mask-closable="false" v-model:open="rescueOpen" title="抢救记录单" :confirm-loading="saving" width="720px" @ok="submitRescue">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12"><a-form-item label="开始时间"><a-date-picker v-model:value="rescueForm.startTime" show-time value-format="YYYY-MM-DDTHH:mm:ss" style="width:100%" /></a-form-item></a-col>

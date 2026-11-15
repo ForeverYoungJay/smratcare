@@ -12,7 +12,9 @@
       </template>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
           <a-tag :color="record.status === DINING_STATUS.enabled ? 'green' : 'default'">
@@ -28,7 +30,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" title="送餐区域" :confirm-loading="saving" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="送餐区域" :confirm-loading="saving" @ok="submit">
       <a-form layout="vertical">
         <a-form-item label="区域编码" required>
           <a-input v-model:value="form.areaCode" />

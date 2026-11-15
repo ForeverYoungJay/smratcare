@@ -86,7 +86,7 @@
       </StatefulBlock>
     </a-card>
 
-    <a-modal v-model:open="createOpen" title="新增外出登记" @ok="submitCreate" :confirm-loading="submitting" width="520px">
+    <a-modal :mask-closable="false" v-model:open="createOpen" title="新增外出登记" @ok="submitCreate" :confirm-loading="submitting" width="520px">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人" name="elderId">
           <a-select

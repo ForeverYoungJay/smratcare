@@ -1,6 +1,6 @@
 <template>
   <div class="page-container page-shell" :class="[`page-shell--${mode}`]">
-    <section class="page-head" :class="{ 'page-head--showcase': mode === 'showcase' }">
+    <section v-if="mode !== 'content'" class="page-head" :class="{ 'page-head--showcase': mode === 'showcase', 'page-head--scenic': mode === 'scenic' }" :style="mode === 'scenic' ? { '--page-scenic-image': `url(${visualAssets.scenicMountain.url})` } : undefined">
       <div class="page-head-accent"></div>
       <div class="page-head-glow" v-if="mode === 'showcase'"></div>
       <div class="page-head-main">
@@ -28,13 +28,16 @@
       </div>
     </section>
     <section class="page-body">
+      <div v-if="mode === 'content' && $slots.extra" class="page-content-actions"><slot name="extra" /></div>
       <slot />
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-const props = withDefaults(defineProps<{ title: string; subTitle?: string; subTitleAlias?: string; mode?: 'workspace' | 'showcase'; kicker?: string }>(), {
+import { visualAssets } from '../config/visualAssets'
+
+const props = withDefaults(defineProps<{ title: string; subTitle?: string; subTitleAlias?: string; mode?: 'workspace' | 'showcase' | 'scenic' | 'content'; kicker?: string }>(), {
   mode: 'workspace'
 })
 const subTitleAlias = props.subTitleAlias
@@ -56,6 +59,20 @@ const kicker = props.kicker
   box-shadow: var(--shadow-xs);
   overflow: hidden;
 }
+
+.page-head--scenic {
+  min-height: 174px;
+  padding: 30px 32px;
+  border-color: #e7e5dc;
+  background: linear-gradient(90deg, rgba(255, 253, 247, .97) 0%, rgba(255, 253, 247, .89) 36%, rgba(255, 253, 247, .28) 100%), var(--page-scenic-image) center 48% / cover;
+}
+
+.page-head--scenic .page-head-accent { display: none; }
+.page-head--scenic .page-title { color: #172921; font: 700 clamp(28px, 2.4vw, 38px)/1.3 "Noto Serif SC", "Songti SC", serif; }
+.page-head--scenic .page-subtitle { max-width: 720px; color: #42534a; }
+.page-head--scenic .page-head-main { align-items: flex-start; }
+.page-head--scenic .page-head-foot { border-color: rgba(35, 93, 69, .17); }
+.page-head--scenic .page-head-extra :deep(.ant-btn) { background: rgba(255, 255, 255, .88); }
 
 .page-head-accent {
   position: absolute;
@@ -210,6 +227,8 @@ const kicker = props.kicker
   gap: 18px;
 }
 
+.page-content-actions { display: flex; justify-content: flex-end; }
+
 .page-shell--workspace .page-title {
   font-size: 24px;
 }
@@ -246,6 +265,8 @@ const kicker = props.kicker
   .page-head {
     padding: 18px;
   }
+
+  .page-head--scenic { min-height: 0; background-position: center; }
 
   .page-head-main {
     flex-direction: column;

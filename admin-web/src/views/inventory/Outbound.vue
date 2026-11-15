@@ -243,7 +243,7 @@
       </a-space>
     </a-drawer>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="outboundOpen"
       title="新增领用出库"
       width="860"

@@ -100,7 +100,7 @@
       />
     </a-card>
 
-    <a-modal v-model:open="createOpen" title="新增退住申请" @ok="submitCreate" :confirm-loading="submitting" width="520px">
+    <a-modal :mask-closable="false" v-model:open="createOpen" title="新增退住申请" @ok="submitCreate" :confirm-loading="submitting" width="520px">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人" name="elderId">
           <a-select
@@ -134,7 +134,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="reviewOpen" :title="reviewStatus === 'APPROVED' ? '通过申请' : '驳回申请'" @ok="submitReview" :confirm-loading="reviewSubmitting" width="480px">
+    <a-modal :mask-closable="false" v-model:open="reviewOpen" :title="reviewStatus === 'APPROVED' ? '通过申请' : '驳回申请'" @ok="submitReview" :confirm-loading="reviewSubmitting" width="480px">
       <a-form layout="vertical">
         <a-form-item v-if="reviewStatus === 'APPROVED'" label="审核清单">
           <a-space direction="vertical" style="width: 100%">

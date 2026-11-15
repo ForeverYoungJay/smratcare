@@ -41,7 +41,27 @@
       >
         <template #notification-overlay>
           <a-menu class="notify-menu">
-            <a-menu-item-group :title="`未处理提醒 ${financeReminderPending}`">
+            <a-menu-item-group :title="`我的消息 ${quickChatUnreadCount ? `· ${quickChatUnreadCount} 条未读` : ''}`">
+              <a-menu-item
+                v-for="item in headerMessagePreviews"
+                :key="`message-${item.roomId}`"
+                class="notify-menu__message"
+                @click="openQuickChatByNotification(item.roomId)"
+              >
+                <div class="notify-message">
+                  <span class="notify-message__avatar" aria-hidden="true">{{ item.senderName.slice(0, 1) }}</span>
+                  <span class="notify-message__body">
+                    <span class="notify-message__meta"><strong>{{ item.roomName }}</strong><time :datetime="item.createdAt">{{ quickChatPreviewTime(item.createdAt) }}</time></span>
+                    <small>{{ item.senderName }}：{{ item.content }}</small>
+                  </span>
+                  <span v-if="item.unreadCount" class="notify-message__unread" role="status" aria-atomic="true">{{ item.unreadCount }}</span>
+                </div>
+              </a-menu-item>
+              <a-menu-item v-if="!headerMessagePreviews.length" key="message-empty" disabled>暂无消息</a-menu-item>
+              <a-menu-item key="message-all" @click="openQuickChat">查看全部消息</a-menu-item>
+            </a-menu-item-group>
+            <a-menu-divider />
+            <a-menu-item-group v-if="canUseFinanceReminders" :title="`未处理提醒 ${financeReminderPending}`">
               <a-menu-item
                 v-for="item in financeReminderItems"
                 :key="`reminder-${item.id}`"
@@ -69,7 +89,7 @@
                 进入提醒中心
               </a-menu-item>
             </a-menu-item-group>
-            <a-menu-divider />
+            <a-menu-divider v-if="canUseFinanceReminders" />
             <a-menu-item v-for="item in quickNotifyItems" :key="item.title" @click="onQuickNotifyClick(item)">
               {{ item.title }}
             </a-menu-item>
@@ -913,6 +933,7 @@ import { buildGroupedMenuItems } from './navigation'
 import { loadRecentVisits, saveRecentVisit, type RecentVisitItem } from '../utils/recentVisits'
 import { resolveRouteAccess } from '../utils/routeAccess'
 import { resolveDefaultHome } from '../access/policy'
+import { buildQuickChatPreviews, QUICK_CHAT_OPEN_EVENT } from '../utils/quickChatPreview'
 
 const MAX_RESTORED_ROUTE_TABS = 8
 const MAX_ALIVE_VIEW_CACHE = 3
@@ -1360,6 +1381,11 @@ const quickChatUnreadCount = computed(() =>
     .filter((room) => !isRoomArchivedByCurrentUser(room))
     .reduce((sum, item) => sum + resolveRoomUnreadForCurrentUser(item), 0)
 )
+const headerMessagePreviews = computed(() => buildQuickChatPreviews(
+  { rooms: myQuickChatRooms.value },
+  Array.from(quickChatIdentityAliases()),
+  5
+))
 const quickChatPressureTag = computed(() => {
   const unread = quickChatUnreadCount.value
   const overdue = quickChatTodoOverdueCount.value
@@ -1376,8 +1402,10 @@ const quickChatTodoOverdueCount = computed(() =>
 // 非财务角色调用会被后端拦掉，这里静默降级为 0，不影响其它头部功能。
 const financeReminderPending = ref(0)
 const financeReminderItems = ref<FinanceReminderItem[]>([])
+const canUseFinanceReminders = computed(() => canOpenPath('/finance/reminder-center'))
 
 async function loadFinanceReminders() {
+  if (!canUseFinanceReminders.value) return
   try {
     const [summary, page] = await Promise.all([
       getReminderSummary(),
@@ -4169,11 +4197,24 @@ function quickChatMessagePreview(messageRow: QuickChatMessage) {
 function openQuickChatByNotification(roomId: string) {
   if (!roomId) return
   quickChatOpen.value = true
+  ensureQuickChatRuntime()
   nextTick(() => {
     if (sortedQuickChatRooms.value.some((room) => room.id === roomId)) {
       selectQuickChatRoom(roomId)
     }
   })
+}
+
+function quickChatPreviewTime(value: string) {
+  const parsed = dayjs(value)
+  if (!parsed.isValid()) return ''
+  return parsed.isSame(dayjs(), 'day') ? parsed.format('HH:mm') : parsed.format('MM-DD')
+}
+
+function handleQuickChatOpenEvent(event: Event) {
+  const roomId = String((event as CustomEvent<{ roomId?: string }>).detail?.roomId || '')
+  if (roomId) openQuickChatByNotification(roomId)
+  else openQuickChat()
 }
 
 function notifyQuickChatIncomingMessage(room: QuickChatRoom, messageRow: QuickChatMessage) {
@@ -5757,6 +5798,7 @@ onMounted(() => {
   window.addEventListener('storage', onQuickChatStorageChange)
   window.addEventListener('focus', onQuickChatCloudVisibilityChange)
   window.addEventListener('keydown', handleGlobalShortcut)
+  window.addEventListener(QUICK_CHAT_OPEN_EVENT, handleQuickChatOpenEvent)
   document.addEventListener('visibilitychange', onQuickChatCloudVisibilityChange)
   document.addEventListener('click', closeTabContextMenu)
 })
@@ -5798,6 +5840,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('storage', onQuickChatStorageChange)
   window.removeEventListener('focus', onQuickChatCloudVisibilityChange)
   window.removeEventListener('keydown', handleGlobalShortcut)
+  window.removeEventListener(QUICK_CHAT_OPEN_EVENT, handleQuickChatOpenEvent)
   document.removeEventListener('visibilitychange', onQuickChatCloudVisibilityChange)
   document.removeEventListener('click', closeTabContextMenu)
 })
@@ -6855,14 +6898,79 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .notify-menu {
-  max-width: 380px;
+  width: min(380px, calc(100vw - 24px));
 }
 
-.notify-menu__reminder {
+.notify-menu__reminder,
+.notify-menu__message {
   height: auto !important;
   padding-top: 6px !important;
   padding-bottom: 6px !important;
   line-height: 1.4 !important;
+}
+
+.notify-message {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.notify-message__avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.notify-message__body {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.notify-message__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.notify-message__meta strong,
+.notify-message__body small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notify-message__meta strong {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.notify-message__meta time,
+.notify-message__body small {
+  color: var(--text-tertiary, #7c8982);
+  font-size: 11px;
+}
+
+.notify-message__unread {
+  flex: 0 0 auto;
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .notify-reminder {

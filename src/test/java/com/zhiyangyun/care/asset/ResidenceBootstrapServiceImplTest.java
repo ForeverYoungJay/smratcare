@@ -65,8 +65,6 @@ class ResidenceBootstrapServiceImplTest {
 
     when(baseDataItemMapper.selectList(any())).thenReturn(List.of());
     when(buildingMapper.selectCount(any())).thenReturn(0L, 1L, 0L, 0L);
-    when(roomMapper.selectCount(any())).thenReturn(0L);
-
     AtomicLong ids = new AtomicLong(100L);
     doAnswer(invocation -> {
       Building building = invocation.getArgument(0);

@@ -30,7 +30,7 @@
 
       <a-dropdown trigger="click">
         <a-badge :count="notificationCount" size="small">
-          <a-button size="small" class="global-header__icon-btn" title="消息通知">
+          <a-button size="small" class="global-header__icon-btn" title="消息通知" aria-label="消息通知">
             <BellOutlined />
           </a-button>
         </a-badge>
@@ -40,7 +40,7 @@
       </a-dropdown>
       <a-dropdown trigger="click">
         <a-badge :count="todoCount" size="small">
-          <a-button size="small" class="global-header__icon-btn" title="待办事项">
+          <a-button size="small" class="global-header__icon-btn" title="待办事项" aria-label="待办事项">
             <CheckSquareOutlined />
           </a-button>
         </a-badge>

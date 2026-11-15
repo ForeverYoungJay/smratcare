@@ -10,6 +10,8 @@
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -27,7 +29,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" title="健康记录" @ok="submit" :confirm-loading="saving" width="640px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="健康记录" @ok="submit" :confirm-loading="saving" width="640px">
       <a-form layout="vertical">
         <a-form-item label="老人" required>
           <a-select

@@ -79,7 +79,7 @@
       />
     </a-card>
 
-    <a-modal v-model:open="editOpen" :title="editId ? '编辑试住登记' : '新增试住登记'" @ok="submit" :confirm-loading="submitting" width="560px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" :title="editId ? '编辑试住登记' : '新增试住登记'" @ok="submit" :confirm-loading="submitting" width="560px">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人" name="elderId">
           <a-select

@@ -5,8 +5,14 @@ export const nursingRoutes: RouteRecordRaw[] = [
         path: 'care',
         name: 'Care',
         meta: { title: '护理部业务', icon: 'ScheduleOutlined', navSection: 'care', navOrder: 35, navPinned: true, roles: ['NURSING_EMPLOYEE', 'NURSING_MINISTER', 'DIRECTOR', 'ADMIN'] },
-        redirect: '/care/staff/caregiver-info',
+        redirect: '/care/home',
         children: [
+          {
+            path: 'home',
+            name: 'CareHome',
+            component: () => import('../views/care/CareHome.vue'),
+            meta: { title: '护理部工作台' }
+          },
           {
             path: 'staff',
             name: 'CareStaff',
@@ -44,13 +50,13 @@ export const nursingRoutes: RouteRecordRaw[] = [
                 path: 'care-levels',
                 name: 'CareLevels',
                 component: () => import('../views/care/CareLevels.vue'),
-                meta: { title: '护理等级' }
+                meta: { title: '护理等级', roles: ['NURSING_MINISTER', 'DIRECTOR', 'ADMIN'] }
               },
               {
                 path: 'service-plans',
                 name: 'ServicePlans',
                 component: () => import('../views/care/ServicePlans.vue'),
-                meta: { title: '服务计划' }
+                meta: { title: '服务计划', roles: ['NURSING_MINISTER', 'DIRECTOR', 'ADMIN'] }
               },
               {
                 path: 'nursing-reports',
@@ -132,7 +138,7 @@ export const nursingRoutes: RouteRecordRaw[] = [
             path: 'elder-packages',
             name: 'CareElderPackages',
             component: () => import('../views/care/ElderPackages.vue'),
-            meta: { title: '老人套餐', hidden: true }
+            meta: { title: '老人套餐', hidden: true, roles: ['NURSING_MINISTER', 'DIRECTOR', 'ADMIN'] }
           },
           {
             path: 'task-generate',

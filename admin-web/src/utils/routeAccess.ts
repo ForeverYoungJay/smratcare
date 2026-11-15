@@ -57,6 +57,11 @@ export function resolveRouteAccess(
     return { canAccess: true, requiredRoles: [], requiredPermissions: [] }
   }
 
+  // 通用页面对所有登录用户开放，不受 pagePermissions 白名单约束
+  if (resolved.matched.some((record) => record.meta?.publicForAuthenticated)) {
+    return { canAccess: true, requiredRoles: [], requiredPermissions: [] }
+  }
+
   const roleGroups = resolved.matched
     .map((record) => ((record.meta?.roles as string[] | undefined) || []).filter(Boolean))
     .filter((group) => group.length > 0)

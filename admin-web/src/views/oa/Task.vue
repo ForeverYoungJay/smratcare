@@ -97,6 +97,8 @@
 
         <StatefulBlock :loading="loading" :error="tableError" :empty="!loading && !tableError && rows.length === 0" empty-text="暂无任务记录" @retry="fetchData">
           <DataTable
+            :filter-model="query"
+            @clear-filters="fetchData"
             rowKey="id"
             :row-selection="rowSelection"
             :columns="columns"
@@ -145,7 +147,7 @@
       </a-tab-pane>
     </a-tabs>
 
-    <a-modal v-model:open="editOpen" title="任务" @ok="submit" :confirm-loading="saving" width="760px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="任务" @ok="submit" :confirm-loading="saving" width="760px">
       <a-form layout="vertical">
         <a-form-item label="任务标题" required>
           <a-input v-model:value="form.title" placeholder="请输入任务标题" />

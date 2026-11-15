@@ -69,7 +69,7 @@
             <a-radio-button value="plan">楼层平面图</a-radio-button>
             <a-radio-button value="list">卡片列表</a-radio-button>
           </a-radio-group>
-          <a-button @click="openBedManage">床位管理</a-button>
+          <a-button v-if="!isMarketingMode" @click="openBedManage">床位管理</a-button>
           <a-button v-if="!isMarketingMode" type="primary" @click="openElderBedPanorama">3D 床态全景</a-button>
         </a-space>
         <a-radio-group v-if="viewMode === 'grid'" v-model:value="matrixQuickFilter" size="small" class="matrix-filter-switch">
@@ -231,7 +231,7 @@
       <template #footer>
         <a-space>
           <a-button @click="detailOpen = false">关闭</a-button>
-          <template v-if="current && isIdleBed(current)">
+          <template v-if="current && isIdleBed(current) && !isMarketingMode">
             <a-button @click="goHistoricalAdmissionFromBed(current)">历史补录入住</a-button>
             <a-button type="primary" @click="goContractAdmissionFromBed(current)">合同入住办理</a-button>
           </template>
@@ -247,7 +247,7 @@
         <a-descriptions-item label="总床位">{{ roomCurrent?.totalBeds || 0 }}</a-descriptions-item>
         <a-descriptions-item label="在住人数">{{ roomCurrent?.elderCount || 0 }}</a-descriptions-item>
         <a-descriptions-item label="公开备注" :span="2">{{ resolveVisibleRemark(roomCurrent?.remark) || '-' }}</a-descriptions-item>
-        <a-descriptions-item label="全部备注" :span="2">{{ resolveAllRemark(roomCurrent?.remark) || '-' }}</a-descriptions-item>
+        <a-descriptions-item v-if="!isMarketingMode" label="全部备注" :span="2">{{ resolveAllRemark(roomCurrent?.remark) || '-' }}</a-descriptions-item>
       </a-descriptions>
       <a-table :loading="roomResidentLoading" :data-source="roomResidents" :pagination="false" :row-key="(item:any)=>item.id" size="small">
         <a-table-column title="头像" key="avatar" width="70">
@@ -278,6 +278,7 @@ import { updateRoomSort } from '../../api/bed'
 import { getElderDetail } from '../../api/elder'
 import { useBedMapDataset } from '../../composables/useBedMapDataset'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
+import { getRoles } from '../../utils/auth'
 import type { BedItem, ElderItem, RoomItem } from '../../types/api'
 
 type RoomScene = {
@@ -343,6 +344,7 @@ const matrixQuickFilter = ref<'all' | 'idle' | 'occupied'>('all')
 const selectedBuilding = ref('')
 const selectedFloor = ref('')
 const isMarketingMode = computed(() => route.name === 'MarketingRoomPanorama' || route.path.startsWith('/marketing/'))
+const canLoadResidenceConfig = getRoles().some((role) => String(role).toUpperCase().endsWith('_MINISTER') || ['DIRECTOR', 'SYS_ADMIN', 'ADMIN'].includes(String(role).toUpperCase()))
 const pageTitle = computed(() => (isMarketingMode.value ? '房态图' : '房态图'))
 const pageSubTitle = computed(() => (isMarketingMode.value ? '按楼独立展开，楼层不再混排的轻量房态图' : '按楼独立展开，优先保证加载速度与操作清晰度'))
 
@@ -646,9 +648,12 @@ function genderText(gender?: number) {
 
 async function load() {
   try {
-    await Promise.all([ensureBedMapLoaded(false), ensureRoomListLoaded(), ensureResidenceConfigLoaded()])
+    await Promise.all([ensureBedMapLoaded(false), ensureRoomListLoaded()])
   } catch {
     message.warning('房态图数据加载失败')
+  }
+  if (canLoadResidenceConfig) {
+    await ensureResidenceConfigLoaded().catch(() => message.warning('房型筛选配置加载失败，房态仍可查看'))
   }
 }
 
@@ -694,7 +699,7 @@ function clearMatrixSelection() {
 }
 
 function canDragFunctionalRoom(room: RoomScene) {
-  return room.isFunctionalRoom && Boolean(room.roomId) && Boolean(room.floorId) && matrixQuickFilter.value === 'all' && !roomDrag.saving
+  return !isMarketingMode.value && room.isFunctionalRoom && Boolean(room.roomId) && Boolean(room.floorId) && matrixQuickFilter.value === 'all' && !roomDrag.saving
 }
 
 function compareRoomSceneOrder(left: RoomScene, right: RoomScene) {
@@ -1021,7 +1026,7 @@ function openElderBedPanorama() {
 useLiveSyncRefresh({
   topics: ['bed', 'elder', 'room'],
   refresh: async () => {
-    await refreshBedMapDataset({ rooms: true, residenceConfig: true })
+    await refreshBedMapDataset({ rooms: true, residenceConfig: canLoadResidenceConfig })
   }
 })
 

@@ -132,6 +132,8 @@
     </a-space>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="onSearch"
       rowKey="id"
       :columns="columns"
       :data-source="filteredRows"

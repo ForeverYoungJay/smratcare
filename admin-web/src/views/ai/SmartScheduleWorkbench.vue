@@ -148,7 +148,7 @@
       </div>
     </a-card>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="itemEditVisible"
       title="调整班次"
       :confirm-loading="itemSaving"
@@ -180,7 +180,7 @@
       </template>
     </a-modal>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="constraintVisible"
       title="排班约束配置"
       :confirm-loading="constraintSaving"

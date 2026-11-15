@@ -1,12 +1,27 @@
 <template>
-  <PageContainer title="财务工作台" subTitle="把今天要处理的收费、欠费、退款、对账和经营观察收在一个入口里。" mode="showcase" kicker="经营运营">
+  <PageContainer title="财务部工作台" subTitle="精细化财务管理，让每一份费用都公开、透明、可追溯。" mode="scenic">
     <template #meta>
       <span class="soft-pill">业务日期 {{ overview?.bizDate || '-' }}</span>
       <span class="soft-pill">当前视角 {{ roleTone }}</span>
       <span class="selection-pill">待审批 {{ pendingCount }}</span>
     </template>
 
-    <StatefulBlock :loading="loading" :error="errorMessage" @retry="loadData">
+    <DepartmentHomeOverview
+      department="FINANCE"
+      :show-header="false"
+      :show-catalog="false"
+      :metrics="departmentMetrics"
+      :data-state="departmentDataState"
+      :data-message="errorMessage"
+      :scope-label="isManagerOrAbove ? '财务部管理范围' : '当前岗位可用范围'"
+      :period-label="overview?.bizDate ? `业务日期 ${overview.bizDate}` : ''"
+      :updated-at="departmentUpdatedAt"
+      :refreshing="loading"
+      show-refresh
+      @refresh="loadData"
+    />
+
+    <StatefulBlock class="finance-detail" :loading="loading" :error="errorMessage" @retry="loadData">
       <section class="finance-stage">
         <section class="command-deck fade-up">
           <div class="command-deck__main">
@@ -27,7 +42,7 @@
               <a-button type="primary" @click="go('/finance/payments/cashier-desk')">进入收银台</a-button>
               <a-button @click="go('/finance/bills/in-resident')">查看在住账单</a-button>
               <a-button @click="go('/finance/reconcile/issue-center')">处理异常</a-button>
-              <a-button v-if="isManagerOrAbove" @click="go('/finance/reconcile/month-close')">查看月结</a-button>
+              <a-button v-if="canAccessMonthClose" @click="go('/finance/reconcile/month-close')">查看月结</a-button>
             </div>
           </div>
           <div class="command-deck__side">
@@ -289,9 +304,11 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import DepartmentHomeOverview from '../../components/workbench/DepartmentHomeOverview.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
 import { getFinanceConfigChangeLogPage, getFinanceLedgerHealth, getFinanceMasterDataOverview, getFinanceOpsInsights, getFinanceWorkbenchOverview } from '../../api/finance'
 import { useUserStore } from '../../stores/user'
@@ -305,6 +322,7 @@ import type {
   FinanceWorkbenchOverview
 } from '../../types'
 import { useECharts } from '../../plugins/echarts'
+import type { DepartmentHomeDataState, DepartmentHomeMetric } from '../../workbench/departmentHome'
 
 interface ActionLink {
   label: string
@@ -359,6 +377,22 @@ const masterOverview = ref<FinanceMasterDataOverview | null>(null)
 const latestConfigChange = ref<FinanceConfigChangeLogItem | null>(null)
 const ledgerHealth = ref<FinanceLedgerHealth | null>(null)
 const opsInsight = ref<FinanceOpsInsight | null>(null)
+const departmentUpdatedAt = ref('')
+const departmentForbidden = ref(false)
+
+const departmentDataState = computed<DepartmentHomeDataState>(() => {
+  if (loading.value) return 'loading'
+  if (departmentForbidden.value) return 'forbidden'
+  if (errorMessage.value) return 'error'
+  return overview.value ? 'ready' : 'empty'
+})
+
+const departmentMetrics = computed<DepartmentHomeMetric[]>(() => overview.value ? [
+  { key: 'collected', label: '今日收款', value: `¥ ${Number(overview.value.cashier?.todayCollectedTotal || 0).toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`, helper: '当前业务日期实收', path: '/finance/payments/records', tone: 'success' },
+  { key: 'pending', label: '待审批事项', value: pendingCount.value, helper: '退款、折扣与结算', path: '/workbench/approvals', tone: 'warning' },
+  { key: 'arrears', label: '欠费提醒', value: overview.value.risk?.overdueElderCount, helper: '需催缴跟进的长者', path: '/finance/bills/follow-up', tone: 'danger' },
+  { key: 'reconcile', label: '对账待办', value: overview.value.pending?.issueTodoCount, helper: '账务差异待处理', path: '/finance/reconcile/issue-center', tone: 'danger' }
+] : [])
 
 const { chartRef: revenueChartRef, setOption: setRevenueOption } = useECharts()
 
@@ -366,7 +400,7 @@ const userRoles = computed(() => userStore.roles || [])
 const canAccessMonthClose = computed(() =>
   resolveRouteAccess(router, userRoles.value, '/finance/reconcile/month-close', userStore.pagePermissions || []).canAccess
 )
-const isManagerOrAbove = computed(() => canAccessMonthClose.value)
+const isManagerOrAbove = computed(() => userRoles.value.some((role) => ['FINANCE_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'].includes(String(role).toUpperCase())))
 const roleTone = computed(() => isManagerOrAbove.value ? '主管 / 结账视角' : '一线 / 收银视角')
 const roleHeadline = computed(() => isManagerOrAbove.value ? '先收口风险，再推进审批、催缴和月结。' : '先完成收费闭环，再补齐票据、修正和交班。')
 const roleHint = computed(() => isManagerOrAbove.value
@@ -741,21 +775,38 @@ function renderRevenueChart() {
 async function loadData() {
   loading.value = true
   errorMessage.value = ''
+  departmentForbidden.value = false
   try {
-    const [workbenchData, configData, ledgerData, opsInsightData] = await Promise.all([
+    // 用 allSettled：以前任何一个接口挂了整页都变错误页，
+    // 早上打开工作台只因为图表接口超时就什么都看不到
+    const [workbenchData, configData, ledgerData, opsInsightData, changeLogPage] = await Promise.allSettled([
       getFinanceWorkbenchOverview(),
       getFinanceMasterDataOverview(),
       getFinanceLedgerHealth({ limit: 12 }),
-      getFinanceOpsInsights()
+      getFinanceOpsInsights(),
+      getFinanceConfigChangeLogPage({ pageNo: 1, pageSize: 1 })
     ])
-    overview.value = workbenchData
-    masterOverview.value = configData
-    ledgerHealth.value = ledgerData
-    opsInsight.value = opsInsightData
-    const changeLogPage = await getFinanceConfigChangeLogPage({ pageNo: 1, pageSize: 1 })
-    latestConfigChange.value = changeLogPage?.list?.[0] || null
+    if (workbenchData.status === 'fulfilled') overview.value = workbenchData.value
+    if (configData.status === 'fulfilled') masterOverview.value = configData.value
+    if (ledgerData.status === 'fulfilled') ledgerHealth.value = ledgerData.value
+    if (opsInsightData.status === 'fulfilled') opsInsight.value = opsInsightData.value
+    if (changeLogPage.status === 'fulfilled') latestConfigChange.value = changeLogPage.value?.list?.[0] || null
+
+    const failures = [workbenchData, configData, ledgerData, opsInsightData, changeLogPage]
+      .filter((item): item is PromiseRejectedResult => item.status === 'rejected')
+    // 主数据（工作台总览）失败才算整页失败，其余只做降级提示
+    if (workbenchData.status === 'rejected') {
+      const reason: any = workbenchData.reason
+      departmentForbidden.value = Number(reason?.response?.status) === 403
+      errorMessage.value = reason?.message || '加载财务工作台失败'
+      message.error(errorMessage.value)
+    } else if (failures.length) {
+      message.warning(`有 ${failures.length} 块数据加载失败，其余内容已正常显示，可稍后刷新重试`)
+    }
+    departmentUpdatedAt.value = dayjs().format('HH:mm')
     renderRevenueChart()
   } catch (error: any) {
+    departmentForbidden.value = Number(error?.response?.status) === 403
     errorMessage.value = error?.message || '加载财务工作台失败'
     message.error(errorMessage.value)
   } finally {

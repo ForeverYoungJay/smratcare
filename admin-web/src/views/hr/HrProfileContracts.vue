@@ -16,6 +16,8 @@
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="staffId"
       :columns="columns"
       :data-source="rows"
@@ -39,7 +41,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="modalOpen" title="维护劳动合同" width="560px" @ok="submit" :confirm-loading="saving">
+    <a-modal :mask-closable="false" v-model:open="modalOpen" title="维护劳动合同" width="560px" @ok="submit" :confirm-loading="saving">
       <a-form :model="form" layout="vertical">
         <a-form-item label="员工">
           <a-input :value="`${form.realName || '-'}${form.staffNo ? ` (${form.staffNo})` : ''}`" disabled />

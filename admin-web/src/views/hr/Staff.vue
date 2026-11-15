@@ -73,6 +73,8 @@
     </a-row>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="staffId"
       :row-selection="rowSelection"
       :columns="columns"
@@ -280,7 +282,7 @@
       </template>
     </a-drawer>
 
-    <a-modal v-model:open="terminateOpen" title="员工离职" @ok="submitTerminate" :confirm-loading="terminating">
+    <a-modal :mask-closable="false" v-model:open="terminateOpen" title="员工离职" @ok="submitTerminate" :confirm-loading="terminating">
       <a-form layout="vertical">
         <a-form-item label="员工ID" required>
           <a-input v-model:value="terminateForm.staffId" disabled />

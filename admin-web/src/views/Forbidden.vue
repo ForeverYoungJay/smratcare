@@ -4,7 +4,7 @@
       <template #extra>
         <a-space>
           <a-button @click="goEnterpriseHome">返回企业首页</a-button>
-          <a-button type="primary" @click="goPortal">返回首页</a-button>
+          <a-button type="primary" @click="goHome">返回我的首页</a-button>
           <a-button @click="contactAdmin">联系管理员</a-button>
         </a-space>
       </template>
@@ -15,11 +15,14 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { enterpriseProfile } from '../constants/enterpriseProfile'
+import { resolveDefaultHome } from '../access/policy'
+import { getRoles } from '../utils/auth'
 
 const router = useRouter()
 
-function goPortal() {
-  router.push('/portal')
+// 不能写死 /portal：一线员工无权访问经营总览，点了会再吃一次 403
+function goHome() {
+  router.push(resolveDefaultHome(getRoles()))
 }
 
 function goEnterpriseHome() {

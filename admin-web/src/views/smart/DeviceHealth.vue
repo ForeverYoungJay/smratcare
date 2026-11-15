@@ -48,7 +48,9 @@
       </template>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="onSearch" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'onlineStatus'">
           <a-badge :status="record.onlineStatus === 'ONLINE' ? 'success' : 'error'" :text="record.onlineStatus === 'ONLINE' ? '在线' : '离线'" />

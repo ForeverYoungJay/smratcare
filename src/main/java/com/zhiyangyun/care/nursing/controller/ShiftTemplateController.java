@@ -46,6 +46,7 @@ public class ShiftTemplateController {
     return Result.ok(response);
   }
 
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping("/batch-save")
   public Result<List<ShiftTemplateResponse>> saveBatch(@Valid @RequestBody ShiftTemplateBatchSaveRequest request) {
     Long tenantId = AuthContext.getOrgId();

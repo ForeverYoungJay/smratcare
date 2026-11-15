@@ -73,7 +73,7 @@
       />
     </a-card>
 
-    <a-modal v-model:open="createOpen" title="新增外出就医登记" @ok="submitCreate" :confirm-loading="submitting" width="560px">
+    <a-modal :mask-closable="false" v-model:open="createOpen" title="新增外出就医登记" @ok="submitCreate" :confirm-loading="submitting" width="560px">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人" name="elderId">
           <a-select

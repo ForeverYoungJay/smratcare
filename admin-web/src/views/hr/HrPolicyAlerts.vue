@@ -16,6 +16,8 @@
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="documentId"
       :columns="columns"
       :data-source="rows"

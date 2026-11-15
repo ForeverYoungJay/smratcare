@@ -155,7 +155,7 @@
       </table>
     </div>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="reportConfigOpen"
       :title="reportAction === 'print' ? '打印内容设置' : '下载内容设置'"
       @ok="submitReportAction"

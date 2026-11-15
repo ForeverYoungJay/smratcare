@@ -109,7 +109,10 @@
         :hint="flowGuardHint"
         @action="handleFlowGuardAction"
       />
-      <MarketingListToolbar :selected-count="selectedCount" tip="支持批量删除与流程推进">
+      <MarketingListToolbar
+        :selected-count="selectedCount"
+        :tip="canApproveContract ? '支持批量删除与流程推进' : '可查看、编辑并推进入住评估与办理；最终签署由主管完成'"
+      >
         <a-space>
           <a-button v-if="!isSignedMode" type="primary" @click="openForm()">新增合同</a-button>
           <a-button :disabled="!hasSingleSelection" @click="viewSelected">查看</a-button>
@@ -118,8 +121,8 @@
           <a-button :disabled="!hasSingleSelection" @click="assessmentSelected">入住评估</a-button>
           <a-button :disabled="!hasSingleSelection" @click="openAttachmentSelected">附件</a-button>
           <a-button :disabled="!hasSingleSelection" @click="admissionSelected">入住办理</a-button>
-          <a-button :disabled="!hasSingleSelection" @click="finalizeSelected">最终签署</a-button>
-          <a-button :disabled="selectedCount === 0" danger @click="batchDelete">删除</a-button>
+          <a-button v-if="canApproveContract" :disabled="!hasSingleSelection" @click="finalizeSelected">最终签署</a-button>
+          <a-button v-if="canApproveContract" :disabled="selectedCount === 0" danger @click="batchDelete">删除</a-button>
         </a-space>
       </MarketingListToolbar>
       <a-table
@@ -179,7 +182,7 @@
       />
     </a-card>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="open"
       :title="contractModalTitle"
       width="1120px"
@@ -636,7 +639,7 @@
       <a-empty v-else description="附件链接缺失，暂时无法预览" />
     </a-modal>
 
-    <a-modal v-model:open="finalizeOpen" title="最终签署" width="620px" :confirm-loading="finalizing" @ok="submitFinalize">
+    <a-modal :mask-closable="false" v-model:open="finalizeOpen" title="最终签署" width="620px" :confirm-loading="finalizing" @ok="submitFinalize">
       <a-form layout="vertical" :model="finalizeForm">
         <a-alert
           type="info"
@@ -744,6 +747,7 @@ import { createDisease, getDiseaseList } from '../../api/store'
 import { getStaffPage } from '../../api/staff'
 import { idCardValidator, mobilePhoneValidator } from '../../utils/validators'
 import { useUserStore } from '../../stores/user'
+import { hasAnyRole } from '../../utils/roleAccess'
 import type {
   ContractAttachmentItem,
   ContractSystemLinkageSummary,
@@ -852,6 +856,9 @@ const currentStaffDisplayName = computed(() => {
   if (realName) return realName
   return String(userStore.staffInfo?.username || '').trim()
 })
+const canApproveContract = computed(() => hasAnyRole(userStore.roles || [], [
+  'MARKETING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'
+]))
 
 function ensureMarketerOption(name?: string) {
   const text = String(name || '').trim()
@@ -1881,9 +1888,9 @@ function nextStepLabel(record: CrmContractItem) {
     return isAssessmentReady(record) ? '去入住办理' : '去入住评估'
   }
   if (stage === 'PENDING_BED_SELECT') {
-    return isAdmissionReady(record) ? '去最终签署' : '去入住办理'
+    return isAdmissionReady(record) ? (canApproveContract.value ? '去最终签署' : '等待主管签署') : '去入住办理'
   }
-  if (stage === 'PENDING_SIGN') return '去最终签署'
+  if (stage === 'PENDING_SIGN') return canApproveContract.value ? '去最终签署' : '等待主管签署'
   return '查看'
 }
 
@@ -1907,14 +1914,16 @@ async function handleNextStep(record: CrmContractItem) {
   }
   if (stage === 'PENDING_BED_SELECT') {
     if (isAdmissionReady(record)) {
-      await openFinalize(record)
+      if (canApproveContract.value) await openFinalize(record)
+      else view(record)
       return
     }
     await goAdmissionProcessing(record)
     return
   }
   if (stage === 'PENDING_SIGN') {
-    await openFinalize(record)
+    if (canApproveContract.value) await openFinalize(record)
+    else view(record)
     return
   }
   view(record)

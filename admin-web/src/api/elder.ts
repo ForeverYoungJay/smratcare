@@ -1,6 +1,5 @@
 import request, { fetchPage } from '../utils/request'
 import type {
-  PageResult,
   ElderItem,
   ElderCreateRequest,
   ElderAssignBedRequest,

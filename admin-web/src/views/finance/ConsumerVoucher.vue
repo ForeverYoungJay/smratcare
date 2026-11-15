@@ -106,7 +106,7 @@
       </div>
     </a-card>
 
-    <a-modal v-model:open="issueOpen" title="发放消费券" width="620" :confirm-loading="issuing" @ok="submitIssue">
+    <a-modal :mask-closable="false" v-model:open="issueOpen" title="发放消费券" width="620" :confirm-loading="issuing" @ok="submitIssue">
       <a-form layout="vertical" :model="issueForm" :rules="issueRules" ref="issueFormRef">
         <a-form-item label="券名称" name="voucherName">
           <a-input v-model:value="issueForm.voucherName" placeholder="如：中秋关怀券" />

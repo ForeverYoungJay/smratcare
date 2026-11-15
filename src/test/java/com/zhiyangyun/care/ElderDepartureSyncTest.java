@@ -90,6 +90,7 @@ class ElderDepartureSyncTest {
     plan.setTenantId(1L);
     plan.setOrgId(1L);
     plan.setElderId(4003L);
+    plan.setServiceItemId(1L);
     plan.setPlanName("离院联动测试计划");
     plan.setCycleType("DAILY");
     plan.setFrequency(1);
@@ -102,6 +103,7 @@ class ElderDepartureSyncTest {
     serviceBooking.setOrgId(1L);
     serviceBooking.setElderId(4003L);
     serviceBooking.setPlanId(plan.getId());
+    serviceBooking.setServiceItemId(1L);
     serviceBooking.setBookingTime(LocalDateTime.now().plusDays(1));
     serviceBooking.setStatus("BOOKED");
     serviceBookingMapper.insert(serviceBooking);

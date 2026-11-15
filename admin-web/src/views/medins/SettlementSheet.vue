@@ -22,7 +22,9 @@
       </template>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="onSearch" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'totalFee'">{{ yuan(record.totalFee) }}</template>
         <template v-else-if="column.key === 'fundPay'">{{ yuan(record.fundPay) }}</template>
@@ -51,7 +53,7 @@
     </DataTable>
 
     <!-- 生成清单 -->
-    <a-modal v-model:open="genOpen" title="生成医保结算清单" :confirm-loading="saving" @ok="submitGenerate">
+    <a-modal :mask-closable="false" v-model:open="genOpen" title="生成医保结算清单" :confirm-loading="saving" @ok="submitGenerate">
       <a-alert type="info" show-icon message="从已提交(SUBMITTED)的长护险结算单生成，金额自动带入统筹支付/个人自付。" style="margin-bottom: 12px" />
       <a-form layout="vertical">
         <a-form-item label="长者" required>
@@ -65,7 +67,7 @@
     </a-modal>
 
     <!-- 上传清单 -->
-    <a-modal v-model:open="uploadOpen" title="上传结算清单" :confirm-loading="saving" @ok="submitUpload">
+    <a-modal :mask-closable="false" v-model:open="uploadOpen" title="上传结算清单" :confirm-loading="saving" @ok="submitUpload">
       <a-form layout="vertical">
         <a-form-item label="上传渠道" required>
           <a-select v-model:value="uploadForm.channel" placeholder="选择医保渠道">

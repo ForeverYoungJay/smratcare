@@ -16,6 +16,8 @@
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="contractId"
       :columns="columns"
       :data-source="rows"

@@ -25,7 +25,9 @@
       </template>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="onSearch" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'channel'">
           <a-tag :color="record.channel === 'MZ_JINMIN' ? 'geekblue' : 'purple'">{{ channelText(record.channel) }}</a-tag>
@@ -49,7 +51,7 @@
     </DataTable>
 
     <!-- 构建任务 -->
-    <a-modal v-model:open="buildOpen" title="构建上报任务" :confirm-loading="saving" @ok="submitBuild">
+    <a-modal :mask-closable="false" v-model:open="buildOpen" title="构建上报任务" :confirm-loading="saving" @ok="submitBuild">
       <a-form layout="vertical">
         <a-form-item label="渠道" required>
           <a-select v-model:value="buildForm.channel">

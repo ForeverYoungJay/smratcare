@@ -145,7 +145,7 @@
       </a-tabs>
     </a-drawer>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="refundOpen"
       title="订单退款"
       :confirm-loading="refundSubmitting"

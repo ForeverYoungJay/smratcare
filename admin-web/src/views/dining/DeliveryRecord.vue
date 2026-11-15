@@ -15,7 +15,9 @@
       </template>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
           <a-tag :color="getDiningDeliveryStatusColor(record.status)">
@@ -40,7 +42,7 @@
       </div>
     </a-modal>
 
-    <a-modal v-model:open="editOpen" title="送餐记录" :confirm-loading="saving" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="送餐记录" :confirm-loading="saving" @ok="submit">
       <a-form layout="vertical">
         <a-form-item label="点餐单" required>
           <a-select

@@ -44,7 +44,7 @@
       </vxe-table>
     </a-card>
 
-    <a-modal v-model:open="editOpen" title="缴费渠道" @ok="submitEdit" :confirm-loading="saving">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="缴费渠道" @ok="submitEdit" :confirm-loading="saving">
       <a-form layout="vertical" :model="form">
         <a-form-item label="渠道编码">
           <a-input v-model:value="form.channelCode" placeholder="如 ALIPAY / WECHAT / BANK" />

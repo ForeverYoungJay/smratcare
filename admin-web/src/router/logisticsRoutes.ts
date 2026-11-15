@@ -16,7 +16,7 @@ export const logisticsRoutes: RouteRecordRaw[] = [
             path: 'workbench',
             name: 'LogisticsWorkbench',
             component: () => import('../views/logistics/Workbench.vue'),
-            meta: { title: '后勤工作台' }
+            meta: { title: '后勤部工作台' }
           },
           {
             path: 'task-center',
@@ -197,7 +197,7 @@ export const logisticsRoutes: RouteRecordRaw[] = [
             name: 'LogisticsReports',
             meta: { title: '后勤报表中心' },
             children: [
-              { path: 'bed-usage', name: 'LogisticsReportBedUsage', redirect: '/stats/org/bed-usage', meta: { title: '床位使用率' } },
+              { path: 'bed-usage', name: 'LogisticsReportBedUsage', component: () => import('../views/stats/OrgBedUsage.vue'), meta: { title: '床位使用率' } },
               { path: 'stock-amount', name: 'LogisticsReportStockAmount', redirect: '/logistics/storage/stock-amount', meta: { title: '库存金额统计' } },
               { path: 'purchase', name: 'LogisticsReportPurchase', redirect: '/logistics/storage/purchase', meta: { title: '采购统计' } },
               { path: 'consume', name: 'LogisticsReportConsume', redirect: '/logistics/storage/outbound', meta: { title: '物资消耗统计' } },

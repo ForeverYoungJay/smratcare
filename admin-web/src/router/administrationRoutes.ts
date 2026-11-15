@@ -290,7 +290,7 @@ export const administrationRoutes: RouteRecordRaw[] = [
             path: 'staff-collaboration',
             name: 'OaStaffCollaboration',
             component: () => import('../views/oa/StaffCollaborationCenter.vue'),
-            meta: { title: '员工协同中心', hidden: true }
+            meta: { title: '跨部门协同流程' }
           },
           {
             path: 'employee-suggestions',

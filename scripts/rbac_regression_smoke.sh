@@ -64,7 +64,7 @@ assert_status_eq() {
   local expected="$2"
   local title="$3"
   if [[ "$actual" != "$expected" ]]; then
-    echo "❌ $title -> 期望 $expected，实际 $actual"
+    echo "❌ $title -> 期望 ${expected}，实际 ${actual}"
     exit 1
   fi
   echo "✅ $title -> $actual"
@@ -81,26 +81,8 @@ assert_not_403() {
 }
 
 echo "[1/3] 菜单/路由权限规则静态断言"
-node --input-type=module <<'NODE'
-import { hasRouteAccess } from './admin-web/src/utils/roleAccess.js'
-
-const cases = [
-  { title: '护理员工可访问护理员工路由', roles: ['NURSING_EMPLOYEE'], required: ['NURSING_EMPLOYEE', 'NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'], path: '/care/caregiver-info', expected: true },
-  { title: '护理员工不可访问护理管理路由', roles: ['NURSING_EMPLOYEE'], required: ['ADMIN'], path: '/care/care-packages', expected: false },
-  { title: '护理部长可访问护理管理路由', roles: ['NURSING_MINISTER'], required: ['ADMIN'], path: '/care/care-packages', expected: true },
-  { title: '财务员工不可访问营销模块', roles: ['FINANCE_EMPLOYEE'], required: ['MARKETING_EMPLOYEE', 'MARKETING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'], path: '/marketing/workbench', expected: false },
-  { title: '市场员工可访问营销模块', roles: ['MARKETING_EMPLOYEE'], required: ['MARKETING_EMPLOYEE', 'MARKETING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'], path: '/marketing/workbench', expected: true }
-]
-
-for (const c of cases) {
-  const actual = hasRouteAccess(c.roles, c.required, c.path)
-  if (actual !== c.expected) {
-    console.error(`❌ ${c.title} -> expected=${c.expected}, actual=${actual}`)
-    process.exit(1)
-  }
-  console.log(`✅ ${c.title}`)
-}
-NODE
+(cd admin-web && npm run test:unit -- --run src/utils/routeAccess.test.ts >/dev/null)
+echo "✅ 路由权限单元测试通过"
 echo
 
 echo "[2/3] 获取回归账号 token"
@@ -115,23 +97,39 @@ echo
 
 echo "[3/3] 核心接口 403/200 回归断言"
 
-status="$(api_status "$finance_emp_token" "PUT" "/api/finance/fee/admission-audit/1/review" '{"status":"APPROVED","remark":"smoke"}')"
+status="$(api_status "$finance_emp_token" "PUT" "/api/finance/fee/admission-audit/-1/review" '{"status":"APPROVED","remark":"smoke"}')"
 assert_status_eq "$status" "403" "财务员工不可执行费用审核(review)"
 
-status="$(api_status "$finance_minister_token" "PUT" "/api/finance/fee/admission-audit/1/review" '{"status":"APPROVED","remark":"smoke"}')"
+status="$(api_status "$finance_minister_token" "PUT" "/api/finance/fee/admission-audit/-1/review" '{"status":"APPROVED","remark":"smoke"}')"
 assert_not_403 "$status" "财务部长可执行费用审核(review)"
 
 status="$(api_status "$nursing_emp_token" "GET" "/api/nursing/service-plans/page?pageNo=1&pageSize=1")"
-assert_status_eq "$status" "403" "护理员工不可查看护理服务计划管理页"
+assert_not_403 "$status" "护理员工可查看护理服务计划"
 
 status="$(api_status "$nursing_minister_token" "GET" "/api/nursing/service-plans/page?pageNo=1&pageSize=1")"
 assert_not_403 "$status" "护理部长可查看护理服务计划管理页"
 
-status="$(api_status "$marketing_emp_token" "POST" "/api/marketing/plans" '{}')"
-assert_status_eq "$status" "403" "市场员工不可创建营销计划"
+status="$(api_status "$nursing_emp_token" "GET" "/api/nursing/care-levels/list?enabled=1")"
+assert_not_403 "$status" "护理员工可查看护理等级"
 
-status="$(api_status "$marketing_minister_token" "POST" "/api/marketing/plans" '{}')"
-assert_not_403 "$status" "市场部长可创建营销计划"
+status="$(api_status "$marketing_emp_token" "GET" "/api/bed/map?includeRisk=false")"
+assert_not_403 "$status" "市场员工可只读查看床位房态"
+
+risk_response="$(curl -sS -H "Authorization: Bearer $marketing_emp_token" "$BASE_URL/api/bed/map?includeRisk=true")"
+if ! printf '%s' "$risk_response" | jq -e '.data | length > 0 and all(.[]; .riskLevel == null and .riskLabel == null and .riskSource == null and .abnormalVital24hCount == null and .latestAssessmentLevel == null and .latestAssessmentDate == null)' >/dev/null; then
+  echo "❌ 市场员工不应读取护理风险数据"
+  exit 1
+fi
+echo "✅ 市场员工无法通过 includeRisk=true 获取护理风险数据"
+
+status="$(api_status "$marketing_emp_token" "PUT" "/api/bed/-1" '{"roomId":-1,"bedNo":"smoke"}')"
+assert_status_eq "$status" "403" "市场员工不可修改床位"
+
+status="$(api_status "$marketing_emp_token" "PUT" "/api/marketing/plans/-1" '{"moduleType":"SPEECH","title":"权限检查"}')"
+assert_status_eq "$status" "403" "市场员工不可修改营销计划"
+
+status="$(api_status "$marketing_minister_token" "PUT" "/api/marketing/plans/-1" '{"moduleType":"SPEECH","title":"权限检查"}')"
+assert_not_403 "$status" "市场部长可进入营销计划修改接口"
 
 status="$(api_status "$finance_emp_token" "GET" "/api/marketing/plans/page?pageNo=1&pageSize=1")"
 assert_status_eq "$status" "403" "财务员工不可跨部门访问营销计划列表"

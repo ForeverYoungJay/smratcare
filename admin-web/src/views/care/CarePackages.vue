@@ -29,7 +29,7 @@
       </a-table>
     </a-card>
 
-    <a-modal v-model:open="modalOpen" title="护理套餐" :confirm-loading="submitting" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="modalOpen" title="护理套餐" :confirm-loading="submitting" @ok="submit">
       <a-form ref="formRef" layout="vertical" :model="form" :rules="rules">
         <a-form-item name="name" label="套餐名称" required>
           <a-input v-model:value="form.name" />

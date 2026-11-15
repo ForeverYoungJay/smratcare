@@ -55,7 +55,7 @@ class AuthSecurityTest {
         .andExpect(header().exists("X-Request-Id"))
         .andExpect(jsonPath("$.code", is(0)))
         .andExpect(jsonPath("$.success", is(true)))
-        .andExpect(jsonPath("$.timestamp").isNumber())
+        .andExpect(jsonPath("$.timestamp").isString())
         .andExpect(jsonPath("$.requestId").isString())
         .andExpect(jsonPath("$.data.token").exists());
   }
@@ -117,6 +117,36 @@ class AuthSecurityTest {
     mockMvc.perform(get("/api/health/archive/page")
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void staff_cannot_access_nursing_tasks_without_nursing_or_medical_role() throws Exception {
+    String token = loginAndGetToken("staff", "123456");
+
+    mockMvc.perform(get("/api/care/tasks/page")
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isForbidden());
+
+    mockMvc.perform(post("/api/nursing/shift-templates/batch-save")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{}")
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void staff_cannot_access_medical_private_apis_without_medical_or_nursing_role() throws Exception {
+    String token = loginAndGetToken("staff", "123456");
+
+    for (String path : new String[] {
+        "/api/medical/emr/page",
+        "/api/medical/rounds/plans/page",
+        "/api/pharmacy/drugs/page"
+    }) {
+      mockMvc.perform(get(path)
+              .header("Authorization", "Bearer " + token))
+          .andExpect(status().isForbidden());
+    }
   }
 
   @Test

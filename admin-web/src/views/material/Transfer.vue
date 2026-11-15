@@ -48,7 +48,7 @@
       />
     </a-card>
 
-    <a-modal v-model:open="editorOpen" :title="editingId ? '编辑调拨单' : '新建调拨单'" width="860px" :confirm-loading="saving" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="editorOpen" :title="editingId ? '编辑调拨单' : '新建调拨单'" width="860px" :confirm-loading="saving" @ok="submit">
       <a-form layout="vertical" :model="form">
         <a-row :gutter="12">
           <a-col :span="12">

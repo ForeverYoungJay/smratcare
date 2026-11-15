@@ -5,9 +5,10 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
 INIT_SQL="docker/mysql/init/2_data.sql"
+DEMO_SQL="src/main/resources/db/migration/V147__seed_demo_staff_for_6_departments_3_roles.sql"
 
-if [[ ! -f "$INIT_SQL" ]]; then
-  echo "未找到初始化数据文件：$INIT_SQL"
+if [[ ! -f "$INIT_SQL" || ! -f "$DEMO_SQL" ]]; then
+  echo "未找到初始化或示例账号迁移文件。"
   exit 1
 fi
 
@@ -17,7 +18,7 @@ echo
 echo "[1/6] 检查 6 部门编码是否完整"
 dept_codes=(CARE MED FIN LOGI HR MKT)
 for code in "${dept_codes[@]}"; do
-  if ! rg -nF "'$code'" "$INIT_SQL" >/dev/null; then
+  if ! rg -nF "'$code'" "$INIT_SQL" "$DEMO_SQL" >/dev/null; then
     echo "缺少部门编码：$code"
     exit 1
   fi
@@ -36,7 +37,7 @@ role_codes=(
   MARKETING_EMPLOYEE MARKETING_MINISTER
 )
 for code in "${role_codes[@]}"; do
-  if ! rg -nF "'$code'" "$INIT_SQL" >/dev/null; then
+  if ! rg -nF "'$code'" "$INIT_SQL" "$DEMO_SQL" >/dev/null; then
     echo "缺少角色编码：$code"
     exit 1
   fi
@@ -55,7 +56,7 @@ users=(
   marketing_emp marketing_minister marketing_director
 )
 for username in "${users[@]}"; do
-  if ! rg -n "'.*', '$username'," "$INIT_SQL" >/dev/null; then
+  if ! rg -nF "'$username'" "$INIT_SQL" "$DEMO_SQL" >/dev/null; then
     echo "缺少账号：$username"
     exit 1
   fi
@@ -64,7 +65,7 @@ echo "通过：账号矩阵完整。"
 echo
 
 echo "[4/6] 检查 admin 是否归属 HR 部门"
-if ! rg -n "\(500, 1, 14, 'S0001', 'admin'," "$INIT_SQL" >/dev/null; then
+if ! rg -nF "500, 1, 14, 'S0001', 'admin'," "$INIT_SQL" >/dev/null; then
   echo "admin 未归属 HR（department_id=14）。"
   exit 1
 fi
@@ -84,11 +85,11 @@ echo "通过：V146/V147 迁移文件存在。"
 echo
 
 echo "[6/6] 检查 staff_role 是否包含 admin 双角色绑定"
-if ! rg -n "\(600, 1, 500, 100," "$INIT_SQL" >/dev/null; then
+if ! rg -nF "(600, 1, 500, 100," "$INIT_SQL" >/dev/null; then
   echo "缺少 admin -> ADMIN 绑定。"
   exit 1
 fi
-if ! rg -n "\(601, 1, 500, 101," "$INIT_SQL" >/dev/null; then
+if ! rg -nF "(601, 1, 500, 101," "$INIT_SQL" >/dev/null; then
   echo "缺少 admin -> SYS_ADMIN 绑定。"
   exit 1
 fi

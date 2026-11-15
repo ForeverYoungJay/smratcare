@@ -25,6 +25,8 @@
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :row-selection="rowSelection"
       :columns="columns"
@@ -42,7 +44,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" :title="form.id ? '编辑分组' : '新增分组'" @ok="submit" :confirm-loading="saving" width="620px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" :title="form.id ? '编辑分组' : '新增分组'" @ok="submit" :confirm-loading="saving" width="620px">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">

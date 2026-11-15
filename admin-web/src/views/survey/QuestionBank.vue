@@ -86,7 +86,7 @@
       />
     </a-card>
 
-    <a-modal v-model:open="open" title="题目" width="520px" :confirm-loading="submitting" @ok="submit" @cancel="() => (open = false)">
+    <a-modal :mask-closable="false" v-model:open="open" title="题目" width="520px" :confirm-loading="submitting" @ok="submit" @cancel="() => (open = false)">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="题目编码" name="questionCode">
           <a-input v-model:value="form.questionCode" placeholder="如 Q_001" />

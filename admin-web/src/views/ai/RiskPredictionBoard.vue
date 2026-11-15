@@ -133,7 +133,7 @@
       </template>
     </a-drawer>
 
-    <a-modal v-model:open="modelVisible" title="风险评分模型配置" width="720" :footer="null">
+    <a-modal :mask-closable="false" v-model:open="modelVisible" title="风险评分模型配置" width="720" :footer="null">
       <a-alert
         type="info"
         show-icon

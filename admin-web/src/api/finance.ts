@@ -135,7 +135,7 @@ export function executeFinanceDischargeStatusSync(data: FinanceDischargeStatusSy
 export async function exportFinanceLedgerHealthCsv(params?: { limit?: number }) {
   const url = new URL('/api/finance/workbench/ledger/health/export', window.location.origin)
   Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
+    if (value !== undefined && value !== null) {
       url.searchParams.set(key, String(value))
     }
   })

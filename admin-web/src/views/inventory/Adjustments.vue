@@ -100,7 +100,7 @@
       />
     </a-card>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="createOpen"
       title="新增盘点记录"
       :confirm-loading="saving"

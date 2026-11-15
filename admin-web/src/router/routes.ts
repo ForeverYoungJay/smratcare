@@ -36,7 +36,9 @@ export const routes: RouteRecordRaw[] = [
   },
   {
     path: '/admin',
-    redirect: '/login?redirect=/portal',
+    // 不写死 /portal：登录后由 resolveDefaultHome 按角色决定落地页，
+    // 否则一线员工从这个入口进来会被送到自己无权访问的经营总览并吃 403
+    redirect: '/login',
     meta: { title: '后台入口', hidden: true }
   },
   {

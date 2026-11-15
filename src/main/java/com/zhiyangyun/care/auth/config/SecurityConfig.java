@@ -114,7 +114,8 @@ public class SecurityConfig {
             .requestMatchers("/api/admin/staff/options", "/api/admin/departments/options").hasAnyRole(STAFF_ROLES)
             .requestMatchers("/api/admin/**").hasAnyRole(MINISTER_OR_HIGHER_ROLES)
             .requestMatchers("/api/base-config/**").hasAnyRole(MINISTER_OR_HIGHER_ROLES)
-            .requestMatchers("/api/medical-care/**", "/api/health/**", "/api/vital/**").hasAnyRole(MEDICAL_AND_NURSING_ROLES)
+            .requestMatchers("/api/care/**", "/api/nursing/**").hasAnyRole(MEDICAL_AND_NURSING_ROLES)
+            .requestMatchers("/api/medical-care/**", "/api/medical/**", "/api/health/**", "/api/vital/**", "/api/pharmacy/**").hasAnyRole(MEDICAL_AND_NURSING_ROLES)
             .requestMatchers(
                 "/api/asset/**",
                 "/api/material/**",

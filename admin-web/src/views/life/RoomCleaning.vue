@@ -13,6 +13,8 @@
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -36,7 +38,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" :title="form.id ? '编辑打扫任务' : '新增打扫任务'" @ok="submit" :confirm-loading="saving" width="620px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" :title="form.id ? '编辑打扫任务' : '新增打扫任务'" @ok="submit" :confirm-loading="saving" width="620px">
       <a-form layout="vertical">
         <a-form-item label="房间" required>
           <a-select

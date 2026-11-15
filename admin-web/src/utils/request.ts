@@ -1,4 +1,5 @@
 import axios from 'axios'
+import type { AxiosInstance, AxiosRequestConfig } from 'axios'
 import { message } from 'ant-design-vue'
 import router from '../router'
 import { getToken, clearToken, clearRoles, clearPermissions, clearPagePermissions } from './auth'
@@ -11,19 +12,43 @@ type RequestExtraConfig = {
   forceErrorToast?: boolean
 }
 
+type DataRequestClient = Omit<AxiosInstance, 'get' | 'post' | 'put' | 'patch' | 'delete'> & {
+  get<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T>
+  post<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>
+  put<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>
+  patch<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>
+  delete<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T>
+}
+
+// The response interceptor unwraps both AxiosResponse and the backend Result<T>
+// envelope, so callers receive T rather than AxiosResponse<T>.
 const request = axios.create({
   baseURL: '/',
   timeout: 45000
-})
+}) as DataRequestClient
 
-let lastForbiddenToastAt = 0
-let lastForbiddenToastKey = ''
-const FORBIDDEN_TOAST_COOLDOWN_MS = 2500
+let lastThrottledToastAt = 0
+let lastThrottledToastKey = ''
+const TOAST_COOLDOWN_MS = 2500
 const GENERIC_FORBIDDEN_PATTERNS = [
   /access denied/i,
   /无权限访问该资源/,
   /当前账号无该操作权限/
 ]
+/** 后端通用 403 报文没有信息量，统一换成能指导下一步的中文文案 */
+const GENERIC_FORBIDDEN_TEXT = '当前账号没有该操作权限，请联系主管或管理员开通'
+
+/**
+ * 同一来源的重复提示在冷却期内只弹一次。
+ * 自动刷新类请求在弱网下会连续失败，靠节流避免刷屏——而不是靠静默把失败藏起来。
+ */
+function toastOnce(key: string, show: () => void) {
+  const now = Date.now()
+  if (key === lastThrottledToastKey && now - lastThrottledToastAt <= TOAST_COOLDOWN_MS) return
+  lastThrottledToastAt = now
+  lastThrottledToastKey = key
+  show()
+}
 
 /** 后端偶发返回英文原文，已知报文在展示前翻译为中文 */
 const KNOWN_ERROR_TRANSLATIONS: Array<{ pattern: RegExp; text: string }> = [
@@ -59,7 +84,19 @@ function resolveAxiosErrorMessage(error: any) {
   if (/network error/i.test(rawMessage)) {
     return '网络异常，请检查网络后重试'
   }
-  return resolveErrorMessage(error?.response?.data, rawMessage || '请求失败')
+  const status = Number(error?.response?.status || 0)
+  // 后端没给可用报文时，以前会把 axios 的英文原文（Request failed with status code 500）直接显示给用户
+  const statusFallback = status >= 500
+    ? '服务暂时不可用（服务器异常），请稍后重试'
+    : status > 0
+      ? `请求失败（${status}），请稍后重试`
+      : '请求失败，请稍后重试'
+  // 网关/代理故障时响应体常常是整页 HTML，不能原样弹给用户
+  const payload = error?.response?.data
+  const usablePayload = typeof payload === 'string' && (payload.length > 200 || /^\s*</.test(payload))
+    ? null
+    : payload
+  return resolveErrorMessage(usablePayload, statusFallback)
 }
 
 function normalizeRedirectPath(path?: string | null) {
@@ -159,24 +196,19 @@ request.interceptors.response.use(
       const payload = error?.response?.data
       const rawMessage = resolveErrorMessage(payload, '当前账号无该操作权限（403）')
       const isGenericForbidden = GENERIC_FORBIDDEN_PATTERNS.some((pattern) => pattern.test(rawMessage))
-      if (isGenericForbidden) {
-        return Promise.reject(error)
+      // 通用 403 以前直接静默，导致“点了没反应”——现在换成可执行的中文提示
+      const displayMessage = isGenericForbidden ? GENERIC_FORBIDDEN_TEXT : rawMessage
+      if (error && typeof error === 'object') {
+        try {
+          error.message = displayMessage
+        } catch {
+          // message 只读时忽略，不影响主流程
+        }
       }
-      const displayMessage = rawMessage
-      const now = Date.now()
-      const key = `${url}|${displayMessage}`
-      if (key !== lastForbiddenToastKey || now - lastForbiddenToastAt > FORBIDDEN_TOAST_COOLDOWN_MS) {
-        message.warning(displayMessage)
-        lastForbiddenToastAt = now
-        lastForbiddenToastKey = key
-      }
+      toastOnce(`${url}|${displayMessage}`, () => message.warning(displayMessage))
       return Promise.reject(error)
     }
     if (silentError) {
-      return Promise.reject(error)
-    }
-    // 自动刷新类 GET 请求在超时/弱网下容易形成提示风暴，默认静默处理
-    if (!forceErrorToast && method === 'GET' && isTimeoutOrNetwork) {
       return Promise.reject(error)
     }
     const resolvedMessage = resolveAxiosErrorMessage(error)
@@ -188,6 +220,12 @@ request.interceptors.response.use(
         // message 只读时忽略，不影响主流程
       }
     }
+    // 自动刷新类 GET 请求在超时/弱网下会连续失败：按来源节流，但不再整条静默，
+    // 否则页面会留着上一次的旧数据冒充新数据
+    if (!forceErrorToast && method === 'GET' && isTimeoutOrNetwork) {
+      toastOnce(`net|${url}`, () => message.error(resolvedMessage))
+      return Promise.reject(error)
+    }
     message.error(resolvedMessage)
     return Promise.reject(error)
   }
@@ -197,10 +235,10 @@ export default request
 
 export function fetchPage<T>(
   url: string,
-  params?: Record<string, any>,
-  config?: Record<string, any>
+  params?: object,
+  config?: AxiosRequestConfig
 ) {
-  const merged = { ...(params || {}) }
+  const merged: Record<string, any> = { ...(params || {}) }
   if (merged.pageNo != null && merged.page == null) {
     merged.page = merged.pageNo
   }
@@ -219,22 +257,22 @@ export function fetchPage<T>(
         list: res.records as T[],
         total: Number(res.total || 0),
         pageNo: Number(res.current || 1),
-        pageSize: Number(res.size || params?.pageSize || 10)
+        pageSize: Number(res.size || merged.pageSize || 10)
       } as PageResult<T>
     }
     if (Array.isArray(res)) {
       return {
         list: res as T[],
         total: res.length,
-        pageNo: Number(params?.pageNo || 1),
-        pageSize: Number(params?.pageSize || res.length || 10)
+        pageNo: Number(merged.pageNo || 1),
+        pageSize: Number(merged.pageSize || res.length || 10)
       } as PageResult<T>
     }
     return {
       list: [],
       total: 0,
-      pageNo: Number(params?.pageNo || 1),
-      pageSize: Number(params?.pageSize || 10)
+      pageNo: Number(merged.pageNo || 1),
+      pageSize: Number(merged.pageSize || 10)
     } as PageResult<T>
   })
 }

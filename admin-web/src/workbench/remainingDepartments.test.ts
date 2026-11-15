@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AxiosHeaders, type AxiosResponse } from 'axios'
 import { resolveWorkbenchProfile } from './model'
 import type { HrWorkbenchSummary, LogisticsWorkbenchSummary, MarketingWorkbenchSummary } from '../types'
 
@@ -13,10 +12,6 @@ import { getMarketingWorkbenchSummary } from '../api/marketing'
 import { buildLogisticsWorkbenchDetail, loadLogisticsWorkbench } from './logistics'
 import { buildHrRoleWorkbenchDetail, loadHrRoleWorkbench } from './hr'
 import { buildMarketingRoleWorkbenchDetail, loadMarketingRoleWorkbench } from './marketing'
-
-function response<T>(data: T): AxiosResponse<T> {
-  return { data, status: 200, statusText: 'OK', headers: new AxiosHeaders(), config: { headers: new AxiosHeaders() } }
-}
 
 const logistics = {
   maintenancePendingCount: 8, maintenanceOverdueCount: 2, lowStockCount: 3,
@@ -63,9 +58,9 @@ describe('remaining department workbench adapters', () => {
   })
 
   it('calls existing aggregate APIs without inventing current-user filters', async () => {
-    vi.mocked(getLogisticsWorkbenchSummary).mockResolvedValue(response(logistics))
-    vi.mocked(getHrWorkbenchSummary).mockResolvedValue(response(hr))
-    vi.mocked(getMarketingWorkbenchSummary).mockResolvedValue(response(marketing))
+    vi.mocked(getLogisticsWorkbenchSummary).mockResolvedValue(logistics)
+    vi.mocked(getHrWorkbenchSummary).mockResolvedValue(hr)
+    vi.mocked(getMarketingWorkbenchSummary).mockResolvedValue(marketing)
 
     await loadLogisticsWorkbench(resolveWorkbenchProfile(['LOGISTICS_EMPLOYEE']))
     await loadHrRoleWorkbench(resolveWorkbenchProfile(['HR_EMPLOYEE']))

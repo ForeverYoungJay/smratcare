@@ -13,6 +13,8 @@
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       :row-key="resolveRowKey"
       :columns="columns"
       :data-source="rows"

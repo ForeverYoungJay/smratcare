@@ -14,7 +14,7 @@
         </div>
       </div>
 
-      <StatefulBlock :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
+      <StatefulBlock :filter-model="query" @clear-filters="clearListFilters" :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
         <div class="summary-strip">
           <div v-for="card in summaryCards" :key="card.title" class="summary-strip-card">
             <span class="summary-card-label">{{ card.title }}</span>
@@ -158,6 +158,7 @@
           :row-selection="rowSelection"
           :scroll="{ x: tableScrollX }"
         >
+
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'consultantName' || column.key === 'elderName'">
               <div class="person-cell">
@@ -226,29 +227,62 @@
       </StatefulBlock>
     </section>
 
-    <a-modal v-model:open="open" :title="modalTitle" width="820px" :confirm-loading="submitting" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="open" :title="modalTitle" width="820px" :confirm-loading="submitting" @ok="submit">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">
             <a-form-item label="咨询人姓名" name="consultantName">
-              <a-input v-model:value="form.consultantName" />
+              <a-input v-model:value="form.consultantName" @blur="checkDuplicates" />
             </a-form-item>
           </a-col>
           <a-col :span="12">
             <a-form-item label="联系电话" name="consultantPhone">
-              <a-input v-model:value="form.consultantPhone" />
+              <a-input v-model:value="form.consultantPhone" @blur="checkDuplicates" />
             </a-form-item>
           </a-col>
           <a-col :span="12">
             <a-form-item label="老人姓名" name="elderName">
-              <a-input v-model:value="form.elderName" />
+              <a-input v-model:value="form.elderName" @blur="checkDuplicates" />
             </a-form-item>
           </a-col>
           <a-col :span="12">
             <a-form-item label="老人联系电话" name="elderPhone">
-              <a-input v-model:value="form.elderPhone" />
+              <a-input v-model:value="form.elderPhone" @blur="checkDuplicates" />
             </a-form-item>
           </a-col>
+          <a-col :span="12">
+            <a-form-item label="咨询日期">
+              <a-date-picker v-model:value="form.consultDate" value-format="YYYY-MM-DD" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="客户来源">
+              <a-select v-model:value="form.infoSource" allow-clear show-search placeholder="请选择来源">
+                <a-select-option v-for="source in STANDARD_SOURCES" :key="source" :value="source">{{ source }}</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+          <a-col :span="24">
+            <a-form-item label="咨询内容/备注">
+              <a-textarea v-model:value="form.remark" :rows="2" placeholder="记录客户关注的照护、房型、费用等问题" />
+            </a-form-item>
+          </a-col>
+          <a-col v-if="duplicateWarnings.length" :span="24">
+            <a-alert type="warning" show-icon message="发现疑似重复客户">
+              <template #description>
+                <div v-for="item in duplicateWarnings" :key="String(item.id || item.name)">
+                  {{ item.name || '其他客户' }} {{ item.phone || '' }}：{{ item.reasons.join('、') }}
+                  <span v-if="!item.accessible">（由其他员工负责，请联系主管确认）</span>
+                </div>
+              </template>
+            </a-alert>
+          </a-col>
+          <a-col :span="24">
+            <a-button type="link" class="advanced-toggle" @click="showAdvancedFields = !showAdvancedFields">
+              {{ showAdvancedFields ? '收起更多资料' : '填写更多资料（老人情况、负责人、预订信息）' }}
+            </a-button>
+          </a-col>
+          <template v-if="showAdvancedFields">
           <a-col :span="8">
             <a-form-item label="性别">
               <a-select v-model:value="form.gender" allow-clear>
@@ -262,11 +296,6 @@
               <a-input-number v-model:value="form.age" :min="0" :max="120" style="width: 100%" />
             </a-form-item>
           </a-col>
-          <a-col :span="8">
-            <a-form-item label="咨询日期">
-              <a-date-picker v-model:value="form.consultDate" value-format="YYYY-MM-DD" style="width: 100%" />
-            </a-form-item>
-          </a-col>
           <a-col :span="12">
             <a-form-item label="咨询类型">
               <a-input v-model:value="form.consultType" />
@@ -275,11 +304,6 @@
           <a-col :span="12">
             <a-form-item label="媒体渠道">
               <a-input v-model:value="form.mediaChannel" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="信息来源">
-              <a-input v-model:value="form.infoSource" />
             </a-form-item>
           </a-col>
           <a-col :span="12">
@@ -332,16 +356,12 @@
               <a-input v-model:value="form.followupStatus" placeholder="已回访/待回访" />
             </a-form-item>
           </a-col>
-          <a-col :span="24">
-            <a-form-item label="备注">
-              <a-textarea v-model:value="form.remark" :rows="2" />
-            </a-form-item>
-          </a-col>
+          </template>
         </a-row>
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="planOpen" title="新增回访计划" :confirm-loading="planSubmitting" @ok="submitCallbackPlan">
+    <a-modal :mask-closable="false" v-model:open="planOpen" title="新增回访计划" :confirm-loading="planSubmitting" @ok="submitCallbackPlan">
       <a-form :model="planForm" layout="vertical">
         <a-form-item label="计划标题">
           <a-input v-model:value="planForm.title" />
@@ -369,7 +389,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="executeOpen" title="执行回访计划" :confirm-loading="executeSubmitting" @ok="submitExecuteCallback">
+    <a-modal :mask-closable="false" v-model:open="executeOpen" title="执行回访计划" :confirm-loading="executeSubmitting" @ok="submitExecuteCallback">
       <a-form :model="executeForm" layout="vertical">
         <a-form-item label="执行备注">
           <a-textarea v-model:value="executeForm.executeNote" :rows="2" />
@@ -397,7 +417,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="assignOpen"
       title="分配线索负责人"
       :confirm-loading="assignSubmitting"
@@ -467,6 +487,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { clearFilters } from '../../../utils/filterState'
 import { useRoute, useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
@@ -483,8 +504,10 @@ import {
   createCrmLead,
   createLeadCallbackPlan,
   executeCallbackPlan,
+  getLeadDuplicates,
   getLeadAssignLogs,
   getLeadCallbackPlans,
+  getLeadCallbackPlansBatch,
   getMarketingLeadEntrySummary,
   getLeadStageLogs,
   getLeadPage,
@@ -493,12 +516,13 @@ import {
 import { useStaffOptions } from '../../../composables/useStaffOptions'
 import { useUserStore } from '../../../stores/user'
 import { CONTRACT_FLOW_STAGE_LABELS, MARKETING_CALLBACK_TYPE_LABELS, MARKETING_CALLBACK_TYPE_OPTIONS, MARKETING_LEAD_MODE_LABELS, marketingInfoSourceLabel } from '../../../utils/marketingEnums'
-import { resolveRouteAccess } from '../../../utils/routeAccess'
+import { hasAnyRole } from '../../../utils/roleAccess'
 import type {
   CrmLeadAssignLogItem,
   CrmLeadItem,
   CrmStageTransitionLogItem,
   Id,
+  CrmLeadDuplicateItem,
   MarketingCallbackType,
   MarketingLeadEntrySummary,
   MarketingLeadMode
@@ -644,11 +668,10 @@ const callbackSnapshot = ref<Record<string, {
   callbackType?: string
 }>>({})
 const todayText = dayjs().format('YYYY-MM-DD')
+const showAdvancedFields = ref(false)
+const duplicateWarnings = ref<CrmLeadDuplicateItem[]>([])
 
-const rules: FormRules = {
-  consultantName: [{ required: true, message: '请输入咨询人姓名' }],
-  elderName: [{ required: true, message: '请输入老人姓名' }]
-}
+const rules: FormRules = {}
 
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
@@ -658,8 +681,9 @@ const rowSelection = computed(() => ({
 }))
 const selectedCount = computed(() => selectedRowKeys.value.length)
 const selectedRows = computed(() => rows.value.filter((item) => selectedRowKeys.value.some((id) => sameId(item.id, id))))
-const canAssignLead = computed(() =>
-  resolveRouteAccess(router, userStore.roles || [], route.path, userStore.pagePermissions || []).canAccess)
+const canManageLeadPool = computed(() => hasAnyRole(userStore.roles || [], [
+  'MARKETING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'
+]))
 const modeLabel = computed(() => MARKETING_LEAD_MODE_LABELS[effectiveMode.value] || '营销线索')
 const workspaceSummary = computed(() => {
   if (effectiveMode.value === 'consultation') {
@@ -689,22 +713,12 @@ const activeFilterCount = computed(() => {
     query.marketerName,
     ...(query.consultDateRange || [])
   ].filter((item) => String(item || '').trim())
-  if (props.mode === 'pipeline') values.push(pipelineTab.value)
   return values.length
 })
 const activeFilterSummary = computed(() => (
   activeFilterCount.value > 0 ? `已启用 ${activeFilterCount.value} 个筛选条件` : '未设置筛选条件'
 ))
-const hasScopedDataset = computed(() => {
-  const scenario = String(props.scenario || route.query.scenario || '').trim()
-  const filter = String(route.query.filter || '').trim()
-  const stage = String(route.query.stage || '').trim()
-  const source = String(route.query.source || '').trim()
-  const callbackType = effectiveMode.value === 'callback'
-    ? String(props.callbackType || route.query.type || '').trim()
-    : ''
-  return Boolean(scenario || filter || stage || source || callbackType)
-})
+const hasScopedDataset = computed(() => false)
 
 const modalTitle = computed(() => form.id ? '编辑客户' : '新增客户')
 
@@ -809,48 +823,48 @@ const actionButtons = computed(() => {
       { key: 'create', label: '新增', type: 'primary' as const },
       { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
       { key: 'detail', label: '客户轨迹', type: 'default' as const, disabled: selectedCount.value !== 1 },
-      { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1 || !canAssignLead.value },
+      { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1, hidden: !canManageLeadPool.value },
       { key: 'setIntent', label: '设为意向', type: 'default' as const, disabled: selectedCount.value === 0 },
       { key: 'abandon', label: '放弃客户', type: 'default' as const, disabled: selectedCount.value === 0, danger: true },
-      { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true }
-    ]
+      { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true, hidden: !canManageLeadPool.value }
+    ].filter((item) => !item.hidden)
   }
   if (mode === 'intent') {
     return [
       { key: 'create', label: '新增', type: 'primary' as const },
       { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
       { key: 'detail', label: '客户轨迹', type: 'default' as const, disabled: selectedCount.value !== 1 },
-      { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1 || !canAssignLead.value },
+      { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1, hidden: !canManageLeadPool.value },
       { key: 'toReservation', label: '转预订', type: 'default' as const, disabled: selectedCount.value === 0 },
       { key: 'tag', label: '设置客户标签', type: 'default' as const, disabled: selectedCount.value === 0 },
       { key: 'callback', label: '添加回访计划', type: 'default' as const, disabled: selectedCount.value === 0 },
       { key: 'abandon', label: '放弃客户', type: 'default' as const, disabled: selectedCount.value === 0, danger: true },
-      { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true }
-    ]
+      { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true, hidden: !canManageLeadPool.value }
+    ].filter((item) => !item.hidden)
   }
   if (mode === 'reservation') {
     return [
       { key: 'create', label: '新增', type: 'primary' as const },
       { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
       { key: 'detail', label: '客户轨迹', type: 'default' as const, disabled: selectedCount.value !== 1 },
-      { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1 || !canAssignLead.value },
+      { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1, hidden: !canManageLeadPool.value },
       { key: 'toggleRefund', label: '退款切换', type: 'default' as const, disabled: selectedCount.value !== 1 },
-      { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true }
-    ]
+      { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true, hidden: !canManageLeadPool.value }
+    ].filter((item) => !item.hidden)
   }
   if (mode === 'invalid') {
     return [
       { key: 'detail', label: '客户轨迹', type: 'default' as const, disabled: selectedCount.value !== 1 },
-      { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1 || !canAssignLead.value },
+      { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1, hidden: !canManageLeadPool.value },
       { key: 'recover', label: '恢复客户', type: 'primary' as const, disabled: selectedCount.value === 0 },
-      { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true }
-    ]
+      { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true, hidden: !canManageLeadPool.value }
+    ].filter((item) => !item.hidden)
   }
   if (mode === 'callback') {
     return [
       { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
       { key: 'detail', label: '客户轨迹', type: 'default' as const, disabled: selectedCount.value !== 1 },
-      { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1 || !canAssignLead.value },
+      { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1, hidden: !canManageLeadPool.value },
       { key: 'execute', label: '执行回访', type: 'primary' as const, disabled: selectedCount.value !== 1 },
       { key: 'setTodayFollow', label: '设今日回访', type: 'default' as const, disabled: selectedCount.value === 0 },
       { key: 'postponeFollow', label: '顺延3天', type: 'default' as const, disabled: selectedCount.value === 0 },
@@ -858,13 +872,13 @@ const actionButtons = computed(() => {
       { key: 'callback', label: '添加回访计划', type: 'default' as const, disabled: selectedCount.value === 0 },
       { key: 'toReservation', label: '转预订', type: 'default' as const, disabled: selectedCount.value === 0 },
       { key: 'abandon', label: '放弃客户', type: 'default' as const, disabled: selectedCount.value === 0, danger: true },
-      { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true }
-    ]
+      { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true, hidden: !canManageLeadPool.value }
+    ].filter((item) => !item.hidden)
   }
   return [
     { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
     { key: 'detail', label: '客户轨迹', type: 'default' as const, disabled: selectedCount.value !== 1 },
-    { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1 || !canAssignLead.value },
+    { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1, hidden: !canManageLeadPool.value },
     { key: 'execute', label: '执行回访', type: 'primary' as const, disabled: selectedCount.value !== 1 },
     { key: 'setTodayFollow', label: '设今日回访', type: 'default' as const, disabled: selectedCount.value === 0 },
     { key: 'postponeFollow', label: '顺延3天', type: 'default' as const, disabled: selectedCount.value === 0 },
@@ -872,8 +886,8 @@ const actionButtons = computed(() => {
     { key: 'callback', label: '添加回访计划', type: 'default' as const, disabled: selectedCount.value === 0 },
     { key: 'toReservation', label: '转预订', type: 'default' as const, disabled: selectedCount.value === 0 },
     { key: 'abandon', label: '放弃客户', type: 'default' as const, disabled: selectedCount.value === 0, danger: true },
-    { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true }
-  ]
+    { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true, hidden: !canManageLeadPool.value }
+  ].filter((item) => !item.hidden)
 })
 
 const mappedRows = computed(() => rows.value.map((item, index) => {
@@ -1049,10 +1063,10 @@ function buildRowActions(record: CrmLeadItem) {
     return [
       { key: 'detail', label: '轨迹' },
       { key: 'edit', label: '编辑' },
-      { key: 'assign', label: '分配', disabled: !canAssignLead.value },
+      { key: 'assign', label: '分配', hidden: !canManageLeadPool.value },
       { key: 'setIntent', label: '转意向' },
       { key: 'abandon', label: '放弃', danger: true }
-    ].filter((item) => !item.disabled)
+    ].filter((item) => !item.hidden)
   }
   if (mode === 'intent') {
     return [
@@ -1060,9 +1074,9 @@ function buildRowActions(record: CrmLeadItem) {
       { key: 'edit', label: '编辑' },
       { key: 'callback', label: '回访计划' },
       { key: 'toReservation', label: '转预订' },
-      { key: 'assign', label: '分配', disabled: !canAssignLead.value },
+      { key: 'assign', label: '分配', hidden: !canManageLeadPool.value },
       { key: 'abandon', label: '放弃', danger: true }
-    ].filter((item) => !item.disabled)
+    ].filter((item) => !item.hidden)
   }
   if (mode === 'reservation') {
     return [
@@ -1075,9 +1089,9 @@ function buildRowActions(record: CrmLeadItem) {
     return [
       { key: 'detail', label: '轨迹' },
       { key: 'recover', label: '恢复' },
-      { key: 'assign', label: '分配', disabled: !canAssignLead.value },
-      { key: 'delete', label: '删除', danger: true }
-    ].filter((item) => !item.disabled)
+      { key: 'assign', label: '分配', hidden: !canManageLeadPool.value },
+      { key: 'delete', label: '删除', danger: true, hidden: !canManageLeadPool.value }
+    ].filter((item) => !item.hidden)
   }
   return [
     { key: 'detail', label: '轨迹' },
@@ -1251,6 +1265,17 @@ function genderText(gender?: number) {
   return '-'
 }
 
+function resolveServerScenario() {
+  const explicit = String(props.scenario || route.query.scenario || '').trim()
+  if (explicit) return explicit
+  const filter = String(route.query.filter || '').trim()
+  if (filter === 'today') return 'follow_today'
+  if (filter === 'overdue') return 'follow_overdue'
+  if (filter === 'expiring') return 'expiring_lock'
+  if (String(route.query.source || '').trim() === 'medical') return 'source_medical'
+  return ''
+}
+
 function buildQueryParams() {
   const mode = effectiveMode.value
   const isCallback = mode === 'callback'
@@ -1260,6 +1285,7 @@ function buildQueryParams() {
   const routeSource = String(route.query.source || '').trim()
   const normalizedSource = query.infoSource || (routeSource && routeSource !== 'medical' ? routeSource : '') || undefined
   const callbackType = isCallback ? String(props.callbackType || route.query.type || '').trim() : ''
+  const scenario = resolveServerScenario()
   return {
     pageNo: query.pageNo,
     pageSize: query.pageSize,
@@ -1277,6 +1303,7 @@ function buildQueryParams() {
     customerTag: query.customerTag || undefined,
     marketerName: query.marketerName || undefined,
     callbackType: callbackType || undefined,
+    scenario: scenario || undefined,
     followupDueOnly: callbackDueOnly ? true : undefined,
     followupDateTo: callbackDueOnly ? dayjs().format('YYYY-MM-DD') : undefined
   }
@@ -1309,16 +1336,14 @@ async function fetchData() {
   try {
     const params = buildQueryParams()
     const [pageData, summaryRes] = await Promise.all([
-      hasScopedDataset.value ? fetchAllLeadPages(params) : getLeadPage(params),
+      getLeadPage(params),
       getMarketingLeadEntrySummary(buildSummaryParams())
     ])
-    const rawList = hasScopedDataset.value
-      ? (pageData as CrmLeadItem[]).map((item) => ({ ...item, id: String(item.id) }))
-      : (((pageData as any)?.list || []).map((item: CrmLeadItem) => ({ ...item, id: String(item.id) })))
+    const rawList = ((pageData as any)?.list || []).map((item: CrmLeadItem) => ({ ...item, id: String(item.id) }))
     Object.assign(summary, summaryRes || {})
     const snapshots = await hydrateCallbackSnapshot(rawList)
     rows.value = applyScenarioFilters(rawList, snapshots)
-    total.value = hasScopedDataset.value ? rows.value.length : Number((pageData as any)?.total || 0)
+    total.value = Number((pageData as any)?.total || 0)
   } catch (error: any) {
     const text = error?.message || '请求失败，请稍后重试'
     tableError.value = text
@@ -1329,43 +1354,25 @@ async function fetchData() {
   }
 }
 
-async function fetchAllLeadPages(baseParams: Record<string, any>) {
-  const pageSize = 200
-  let pageNo = 1
-  let totalPages = 1
-  const result: CrmLeadItem[] = []
-  while (pageNo <= totalPages && pageNo <= 50) {
-    const page = await getLeadPage({ ...baseParams, pageNo, pageSize })
-    result.push(...((page?.list || []) as CrmLeadItem[]))
-    const totalCount = Number(page?.total || 0)
-    totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
-    pageNo += 1
-  }
-  return result
-}
-
 async function hydrateCallbackSnapshot(list: CrmLeadItem[]) {
   const mode = effectiveMode.value
   if (mode !== 'intent' && mode !== 'callback') {
     callbackSnapshot.value = {}
     return {}
   }
-  const pairs = await Promise.all(list.map(async (item) => {
-    try {
-      const plans = await getLeadCallbackPlans(item.id)
-      const latest = (plans || [])[0]
-      const pending = (plans || []).find((plan) => plan.status === 'PENDING')
-      return [item.id, {
-        title: latest?.title,
-        followupContent: latest?.followupContent,
-        followupResult: latest?.followupResult,
-        planId: pending?.id || latest?.id,
-        callbackType: pending?.callbackType || latest?.callbackType
-      }] as const
-    } catch {
-      return [item.id, {}] as const
-    }
-  }))
+  const batches = await getLeadCallbackPlansBatch(list.map(item => item.id)).catch(() => ({}))
+  const pairs = list.map((item) => {
+    const plans = batches[String(item.id)] || []
+    const latest = plans[0]
+    const pending = plans.find((plan) => plan.status === 'PENDING')
+    return [item.id, {
+      title: latest?.title,
+      followupContent: latest?.followupContent,
+      followupResult: latest?.followupResult,
+      planId: pending?.id || latest?.id,
+      callbackType: pending?.callbackType || latest?.callbackType
+    }] as const
+  })
   const snapshotMap = Object.fromEntries(pairs)
   callbackSnapshot.value = snapshotMap
   return snapshotMap
@@ -1644,6 +1651,8 @@ function confirmDeleteIds(ids: string[]) {
 }
 
 function openForm(row?: CrmLeadItem) {
+  duplicateWarnings.value = []
+  showAdvancedFields.value = !!row
   if (row) {
     Object.assign(form, row)
   } else {
@@ -1679,16 +1688,58 @@ function openForm(row?: CrmLeadItem) {
   open.value = true
 }
 
+let duplicateCheckSequence = 0
+async function checkDuplicates() {
+  const name = String(form.elderName || form.consultantName || form.name || '').trim()
+  const phone = String(form.elderPhone || form.consultantPhone || form.phone || '').trim()
+  if (!phone) {
+    duplicateWarnings.value = []
+    return []
+  }
+  const sequence = ++duplicateCheckSequence
+  try {
+    const result = await getLeadDuplicates({ name, phone, idCardNo: form.idCardNo, excludeId: form.id })
+    if (sequence === duplicateCheckSequence) duplicateWarnings.value = result || []
+    return result || []
+  } catch {
+    if (sequence === duplicateCheckSequence) duplicateWarnings.value = []
+    return []
+  }
+}
+
+function confirmDuplicateCreation(items: CrmLeadDuplicateItem[]) {
+  return new Promise<boolean>((resolve) => {
+    const summary = items.map(item => `${item.name || '其他客户'}（${item.reasons.join('、')}）`).join('；')
+    Modal.confirm({
+      title: '确认仍要保存这条客户线索？',
+      content: `${summary}。仅当同一联系电话对应不同老人或确属新的咨询事项时继续。`,
+      okText: '确认属于不同客户，继续保存',
+      cancelText: '返回查看',
+      onOk: () => resolve(true),
+      onCancel: () => resolve(false)
+    })
+  })
+}
+
 async function submit() {
   if (!formRef.value) return
   try {
     await formRef.value.validate()
+    if (!String(form.name || form.elderName || form.consultantName || '').trim()) {
+      message.warning('请至少填写咨询人姓名或老人姓名')
+      return
+    }
     if (submitting.value) return
+    const duplicates = await checkDuplicates()
+    const exactDuplicates = duplicates.filter(item => item.reasons.includes('姓名和电话相同'))
+    const allowDuplicate = exactDuplicates.length > 0 ? await confirmDuplicateCreation(exactDuplicates) : false
+    if (exactDuplicates.length > 0 && !allowDuplicate) return
     submitting.value = true
     const payload: Partial<CrmLeadItem> = {
       ...form,
-      name: form.name || form.elderName || form.consultantName || '未命名线索',
+      name: form.name || form.elderName || form.consultantName,
       phone: form.phone || form.elderPhone || form.consultantPhone,
+      allowDuplicate,
       status: effectiveMode.value === 'reservation'
         ? 1
         : (defaultStatus(effectiveMode.value) ?? form.status ?? 0)
@@ -1701,8 +1752,8 @@ async function submit() {
     message.success('保存成功')
     open.value = false
     fetchData()
-  } catch {
-    message.error('保存失败')
+  } catch (error: any) {
+    message.error(error?.message || '保存失败，请检查填写内容')
   } finally {
     submitting.value = false
   }
@@ -2052,6 +2103,12 @@ onMounted(() => {
     consumeQuickQuery()
   }
 })
+
+
+function clearListFilters() {
+  clearFilters(query)
+  onSearch()
+}
 </script>
 
 <style scoped>

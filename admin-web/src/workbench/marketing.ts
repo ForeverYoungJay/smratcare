@@ -19,7 +19,7 @@ export function buildMarketingRoleWorkbenchDetail(profile: WorkbenchProfile, dat
       { label: '新增线索', icon: '新', path: '/marketing/leads/all' },
       { label: '今日跟进', icon: '跟', path: '/marketing/interactions/today' },
       { label: '待回访', icon: '访', path: '/marketing/interactions/due' },
-      { label: '到访预约', icon: '约', path: '/marketing/reservation/records' },
+      { label: '到访预约', icon: '约', path: '/marketing/reservation/visits' },
       { label: '合同办理', icon: '合', path: '/marketing/contracts/pending' },
       { label: '销售漏斗', icon: '漏', path: '/marketing/funnel/consultation' },
       { label: '渠道报表', icon: '渠', path: '/marketing/reports/channel', managementOnly: true },
@@ -38,7 +38,7 @@ export function buildMarketingRoleWorkbenchDetail(profile: WorkbenchProfile, dat
     ],
     steps: [
       { title: '先完成今日回访', description: '确认客户当前意向、顾虑和下一次联系时间。', path: '/marketing/interactions/today' },
-      { title: '再推进到访与试住', description: '把高意向客户推进到参观、评估、锁床或试住。', path: '/marketing/reservation/records' },
+      { title: '再推进到访与试住', description: '把高意向客户推进到参观、评估、锁床或试住。', path: '/marketing/reservation/visits' },
       { title: '最后闭环合同与入住', description: '补齐合同资料并同步床位、财务和入住准备。', path: '/marketing/contracts/pending' }
     ],
     managementSummary: management ? `本月成交 ${Number(data.performance?.monthDealCount || 0)} 单，销售额 ${Number(data.performance?.monthAmount || 0).toLocaleString('zh-CN')} 元。` : undefined,

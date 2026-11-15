@@ -43,7 +43,7 @@
       </vxe-table>
     </a-card>
 
-    <a-modal v-model:open="editOpen" title="费用科目" @ok="submitEdit" :confirm-loading="saving">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="费用科目" @ok="submitEdit" :confirm-loading="saving">
       <a-form layout="vertical" :model="form">
         <a-form-item label="科目编码（可选，自动补前缀 FEE_SUBJECT_）">
           <a-input v-model:value="form.keySuffix" placeholder="留空自动生成；或输入 ROOM_FEE / ELECTRICITY_FEE" />

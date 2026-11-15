@@ -63,6 +63,49 @@ export interface MarketingCallbackReport {
 
 export type MarketingCallbackType = 'checkin' | 'trial' | 'discharge' | 'score'
 
+export type CrmVisitAppointmentStatus = 'SCHEDULED' | 'ARRIVED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW'
+
+export interface CrmVisitAppointmentItem {
+  id: Id
+  leadId: Id
+  leadName?: string
+  elderName?: string
+  appointmentTime: string
+  visitorName: string
+  visitorPhone?: string
+  partySize: number
+  ownerStaffId?: Id
+  ownerStaffName?: string
+  status: CrmVisitAppointmentStatus
+  arrivedAt?: string
+  completedAt?: string
+  visitResult?: string
+  cancelReason?: string
+  nextFollowDate?: string
+  remark?: string
+  createTime?: string
+}
+
+export interface CrmVisitAppointmentPayload {
+  leadId: Id
+  appointmentTime: string
+  visitorName: string
+  visitorPhone?: string
+  partySize?: number
+  ownerStaffName?: string
+  remark?: string
+}
+
+export interface CrmLeadDuplicateItem {
+  id?: Id
+  name?: string
+  phone?: string
+  ownerStaffName?: string
+  status?: number
+  accessible: boolean
+  reasons: string[]
+}
+
 export interface CrmLeadAssignRequest {
   ownerStaffId: Id
   ownerStaffName?: string
@@ -167,6 +210,7 @@ export interface CrmLeadPageQuery extends PageQuery {
   followupDateFrom?: string
   followupDateTo?: string
   followupDueOnly?: boolean
+  scenario?: string
 }
 
 /** 合同分页查询条件（对应 CrmContractController#page 的请求参数）。 */
@@ -387,6 +431,13 @@ export interface SmsTaskItem {
   sendTime?: string
   resultMessage?: string
   createTime?: string
+}
+
+export interface CrmContractReminderConfig {
+  enabled: boolean
+  advanceDays: number
+  sendTime: string
+  templateContent: string
 }
 
 export interface SmsTaskCreateRequest {

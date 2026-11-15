@@ -189,7 +189,7 @@
       </vxe-table>
     </a-card>
 
-    <a-modal v-model:open="payOpen" :title="activePaymentId ? '修改收款' : '登记收款'" @ok="submitPay" :confirm-loading="paying">
+    <a-modal :mask-closable="false" v-model:open="payOpen" :title="activePaymentId ? '修改收款' : '登记收款'" @ok="submitPay" :confirm-loading="paying">
       <a-form layout="vertical" :model="payForm" :rules="payRules" ref="payFormRef">
         <a-form-item label="金额" name="amount">
           <a-input-number v-model:value="payForm.amount" style="width: 100%" />

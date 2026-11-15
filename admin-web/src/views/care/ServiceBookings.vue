@@ -32,7 +32,7 @@
       </a-table>
     </a-card>
 
-    <a-modal v-model:open="modalOpen" title="服务预定" :confirm-loading="submitting" width="760" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="modalOpen" title="服务预定" :confirm-loading="submitting" width="760" @ok="submit">
       <a-form ref="formRef" layout="vertical" :model="form" :rules="rules">
         <a-row :gutter="16">
           <a-col :span="12">

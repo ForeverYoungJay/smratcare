@@ -41,6 +41,9 @@ class InventoryFlowTest {
 
   @Test
   void cancel_rolls_back_inventory() {
+    int before = batchMapper.selectList(Wrappers.lambdaQuery(InventoryBatch.class)
+        .eq(InventoryBatch::getProductId, 6003L))
+        .stream().mapToInt(batch -> batch.getQuantity() == null ? 0 : batch.getQuantity()).sum();
     var submit = new com.zhiyangyun.care.store.model.OrderPreviewRequest();
     submit.setElderId(4003L);
     submit.setProductId(6003L);
@@ -54,7 +57,11 @@ class InventoryFlowTest {
     long inCount = logMapper.selectCount(Wrappers.lambdaQuery(InventoryLog.class)
         .eq(InventoryLog::getRefOrderId, resp.getOrderId())
         .eq(InventoryLog::getChangeType, "IN"));
-    assertTrue(inCount > 0);
+    int after = batchMapper.selectList(Wrappers.lambdaQuery(InventoryBatch.class)
+        .eq(InventoryBatch::getProductId, 6003L))
+        .stream().mapToInt(batch -> batch.getQuantity() == null ? 0 : batch.getQuantity()).sum();
+    assertEquals(0L, inCount);
+    assertEquals(before, after);
   }
 
   @Test
@@ -64,6 +71,9 @@ class InventoryFlowTest {
     submit.setProductId(6003L);
     submit.setQty(1);
     var resp = storeOrderService.submit(submit);
+    var fulfill = new com.zhiyangyun.care.store.model.OrderFulfillRequest();
+    fulfill.setOrderId(resp.getOrderId());
+    storeOrderService.fulfill(fulfill);
 
     OrderRefundRequest refund = new OrderRefundRequest();
     refund.setOrderId(resp.getOrderId());

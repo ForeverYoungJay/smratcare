@@ -36,7 +36,7 @@
       description="投诉建议、满意度评价和在线沟通统一在这里受理，处理反馈会同步回家属端历史记录。"
     />
 
-    <StatefulBlock :loading="loading" :error="error" :empty="!loading && !error && rows.length === 0" empty-text="暂无家属反馈与沟通记录" @retry="fetchData">
+    <StatefulBlock :filter-model="query" @clear-filters="clearListFilters" :loading="loading" :error="error" :empty="!loading && !error && rows.length === 0" empty-text="暂无家属反馈与沟通记录" @retry="fetchData">
       <a-table
         row-key="id"
         :columns="columns"
@@ -45,6 +45,7 @@
         :row-selection="{ selectedRowKeys, type: 'radio', onChange: onSelectChange }"
         @change="onTableChange"
       >
+
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
             <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
@@ -72,7 +73,7 @@
       </a-table>
     </StatefulBlock>
 
-    <a-modal v-model:open="handleOpen" title="处理家属反馈" :confirm-loading="handleSubmitting" @ok="submitHandle">
+    <a-modal :mask-closable="false" v-model:open="handleOpen" title="处理家属反馈" :confirm-loading="handleSubmitting" @ok="submitHandle">
       <a-form :model="handleForm" layout="vertical">
         <a-form-item label="处理状态">
           <a-select v-model:value="handleForm.status">
@@ -97,6 +98,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { clearFilters } from '../../utils/filterState'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
@@ -278,6 +280,12 @@ function statusColor(status?: string) {
 
 function isDone(status?: string) {
   return status === 'DONE' || status === 'ADOPTED' || status === 'RESOLVED'
+}
+
+
+function clearListFilters() {
+  clearFilters(query)
+  fetchData()
 }
 </script>
 

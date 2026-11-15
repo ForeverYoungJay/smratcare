@@ -28,7 +28,7 @@ export function exportExcel(data: Record<string, any>[], filename: string) {
  */
 export async function exportXlsxByRequest(
   path: string,
-  params?: Record<string, string | number | boolean | undefined | null>,
+  params?: object,
   fallbackFilename?: string
 ) {
   const url = new URL(path, window.location.origin)
@@ -58,7 +58,7 @@ export async function exportXlsxByRequest(
 
 export async function exportCsvByRequest(
   path: string,
-  params?: Record<string, string | number | boolean | undefined | null>,
+  params?: object,
   fallbackFilename?: string
 ) {
   const url = new URL(path, window.location.origin)

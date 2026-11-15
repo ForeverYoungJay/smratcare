@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -111,9 +112,14 @@ public class FinanceHomeController {
     summary.setElectricityUnrecordedRoomCount(electricitySummary.getUnrecordedRoomCount());
 
     // 最近操作记录
+    // 只读动作（查询/查看/导出）会把院长首页刷满，只保留真正改变了数据的操作
     List<AuditLog> logs = auditLogMapper.selectList(
         Wrappers.lambdaQuery(AuditLog.class)
             .eq(orgId != null, AuditLog::getOrgId, orgId)
+            .notLike(AuditLog::getActionType, "%QUERY")
+            .notLike(AuditLog::getActionType, "%VIEW")
+            .notLike(AuditLog::getActionType, "%LIST")
+            .notLike(AuditLog::getActionType, "%EXPORT")
             .orderByDesc(AuditLog::getCreateTime)
             .orderByDesc(AuditLog::getId)
             .last("LIMIT 12"));
@@ -162,8 +168,43 @@ public class FinanceHomeController {
       case "UPDATE" -> "修改";
       case "DELETE" -> "删除";
       case "EXPORT" -> "导出";
-      default -> actionType;
+      default -> humanizeAction(actionType);
     };
+  }
+
+  /** 动作域前缀 -> 中文 */
+  private static final Map<String, String> ACTION_DOMAIN_TEXT = Map.ofEntries(
+      Map.entry("FIN", "财务"), Map.entry("FINANCE", "财务"), Map.entry("MARKETING", "营销"),
+      Map.entry("ELDER", "长者"), Map.entry("CARE", "护理"), Map.entry("NURSING", "护理"),
+      Map.entry("MEDICAL", "医务"), Map.entry("HEALTH", "健康"), Map.entry("HR", "人事"),
+      Map.entry("OA", "行政"), Map.entry("LOGISTICS", "后勤"), Map.entry("INVENTORY", "库存"),
+      Map.entry("SYSTEM", "系统"), Map.entry("BED", "床位"), Map.entry("ASSESSMENT", "评估"));
+
+  /** 动作后缀 -> 中文 */
+  private static final Map<String, String> ACTION_VERB_TEXT = Map.ofEntries(
+      Map.entry("QUERY", "查询"), Map.entry("VIEW", "查看"), Map.entry("LIST", "查询"),
+      Map.entry("EXPORT", "导出"), Map.entry("IMPORT", "导入"), Map.entry("CREATE", "新增"),
+      Map.entry("ADD", "新增"), Map.entry("UPDATE", "修改"), Map.entry("SAVE", "保存"),
+      Map.entry("DELETE", "删除"), Map.entry("REMOVE", "删除"), Map.entry("PAY", "收款"),
+      Map.entry("REFUND", "退款"), Map.entry("HANDLE", "处理"), Map.entry("APPROVE", "审批"),
+      Map.entry("REJECT", "驳回"), Map.entry("LOGIN", "登录"), Map.entry("LOGOUT", "登出"));
+
+  /**
+   * 未登记的动作码不能原样显示给用户。
+   * 首页曾整屏显示 MARKETING_REPORT_QUERY / report snapshots 这种内部标识。
+   */
+  private static String humanizeAction(String actionType) {
+    // 历史数据里可能已经是中文，原样透传
+    if (!actionType.matches("[A-Z0-9_]+")) {
+      return actionType;
+    }
+    String[] parts = actionType.split("_");
+    String domain = ACTION_DOMAIN_TEXT.getOrDefault(parts[0], "");
+    String verb = ACTION_VERB_TEXT.getOrDefault(parts[parts.length - 1], "");
+    if (domain.isEmpty() && verb.isEmpty()) {
+      return "其他操作";
+    }
+    return domain + (verb.isEmpty() ? "操作" : verb);
   }
 
   private static BigDecimal rate(BigDecimal numerator, BigDecimal denominator) {

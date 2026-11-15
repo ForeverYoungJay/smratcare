@@ -5,14 +5,23 @@ import { resolveDefaultHome } from '../access/policy'
 
 function normalizeRedirectPath(path?: string | null) {
   const raw = String(path || '').trim()
-  if (!raw.startsWith('/')) return '/portal'
-  if (raw === '/login') return '/portal'
+  if (!raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) return ''
+  if (raw === '/login') return ''
   if (raw.startsWith('/login?')) {
     const query = raw.split('?')[1] || ''
     const params = new URLSearchParams(query)
     return normalizeRedirectPath(params.get('redirect'))
   }
   return raw
+}
+
+export function resolveAuthorizedLoginTarget(router: Router, redirect: string, roles: string[], pagePermissions: string[], permissions: string[] = []) {
+  const target = normalizeRedirectPath(redirect)
+  const resolved = target ? router.resolve(target) : null
+  if (resolved && resolved.matched.length && !resolved.matched.some((record) => record.name === 'NotFound')
+    && resolved.path !== '/403'
+    && resolveRouteAccess(router, roles, resolved.path, pagePermissions, permissions).canAccess) return target
+  return resolveDefaultHome(roles)
 }
 
 function resolveLoginRedirectTarget(fullPath: string) {
@@ -36,7 +45,7 @@ export function setupPermission(router: Router) {
 
     if (to.path === '/login' && token) {
       const redirect = typeof to.query.redirect === 'string' ? to.query.redirect : ''
-      next(redirect ? normalizeRedirectPath(redirect) : resolveDefaultHome(getRoles()))
+      next(resolveAuthorizedLoginTarget(router, redirect, getRoles(), getPagePermissions(), getPermissions()))
       return
     }
 

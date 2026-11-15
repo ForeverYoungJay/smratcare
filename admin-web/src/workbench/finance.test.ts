@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AxiosHeaders, type AxiosResponse } from 'axios'
 import { resolveWorkbenchProfile } from './model'
 
 vi.mock('../api/finance', () => ({ getFinanceWorkbenchOverview: vi.fn() }))
@@ -45,14 +44,7 @@ describe('finance workbench adapter', () => {
   })
 
   it('loads the existing overview without inventing a personal filter', async () => {
-    const response: AxiosResponse<FinanceWorkbenchOverview> = {
-      data: overview(),
-      status: 200,
-      statusText: 'OK',
-      headers: new AxiosHeaders(),
-      config: { headers: new AxiosHeaders() }
-    }
-    vi.mocked(getFinanceWorkbenchOverview).mockResolvedValue(response)
+    vi.mocked(getFinanceWorkbenchOverview).mockResolvedValue(overview())
     const result = await loadFinanceWorkbench(resolveWorkbenchProfile(['FINANCE_EMPLOYEE']))
     expect(getFinanceWorkbenchOverview).toHaveBeenCalledWith({ silent403: true, silentError: true })
     expect(result.overview.cashier.todayCollectedTotal).toBe(1280)

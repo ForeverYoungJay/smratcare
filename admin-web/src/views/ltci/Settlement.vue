@@ -21,7 +21,9 @@
       </template>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="onSearch" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'totalFee'">{{ yuan(record.totalFee) }}</template>
         <template v-else-if="column.key === 'fundPay'">{{ yuan(record.fundPay) }}</template>
@@ -44,7 +46,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="genOpen" title="生成结算草稿" :confirm-loading="saving" @ok="submitGenerate">
+    <a-modal :mask-closable="false" v-model:open="genOpen" title="生成结算草稿" :confirm-loading="saving" @ok="submitGenerate">
       <a-form layout="vertical">
         <a-form-item label="长者" required>
           <a-select v-model:value="genForm.elderId" show-search :filter-option="false" :options="elderOptions"

@@ -51,6 +51,8 @@
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :row-selection="rowSelection"
       :columns="columns"
@@ -79,7 +81,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" title="公告" @ok="submit" :confirm-loading="saving" width="640px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="公告" @ok="submit" :confirm-loading="saving" width="640px">
       <a-form layout="vertical">
         <a-form-item label="标题" required>
           <a-input v-model:value="form.title" />

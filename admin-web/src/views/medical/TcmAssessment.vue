@@ -53,7 +53,9 @@
     </StatefulBlock>
 
     <StatefulBlock :loading="loading" :error="tableError" :empty="!loading && !tableError && rows.length === 0" empty-text="暂无中医体质评估记录" @retry="fetchData">
-      <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="false" :pagination="pagination" :row-class-name="resolveRowClassName" @change="onTableChange">
+      <DataTable
+        :filter-model="query"
+        @clear-filters="fetchData" rowKey="id" :columns="columns" :data-source="rows" :loading="false" :pagination="pagination" :row-class-name="resolveRowClassName" @change="onTableChange">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'elderBed'">
             {{ record.elderName || '-' }} / {{ (record.elderId && bedNoMap[record.elderId]) || '-' }}
@@ -77,7 +79,7 @@
       </DataTable>
     </StatefulBlock>
 
-    <a-modal v-model:open="editOpen" :title="form.id ? '编辑中医体质评估' : '新建中医体质评估'" width="900px" @ok="submit" :confirm-loading="saving">
+    <a-modal :mask-closable="false" v-model:open="editOpen" :title="form.id ? '编辑中医体质评估' : '新建中医体质评估'" width="900px" @ok="submit" :confirm-loading="saving">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="8">

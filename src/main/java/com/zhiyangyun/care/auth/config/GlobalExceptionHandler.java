@@ -1,6 +1,7 @@
 package com.zhiyangyun.care.auth.config;
 
 import com.zhiyangyun.care.auth.model.Result;
+import com.zhiyangyun.care.common.web.ResourceNotFoundException;
 import jakarta.validation.ConstraintViolationException;
 import java.io.IOException;
 import java.util.LinkedHashSet;
@@ -132,6 +133,13 @@ public class GlobalExceptionHandler {
     log.warn("Resource not found: {}", ex.getResourcePath());
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .body(Result.error(404, "请求资源不存在"));
+  }
+
+  @ExceptionHandler(ResourceNotFoundException.class)
+  public ResponseEntity<Result<Void>> handleResourceNotFound(ResourceNotFoundException ex) {
+    log.warn("Business resource not found: {}", ex.getMessage());
+    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        .body(Result.error(404, defaultText(ex.getMessage(), "请求资源不存在")));
   }
 
   @ExceptionHandler(AsyncRequestNotUsableException.class)

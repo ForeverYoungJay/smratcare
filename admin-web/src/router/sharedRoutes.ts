@@ -12,7 +12,7 @@ export const sharedRoutes: RouteRecordRaw[] = [
         path: 'function-map',
         name: 'FunctionMap',
         component: () => import('../views/FunctionMap.vue'),
-        meta: { title: '全部功能', icon: 'ApartmentOutlined', navSection: 'entry', navOrder: 15, navPinned: true }
+        meta: { title: '全部功能', icon: 'ApartmentOutlined', navSection: 'entry', navOrder: 15, navPinned: true, publicForAuthenticated: true }
       },
   {
         path: 'workbench',

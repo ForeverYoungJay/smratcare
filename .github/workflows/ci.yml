@@ -34,6 +34,10 @@ jobs:
           cache-dependency-path: admin-web/package-lock.json
       - name: Install dependencies
         run: npm ci
+      - name: Type check
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
       - name: Unit tests
         run: npm run test:unit
       - name: Navigation check

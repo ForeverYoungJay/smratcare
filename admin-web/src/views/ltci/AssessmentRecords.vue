@@ -30,6 +30,8 @@
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="onSearch"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -72,7 +74,7 @@
     </DataTable>
 
     <!-- 新建评估：申请 + 打分（一步提交） -->
-    <a-modal v-model:open="createOpen" title="新建失能评估" width="760px" :confirm-loading="saving" @ok="submitCreate">
+    <a-modal :mask-closable="false" v-model:open="createOpen" title="新建失能评估" width="760px" :confirm-loading="saving" @ok="submitCreate">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">
@@ -149,7 +151,7 @@
     </a-modal>
 
     <!-- 争议复核 -->
-    <a-modal v-model:open="disputeOpen" title="发起争议复核" :confirm-loading="saving" @ok="submitDispute">
+    <a-modal :mask-closable="false" v-model:open="disputeOpen" title="发起争议复核" :confirm-loading="saving" @ok="submitDispute">
       <a-form layout="vertical">
         <a-form-item label="争议理由" required>
           <a-textarea v-model:value="disputeForm.reason" :rows="3" placeholder="请填写争议/复核理由" />

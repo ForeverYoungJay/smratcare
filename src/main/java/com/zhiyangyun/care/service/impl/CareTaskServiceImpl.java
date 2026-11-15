@@ -598,6 +598,12 @@ public class CareTaskServiceImpl implements CareTaskService {
       response.setMessage("Task already completed");
       return response;
     }
+    if (request.getStaffId() == null || request.getStaffId() <= 0) {
+      throw new IllegalArgumentException("无法识别当前执行人员");
+    }
+    if (task.getAssignedStaffId() != null && !task.getAssignedStaffId().equals(request.getStaffId())) {
+      throw new IllegalStateException("任务已分配给其他护理员，请先完成改派");
+    }
 
     ElderProfile elder = elderMapper.selectById(task.getElderId());
     Long bedIdForCheck = task.getBedId() != null ? task.getBedId() : (elder == null ? null : elder.getBedId());
@@ -637,9 +643,23 @@ public class CareTaskServiceImpl implements CareTaskService {
 
     boolean suspicious = isSuspicious(task.getTenantId(), request.getStaffId(), elderBed.getRoomId());
 
-    task.setStatus(TaskStatus.DONE.name());
-    task.setAssignedStaffId(request.getStaffId());
-    dailyMapper.updateById(task);
+    CareTaskDaily completed = new CareTaskDaily();
+    completed.setStatus(TaskStatus.DONE.name());
+    completed.setAssignedStaffId(request.getStaffId());
+    int claimed = dailyMapper.update(completed, Wrappers.lambdaUpdate(CareTaskDaily.class)
+        .eq(CareTaskDaily::getId, task.getId())
+        .eq(task.getTenantId() != null, CareTaskDaily::getTenantId, task.getTenantId())
+        .eq(CareTaskDaily::getIsDeleted, 0)
+        .ne(CareTaskDaily::getStatus, TaskStatus.DONE.name())
+        .and(w -> w.isNull(CareTaskDaily::getAssignedStaffId)
+            .or().eq(CareTaskDaily::getAssignedStaffId, request.getStaffId())));
+    if (claimed == 0) {
+      response.setStatus(TaskStatus.DONE.name());
+      response.setAbnormal(false);
+      response.setSuspicious(false);
+      response.setMessage("Task already completed");
+      return response;
+    }
 
     CareTaskExecuteLog log = new CareTaskExecuteLog();
     log.setTenantId(task.getTenantId());

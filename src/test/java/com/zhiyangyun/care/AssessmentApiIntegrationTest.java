@@ -39,7 +39,7 @@ class AssessmentApiIntegrationTest {
 
   @Test
   void score_preview_should_return_calculated_score_and_level() throws Exception {
-    String token = loginAndGetToken("staff", "123456");
+    String token = loginAndGetToken("nurse1", "123456");
 
     Map<String, Object> body = new HashMap<>();
     body.put("templateId", 91001L);
@@ -57,7 +57,7 @@ class AssessmentApiIntegrationTest {
 
   @Test
   void create_record_should_auto_score_by_template() throws Exception {
-    String token = loginAndGetToken("staff", "123456");
+    String token = loginAndGetToken("nurse1", "123456");
 
     Map<String, Object> body = new HashMap<>();
     body.put("elderName", "Elder One");
@@ -100,7 +100,7 @@ class AssessmentApiIntegrationTest {
     record.setIsDeleted(0);
     assessmentRecordMapper.insert(record);
 
-    String token = loginAndGetToken("staff", "123456");
+    String token = loginAndGetToken("nurse1", "123456");
 
     mockMvc.perform(get("/api/assessment/records/" + record.getId())
             .header("Authorization", "Bearer " + token))

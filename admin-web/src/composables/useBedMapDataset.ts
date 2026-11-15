@@ -33,7 +33,7 @@ async function ensureBedMapLoaded(includeRisk = false, force = false) {
 
   if (!force && plainBeds.value.length) return plainBeds.value
   if (!force && plainBedPromise) return plainBedPromise
-  plainBedPromise = getBedMap()
+  plainBedPromise = getBedMap({ params: { includeRisk: false } })
     .then((data) => {
       plainBeds.value = data || []
       return plainBeds.value
@@ -89,7 +89,7 @@ async function refreshBedMapDataset(options?: {
   await Promise.all(tasks)
 }
 
-/** 清空模块级缓存：单元测试隔离用，业务代码请用 refreshBedMapDataset 强刷 */
+/** 清空模块级缓存：账号切换时防止跨机构房态残留，页面内更新请用 refreshBedMapDataset 强刷。 */
 export function resetBedMapDatasetState() {
   plainBeds.value = []
   riskBeds.value = []

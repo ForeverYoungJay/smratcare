@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="长者管理" subTitle="长者全周期管理：售前跟进 → 入院办理 → 在院服务 → 变更与退院">
+  <PageContainer title="长者 360° 档案" subTitle="全方位记录长者信息，整合照护、医疗、服务与生活数据，让关爱更专业、更贴心。" mode="scenic">
     <a-alert
       type="info"
       show-icon
@@ -7,18 +7,34 @@
       style="margin-bottom: 16px"
     />
 
-    <a-card v-if="elder" class="card-elevated resident-hero" :bordered="false" style="margin-bottom: 16px">
+    <a-card
+      v-if="elder"
+      class="card-elevated resident-hero"
+      :bordered="false"
+      :style="{ marginBottom: '16px', '--resident-scenic-image': `url(${visualAssets.scenicMountain.url})` }"
+    >
       <div class="resident-hero__main">
-        <div>
-          <div class="resident-hero__title">
-            <strong>{{ elder.fullName || '未命名长者' }}</strong>
-            <a-tag :color="statusColor(elder.lifecycleStatus)">{{ statusLabel(elder.lifecycleStatus) }}</a-tag>
-            <a-tag v-if="elder.departureType === 'DEATH'" color="magenta">死亡离场</a-tag>
-          </div>
-          <div class="resident-hero__meta">
-            <span>床位：{{ elder.roomNo || '-' }} / {{ elder.bedNo || '未分配' }}</span>
-            <span>护理等级：{{ elder.careLevel || '未评定' }}</span>
-            <span>联系电话：{{ elder.phone || '未登记' }}</span>
+        <div class="resident-hero__identity">
+          <img
+            class="resident-hero__portrait"
+            :src="visualAssets.seniorPortrait.url"
+            alt="长者照片示意，非本人"
+          />
+          <div>
+            <div class="resident-hero__title">
+              <strong>{{ elder.fullName || '未命名长者' }}</strong>
+              <a-tag :color="statusColor(elder.lifecycleStatus)">{{ statusLabel(elder.lifecycleStatus) }}</a-tag>
+              <a-tag v-if="elder.departureType === 'DEATH'" color="magenta">死亡离场</a-tag>
+            </div>
+            <div class="resident-hero__meta">
+              <span>照片示意 · 非本人</span>
+              <span>性别：{{ elder.gender === 1 ? '男' : elder.gender === 2 ? '女' : '未登记' }}</span>
+              <span>入住：{{ elder.admissionDate || elder.checkInDate || '未登记' }}</span>
+              <span>床位：{{ elder.roomNo || '-' }} / {{ elder.bedNo || '未分配' }}</span>
+              <span>护理等级：{{ elder.careLevel || '未评定' }}</span>
+              <span>联系电话：{{ elder.phone || '未登记' }}</span>
+            </div>
+            <div v-if="careProfile?.riskTags?.length" class="resident-hero__risks"><span>风险标签</span><a-tag v-for="tag in careProfile.riskTags" :key="tag" color="volcano">{{ tag }}</a-tag></div>
           </div>
         </div>
         <a-space wrap>
@@ -92,7 +108,7 @@
 
     <StatefulBlock :loading="loading" :error="errorMessage" :empty="!cards.length" empty-text="暂无长者总览数据" @retry="loadOverview">
       <a-row :gutter="16">
-        <a-col v-for="card in cards" :key="card.key" :xs="24" :lg="12" style="margin-bottom: 16px">
+        <a-col v-for="card in cards" :key="card.key" :xs="24" :md="12" :xl="8" style="margin-bottom: 16px">
           <a-card :title="card.title" class="card-elevated" :bordered="false">
             <template #extra>
               <a-tag :color="card.tagColor">{{ card.tag }}</a-tag>
@@ -135,6 +151,7 @@ import { getResidentOverview } from '../../../api/medicalCare'
 import { adjustElderCareLevel, getElderCareProfile, getElderDetail, getElderPage } from '../../../api/elder'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
 import type { ElderCareProfile, ElderItem, MedicalResidentOverview } from '../../../types'
+import { visualAssets } from '../../../config/visualAssets'
 
 const router = useRouter()
 const route = useRoute()
@@ -266,6 +283,29 @@ useLiveSyncRefresh({
   flex-wrap: wrap;
 }
 
+.resident-hero {
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(255, 253, 247, .98), rgba(255, 253, 247, .88) 62%, rgba(255, 253, 247, .56)),
+    var(--resident-scenic-image) center 48% / cover;
+}
+
+.resident-hero__identity {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.resident-hero__portrait {
+  width: 112px;
+  height: 126px;
+  flex: 0 0 auto;
+  border: 4px solid rgba(255, 255, 255, .9);
+  border-radius: 18px;
+  object-fit: cover;
+  box-shadow: 0 10px 24px rgba(54, 45, 29, .14);
+}
+
 .resident-hero__title {
   display: flex;
   gap: 8px;
@@ -281,9 +321,18 @@ useLiveSyncRefresh({
 
 .resident-hero__meta {
   display: flex;
-  gap: 16px;
+  gap: 8px 16px;
   flex-wrap: wrap;
   color: var(--muted);
+}
+
+.resident-hero__meta > span:first-child { color: #a5652c; font-size: 12px; }
+.resident-hero__risks { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
+.resident-hero__risks > span { margin-right: 4px; color: #607269; font-size: 12px; }
+
+@media (max-width: 720px) {
+  .resident-hero__identity { align-items: flex-start; }
+  .resident-hero__portrait { width: 76px; height: 88px; border-radius: 14px; }
 }
 
 .care-profile__header {

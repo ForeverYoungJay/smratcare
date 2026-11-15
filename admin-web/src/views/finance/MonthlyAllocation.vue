@@ -60,7 +60,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="createOpen" title="新建月分摊" :confirm-loading="creating" @ok="submitCreate">
+    <a-modal :mask-closable="false" v-model:open="createOpen" title="新建月分摊" :confirm-loading="creating" @ok="submitCreate">
       <a-form layout="vertical">
         <a-form-item label="分摊月份" required>
           <a-date-picker v-model:value="createForm.allocationMonth" picker="month" style="width: 100%" />
@@ -160,7 +160,7 @@
       </vxe-table>
     </a-modal>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="meterOpen"
       title="月抄表数据校验"
       :confirm-loading="meterLoading"

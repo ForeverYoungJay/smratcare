@@ -800,7 +800,7 @@
       </div>
     </a-modal>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="bootstrapOpen"
       title="结构生成向导"
       width="520px"
@@ -877,7 +877,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="generateOpen"
       :title="generateWizardTitle"
       width="560px"

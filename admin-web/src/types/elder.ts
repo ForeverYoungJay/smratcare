@@ -211,6 +211,7 @@ export interface CrmLeadItem {
   remark?: string
   createTime?: string
   updateTime?: string
+  allowDuplicate?: boolean
 }
 
 export interface AdmissionRequest {

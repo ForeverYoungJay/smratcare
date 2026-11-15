@@ -52,7 +52,8 @@ function buildMenu(
         const roleAllowed = roleGroups.length > 0
           ? canAccessRoleGroups(roles, roleGroups, routePath, pagePermissions)
           : permissionGroups.length > 0 ? pageAllowed : canAccessRoleGroups(roles, roleGroups, routePath, pagePermissions)
-        const selfAccessible = permissionAllowed && roleAllowed
+        // 通用页面（功能地图等）对所有登录用户可见，与 pagePermissions 白名单无关
+        const selfAccessible = Boolean(r.meta?.publicForAuthenticated) || (permissionAllowed && roleAllowed)
         const children = r.children?.length
           ? buildMenu(r.children, roles, pagePermissions, permissions, routePath, roleGroups, permissionGroups)
           : []

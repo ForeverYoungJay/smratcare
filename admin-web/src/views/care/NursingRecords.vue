@@ -36,6 +36,8 @@
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="sourceId"
       :columns="columns"
       :data-source="rows"
@@ -44,7 +46,13 @@
       @change="handleTableChange"
     >
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'successFlag'">
+        <template v-if="column.key === 'recordType'">
+          {{ nursingRecordTypeLabel(record.recordType) }}
+        </template>
+        <template v-else-if="column.key === 'status'">
+          <a-tag :color="nursingRecordStatusColor(record.status)">{{ nursingRecordStatusLabel(record.status) }}</a-tag>
+        </template>
+        <template v-else-if="column.key === 'successFlag'">
           <a-tag :color="record.successFlag === 1 ? 'green' : 'red'">
             {{ record.successFlag === 1 ? '成功' : '失败' }}
           </a-tag>
@@ -68,6 +76,7 @@ import { getNursingRecordPage } from '../../api/nursing'
 import { normalizeResidentId } from '../../utils/id'
 import type { Id, NursingRecordItem, PageResult } from '../../types'
 import { resolveCareError } from './careError'
+import { nursingRecordStatusColor, nursingRecordStatusLabel, nursingRecordTypeLabel } from '../../utils/nursingEnums'
 
 const loading = ref(false)
 const rows = ref<NursingRecordItem[]>([])

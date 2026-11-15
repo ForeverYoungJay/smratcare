@@ -26,7 +26,9 @@
       </a-form-item>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="onTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="onTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'diseaseSummary'">
           <a-space v-if="diseaseSummaryMap[String(record.id)]?.length" wrap>

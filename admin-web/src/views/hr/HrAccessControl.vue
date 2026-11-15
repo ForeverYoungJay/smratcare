@@ -18,7 +18,9 @@
       </template>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" :row-class-name="rowClassName" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" :row-class-name="rowClassName" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'accessResult'">
           <a-tag :color="record.accessResult === 'PASS' ? 'green' : record.accessResult === 'EXCEPTION' ? 'red' : 'default'">

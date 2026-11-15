@@ -7,6 +7,7 @@ import { getMenuTree } from '../layouts/menu'
 import { getRecommendedPagePermissions } from '../utils/pageAccess'
 import { resolveDefaultHome } from '../access/policy'
 import { resolveRouteAccess } from '../utils/routeAccess'
+import { resolveAuthorizedLoginTarget } from './permission'
 
 function collectRoutes(routeList: RouteRecordRaw[], parent = ''): Array<{ path: string; name?: string; hidden: boolean }> {
   return routeList.flatMap((route) => {
@@ -35,7 +36,7 @@ describe('route security foundation', () => {
 
   it('keeps the application route composition stable across domain modules', () => {
     const root = routes.find((route) => route.path === '/')
-    expect(collectRoutes(routes)).toHaveLength(634)
+    expect(collectRoutes(routes)).toHaveLength(636)
     expect(root?.children?.map((route) => route.path)).toEqual([
       'portal', 'function-map', 'workbench', 'dashboard', 'elder',
       'marketing', 'bed', 'material', 'store', 'inventory',
@@ -53,6 +54,23 @@ describe('route security foundation', () => {
     expect(redirectPreservingLocation('/workbench/todo')({ query: { status: 'OVERDUE' }, hash: '#mine' } as any))
       .toEqual({ path: '/workbench/todo', query: { status: 'OVERDUE' }, hash: '#mine' })
     expect(toCanonicalRoutePath('/oa/todo?status=OVERDUE#mine')).toBe('/workbench/todo')
+  })
+
+  it.each([
+    ['/logistics/maintenance/report', '/logistics/assets/maintenance-record', undefined],
+    ['/logistics/maintenance/dispatch', '/logistics/assets/maintenance-record', 'OPEN'],
+    ['/logistics/maintenance/progress', '/logistics/assets/maintenance-record', 'PROCESSING']
+  ])('keeps the legacy maintenance entry %s on the unified work-order page', async (legacyPath, expectedPath, status) => {
+    await router.push(legacyPath)
+    await router.isReady()
+    expect(router.currentRoute.value.path).toBe(expectedPath)
+    expect(router.currentRoute.value.query.status).toBe(status)
+  })
+
+  it('keeps the logistics bed usage report inside the permitted logistics route', async () => {
+    await router.push('/logistics/reports/bed-usage')
+    await router.isReady()
+    expect(router.currentRoute.value.path).toBe('/logistics/reports/bed-usage')
   })
 
   it('does not expose hidden compatibility routes in menus', () => {
@@ -78,6 +96,13 @@ describe('route security foundation', () => {
     expect(resolveDefaultHome(['NURSING_EMPLOYEE'])).toBe('/workbench/overview')
     expect(resolveDefaultHome(['DIRECTOR'])).toBe('/portal')
     expect(resolveDefaultHome(['SYS_ADMIN'])).toBe('/system')
+  })
+
+  it('ignores a redirect left by a previous account when the new role cannot open it', () => {
+    const permissions = getRecommendedPagePermissions('LOGISTICS_EMPLOYEE')
+    expect(resolveAuthorizedLoginTarget(router, '/portal', ['LOGISTICS_EMPLOYEE'], permissions)).toBe('/workbench/overview')
+    expect(resolveAuthorizedLoginTarget(router, '/logistics/workbench', ['LOGISTICS_EMPLOYEE'], permissions)).toBe('/logistics/workbench')
+    expect(resolveAuthorizedLoginTarget(router, '//example.com', ['LOGISTICS_EMPLOYEE'], permissions)).toBe('/workbench/overview')
   })
 
   it('does not let personal workbench presets imply the director portal', () => {
@@ -108,5 +133,18 @@ describe('route security foundation', () => {
     expect(resolveRouteAccess(router, ['MARKETING_EMPLOYEE'], '/marketing/reports/channel', employeePermissions).canAccess).toBe(false)
     expect(resolveRouteAccess(router, ['MARKETING_EMPLOYEE'], '/marketing/plan', employeePermissions).canAccess).toBe(false)
     expect(resolveRouteAccess(router, ['MARKETING_MINISTER'], '/marketing/reports/channel', ministerPermissions).canAccess).toBe(true)
+  })
+
+  it('keeps nursing plan management separate from employee plan reading', () => {
+    const employeePermissions = getRecommendedPagePermissions('NURSING_EMPLOYEE')
+    const ministerPermissions = getRecommendedPagePermissions('NURSING_MINISTER')
+    expect(resolveRouteAccess(router, ['NURSING_EMPLOYEE'], '/care/workbench/plan', employeePermissions).canAccess).toBe(true)
+    expect(resolveRouteAccess(router, ['NURSING_EMPLOYEE'], '/care/service/service-plans', employeePermissions).canAccess).toBe(false)
+    expect(resolveRouteAccess(router, ['NURSING_MINISTER'], '/care/service/service-plans', ministerPermissions).canAccess).toBe(true)
+  })
+
+  it('keeps finance reminders out of non-finance job shells', () => {
+    expect(resolveRouteAccess(router, ['LOGISTICS_MINISTER'], '/finance/reminder-center', getRecommendedPagePermissions('LOGISTICS_MINISTER')).canAccess).toBe(false)
+    expect(resolveRouteAccess(router, ['FINANCE_EMPLOYEE'], '/finance/reminder-center', getRecommendedPagePermissions('FINANCE_EMPLOYEE')).canAccess).toBe(true)
   })
 })

@@ -122,6 +122,13 @@ class BedServiceImplTest {
     elder.setFullName("关系占床长者");
     elder.setLifecycleStatus("IN_HOSPITAL");
 
+    com.zhiyangyun.care.elder.entity.Room room = new com.zhiyangyun.care.elder.entity.Room();
+    room.setId(22L);
+    room.setTenantId(1L);
+    room.setOrgId(1L);
+    room.setCapacity(2);
+    room.setIsDeleted(0);
+
     BedRequest request = new BedRequest();
     request.setTenantId(1L);
     request.setOrgId(1L);
@@ -131,6 +138,8 @@ class BedServiceImplTest {
     request.setStatus(BedStatus.OCCUPIED);
 
     when(bedMapper.selectById(12L)).thenReturn(bed);
+    when(roomMapper.selectById(22L)).thenReturn(room);
+    when(bedMapper.selectCount(any())).thenReturn(0L);
     when(relationMapper.selectList(any())).thenReturn(List.of(relation), List.of(relation));
     when(roomMapper.selectList(any())).thenReturn(List.of());
     when(elderMapper.selectBatchIds(any())).thenReturn(List.of(elder));

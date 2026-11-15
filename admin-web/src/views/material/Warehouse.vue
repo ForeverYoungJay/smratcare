@@ -55,7 +55,7 @@
       />
     </a-card>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="editorOpen"
       :title="editingId ? '编辑仓库' : '新增仓库'"
       :confirm-loading="saving"

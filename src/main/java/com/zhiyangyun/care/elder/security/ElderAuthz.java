@@ -29,11 +29,21 @@ public class ElderAuthz {
         "MEDICAL_EMPLOYEE", "MEDICAL_MINISTER",
         "NURSING_EMPLOYEE", "NURSING_MINISTER",
         "LOGISTICS_EMPLOYEE", "LOGISTICS_MINISTER",
+        "MARKETING_EMPLOYEE", "MARKETING_MINISTER",
         "DIRECTOR", "SYS_ADMIN", "ADMIN");
   }
 
   public boolean canWriteBed() {
     return hasAnyRole("LOGISTICS_EMPLOYEE", "LOGISTICS_MINISTER", "DIRECTOR", "SYS_ADMIN", "ADMIN");
+  }
+
+  public boolean canReadBedRisk() {
+    return hasAnyRole(
+        "HR_EMPLOYEE", "HR_MINISTER",
+        "MEDICAL_EMPLOYEE", "MEDICAL_MINISTER",
+        "NURSING_EMPLOYEE", "NURSING_MINISTER",
+        "LOGISTICS_EMPLOYEE", "LOGISTICS_MINISTER",
+        "DIRECTOR", "SYS_ADMIN", "ADMIN");
   }
 
   public boolean canReadResidence() {

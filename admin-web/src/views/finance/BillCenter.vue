@@ -236,7 +236,7 @@
       </template>
     </a-drawer>
 
-    <a-modal v-model:open="generateOpen" title="生成账单" @ok="submitGenerate" :confirm-loading="generating">
+    <a-modal :mask-closable="false" v-model:open="generateOpen" title="生成账单" @ok="submitGenerate" :confirm-loading="generating">
       <a-form layout="vertical" :model="generateForm">
         <a-form-item label="账单月份">
           <a-date-picker v-model:value="generateForm.month" picker="month" style="width: 100%" />
@@ -244,7 +244,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="payOpen"
       :title="activePaymentId ? '修改收款' : '登记收款'"
       width="720"

@@ -11,6 +11,7 @@ import com.zhiyangyun.care.crm.model.action.CrmSmsTaskCreateRequest;
 import com.zhiyangyun.care.crm.model.action.CrmSmsTaskResponse;
 import com.zhiyangyun.care.crm.model.CrmLeadResponse;
 import java.util.List;
+import java.util.Map;
 
 public interface CrmLeadActionService {
   int batchUpdateStatus(Long tenantId, CrmLeadBatchStatusRequest request);
@@ -19,6 +20,7 @@ public interface CrmLeadActionService {
 
   CrmCallbackPlanResponse createCallbackPlan(Long tenantId, Long orgId, Long staffId, Long leadId, CrmCallbackPlanRequest request);
   List<CrmCallbackPlanResponse> listCallbackPlan(Long tenantId, Long leadId);
+  Map<Long, List<CrmCallbackPlanResponse>> listCallbackPlans(Long tenantId, List<Long> leadIds);
   CrmCallbackPlanResponse executeCallbackPlan(Long tenantId, Long planId, CrmCallbackPlanExecuteRequest request);
 
   CrmContractAttachmentResponse createAttachment(Long tenantId, Long orgId, Long staffId, Long leadId, CrmContractAttachmentRequest request);

@@ -1,4 +1,4 @@
-import type { RouteRecordRaw } from 'vue-router'
+import type { RouteComponent, RouteRecordRaw } from 'vue-router'
 
 /**
  * 营销模块路由（配置化）
@@ -10,7 +10,7 @@ import type { RouteRecordRaw } from 'vue-router'
  * 非重复的独立组件页面保留字面量，便于查阅。
  */
 
-type Lazy = RouteRecordRaw['component']
+type Lazy = RouteComponent
 type Props = Record<string, unknown>
 
 const LeadScenarioPage: Lazy = () => import('../views/marketing/LeadScenarioPage.vue')
@@ -43,7 +43,7 @@ export const marketingRoutes: RouteRecordRaw[] = [
         component: () => import('../views/ModuleHub.vue'),
         meta: { title: '营销导航', hidden: true }
       },
-      view('workbench', 'MarketingWorkbench', '销售运营工作台（首页）', () => import('../views/marketing/Workbench.vue')),
+      view('workbench', 'MarketingWorkbench', '市场部工作台', () => import('../views/marketing/Workbench.vue')),
       {
         path: 'leads',
         name: 'MarketingLeads',
@@ -99,8 +99,9 @@ export const marketingRoutes: RouteRecordRaw[] = [
         path: 'reservation',
         name: 'MarketingReservation',
         meta: { title: '预定与床态联动' },
-        redirect: '/marketing/reservation/records',
+        redirect: '/marketing/reservation/visits',
         children: [
+          view('visits', 'MarketingVisitAppointments', '预约参观', () => import('../views/marketing/VisitAppointments.vue')),
           lead('records', 'MarketingReservationRecords', '床位预定记录', { mode: 'reservation', title: '预订管理', subTitle: '已预订客户与签约前准备' }),
           lead('lock', 'MarketingReservationLock', '锁床管理', { mode: 'reservation', title: '锁床管理', subTitle: '锁床客户与锁床状态跟踪', scenario: 'lock_bed' }),
           lead('expiring', 'MarketingReservationExpiring', '预定到期提醒', { mode: 'reservation', title: '预定到期提醒', subTitle: '锁床临期与预定超时预警', scenario: 'expiring_lock' }),

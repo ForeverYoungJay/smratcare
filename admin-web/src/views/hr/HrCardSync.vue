@@ -15,7 +15,9 @@
       </template>
     </SearchForm>
 
-    <DataTable rowKey="cardAccountId" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" :row-class-name="rowClassName" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData" rowKey="cardAccountId" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" :row-class-name="rowClassName" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'syncStatus'">
           <a-tag :color="record.syncStatus === 'SYNCED' ? 'green' : record.syncStatus === 'CARD_LOST' ? 'red' : 'orange'">

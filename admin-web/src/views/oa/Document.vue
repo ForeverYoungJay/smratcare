@@ -84,6 +84,8 @@
         </div>
 
         <DataTable
+          :filter-model="query"
+          @clear-filters="fetchData"
           rowKey="id"
           :row-selection="rowSelection"
           :columns="columns"
@@ -125,7 +127,7 @@
       </a-col>
     </a-row>
 
-    <a-modal v-model:open="editOpen" title="文档" @ok="submit" :confirm-loading="saving" width="680px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="文档" @ok="submit" :confirm-loading="saving" width="680px">
       <a-form layout="vertical">
         <a-form-item label="上传文件（Word/PDF）">
           <a-upload
@@ -179,7 +181,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="folderEditOpen"
       :title="folderForm.id ? '编辑档案夹' : '新增档案夹'"
       @ok="submitFolder"

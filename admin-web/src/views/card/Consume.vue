@@ -10,6 +10,8 @@
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -18,7 +20,7 @@
       @change="handleTableChange"
     />
 
-    <a-modal v-model:open="open" title="一卡通消费" @ok="submit" :confirm-loading="saving" width="560px">
+    <a-modal :mask-closable="false" v-model:open="open" title="一卡通消费" @ok="submit" :confirm-loading="saving" width="560px">
       <a-form layout="vertical">
         <a-form-item label="卡账户" required>
           <a-select

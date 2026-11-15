@@ -75,7 +75,7 @@
       </vxe-table>
     </a-card>
 
-    <a-modal v-model:open="approvalVisible" title="提交退款/冲正审批" :confirm-loading="submitLoading" @ok="submitApproval">
+    <a-modal :mask-closable="false" v-model:open="approvalVisible" title="提交退款/冲正审批" :confirm-loading="submitLoading" @ok="submitApproval">
       <a-form layout="vertical" :model="approvalForm">
         <a-form-item label="审批原因">
           <a-input v-model:value="approvalForm.reason" allow-clear />

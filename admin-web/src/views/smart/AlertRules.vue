@@ -17,7 +17,9 @@
       </template>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="onSearch" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'eventType'">{{ eventTypeText(record.eventType) }}</template>
         <template v-else-if="column.key === 'condition'">
@@ -46,7 +48,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" :title="form.id ? '编辑规则' : '新增规则'" :confirm-loading="saving" width="680px" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="editOpen" :title="form.id ? '编辑规则' : '新增规则'" :confirm-loading="saving" width="680px" @ok="submit">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">

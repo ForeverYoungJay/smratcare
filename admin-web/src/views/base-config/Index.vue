@@ -111,7 +111,7 @@
       />
     </a-card>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="editorOpen"
       :title="editingId ? '编辑基础数据' : '新增基础数据'"
       @ok="submit"

@@ -47,6 +47,8 @@
       @retry="fetchData"
     >
       <DataTable
+        :filter-model="query"
+        @clear-filters="fetchData"
         rowKey="id"
         :row-selection="rowSelection"
         :columns="columns"
@@ -65,7 +67,7 @@
       </DataTable>
     </StatefulBlock>
 
-    <a-modal v-model:open="editOpen" :title="form.id ? `编辑${title}` : `新增${title}`" @ok="submit" :confirm-loading="saving" width="760px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" :title="form.id ? `编辑${title}` : `新增${title}`" @ok="submit" :confirm-loading="saving" width="760px">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">

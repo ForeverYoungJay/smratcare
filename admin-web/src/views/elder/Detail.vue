@@ -119,7 +119,7 @@
       </a-tabs>
     </a-card>
 
-    <a-modal v-model:open="familyBindOpen" title="绑定家属" width="420px" @ok="submitFamilyBind" @cancel="() => (familyBindOpen = false)">
+    <a-modal :mask-closable="false" v-model:open="familyBindOpen" title="绑定家属" width="420px" @ok="submitFamilyBind" @cancel="() => (familyBindOpen = false)">
       <a-form ref="familyBindRef" :model="familyBind" :rules="familyBindRules" layout="vertical">
         <a-form-item label="家属" name="familyUserId">
           <a-select

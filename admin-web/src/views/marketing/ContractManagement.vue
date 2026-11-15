@@ -25,14 +25,18 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <MarketingListToolbar :selected-count="selectedCount" tip="支持批量短信、批量删除">
+      <MarketingListToolbar
+        :selected-count="selectedCount"
+        :tip="canDeleteContract ? '支持批量短信、批量删除' : '支持单条或批量发送续签提醒短信'"
+      >
         <a-space>
-          <a-button @click="exportList">导出</a-button>
+          <a-button @click="exportList">导出当前页</a-button>
+          <a-button v-if="canDeleteContract" @click="reminderConfigOpen = true">提醒规则设置</a-button>
           <a-button :disabled="selectedCount !== 1" @click="sendSmsSelected">短信</a-button>
           <a-button :disabled="selectedCount === 0" @click="batchSms">批量发短信</a-button>
-          <a-button :disabled="selectedCount !== 1" danger @click="removeSelected">删除</a-button>
-          <a-button :disabled="selectedCount === 0" danger @click="batchDelete">批量删除</a-button>
-          <a-button @click="settingReminder">到期提醒设置</a-button>
+          <a-button v-if="canDeleteContract" :disabled="selectedCount !== 1" danger @click="removeSelected">删除</a-button>
+          <a-button v-if="canDeleteContract" :disabled="selectedCount === 0" danger @click="batchDelete">批量删除</a-button>
+          <a-button @click="showSmsTasks">短信任务记录</a-button>
         </a-space>
       </MarketingListToolbar>
       <a-table
@@ -74,6 +78,29 @@
         </template>
       </a-table>
     </a-modal>
+
+    <a-modal
+      v-model:open="reminderConfigOpen"
+      title="合同到期提醒规则"
+      ok-text="保存"
+      :confirm-loading="reminderConfigSaving"
+      @ok="saveReminderConfig"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="启用到期提醒">
+          <a-switch v-model:checked="reminderConfig.enabled" />
+        </a-form-item>
+        <a-form-item label="提前提醒天数" required>
+          <a-input-number v-model:value="reminderConfig.advanceDays" :min="1" :max="365" style="width: 100%" />
+        </a-form-item>
+        <a-form-item label="计划发送时间" required>
+          <a-input v-model:value="reminderConfig.sendTime" type="time" />
+        </a-form-item>
+        <a-form-item label="短信内容" required>
+          <a-textarea v-model:value="reminderConfig.templateContent" :rows="4" :maxlength="255" show-count />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </PageContainer>
 </template>
 
@@ -84,17 +111,26 @@ import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import MarketingQuickNav from './components/MarketingQuickNav.vue'
 import MarketingListToolbar from './components/MarketingListToolbar.vue'
+import { useUserStore } from '../../stores/user'
+import { exportCsv } from '../../utils/export'
+import { hasAnyRole } from '../../utils/roleAccess'
 import {
   batchDeleteContracts,
   createContractSmsTasks,
   deleteCrmContract,
   getContractPage,
+  getContractReminderConfig,
   getContractSmsTasks,
+  saveContractReminderConfig as persistReminderConfig,
   sendContractSmsTask
 } from '../../api/marketing'
-import type { CrmContractItem, PageResult, SmsTaskItem } from '../../types'
+import type { CrmContractItem, CrmContractReminderConfig, PageResult, SmsTaskItem } from '../../types'
 
 const loading = ref(false)
+const userStore = useUserStore()
+const canDeleteContract = computed(() => hasAnyRole(userStore.roles || [], [
+  'MARKETING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'
+]))
 const rows = ref<CrmContractItem[]>([])
 const total = ref(0)
 const selectedRowKeys = ref<string[]>([])
@@ -142,11 +178,14 @@ function requireSingleSelection(actionLabel: string) {
   return selectedContracts.value[0]
 }
 
-const reminderConfig = reactive({
-  beforeDays: 30,
-  templateName: '合同到期提醒',
-  content: '您好，您的合同即将到期，请及时联系机构续签。'
+const reminderConfig = reactive<CrmContractReminderConfig>({
+  enabled: true,
+  advanceDays: 30,
+  sendTime: '09:00',
+  templateContent: '您好，您的合同即将到期，请及时联系机构续签。'
 })
+const reminderConfigOpen = ref(false)
+const reminderConfigSaving = ref(false)
 
 const smsTaskOpen = ref(false)
 const smsTasks = ref<SmsTaskItem[]>([])
@@ -237,8 +276,8 @@ async function sendSms(record: CrmContractItem) {
   }
   const tasks = await createContractSmsTasks({
     contractIds: [record.id],
-    templateName: reminderConfig.templateName,
-    content: reminderConfig.content,
+    templateName: '合同到期提醒',
+    content: reminderConfig.templateContent,
     planSendTime: dayjs().format('YYYY-MM-DD HH:mm:ss')
   })
   if (tasks?.[0]?.id) {
@@ -262,8 +301,8 @@ async function batchSms() {
   }
   const tasks = await createContractSmsTasks({
     contractIds: targetIds,
-    templateName: reminderConfig.templateName,
-    content: reminderConfig.content,
+    templateName: '合同到期提醒',
+    content: reminderConfig.templateContent,
     planSendTime: dayjs().format('YYYY-MM-DD HH:mm:ss')
   })
   await Promise.all((tasks || []).map((item) => sendContractSmsTask(item.id)))
@@ -327,10 +366,21 @@ function batchDelete() {
 }
 
 function exportList() {
-  message.success('导出任务已提交')
+  exportCsv(rows.value.map((item) => ({
+    合同编号: item.contractNo,
+    长者姓名: item.elderName,
+    联系电话: item.elderPhone,
+    负责人: item.marketerName,
+    签约房号: item.reservationRoomNo,
+    签约时间: item.contractSignedAt,
+    合同有效期: item.contractExpiryDate,
+    合同状态: statusText(item.status),
+    短信发送次数: item.smsSendCount,
+    到期倒计时天数: calcCountdown(item.contractExpiryDate)
+  })), `marketing-contract-renewal-${Date.now()}.csv`)
 }
 
-async function settingReminder() {
+async function showSmsTasks() {
   smsTasks.value = await getContractSmsTasks()
   smsTaskOpen.value = true
 }
@@ -341,7 +391,26 @@ async function sendTask(taskId: number) {
   fetchData()
 }
 
-onMounted(fetchData)
+async function loadReminderConfig() {
+  Object.assign(reminderConfig, await getContractReminderConfig())
+}
+
+async function saveReminderConfig() {
+  if (!reminderConfig.templateContent.trim()) {
+    message.warning('请填写短信内容')
+    return
+  }
+  reminderConfigSaving.value = true
+  try {
+    Object.assign(reminderConfig, await persistReminderConfig({ ...reminderConfig }))
+    reminderConfigOpen.value = false
+    message.success('提醒规则已保存')
+  } finally {
+    reminderConfigSaving.value = false
+  }
+}
+
+onMounted(() => Promise.all([fetchData(), loadReminderConfig()]))
 </script>
 
 <style scoped>

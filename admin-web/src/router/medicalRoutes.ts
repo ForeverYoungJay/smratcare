@@ -125,7 +125,7 @@ export const medicalRoutes: RouteRecordRaw[] = [
             path: 'center',
             name: 'MedicalCareCenter',
             component: () => import('../views/medical/MedicalHealthCenter.vue'),
-            meta: { title: '服务中心' }
+            meta: { title: '医务部工作台' }
           },
           {
             path: 'workbench',

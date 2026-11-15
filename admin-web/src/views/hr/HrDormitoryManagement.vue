@@ -87,6 +87,8 @@
       </SearchForm>
 
       <DataTable
+        :filter-model="query"
+        @clear-filters="fetchData"
         rowKey="staffId"
         :columns="columns"
         :data-source="rows"

@@ -18,7 +18,9 @@
       </template>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'mealType'">
           {{ getDiningMealTypeLabel(record.mealType) }}
@@ -43,7 +45,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" title="点餐信息" :confirm-loading="saving" @ok="submit" width="760px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="点餐信息" :confirm-loading="saving" @ok="submit" width="760px">
       <a-form layout="vertical">
         <a-row :gutter="12">
           <a-col :span="12">

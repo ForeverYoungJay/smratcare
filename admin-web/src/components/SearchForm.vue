@@ -37,6 +37,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import dayjs from 'dayjs'
+import { countActiveFilters } from '../utils/filterState'
 
 const props = withDefaults(
   defineProps<{
@@ -57,13 +58,7 @@ const props = withDefaults(
 const emit = defineEmits<{ (e: 'search'): void; (e: 'reset'): void }>()
 const initialModel: Record<string, any> = {}
 
-const activeFieldCount = computed(() =>
-  Object.values(props.model || {}).filter((value) => {
-    if (Array.isArray(value)) return value.length > 0
-    if (typeof value === 'string') return value.trim().length > 0
-    return value !== undefined && value !== null && value !== ''
-  }).length
-)
+const activeFieldCount = computed(() => countActiveFilters(props.model))
 const heading = computed(() => (activeFieldCount.value > 0 ? '当前已按条件筛选' : '筛选条件'))
 
 function cloneValue<T>(value: T): T {
