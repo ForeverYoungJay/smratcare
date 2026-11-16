@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveWorkbenchProfile, workbenchAudienceLabel } from './model'
+import { buildWorkbenchKpis, resolveWorkbenchProfile, workbenchAudienceLabel } from './model'
 
 describe('workbench profile', () => {
   it.each([
@@ -47,5 +47,24 @@ describe('workbench profile', () => {
   it('provides staff-facing audience labels', () => {
     expect(workbenchAudienceLabel(resolveWorkbenchProfile(['FINANCE_EMPLOYEE']))).toBe('员工工作台')
     expect(workbenchAudienceLabel(resolveWorkbenchProfile(['FINANCE_MINISTER']))).toBe('部长工作台')
+  })
+})
+
+describe('buildWorkbenchKpis', () => {
+  const roleMetric = { label: '我的待执行', value: '3', helper: '', path: '/care/today', tone: 'success' as const }
+  const oa = { overdue: '7', healthRisk: '2', healthPath: '/medical-care/unified-task-center', approvals: '5' }
+
+  it.each([
+    ['nursing', 'health'],
+    ['medical', 'health'],
+    ['finance', 'approvals'],
+    ['manager', 'approvals']
+  ])('%s gets %s as the last card', (personaKey, lastKey) => {
+    const kpis = buildWorkbenchKpis(personaKey, [roleMetric, roleMetric], oa)
+    expect(kpis.map((item) => item.key)).toEqual(['role-0', 'role-1', 'overdue', lastKey])
+  })
+
+  it('keeps the row short when a persona has fewer role metrics', () => {
+    expect(buildWorkbenchKpis('medical', [roleMetric], oa).map((item) => item.key)).toEqual(['role-0', 'overdue', 'health'])
   })
 })

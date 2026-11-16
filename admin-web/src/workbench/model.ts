@@ -79,3 +79,30 @@ export function workbenchAudienceLabel(profile: WorkbenchProfile) {
   if (profile.audience === 'BUSINESS_ADMIN') return '运营管理入口'
   return '个人工作台'
 }
+
+export type WorkbenchKpiTone = 'brand' | 'success' | 'warning' | 'danger'
+
+export interface WorkbenchKpi {
+  key: string
+  label: string
+  value: string
+  helper: string
+  path: string
+  tone: WorkbenchKpiTone
+}
+
+// 前两张来自岗位画像（已按员工/部长区分口径），其后是个人 OA 口径
+export function buildWorkbenchKpis(
+  personaKey: string,
+  roleMetrics: Array<Omit<WorkbenchKpi, 'key'>>,
+  oa: { overdue: string; healthRisk: string; healthPath: string; approvals: string }
+): WorkbenchKpi[] {
+  const clinicalRole = personaKey === 'nursing' || personaKey === 'medical'
+  return [
+    ...roleMetrics.slice(0, 2).map((metric, index) => ({ ...metric, key: `role-${index}` })),
+    { key: 'overdue', label: '逾期待办', value: oa.overdue, helper: '审批与 OA 待办已过期限', path: '/workbench/todo', tone: 'danger' },
+    clinicalRole
+      ? { key: 'health', label: '健康风险', value: oa.healthRisk, helper: '健康异常待复核', path: oa.healthPath, tone: 'danger' }
+      : { key: 'approvals', label: '待审批', value: oa.approvals, helper: '流程审批、报销与采购', path: '/workbench/approvals', tone: 'warning' }
+  ]
+}

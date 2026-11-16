@@ -13,26 +13,21 @@
       </template>
     </a-alert>
 
-    <header class="workbench-hero">
-      <img :src="visualAssets.scenicMountain.url" alt="" aria-hidden="true" class="workbench-hero__image" />
-      <div class="workbench-hero__copy">
-        <span class="workbench-hero__eyebrow"><span aria-hidden="true" class="workbench-hero__sun"></span>{{ roleLabel }} · {{ audienceLabel }}</span>
+    <header class="workbench-greeting">
+      <div class="workbench-greeting__copy">
         <h1>{{ workbenchHeadline }}</h1>
-        <p>{{ workbenchSubline }}</p>
+        <p :title="workbenchSubline">{{ workbenchSubline }}</p>
       </div>
-      <div class="workbench-hero__aside">
-        <span>{{ todayDateLabel }}</span>
-        <small>最近刷新 {{ refreshedAt }}</small>
-        <div class="workbench-hero__actions">
-          <a-button
-            v-for="action in attendanceActionButtons"
-            :key="action"
-            :loading="attendancePending === action"
-            :disabled="attendanceSubmitting && attendancePending !== action"
-            @click="handleAttendanceAction(action)"
-          >{{ attendanceActionLabel(action) }}</a-button>
-          <a-button :loading="loading" @click="loadWorkbench()">刷新数据</a-button>
-        </div>
+      <div class="workbench-greeting__actions">
+        <small>{{ todayDateLabel }} · 更新于 {{ refreshedAt }}</small>
+        <a-button
+          v-for="action in attendanceActionButtons"
+          :key="action"
+          :loading="attendancePending === action"
+          :disabled="attendanceSubmitting && attendancePending !== action"
+          @click="handleAttendanceAction(action)"
+        >{{ attendanceActionLabel(action) }}</a-button>
+        <a-button :loading="loading" @click="loadWorkbench()">刷新</a-button>
       </div>
     </header>
 
@@ -43,11 +38,11 @@
 
     <section v-if="!initialLoading" class="workbench-kpis" aria-label="今日关键指标">
       <button
-        v-for="(item, index) in todayFocusCards"
-        :key="item.label"
+        v-for="item in todayFocusCards"
+        :key="item.key"
         type="button"
         class="workbench-kpi"
-        :class="`workbench-kpi--${index}`"
+        :class="`workbench-kpi--${item.tone}`"
         @click="openPath(item.path)"
       >
         <span class="workbench-kpi__icon" aria-hidden="true"><component :is="item.icon" /></span>
@@ -56,88 +51,85 @@
       </button>
     </section>
 
-    <section v-if="!initialLoading" class="workbench-dashboard" aria-label="工作台总览">
-      <article class="workbench-panel workbench-panel--todos">
-        <div class="workbench-panel__head"><h2>我的待办 <small>({{ portalSummary?.openTodoCount ?? 0 }})</small></h2><button type="button" @click="openPath('/workbench/todo')">查看全部 <RightOutlined aria-hidden="true" /></button></div>
-        <div class="workbench-filter" role="group" aria-label="待办筛选">
-          <button v-for="filter in todoFilterOptions" :key="filter.key" type="button" :class="{ active: todoFilter === filter.key }" :aria-pressed="todoFilter === filter.key" @click="todoFilter = filter.key">{{ filter.label }}</button>
-        </div>
-        <div v-if="visibleTodos.length" class="workbench-todo-list">
-          <button v-for="todo in visibleTodos" :key="todo.id" type="button" class="workbench-todo-row" @click="openPath('/workbench/todo')">
-            <span class="workbench-todo-row__mark" aria-hidden="true"></span>
-            <span class="workbench-todo-row__title">{{ todo.title }}</span>
-            <span class="workbench-todo-row__status" :class="{ overdue: isTodoOverdue(todo) }">{{ isTodoOverdue(todo) ? '已逾期' : '待处理' }}</span>
-            <time v-if="todo.dueTime" :datetime="todo.dueTime">{{ dayjs(todo.dueTime).format('MM-DD HH:mm') }}</time>
-          </button>
-        </div>
-        <div v-else class="workbench-empty">{{ portalSummary?.openTodoCount ? '当前筛选暂无待办，查看全部可继续处理。' : '今天没有待处理事项。' }}</div>
-      </article>
-
-      <article class="workbench-panel workbench-panel--quick">
-        <div class="workbench-panel__head"><h2>常用入口</h2><button type="button" @click="openPath('/function-map')">全部功能 <RightOutlined aria-hidden="true" /></button></div>
-        <div class="workbench-shortcuts">
-          <button v-for="action in visibleQuickActions" :key="action.path" type="button" class="workbench-shortcut" :class="`workbench-shortcut--${action.tone}`" @click="openPath(action.path)">
-            <component :is="action.icon" aria-hidden="true" /><span>{{ action.label }}</span>
-          </button>
-        </div>
-      </article>
-
-      <article class="workbench-panel workbench-panel--notices">
-        <div class="workbench-panel__head"><h2>通知公告</h2><button type="button" @click="openPath('/oa/notice')">全部 <RightOutlined aria-hidden="true" /></button></div>
-        <div v-if="visibleNotices.length" class="workbench-notice-list">
-          <button v-for="notice in visibleNotices" :key="notice.id" type="button" class="workbench-notice-row" @click="openPath('/oa/notice')">
-            <span class="workbench-notice-row__dot" aria-hidden="true"></span><span>{{ notice.title }}</span><time v-if="notice.publishTime" :datetime="notice.publishTime">{{ dayjs(notice.publishTime).format('MM-DD') }}</time>
-          </button>
-        </div>
-        <div v-else class="workbench-empty">暂无已发布公告。</div>
-      </article>
-
-      <article class="workbench-panel workbench-panel--agenda">
-        <div class="workbench-panel__head"><h2>今日工作日程</h2><button type="button" @click="openPath('/workbench/schedule')">完整日历 <RightOutlined aria-hidden="true" /></button></div>
-        <div class="workbench-agenda">
-          <div v-for="item in selectedDateAgenda.slice(0, 5)" :key="item.id" class="workbench-agenda__row">
-            <time :datetime="item.startTime || item.endTime">{{ item.startTime ? dayjs(item.startTime).format('HH:mm') : '全天' }}</time>
-            <span>{{ item.title }}</span><StatusTag :text="agendaTypeText(item.calendarType)" :tone="agendaTone(item)" />
+    <section v-if="!initialLoading" class="workbench-main" aria-label="工作台总览">
+      <div class="workbench-column">
+        <article class="workbench-panel workbench-panel--todos">
+          <div class="workbench-panel__head"><h2>我的待办 <small>({{ portalSummary?.openTodoCount ?? 0 }})</small></h2><button type="button" @click="openPath('/workbench/todo')">查看全部 <RightOutlined aria-hidden="true" /></button></div>
+          <div class="workbench-filter" role="group" aria-label="待办筛选">
+            <button v-for="filter in todoFilterOptions" :key="filter.key" type="button" :class="{ active: todoFilter === filter.key }" :aria-pressed="todoFilter === filter.key" @click="todoFilter = filter.key">{{ filter.label }}</button>
           </div>
-          <div v-if="!selectedDateAgenda.length" class="workbench-empty">今日暂无日程安排，可在日历中添加。</div>
-        </div>
-      </article>
-
-      <article class="workbench-panel workbench-panel--coordination">
-        <div class="workbench-panel__head"><h2>跨部门协同</h2><button type="button" @click="openPath('/oa/staff-collaboration')">查看流程 <RightOutlined aria-hidden="true" /></button></div>
-        <div class="workbench-coordination__lead"><strong>{{ portalSummary?.ongoingTaskCount ?? 0 }}</strong><span>项进行中的协同任务</span></div>
-        <div class="workbench-coordination__stats"><span>待审批 <strong>{{ portalSummary?.pendingApprovalCount ?? 0 }}</strong></span><span>今日日程 <strong>{{ portalSummary?.todayScheduleCount ?? 0 }}</strong></span><span>逾期待办 <strong>{{ portalSummary?.overdueTodoCount ?? 0 }}</strong></span></div>
-      </article>
-
-      <article class="workbench-panel workbench-panel--messages">
-        <div class="workbench-panel__head"><h2>我的消息</h2><button type="button" @click="openAllMessages">全部 <RightOutlined aria-hidden="true" /></button></div>
-        <div v-if="messagePreviews.length" class="workbench-message-list" role="list">
-          <button
-            v-for="item in messagePreviews"
-            :key="item.roomId"
-            type="button"
-            class="workbench-message-row"
-            :aria-label="`${item.roomName}，${item.senderName}：${item.content}${item.unreadCount ? `，${item.unreadCount}条未读` : ''}`"
-            @click="openMessage(item)"
-          >
-            <span class="workbench-message-row__avatar" aria-hidden="true">{{ item.senderName.slice(0, 1) }}</span>
-            <span class="workbench-message-row__body">
-              <span class="workbench-message-row__meta"><strong>{{ item.roomName }}</strong><time :datetime="item.createdAt">{{ messageTimeText(item.createdAt) }}</time></span>
-              <span class="workbench-message-row__preview">{{ item.senderName }}：{{ item.content }}</span>
-            </span>
-            <span v-if="item.unreadCount" class="workbench-message-row__unread" role="status" aria-atomic="true">{{ item.unreadCount }}</span>
+          <div v-if="visibleTodos.length" class="workbench-todo-list">
+            <button v-for="todo in visibleTodos" :key="todo.id" type="button" class="workbench-todo-row" @click="openPath('/workbench/todo')">
+              <span class="workbench-todo-row__mark" aria-hidden="true"></span>
+              <span class="workbench-todo-row__title">{{ todo.title }}</span>
+              <span class="workbench-todo-row__status" :class="{ overdue: isTodoOverdue(todo) }">{{ isTodoOverdue(todo) ? '已逾期' : '待处理' }}</span>
+              <time v-if="todo.dueTime" :datetime="todo.dueTime">{{ dayjs(todo.dueTime).format('MM-DD HH:mm') }}</time>
+            </button>
+          </div>
+          <div v-else class="workbench-empty">{{ portalSummary?.openTodoCount ? '当前筛选暂无待办，查看全部可继续处理。' : '今天没有待处理事项。' }}</div>
+          <button type="button" class="workbench-coordination-link" @click="openPath('/oa/staff-collaboration')">
+            <span>跨部门协同</span><strong>{{ portalSummary?.ongoingTaskCount ?? 0 }}</strong><span>项进行中</span><RightOutlined aria-hidden="true" />
           </button>
-        </div>
-        <div v-else class="workbench-empty">暂无消息，新的协作消息会显示在这里。</div>
-      </article>
-
-      <article class="workbench-panel workbench-panel--role">
-        <div class="workbench-panel__head"><h2>{{ roleLabel }}关注</h2><button type="button" @click="openPath('/function-map')">更多 <RightOutlined aria-hidden="true" /></button></div>
-        <div class="workbench-role-list">
-          <button v-for="module in orderedPrimaryModules.slice(0, 3)" :key="module.key" type="button" class="workbench-role-row" @click="openPath(module.path)"><span>{{ module.title }}</span><strong>{{ module.metricValue }}</strong><RightOutlined aria-hidden="true" /></button>
-        </div>
-        <div v-if="!orderedPrimaryModules.length" class="workbench-empty">当前岗位暂无可用模块。</div>
-      </article>
+        </article>
+        <article class="workbench-panel workbench-panel--quick">
+          <div class="workbench-panel__head"><h2>常用入口</h2><button type="button" @click="openPath('/function-map')">全部功能 <RightOutlined aria-hidden="true" /></button></div>
+          <div class="workbench-shortcuts">
+            <button v-for="action in visibleQuickActions" :key="action.path" type="button" class="workbench-shortcut" :class="`workbench-shortcut--${action.tone}`" @click="openPath(action.path)">
+              <component :is="action.icon" aria-hidden="true" /><span>{{ action.label }}</span>
+            </button>
+          </div>
+        </article>
+      </div>
+      <div class="workbench-column">
+        <article class="workbench-panel workbench-panel--agenda">
+          <div class="workbench-panel__head"><h2>今日工作日程</h2><button type="button" @click="openPath('/workbench/schedule')">完整日历 <RightOutlined aria-hidden="true" /></button></div>
+          <div class="workbench-agenda">
+            <div v-for="item in selectedDateAgenda.slice(0, 5)" :key="item.id" class="workbench-agenda__row">
+              <time :datetime="item.startTime || item.endTime">{{ item.startTime ? dayjs(item.startTime).format('HH:mm') : '全天' }}</time>
+              <span>{{ item.title }}</span><StatusTag :text="agendaTypeText(item.calendarType)" :tone="agendaTone(item)" />
+            </div>
+            <div v-if="!selectedDateAgenda.length" class="workbench-empty">今日暂无日程安排，可在日历中添加。</div>
+          </div>
+        </article>
+        <article class="workbench-panel workbench-panel--inbox">
+          <div class="workbench-panel__head">
+            <h2>消息与公告</h2>
+            <button type="button" @click="inboxTab === 'messages' ? openAllMessages() : openPath('/oa/notice')">全部 <RightOutlined aria-hidden="true" /></button>
+          </div>
+          <div class="workbench-filter" role="group" aria-label="消息与公告切换">
+            <button type="button" :class="{ active: inboxTab === 'messages' }" :aria-pressed="inboxTab === 'messages'" @click="inboxTab = 'messages'">消息<template v-if="unreadMessageCount"> · {{ unreadMessageCount }} 未读</template></button>
+            <button type="button" :class="{ active: inboxTab === 'notices' }" :aria-pressed="inboxTab === 'notices'" @click="inboxTab = 'notices'">公告</button>
+          </div>
+          <template v-if="inboxTab === 'messages'">
+            <div v-if="messagePreviews.length" class="workbench-message-list" role="list">
+              <button
+                v-for="item in messagePreviews"
+                :key="item.roomId"
+                type="button"
+                class="workbench-message-row"
+                :aria-label="`${item.roomName}，${item.senderName}：${item.content}${item.unreadCount ? `，${item.unreadCount}条未读` : ''}`"
+                @click="openMessage(item)"
+              >
+                <span class="workbench-message-row__avatar" aria-hidden="true">{{ item.senderName.slice(0, 1) }}</span>
+                <span class="workbench-message-row__body">
+                  <span class="workbench-message-row__meta"><strong>{{ item.roomName }}</strong><time :datetime="item.createdAt">{{ messageTimeText(item.createdAt) }}</time></span>
+                  <span class="workbench-message-row__preview">{{ item.senderName }}：{{ item.content }}</span>
+                </span>
+                <span v-if="item.unreadCount" class="workbench-message-row__unread" role="status" aria-atomic="true">{{ item.unreadCount }}</span>
+              </button>
+            </div>
+            <div v-else class="workbench-empty">暂无消息，新的协作消息会显示在这里。</div>
+          </template>
+          <template v-else>
+            <div v-if="visibleNotices.length" class="workbench-notice-list">
+              <button v-for="notice in visibleNotices" :key="notice.id" type="button" class="workbench-notice-row" @click="openPath('/oa/notice')">
+                <span class="workbench-notice-row__dot" aria-hidden="true"></span><span>{{ notice.title }}</span><time v-if="notice.publishTime" :datetime="notice.publishTime">{{ dayjs(notice.publishTime).format('MM-DD') }}</time>
+              </button>
+            </div>
+            <div v-else class="workbench-empty">暂无已发布公告。</div>
+          </template>
+        </article>
+      </div>
     </section>
 
     <div v-if="!initialLoading" class="workbench-details-title"><span>岗位业务明细</span><h2>继续处理今天的工作</h2></div>
@@ -145,6 +137,8 @@
     <section v-if="!initialLoading" class="workbench-shell">
       <DepartmentHomeOverview
         v-if="workbenchProfile.department"
+        class="workbench-shell__department"
+        :show-header="false"
         :department="workbenchProfile.department"
         :metrics="departmentHomeMetrics"
         :data-state="departmentHomeDataState"
@@ -157,81 +151,8 @@
         @refresh="loadWorkbench()"
       />
 
-      <WorkbenchModuleCard title="我的日程" eyebrow="今日">
-        <div class="schedule-head">
-          <div>
-            <strong>{{ selectedDateLabel }}</strong>
-            <p>{{ attendanceWindowLabel }}</p>
-          </div>
-          <a-space size="small">
-            <StatusTag :text="attendanceOverview.todayStatusLabel || '待打卡'" :tone="attendanceTone" />
-            <a-button type="link" @click="openPath('/workbench/schedule')">查看完整日历</a-button>
-          </a-space>
-        </div>
-
-        <div class="schedule-calendar-shell">
-          <div class="schedule-calendar-panel">
-            <div class="schedule-calendar-toolbar">
-              <a-button size="small" @click="moveCalendar(-1)">上月</a-button>
-              <strong>{{ calendarMonthLabel }}</strong>
-              <a-space size="small">
-                <a-button size="small" @click="jumpToToday">今天</a-button>
-                <a-button size="small" @click="moveCalendar(1)">下月</a-button>
-              </a-space>
-            </div>
-            <FullCalendar ref="calendarRef" :options="calendarOptions" />
-          </div>
-
-          <div class="schedule-side-panel">
-            <div class="schedule-status-card">
-              <div class="schedule-status-copy">
-                <strong>{{ attendanceOverview.todayStatusLabel || '未打卡' }}</strong>
-                <span>{{ selectedDateHint }}</span>
-              </div>
-              <StatusTag :text="todayScheduleTagText" :tone="todayScheduleTagTone" />
-            </div>
-
-            <div class="workbench-chip-grid">
-              <button
-                v-for="item in scheduleItems"
-                :key="item.label"
-                type="button"
-                class="workbench-chip"
-                @click="openPath(item.path)"
-              >
-                <strong>{{ item.value }}</strong>
-                <span>{{ item.label }}</span>
-              </button>
-            </div>
-
-            <div class="schedule-agenda">
-              <div class="schedule-agenda-head">
-                <strong>当日安排</strong>
-                <span>{{ selectedDateAgenda.length }} 项</span>
-              </div>
-              <div v-if="selectedDateAgenda.length" class="schedule-agenda-list">
-                <button
-                  v-for="item in selectedDateAgenda.slice(0, 4)"
-                  :key="item.id"
-                  type="button"
-                  class="schedule-agenda-item"
-                  @click="openPath('/workbench/schedule')"
-                >
-                  <div>
-                    <strong>{{ item.title }}</strong>
-                    <span>{{ agendaTimeText(item.startTime, item.endTime) }}</span>
-                  </div>
-                  <StatusTag :text="agendaTypeText(item.calendarType)" :tone="agendaTone(item)" />
-                </button>
-              </div>
-              <a-empty v-else description="这一天暂无安排" />
-            </div>
-          </div>
-        </div>
-      </WorkbenchModuleCard>
-
       <WorkbenchModuleCard
-        v-for="module in orderedPrimaryModules"
+        v-for="module in workbenchProfile.department ? [] : orderedPrimaryModules"
         :key="module.key"
         :title="module.title"
         :eyebrow="module.eyebrow"
@@ -268,7 +189,7 @@
         </div>
       </WorkbenchModuleCard>
 
-      <WorkbenchModuleCard v-if="!orderedPrimaryModules.length" title="业务模块" eyebrow="提示">
+      <WorkbenchModuleCard v-if="!workbenchProfile.department && !orderedPrimaryModules.length" title="业务模块" eyebrow="提示">
         <a-empty description="当前角色暂无可展示的业务模块，可前往「全部功能」查看有权限的入口">
           <a-button type="primary" @click="openPath('/function-map')">前往全部功能</a-button>
         </a-empty>
@@ -279,14 +200,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
-import dayjs, { type Dayjs } from 'dayjs'
-import FullCalendar from '@fullcalendar/vue3'
-import dayGridPlugin from '@fullcalendar/daygrid'
-import interactionPlugin from '@fullcalendar/interaction'
+import { computed, onMounted, onUnmounted, reactive, ref, type Component } from 'vue'
+import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import {
-  AlertOutlined, CalendarOutlined, CheckSquareOutlined, ClockCircleOutlined,
+  AlertOutlined, CalendarOutlined, ClockCircleOutlined,
   FileTextOutlined, HeartOutlined, MedicineBoxOutlined, RightOutlined,
   ScheduleOutlined, TeamOutlined, ToolOutlined, UnorderedListOutlined
 } from '@ant-design/icons-vue'
@@ -294,14 +212,13 @@ import OverviewMetricCard from '../../components/smartcare/OverviewMetricCard.vu
 import StatusTag from '../../components/smartcare/StatusTag.vue'
 import WorkbenchModuleCard from '../../components/smartcare/WorkbenchModuleCard.vue'
 import DepartmentHomeOverview from '../../components/workbench/DepartmentHomeOverview.vue'
-import { visualAssets } from '../../config/visualAssets'
 import { getOaTaskCalendar, getPortalSummary, getQuickChatState } from '../../api/oa'
 import { getAttendanceOverview, punchAttendance } from '../../api/schedule'
 import type { AttendanceDashboardOverview, OaPortalSummary, OaTask } from '../../types'
 import { useUserStore } from '../../stores/user'
 import { useRouter } from 'vue-router'
 import { resolveRouteAccess } from '../../utils/routeAccess'
-import { resolveWorkbenchProfile, workbenchAudienceLabel } from '../../workbench/model'
+import { buildWorkbenchKpis, resolveWorkbenchProfile, type WorkbenchKpiTone } from '../../workbench/model'
 import {
   loadDepartmentWorkbenchSnapshot,
   type DepartmentWorkbenchSnapshot,
@@ -337,7 +254,7 @@ type SummaryMetricItem = {
   label: string
   value: string
   helper: string
-  tone: 'brand' | 'warning' | 'success'
+  tone: WorkbenchKpiTone
   path: string
 }
 
@@ -346,14 +263,7 @@ type WorkbenchPersona = {
   roleLabel: string
   subline: string
   modulePriority: string[]
-  primaryEntry: {
-    label: string
-    value: string
-    helper: string
-    path: string
-  }
   summaryMetrics: SummaryMetricItem[]
-  preferredActions: string[]
 }
 
 const router = useRouter()
@@ -368,9 +278,6 @@ const REFRESH_INTERVAL_MS = 60_000
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 let messageSyncUnsubscribe = () => {}
 let refreshInFlight = false
-const calendarRef = ref<InstanceType<typeof FullCalendar> | null>(null)
-const selectedDate = ref(dayjs())
-const calendarCursor = ref(dayjs().startOf('month'))
 const calendarRows = ref<OaTask[]>([])
 const portalSummary = ref<OaPortalSummary | null>(null)
 const messagePreviews = ref<QuickChatPreviewItem[]>([])
@@ -431,7 +338,6 @@ function openPath(path: string) {
 
 const normalizedRoles = computed(() => (userStore.roles || []).map((role) => String(role || '').toUpperCase()))
 const workbenchProfile = computed(() => resolveWorkbenchProfile(userStore.roles || []))
-const audienceLabel = computed(() => workbenchAudienceLabel(workbenchProfile.value))
 
 function hasRoleFragment(fragment: string) {
   return normalizedRoles.value.some((role) => role.includes(fragment))
@@ -444,12 +350,6 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
       roleLabel: '护理执行角色',
       subline: '先完成护理执行、巡视交接和异常处置，再补充护理记录。',
       modulePriority: ['todo', 'clinical', 'approval', 'workorder', 'hr', 'customer', 'finance'],
-      primaryEntry: {
-        label: '护理执行',
-        value: displayNumber(departmentMetricNumber('pending')),
-        helper: `超时 ${displayNumber(departmentMetricNumber('overdue'))}，先清护理任务与交接风险`,
-        path: '/care/today'
-      },
       summaryMetrics: [
         {
           label: workbenchProfile.value.hasManagementView ? '部门待执行' : '我的待执行',
@@ -465,8 +365,7 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
           tone: 'warning',
           path: '/care/today'
         }
-      ],
-      preferredActions: ['/care/today', '/care/service/nursing-records', '/workbench/attendance']
+      ]
     }
   }
   if (workbenchProfile.value.department === 'MEDICAL') {
@@ -476,22 +375,17 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
       roleLabel: '医务处置角色',
       subline: '优先复核健康异常、医嘱执行和巡诊安排，避免问题跨班次积压。',
       modulePriority: ['todo', 'clinical', 'approval', 'customer', 'workorder', 'finance', 'hr'],
-      primaryEntry: {
-        label: managementView ? '未闭环异常' : '医务处置',
-        value: managementView ? displayNumber(departmentMetricNumber('abnormal')) : '--',
-        helper: managementView
-          ? `待执行医嘱 ${displayNumber(departmentMetricNumber('orders'))}，先看异常与医嘱闭环`
-          : '个人待办口径待后端接入，请进入巡诊或医嘱列表处理',
-        path: managementView ? '/medical-care/unified-task-center' : '/medical-care/rounds'
-      },
       summaryMetrics: [
-        {
-          label: managementView ? '未闭环异常' : '我的巡诊待办',
-          value: managementView ? displayNumber(departmentMetricNumber('abnormal')) : '--',
-          helper: managementView ? '异常复核与交班跟进' : '个人统计接口尚未接入',
-          tone: 'warning',
-          path: managementView ? '/medical-care/unified-task-center' : '/medical-care/rounds'
-        },
+        // 医务员工的个人巡诊统计接口尚未接入，不放占位卡
+        ...(managementView
+          ? [{
+              label: '未闭环异常',
+              value: displayNumber(departmentMetricNumber('abnormal')),
+              helper: '异常复核与交班跟进',
+              tone: 'warning' as const,
+              path: '/medical-care/unified-task-center'
+            }]
+          : []),
         {
           label: managementView ? '待执行医嘱' : '我的今日用药登记',
           value: displayNumber(departmentMetricNumber(managementView ? 'orders' : 'medicationDone')),
@@ -499,8 +393,7 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
           tone: 'success',
           path: managementView ? '/medical-care/orders' : '/medical-care/medication-registration'
         }
-      ],
-      preferredActions: ['/medical-care/rounds', '/medical-care/orders', '/medical-care/medication-registration', '/workbench/attendance']
+      ]
     }
   }
   if (workbenchProfile.value.department === 'LOGISTICS' || hasRoleFragment('GUARD')) {
@@ -510,12 +403,6 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
       roleLabel: '后勤保障角色',
       subline: '先处理逾期维修、巡检和保障工单，再补充现场回执。',
       modulePriority: ['todo', 'workorder', 'approval', 'hr', 'customer', 'clinical', 'finance'],
-      primaryEntry: {
-        label: managementView ? '逾期维修' : '待处理报修',
-        value: displayNumber(departmentMetricNumber(managementView ? 'overdue' : 'maintenance')),
-        helper: managementView ? `库存预警 ${displayNumber(departmentMetricNumber('stock'))}，先清保障风险` : '机构当班任务口径，先响应报修并完成现场回执',
-        path: '/logistics/task-center'
-      },
       summaryMetrics: [
         {
           label: managementView ? '库存预警' : '今日出库',
@@ -531,10 +418,7 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
           tone: managementView ? 'warning' : 'success',
           path: managementView ? '/logistics/maintenance/assets' : '/logistics/dining/delivery-plan'
         }
-      ],
-      preferredActions: managementView
-        ? ['/logistics/task-center', '/logistics/storage/alerts', '/workbench/approvals']
-        : ['/logistics/task-center', '/logistics/storage/inbound', '/logistics/dining/delivery-plan']
+      ]
     }
   }
   if (workbenchProfile.value.department === 'FINANCE') {
@@ -544,12 +428,6 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
       roleLabel: '财务运营角色',
       subline: '优先核对收费、账单和对账例外，避免回款与审批卡住。',
       modulePriority: ['todo', 'finance', 'approval', 'hr', 'customer', 'clinical', 'workorder'],
-      primaryEntry: {
-        label: managementView ? '待审核费用' : '机构今日实收',
-        value: managementView ? displayNumber(departmentMetricNumber('pending')) : displayAmount(departmentMetricNumber('collected')),
-        helper: managementView ? '先处理折扣、退款和退住结算审批' : '机构当日口径，完成收款后及时核对票据',
-        path: managementView ? '/workbench/approvals' : '/finance/payments/cashier-desk'
-      },
       summaryMetrics: [
         {
           label: managementView ? '欠费长者' : '票据未关联',
@@ -565,10 +443,7 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
           tone: 'warning',
           path: '/finance/reconcile/issue-center'
         }
-      ],
-      preferredActions: managementView
-        ? ['/workbench/approvals', '/finance/bills/follow-up', '/finance/reconcile/issue-center']
-        : ['/finance/payments/cashier-desk', '/finance/payments/records', '/finance/payments/shift-close']
+      ]
     }
   }
   if (workbenchProfile.value.department === 'HR') {
@@ -578,12 +453,6 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
       roleLabel: '人事行政角色',
       subline: '先看考勤异常、班组排班和档案动作，再推进招聘与入转调离。',
       modulePriority: ['todo', 'hr', 'approval', 'finance', 'customer', 'clinical', 'workorder'],
-      primaryEntry: {
-        label: managementView ? '请假待审批' : '我的考勤',
-        value: managementView ? displayNumber(departmentMetricNumber('leave')) : displayNumber(attendanceOverview.abnormalCount),
-        helper: managementView ? `考勤异常 ${displayNumber(departmentMetricNumber('attendance'))}，优先处理人员风险` : '个人考勤来自本人数据；机构提醒不计为本人待办',
-        path: managementView ? '/hr/attendance/leave-approval' : '/workbench/attendance'
-      },
       summaryMetrics: [
         {
           label: managementView ? '合同临期' : '机构今日培训',
@@ -599,10 +468,7 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
           tone: 'brand',
           path: managementView ? '/hr/development/records' : '/hr/profile/social-security-reminders'
         }
-      ],
-      preferredActions: managementView
-        ? ['/hr/attendance/leave-approval', '/hr/attendance/abnormal', '/hr/profile/basic']
-        : ['/workbench/attendance', '/workbench/profile', '/hr/profile/social-security-reminders']
+      ]
     }
   }
   if (workbenchProfile.value.department === 'MARKETING') {
@@ -612,12 +478,6 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
       roleLabel: '营销转化角色',
       subline: '先推进线索回访、参观和试住转化，再补营销任务和计划。',
       modulePriority: ['todo', 'customer', 'approval', 'finance', 'clinical', 'workorder', 'hr'],
-      primaryEntry: {
-        label: managementView ? '逾期未跟进' : '团队今日回访',
-        value: displayNumber(departmentMetricNumber(managementView ? 'overdue' : 'today')),
-        helper: managementView ? `高意向客户 ${displayNumber(departmentMetricNumber('intent'))}，先清回访风险` : '机构客户池口径，后端暂不支持按销售人员过滤',
-        path: managementView ? '/marketing/interactions/overdue' : '/marketing/interactions/today'
-      },
       summaryMetrics: [
         {
           label: managementView ? '待签约客户' : '今日新增咨询',
@@ -633,10 +493,7 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
           tone: managementView ? 'brand' : 'warning',
           path: managementView ? '/marketing/reports/conversion' : '/marketing/interactions/overdue'
         }
-      ],
-      preferredActions: managementView
-        ? ['/marketing/interactions/overdue', '/marketing/leads/intent', '/marketing/reports/conversion']
-        : ['/marketing/interactions/today', '/marketing/leads/all', '/marketing/reservation/records']
+      ]
     }
   }
   return {
@@ -644,15 +501,9 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
     roleLabel: '综合管理角色',
     subline: '先处理审批、协同和关键待办，再下钻到具体业务模块。',
     modulePriority: ['todo', 'approval', 'clinical', 'customer', 'workorder', 'finance', 'hr'],
-    primaryEntry: {
-      label: '协同事项',
-      value: displayNumber(portalSummary.value?.pendingApprovalCount),
-      helper: '先处理审批、对账、排班和跨部门协同',
-      path: '/workbench/approvals'
-    },
     summaryMetrics: [
       {
-        label: '我的护理任务',
+        label: '待执行医嘱',
         value: displayNumber(portalSummary.value?.pendingMedicalOrderCount),
         helper: '医护任务与用药提醒',
         tone: 'success',
@@ -665,8 +516,7 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
         tone: 'warning',
         path: '/logistics/task-center'
       }
-    ],
-    preferredActions: ['/workbench/approvals', '/workbench/todo', '/finance/workbench']
+    ]
   }
 })
 
@@ -676,27 +526,10 @@ const staffDisplayName = computed(() =>
   String(userStore.staffInfo?.realName || userStore.staffInfo?.username || '当前员工')
 )
 
-const attendanceTone = computed(() => {
-  const status = String(attendanceOverview.todayStatus || '').toUpperCase()
-  if (status === 'ON_DUTY' || status === 'OUTING' || status === 'LUNCH_BREAK') return 'normal'
-  if (status === 'OFF_DUTY') return 'offline'
-  if (status === 'ON_LEAVE') return 'warning'
-  return 'pending'
-})
-
 const attendanceWindowLabel = computed(() => {
   const start = attendanceOverview.expectedWorkStart || '--:--'
   const end = attendanceOverview.expectedWorkEnd || '--:--'
   return `今日班次 ${start} - ${end}`
-})
-
-const calendarMonthLabel = computed(() => calendarCursor.value.format('YYYY 年 M 月'))
-
-const selectedDateLabel = computed(() => selectedDate.value.format('M 月 D 日 dddd'))
-
-const selectedDateHint = computed(() => {
-  if (selectedDate.value.isSame(dayjs(), 'day')) return '今天的日程和打卡状态会优先显示在这里'
-  return `${selectedDate.value.format('M 月 D 日')} 的安排摘要`
 })
 
 const todayDateLabel = computed(() => dayjs().format('YYYY年M月D日'))
@@ -709,36 +542,14 @@ const workbenchSubline = computed(() =>
   `${roleLabel.value} · ${attendanceWindowLabel.value} · ${workbenchPersona.value.subline}`
 )
 
-const todayFocusCards = computed(() => [
-  {
-    label: '今日待办',
-    value: displayNumber(portalSummary.value?.openTodoCount),
-    helper: '查看需要处理的事项',
-    path: '/workbench/todo',
-    icon: CheckSquareOutlined
-  },
-  {
-    label: '超时任务',
-    value: displayNumber(portalSummary.value?.overdueTodoCount),
-    helper: '需要优先处理',
-    path: '/workbench/todo',
-    icon: ClockCircleOutlined
-  },
-  {
-    label: '风险提醒',
-    value: displayNumber(portalSummary.value?.healthAbnormalCount),
-    helper: '健康异常待复核',
-    path: canAccess('/medical-care/unified-task-center') ? '/medical-care/unified-task-center' : '/workbench/todo',
-    icon: AlertOutlined
-  },
-  {
-    label: '今日日程',
-    value: displayNumber(portalSummary.value?.todayScheduleCount),
-    helper: attendanceWindowLabel.value,
-    path: '/workbench/schedule',
-    icon: CalendarOutlined
-  }
-])
+const kpiIcons: Record<string, Component> = { overdue: ClockCircleOutlined, health: AlertOutlined, approvals: ScheduleOutlined }
+
+const todayFocusCards = computed(() => buildWorkbenchKpis(workbenchPersona.value.key, workbenchPersona.value.summaryMetrics, {
+  overdue: displayNumber(portalSummary.value?.overdueTodoCount),
+  healthRisk: displayNumber(portalSummary.value?.healthAbnormalCount),
+  healthPath: canAccess('/medical-care/unified-task-center') ? '/medical-care/unified-task-center' : '/workbench/todo',
+  approvals: displayNumber(portalSummary.value?.pendingApprovalCount)
+}).map((item) => ({ ...item, icon: kpiIcons[item.key] ?? UnorderedListOutlined })))
 
 const todoFilter = ref<'all' | 'today' | 'overdue'>('all')
 const todoFilterOptions = [
@@ -757,6 +568,9 @@ const visibleTodos = computed(() => (portalSummary.value?.todos || [])
     ? isTodoOverdue(todo)
     : !!todo.dueTime && dayjs(todo.dueTime).isSame(dayjs(), 'day')))
   .slice(0, 6))
+
+const inboxTab = ref<'messages' | 'notices'>('messages')
+const unreadMessageCount = computed(() => messagePreviews.value.reduce((sum, item) => sum + (item.unreadCount || 0), 0))
 
 const visibleNotices = computed(() => (portalSummary.value?.notices || []).slice(0, 5))
 
@@ -800,27 +614,13 @@ const attendanceActionButtons = computed<AttendanceAction[]>(() => {
   return []
 })
 
-const scheduleItems = computed(() => ([
-  { label: '当月在岗', value: `${displayNumber(attendanceOverview.onDutyDays)} 天`, path: '/workbench/attendance' },
-  { label: '请假天数', value: `${displayNumber(attendanceOverview.leaveDays)} 天`, path: '/workbench/attendance' },
-  { label: '考勤异常', value: `${displayNumber(attendanceOverview.abnormalCount)} 次`, path: '/workbench/attendance' },
-  { label: '今日日程', value: `${displayNumber(portalSummary.value?.todayScheduleCount)} 项`, path: '/workbench/schedule' }
-]))
-
 const selectedDateAgenda = computed(() => {
-  const target = selectedDate.value.format('YYYY-MM-DD')
+  const target = dayjs().format('YYYY-MM-DD')
   return calendarRows.value.filter((item) => {
     const start = item.startTime || item.endTime
     return start ? dayjs(start).format('YYYY-MM-DD') === target : false
   })
 })
-
-const todayScheduleTagText = computed(() => {
-  const count = selectedDateAgenda.value.length
-  return count ? `${count} 项待查看` : '暂无安排'
-})
-
-const todayScheduleTagTone = computed(() => (selectedDateAgenda.value.length ? 'pending' : 'offline'))
 
 function agendaTypeText(type?: string) {
   if (type === 'PERSONAL') return '个人'
@@ -834,13 +634,6 @@ function agendaTone(item: OaTask) {
   if (item.status === 'DONE') return 'normal'
   if (item.calendarType === 'COLLAB') return 'warning'
   return 'pending'
-}
-
-function agendaTimeText(startTime?: string, endTime?: string) {
-  if (!startTime && !endTime) return '全天安排'
-  const start = startTime ? dayjs(startTime).format('HH:mm') : '--:--'
-  const end = endTime ? dayjs(endTime).format('HH:mm') : '--:--'
-  return `${start} - ${end}`
 }
 
 const clinicalModule = computed<PrimaryModule>(() => {
@@ -1002,85 +795,20 @@ const orderedPrimaryModules = computed(() => {
     .sort((left, right) => (rank.get(left.key) ?? 99) - (rank.get(right.key) ?? 99))
 })
 
-const calendarOptions = computed(() => ({
-  plugins: [dayGridPlugin, interactionPlugin],
-  initialView: 'dayGridMonth',
-  locale: 'zh-cn',
-  height: 'auto',
-  fixedWeekCount: false,
-  headerToolbar: false,
-  dayMaxEventRows: 2,
-  events: calendarRows.value.map((task) => ({
-    id: String(task.id),
-    title: task.title,
-    start: task.startTime || task.endTime,
-    end: task.endTime || task.startTime,
-    color: task.urgency === 'EMERGENCY' ? 'var(--danger)' : task.calendarType === 'COLLAB' ? 'var(--warning)' : 'var(--primary)',
-    classNames: [
-      selectedDate.value.isSame(task.startTime || task.endTime || '', 'day') ? 'workbench-calendar-event--focus' : '',
-      task.status === 'DONE' ? 'workbench-calendar-event--done' : ''
-    ].filter(Boolean)
-  })),
-  datesSet: (arg: { start: Date; end: Date; view: { currentStart?: Date } }) => {
-    const currentStart = dayjs(arg.view?.currentStart || arg.start)
-    if (!currentStart.isSame(calendarCursor.value, 'month')) {
-      calendarCursor.value = currentStart.startOf('month')
-      loadCalendar(currentStart)
-    }
-  },
-  dateClick: (arg: { dateStr: string }) => {
-    selectedDate.value = dayjs(arg.dateStr)
-  },
-  dayCellClassNames: (arg: { date: Date }) => {
-    const cellDate = dayjs(arg.date)
-    return [
-      cellDate.isSame(dayjs(), 'day') ? 'workbench-calendar-day--today' : '',
-      cellDate.isSame(selectedDate.value, 'day') ? 'workbench-calendar-day--selected' : ''
-    ].filter(Boolean)
-  }
-}))
-
-async function loadCalendar(base = calendarCursor.value): Promise<boolean> {
+async function loadCalendar(): Promise<boolean> {
   if (!canAccess('/workbench/schedule')) {
     calendarRows.value = []
     return true
   }
-  const monthStart = dayjs(base).startOf('month')
-  const monthEnd = monthStart.endOf('month')
+  const today = dayjs().format('YYYY-MM-DD')
   try {
-    const rows = await getOaTaskCalendar({
-      startDate: monthStart.format('YYYY-MM-DD'),
-      endDate: monthEnd.format('YYYY-MM-DD')
-    })
+    const rows = await getOaTaskCalendar({ startDate: today, endDate: today })
     calendarRows.value = Array.isArray(rows) ? rows : []
     return true
   } catch {
     calendarRows.value = []
     return false
   }
-}
-
-function moveCalendar(offset: number) {
-  const api = calendarRef.value?.getApi?.()
-  if (!api) {
-    const next = calendarCursor.value.add(offset, 'month')
-    calendarCursor.value = next.startOf('month')
-    loadCalendar(next)
-    return
-  }
-  if (offset > 0) api.next()
-  else api.prev()
-}
-
-function jumpToToday() {
-  selectedDate.value = dayjs()
-  const api = calendarRef.value?.getApi?.()
-  if (api) {
-    api.today()
-    return
-  }
-  calendarCursor.value = dayjs().startOf('month')
-  loadCalendar(dayjs())
 }
 
 async function refreshAttendance() {
@@ -1114,7 +842,7 @@ async function loadWorkbench(options: { silent?: boolean } = {}) {
         username: userStore.staffInfo?.username
       }),
       refreshAttendance().catch(capture('考勤')),
-      loadCalendar(calendarCursor.value),
+      loadCalendar(),
       refreshMessagePreviews().catch(capture('消息'))
     ])
     portalSummary.value = portal
@@ -1207,67 +935,28 @@ onUnmounted(() => {
   gap: 18px;
 }
 
-.workbench-hero {
-  position: relative;
-  isolation: isolate;
-  display: flex;
-  justify-content: space-between;
-  gap: 24px;
-  overflow: hidden;
-  min-height: 210px;
-  padding: 30px 28px 54px;
-  border: 1px solid #e9e2d3;
-  border-radius: 14px;
-  background: #f8f4eb;
-}
+.workbench-greeting { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 18px; border: 1px solid #e8ece8; border-radius: 12px; background: var(--surface); }
+.workbench-greeting__copy { min-width: 0; }
+.workbench-greeting h1 { margin: 0; color: var(--ink); font-size: 20px; font-weight: 700; line-height: 1.35; }
+.workbench-greeting p { margin: 2px 0 0; overflow: hidden; color: var(--muted); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.workbench-greeting__actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.workbench-greeting__actions small { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 
-.workbench-hero::before {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  content: '';
-  background: linear-gradient(90deg, #faf7f0 0%, rgba(250, 247, 240, .94) 32%, rgba(250, 247, 240, .33) 68%, rgba(250, 247, 240, .75) 100%);
-}
-
-.workbench-hero__image {
-  position: absolute;
-  z-index: -2;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center 54%;
-  filter: saturate(.78) contrast(.9);
-}
-
-.workbench-hero__copy { min-width: 0; max-width: 710px; }
-.workbench-hero__eyebrow { display: flex; align-items: center; gap: 13px; color: #315d50; font-size: 13px; font-weight: 700; }
-.workbench-hero__sun { width: 28px; height: 28px; border: 5px solid #ffd58f; border-radius: 50%; background: #ffc56b; box-shadow: 0 0 0 6px rgba(255, 204, 115, .22); }
-.workbench-hero h1 { margin: 12px 0 8px; font: 700 clamp(28px, 2.5vw, 38px)/1.25 "Noto Serif SC", "Songti SC", serif; color: #1d2823; }
-.workbench-hero p { margin: 0; color: #485850; font-size: 14px; line-height: 1.65; }
-.workbench-hero__aside { display: grid; align-content: start; justify-items: end; gap: 5px; min-width: 180px; color: #34463d; font-size: 13px; }
-.workbench-hero__aside small { color: #596b60; }
-.workbench-hero__actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-
-.workbench-kpis { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: -48px; padding: 0 14px; }
-.workbench-kpi { display: flex; align-items: flex-start; gap: 14px; min-width: 0; min-height: 122px; padding: 18px; border: 1px solid #e6ebe7; border-radius: 12px; background: rgba(255, 255, 255, .97); box-shadow: 0 10px 26px rgba(36, 48, 39, .07); text-align: left; cursor: pointer; transition: border-color .18s ease, box-shadow .18s ease; }
+.workbench-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.workbench-kpi { display: flex; align-items: flex-start; gap: 14px; min-width: 0; min-height: 104px; padding: 16px; border: 1px solid #e6ebe7; border-radius: 12px; background: var(--surface); box-shadow: 0 5px 18px rgba(35, 51, 43, .045); text-align: left; cursor: pointer; transition: border-color .18s ease, box-shadow .18s ease; }
 .workbench-kpi:hover { border-color: #9bcdbd; box-shadow: 0 12px 30px rgba(36, 48, 39, .13); }
 .workbench-kpi__icon { display: grid; place-items: center; flex: 0 0 50px; height: 50px; border-radius: 13px; background: #e4f3ed; color: #137e60; font-size: 25px; }
-.workbench-kpi--1 .workbench-kpi__icon { background: #fff0dc; color: #ca7523; }
-.workbench-kpi--2 .workbench-kpi__icon { background: #fde9e7; color: #d74343; }
-.workbench-kpi--3 .workbench-kpi__icon { background: #e8f1fb; color: #2373ba; }
+.workbench-kpi--warning .workbench-kpi__icon { background: #fff0dc; color: #ca7523; }
+.workbench-kpi--danger .workbench-kpi__icon { background: #fde9e7; color: #d74343; }
 .workbench-kpi__body { display: grid; gap: 3px; min-width: 0; flex: 1; color: #44534b; font-size: 14px; }
 .workbench-kpi__body strong { color: #192c24; font: 700 29px/1.12 "Noto Serif SC", "Songti SC", serif; font-variant-numeric: tabular-nums; }
-.workbench-kpi--1 .workbench-kpi__body strong, .workbench-kpi--2 .workbench-kpi__body strong { color: #c83232; }
+.workbench-kpi--danger .workbench-kpi__body strong { color: #c83232; }
 .workbench-kpi__body small { color: #69766e; font-size: 12px; line-height: 1.45; }
 .workbench-kpi__arrow { align-self: center; color: #4a8f77; }
 
-.workbench-dashboard { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
+.workbench-main { display: grid; grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr); align-items: start; gap: 12px; }
+.workbench-column { display: grid; gap: 12px; min-width: 0; }
 .workbench-panel { min-width: 0; padding: 16px; border: 1px solid #e8ece8; border-radius: 12px; background: var(--surface); box-shadow: 0 5px 18px rgba(35, 51, 43, .045); }
-.workbench-panel--todos, .workbench-panel--agenda { grid-column: span 5; }
-.workbench-panel--quick, .workbench-panel--coordination { grid-column: span 4; }
-.workbench-panel--notices, .workbench-panel--messages { grid-column: span 3; }
-.workbench-panel--role { grid-column: span 12; }
 .workbench-panel__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 13px; }
 .workbench-panel__head h2 { margin: 0; padding-left: 10px; border-left: 3px solid #16866b; color: var(--ink); font-size: 17px; line-height: 1.25; }
 .workbench-panel__head h2 small { color: var(--muted); font-size: 13px; font-weight: 400; }
@@ -1275,14 +964,20 @@ onUnmounted(() => {
 .workbench-filter { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .workbench-filter button { min-height: 30px; padding: 4px 11px; border: 1px solid transparent; border-radius: 7px; background: #f4f6f4; color: #536158; font-size: 12px; cursor: pointer; }
 .workbench-filter button.active { background: #dcefe7; color: #176b52; font-weight: 700; }
-.workbench-todo-list, .workbench-notice-list, .workbench-agenda { display: grid; }
-.workbench-todo-row, .workbench-notice-row { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; min-height: 43px; padding: 7px 3px; border: 0; border-bottom: 1px solid #eef0ec; background: transparent; text-align: left; cursor: pointer; }
-.workbench-todo-row:last-child, .workbench-notice-row:last-child { border-bottom: 0; }
+.workbench-todo-list,
+.workbench-notice-list,
+.workbench-agenda { display: grid; }
+.workbench-todo-row,
+.workbench-notice-row { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; min-height: 43px; padding: 7px 3px; border: 0; border-bottom: 1px solid #eef0ec; background: transparent; text-align: left; cursor: pointer; }
+.workbench-todo-row:last-child,
+.workbench-notice-row:last-child { border-bottom: 0; }
 .workbench-todo-row__mark { flex: 0 0 16px; height: 16px; border: 1px solid #bccbc1; border-radius: 4px; }
-.workbench-todo-row__title, .workbench-notice-row > span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; color: #26382f; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.workbench-todo-row__title,
+.workbench-notice-row > span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; color: #26382f; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .workbench-todo-row__status { flex: 0 0 auto; padding: 3px 7px; border-radius: 5px; background: #e3f2eb; color: #167453; font-size: 11px; }
 .workbench-todo-row__status.overdue { background: #fde8e5; color: #c43737; }
-.workbench-todo-row time, .workbench-notice-row time { flex: 0 0 auto; color: #738077; font-size: 11px; font-variant-numeric: tabular-nums; }
+.workbench-todo-row time,
+.workbench-notice-row time { flex: 0 0 auto; color: #738077; font-size: 11px; font-variant-numeric: tabular-nums; }
 .workbench-shortcuts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
 .workbench-shortcut { display: grid; place-items: center; align-content: center; gap: 10px; min-width: 0; min-height: 96px; padding: 9px 4px; border: 1px solid #eef2ee; border-radius: 10px; background: #f1f8f5; color: #11765a; font-size: 13px; cursor: pointer; transition: background .18s ease, border-color .18s ease; }
 .workbench-shortcut:hover { border-color: #abd4c3; background: #e9f5ee; }
@@ -1305,18 +1000,9 @@ onUnmounted(() => {
 .workbench-agenda__row:last-child { border-bottom: 0; }
 .workbench-agenda__row time { color: #707e72; font-variant-numeric: tabular-nums; }
 .workbench-agenda__row > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workbench-coordination__lead { display: flex; align-items: baseline; gap: 8px; margin: 10px 0 18px; }
-.workbench-coordination__lead strong { color: #187c60; font: 700 42px/1 "Noto Serif SC", "Songti SC", serif; font-variant-numeric: tabular-nums; }
-.workbench-coordination__lead span { color: #657267; font-size: 13px; }
-.workbench-coordination__stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.workbench-coordination__stats span { display: grid; gap: 5px; padding: 10px; border-radius: 8px; background: #f3f7f4; color: #586a5e; font-size: 12px; }
-.workbench-coordination__stats strong { color: #1d664d; font-size: 20px; font-variant-numeric: tabular-nums; }
-.workbench-role-row { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 47px; padding: 8px 2px; border: 0; border-bottom: 1px solid #eef0ec; background: transparent; color: #3e5044; text-align: left; cursor: pointer; }
-.workbench-role-row:last-child { border-bottom: 0; }
-.workbench-role-row span { flex: 1; min-width: 0; font-size: 13px; }
-.workbench-role-row strong { color: #197c60; font-size: 17px; font-variant-numeric: tabular-nums; }
-.workbench-role-row .anticon { color: #a5b3a8; font-size: 11px; }
-.workbench-role-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 18px; }
+.workbench-coordination-link { display: flex; align-items: baseline; gap: 6px; width: 100%; margin-top: 10px; padding: 10px 3px 0; border: 0; border-top: 1px solid #eef0ec; background: transparent; color: #536158; font-size: 13px; text-align: left; cursor: pointer; }
+.workbench-coordination-link strong { color: #187c60; font-size: 17px; font-variant-numeric: tabular-nums; }
+.workbench-coordination-link .anticon { margin-left: auto; color: #a5b3a8; font-size: 11px; }
 .workbench-empty { padding: 22px 8px; color: #68766c; font-size: 13px; }
 .workbench-details-title { padding: 10px 2px 0; }
 .workbench-details-title span { color: #18705d; font-size: 12px; font-weight: 700; letter-spacing: .1em; }
@@ -1324,11 +1010,17 @@ onUnmounted(() => {
 
 .unified-workbench button:focus-visible { outline: 3px solid #25836c; outline-offset: 2px; }
 
-:global([data-theme='dark']) .workbench-hero::before { background: linear-gradient(90deg, rgba(19, 32, 26, .98), rgba(19, 32, 26, .88) 42%, rgba(19, 32, 26, .54)); }
-:global([data-theme='dark']) .workbench-hero h1, :global([data-theme='dark']) .workbench-hero p, :global([data-theme='dark']) .workbench-hero__aside { color: var(--ink); }
-:global([data-theme='dark']) .workbench-kpi, :global([data-theme='dark']) .workbench-panel { background: var(--surface); border-color: var(--border); }
-:global([data-theme='dark']) .workbench-kpi__body, :global([data-theme='dark']) .workbench-kpi__body strong, :global([data-theme='dark']) .workbench-todo-row__title, :global([data-theme='dark']) .workbench-notice-row > span:nth-child(2), :global([data-theme='dark']) .workbench-message-row__meta strong { color: var(--ink); }
+:global([data-theme='dark']) .workbench-kpi,
+:global([data-theme='dark']) .workbench-panel { background: var(--surface); border-color: var(--border); }
+:global([data-theme='dark']) .workbench-kpi__body,
+:global([data-theme='dark']) .workbench-kpi__body strong,
+:global([data-theme='dark']) .workbench-todo-row__title,
+:global([data-theme='dark']) .workbench-notice-row > span:nth-child(2),
+:global([data-theme='dark']) .workbench-message-row__meta strong { color: var(--ink); }
 
+.workbench-shell__department {
+  grid-column: 1 / -1;
+}
 
 .workbench-shell {
   display: grid;
@@ -1336,168 +1028,30 @@ onUnmounted(() => {
   gap: 18px;
 }
 
-.department-summary-card {
-  grid-column: 1 / -1;
-}
-
-.department-metric-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.schedule-head,
 .module-summary-row,
-.workbench-chip-grid,
-.workbench-list,
-.recent-visit-list,
-.common-actions-grid {
+.workbench-list {
   display: grid;
   gap: 12px;
 }
 
-.schedule-head {
-  grid-template-columns: 1fr auto;
-  align-items: center;
-}
-
-.schedule-head strong {
-  display: block;
-  color: var(--ink);
-  font-size: 22px;
-}
-
-.schedule-head p {
-  margin: 4px 0 0;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.schedule-calendar-shell {
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.95fr);
-  gap: 16px;
-}
-
-.schedule-calendar-panel,
-.schedule-side-panel {
-  display: grid;
-  gap: 12px;
-}
-
-.schedule-calendar-toolbar,
-.schedule-status-card,
-.schedule-agenda-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.schedule-calendar-toolbar strong,
-.schedule-status-copy strong,
-.schedule-agenda-head strong {
-  color: var(--ink);
-}
-
-.schedule-status-card,
-.schedule-agenda,
-.workbench-chip,
-.workbench-list-item,
-.recent-visit-item {
+.workbench-list-item {
   border: 1px solid var(--border);
   border-radius: 18px;
   background: #ffffff;
 }
 
-.workbench-chip:hover,
-.workbench-list-item:hover,
-.recent-visit-item:hover,
-.schedule-agenda-item:hover {
+.workbench-list-item:hover {
   border-color: rgba(var(--primary-rgb), 0.36);
   box-shadow: var(--shadow-sm);
 }
 
-.schedule-status-card {
-  padding: 14px 16px;
-}
-
-.schedule-status-copy {
-  display: grid;
-  gap: 4px;
-}
-
-.schedule-status-copy span,
-.schedule-agenda-head span {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.schedule-agenda {
-  padding: 14px 16px;
-  display: grid;
-  gap: 12px;
-}
-
-.schedule-agenda-list {
-  display: grid;
-  gap: 10px;
-}
-
-.schedule-agenda-item {
-  width: 100%;
-  border: 1px solid var(--border-soft);
-  border-radius: 16px;
-  background: var(--surface-3);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-  padding: 12px 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.schedule-agenda-item strong {
-  display: block;
-  color: var(--ink);
-}
-
-.schedule-agenda-item span {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.workbench-chip-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.workbench-chip,
-.workbench-list-item,
-.recent-visit-item {
+.workbench-list-item {
   width: 100%;
   text-align: left;
   cursor: pointer;
 }
 
-.workbench-chip {
-  padding: 14px 16px;
-}
-
-.workbench-chip strong {
-  display: block;
-  color: var(--ink);
-  font-size: 18px;
-}
-
-.workbench-chip span {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.workbench-list-item,
-.recent-visit-item {
+.workbench-list-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1505,120 +1059,46 @@ onUnmounted(() => {
   padding: 15px 16px;
 }
 
-.workbench-list-item strong,
-.recent-visit-item strong {
+.workbench-list-item strong {
   color: var(--ink);
 }
 
-.workbench-list-item span,
-.recent-visit-item span,
-.recent-visit-item small {
+.workbench-list-item span {
   color: var(--muted);
   font-size: 12px;
 }
 
-.common-actions-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-:deep(.fc) {
-  --fc-border-color: rgba(222, 232, 236, 0.9);
-  --fc-event-border-color: transparent;
-  --fc-page-bg-color: transparent;
-  --fc-neutral-bg-color: rgba(243, 248, 249, 0.9);
-  --fc-today-bg-color: rgba(var(--primary-rgb), 0.08);
-  font-size: 13px;
-}
-
-:deep(.fc-theme-standard td),
-:deep(.fc-theme-standard th),
-:deep(.fc-theme-standard .fc-scrollgrid) {
-  border-color: rgba(222, 232, 236, 0.9);
-}
-
-:deep(.fc .fc-col-header-cell-cushion) {
-  padding: 10px 0;
-  color: var(--muted);
-  font-weight: 600;
-}
-
-:deep(.fc .fc-daygrid-day-number) {
-  color: var(--ink);
-  padding: 8px 10px 0;
-}
-
-:deep(.fc .workbench-calendar-day--selected) {
-  background: rgba(var(--primary-rgb), 0.12);
-}
-
-:deep(.fc .workbench-calendar-day--today) .fc-daygrid-day-number {
-  color: var(--primary);
-  font-weight: 700;
-}
-
-:deep(.fc .fc-daygrid-event) {
-  border-radius: 999px;
-  padding: 1px 6px;
-  font-size: 11px;
-}
-
-:deep(.fc .workbench-calendar-event--done) {
-  opacity: 0.55;
-}
-
-:deep(.fc .workbench-calendar-event--focus) {
-  box-shadow: 0 0 0 1px rgba(var(--primary-rgb), 0.18);
-}
-
 @media (max-width: 1280px) {
-  .workbench-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .workbench-panel--todos, .workbench-panel--agenda { grid-column: span 7; }
-  .workbench-panel--quick, .workbench-panel--coordination { grid-column: span 5; }
-  .workbench-panel--notices, .workbench-panel--messages, .workbench-panel--role { grid-column: span 12; }
-  .workbench-shell,
-  .department-metric-grid,
-  .common-actions-grid {
+  .workbench-main { grid-template-columns: minmax(0, 1fr); }
+  .workbench-shell {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .schedule-calendar-shell {
-    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 768px) {
-  .workbench-hero { display: grid; min-height: 0; padding: 22px 18px 42px; }
-  .workbench-hero__aside { justify-items: start; }
-  .workbench-hero__actions { justify-content: flex-start; }
-  .workbench-kpis { margin-top: -34px; padding: 0 8px; }
-  .workbench-panel--todos, .workbench-panel--agenda, .workbench-panel--quick, .workbench-panel--coordination, .workbench-panel--notices, .workbench-panel--messages, .workbench-panel--role { grid-column: span 12; }
-  .workbench-shell,
-  .department-metric-grid,
-  .workbench-chip-grid,
-  .common-actions-grid {
+  .workbench-greeting { flex-direction: column; align-items: flex-start; }
+  .workbench-greeting__actions { justify-content: flex-start; }
+  .workbench-greeting p { white-space: normal; }
+  .workbench-shell {
     grid-template-columns: 1fr;
   }
 
   .workbench-shortcuts { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .workbench-role-list { grid-template-columns: 1fr; }
-
-  .schedule-head {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 520px) {
-  .workbench-kpi { gap: 8px; min-height: 106px; padding: 12px; }
+  .workbench-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .workbench-kpi { gap: 8px; min-height: 96px; padding: 12px; }
   .workbench-kpi__icon { flex-basis: 35px; height: 35px; font-size: 18px; }
   .workbench-kpi__body { font-size: 12px; }
   .workbench-kpi__body strong { font-size: 24px; }
   .workbench-kpi__body small { font-size: 10px; }
   .workbench-kpi__arrow { display: none; }
   .workbench-shortcuts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .workbench-coordination__stats { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .workbench-kpi, .workbench-shortcut { transition: none; }
+  .workbench-kpi,
+.workbench-shortcut { transition: none; }
 }
 </style>
