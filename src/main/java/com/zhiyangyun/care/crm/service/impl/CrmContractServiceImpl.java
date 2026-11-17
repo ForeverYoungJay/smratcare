@@ -8,6 +8,8 @@ import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.assessment.entity.AssessmentRecord;
 import com.zhiyangyun.care.assessment.mapper.AssessmentRecordMapper;
 import com.zhiyangyun.care.crm.entity.CrmContract;
+import com.zhiyangyun.care.finance.entity.AdmissionFeeAudit;
+import com.zhiyangyun.care.finance.mapper.AdmissionFeeAuditMapper;
 import com.zhiyangyun.care.crm.entity.CrmLead;
 import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
@@ -32,7 +34,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -64,6 +68,12 @@ public class CrmContractServiceImpl implements CrmContractService {
   private final ContractSignedLinkageService contractSignedLinkageService;
   private final AuditLogService auditLogService;
   private final CrmTraceService crmTraceService;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private AdmissionFeeAuditMapper feeAuditMapper;
+
+  void setFeeAuditMapper(AdmissionFeeAuditMapper feeAuditMapper) {
+    this.feeAuditMapper = feeAuditMapper;
+  }
 
   public CrmContractServiceImpl(
       CrmContractMapper contractMapper,
@@ -182,7 +192,8 @@ public class CrmContractServiceImpl implements CrmContractService {
       Boolean excludeSigned,
       Boolean overdueOnly,
       Boolean sortByOverdue,
-      String currentOwnerDept) {
+      String currentOwnerDept,
+      LocalDate expiryReminderTo) {
     pageNo = PageGuard.pageNo(pageNo);
     pageSize = PageGuard.pageSize(pageSize);
     var wrapper = Wrappers.lambdaQuery(CrmContract.class)
@@ -241,6 +252,16 @@ public class CrmContractServiceImpl implements CrmContractService {
           .or(v -> v.eq(CrmContract::getFlowStage, FLOW_PENDING_SIGN)
               .lt(CrmContract::getUpdateTime, LocalDateTime.now().minusHours(24))));
     }
+    if (expiryReminderTo != null) {
+      // 合同到期提醒：生效中（SIGNED/EFFECTIVE）、到期日不晚于 expiryReminderTo，且同一长者没有到期更晚的生效合同（未续签）
+      wrapper.in(CrmContract::getStatus, "SIGNED", "EFFECTIVE")
+          .isNotNull(CrmContract::getEffectiveTo)
+          .le(CrmContract::getEffectiveTo, expiryReminderTo)
+          .notExists("SELECT 1 FROM crm_contract r WHERE r.tenant_id = crm_contract.tenant_id"
+              + " AND r.elder_id = crm_contract.elder_id AND r.is_deleted = 0"
+              + " AND r.status IN ('SIGNED', 'EFFECTIVE') AND r.effective_to > crm_contract.effective_to")
+          .orderByAsc(CrmContract::getEffectiveTo);
+    }
     if (Boolean.TRUE.equals(sortByOverdue)) {
       wrapper.orderByAsc(CrmContract::getFlowStage)
           .orderByAsc(CrmContract::getUpdateTime)
@@ -249,7 +270,53 @@ public class CrmContractServiceImpl implements CrmContractService {
       wrapper.orderByDesc(CrmContract::getUpdateTime).orderByDesc(CrmContract::getCreateTime);
     }
     IPage<CrmContract> page = contractMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
-    return page.convert(this::toResponse);
+    IPage<CrmContractResponse> result = page.convert(this::toResponse);
+    fillFinanceAuditStatus(tenantId, result.getRecords());
+    fillAdmittedDate(tenantId, result.getRecords());
+    return result;
+  }
+
+  /**
+   * 市场部只读财务结论：按长者取最新一条入住费用审核状态（APPROVED/PENDING/REJECTED），
+   * 不暴露金额与审核明细；款项本身仍以财务模块为准。
+   */
+  void fillFinanceAuditStatus(Long tenantId, List<CrmContractResponse> records) {
+    if (feeAuditMapper == null || records == null || records.isEmpty()) return;
+    Set<Long> elderIds = records.stream().map(CrmContractResponse::getElderId).filter(Objects::nonNull).collect(Collectors.toSet());
+    if (elderIds.isEmpty()) return;
+    Map<Long, String> latest = new HashMap<>();
+    feeAuditMapper.selectList(Wrappers.lambdaQuery(AdmissionFeeAudit.class)
+            .eq(AdmissionFeeAudit::getIsDeleted, 0)
+            .eq(tenantId != null, AdmissionFeeAudit::getTenantId, tenantId)
+            .in(AdmissionFeeAudit::getElderId, elderIds)
+            .orderByDesc(AdmissionFeeAudit::getCreateTime))
+        .forEach(audit -> latest.putIfAbsent(audit.getElderId(), audit.getStatus()));
+    records.forEach(r -> r.setFinanceAuditStatus(r.getElderId() == null ? null : latest.get(r.getElderId())));
+  }
+
+  /** 是否已移交入住：按合同号或长者匹配入住登记，取最近一次入住日期，供合同页判断移交状态。 */
+  void fillAdmittedDate(Long tenantId, List<CrmContractResponse> records) {
+    if (records == null || records.isEmpty()) return;
+    Set<Long> elderIds = records.stream().map(CrmContractResponse::getElderId).filter(Objects::nonNull).collect(Collectors.toSet());
+    Set<String> contractNos = records.stream().map(CrmContractResponse::getContractNo)
+        .filter(no -> no != null && !no.isBlank()).collect(Collectors.toSet());
+    if (elderIds.isEmpty() && contractNos.isEmpty()) return;
+    Map<Long, LocalDate> byElder = new HashMap<>();
+    Map<String, LocalDate> byContract = new HashMap<>();
+    admissionMapper.selectList(Wrappers.lambdaQuery(ElderAdmission.class)
+            .eq(ElderAdmission::getIsDeleted, 0)
+            .eq(tenantId != null, ElderAdmission::getTenantId, tenantId)
+            .and(w -> w.in(!elderIds.isEmpty(), ElderAdmission::getElderId, elderIds)
+                .or().in(!contractNos.isEmpty(), ElderAdmission::getContractNo, contractNos))
+            .orderByDesc(ElderAdmission::getAdmissionDate))
+        .forEach(a -> {
+          if (a.getElderId() != null) byElder.putIfAbsent(a.getElderId(), a.getAdmissionDate());
+          if (a.getContractNo() != null) byContract.putIfAbsent(a.getContractNo(), a.getAdmissionDate());
+        });
+    records.forEach(r -> {
+      LocalDate date = r.getContractNo() == null ? null : byContract.get(r.getContractNo());
+      r.setAdmittedDate(date != null ? date : r.getElderId() == null ? null : byElder.get(r.getElderId()));
+    });
   }
 
   @Override
@@ -673,6 +740,18 @@ public class CrmContractServiceImpl implements CrmContractService {
     return record != null;
   }
 
+  static final java.util.Set<String> CONTRACT_TYPES = java.util.Set.of("LONG_TERM", "SHORT_TERM", "TRIAL", "DAY_CARE");
+
+  String normalizeContractType(String value) {
+    String type = blankToNull(value);
+    if (type == null) return null;
+    type = type.trim().toUpperCase();
+    if (!CONTRACT_TYPES.contains(type)) {
+      throw new IllegalArgumentException("不支持的合同类型：" + value);
+    }
+    return type;
+  }
+
   private void applyRequest(CrmContract target, CrmContractRequest request, CrmContract current) {
     if (request == null) {
       return;
@@ -684,6 +763,13 @@ public class CrmContractServiceImpl implements CrmContractService {
     target.setIdCardNo(firstNonBlank(blankToNull(request.getIdCardNo()), current == null ? null : current.getIdCardNo()));
     target.setHomeAddress(firstNonBlank(blankToNull(request.getHomeAddress()), current == null ? null : current.getHomeAddress()));
     target.setReservationRoomNo(firstNonBlank(blankToNull(request.getReservationRoomNo()), current == null ? null : current.getReservationRoomNo()));
+    target.setContractType(firstNonBlank(normalizeContractType(request.getContractType()), current == null ? null : current.getContractType()));
+    if (request.getReferenceMonthlyFee() != null && request.getReferenceMonthlyFee().signum() < 0) {
+      throw new IllegalArgumentException("参考月费不能为负数");
+    }
+    target.setReferenceMonthlyFee(request.getReferenceMonthlyFee() == null ? (current == null ? null : current.getReferenceMonthlyFee()) : request.getReferenceMonthlyFee());
+    LocalDate expectedAdmission = parseDate(request.getExpectedAdmissionDate());
+    target.setExpectedAdmissionDate(expectedAdmission == null ? (current == null ? null : current.getExpectedAdmissionDate()) : expectedAdmission);
     target.setReservationBedId(request.getReservationBedId() == null ? (current == null ? null : current.getReservationBedId()) : request.getReservationBedId());
     target.setElderName(firstNonBlank(blankToNull(request.getElderName()), current == null ? null : current.getElderName()));
     target.setElderPhone(firstNonBlank(blankToNull(request.getElderPhone()), current == null ? null : current.getElderPhone()));
@@ -1066,6 +1152,9 @@ public class CrmContractServiceImpl implements CrmContractService {
     target.setSignedAt(source.getSignedAt());
     target.setReservationRoomNo(source.getReservationRoomNo());
     target.setReservationBedId(source.getReservationBedId());
+    target.setContractType(source.getContractType());
+    target.setReferenceMonthlyFee(source.getReferenceMonthlyFee());
+    target.setExpectedAdmissionDate(source.getExpectedAdmissionDate());
     target.setElderName(source.getElderName());
     target.setElderPhone(source.getElderPhone());
     target.setMarketerName(source.getMarketerName());
@@ -1118,6 +1207,9 @@ public class CrmContractServiceImpl implements CrmContractService {
     response.setHomeAddress(contract.getHomeAddress());
     response.setReservationRoomNo(contract.getReservationRoomNo());
     response.setReservationBedId(contract.getReservationBedId());
+    response.setContractType(contract.getContractType());
+    response.setReferenceMonthlyFee(contract.getReferenceMonthlyFee());
+    response.setExpectedAdmissionDate(contract.getExpectedAdmissionDate());
     response.setElderName(contract.getElderName());
     response.setElderPhone(contract.getElderPhone());
     response.setGender(contract.getGender());

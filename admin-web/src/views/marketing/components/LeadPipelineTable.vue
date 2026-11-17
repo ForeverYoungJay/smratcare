@@ -2,12 +2,7 @@
   <PageContainer :title="title" :sub-title="subTitle">
     <section class="card-elevated marketing-workspace">
       <div class="marketing-overview">
-        <div class="marketing-overview-copy">
-          <span class="marketing-overview-kicker">营销工作区</span>
-          <strong>{{ modeLabel }}工作区</strong>
-          <span>{{ workspaceSummary }}</span>
-        </div>
-        <div class="marketing-overview-meta">
+          <div class="marketing-overview-meta">
           <span class="overview-pill">当前列表 {{ displayTotal }} 条</span>
           <span class="overview-pill">{{ activeFilterSummary }}</span>
           <span class="overview-pill overview-pill--accent">已勾选 {{ selectedCount }} 条</span>
@@ -31,7 +26,7 @@
         <SearchForm
           :model="query"
           title="筛选条件"
-          description="搜索、视图切换和表格动作集中在同一块工作区里处理，减少上下跳读。"
+          description=""
           search-text="刷新列表"
           reset-text="重置条件"
           @search="onSearch"
@@ -125,13 +120,16 @@
           <a-tag color="purple">已勾选 {{ selectedCount }} 条</a-tag>
         </a-space>
       </div>
+      <div style="display:flex;justify-content:flex-end;margin:6px 0">
+        <a-button type="link" :aria-expanded="showAllColumns" @click="showAllColumns = !showAllColumns">{{ showAllColumns ? '只看常用信息' : '显示完整信息' }}</a-button>
+      </div>
       <MarketingListToolbar
         :selected-count="selectedCount"
         :tip="selectedCount > 0 ? '批量动作只会处理需要变更的记录。' : '可勾选多条后批量推进，也可在表格右侧逐条处理。'"
       >
         <a-space>
           <a-button
-            v-for="item in actionButtons"
+            v-for="item in actionButtons.filter(action => ['create', 'execute', 'detail'].includes(action.key))"
             :key="item.key"
             :type="item.type"
             :danger="item.danger"
@@ -140,6 +138,12 @@
           >
             {{ item.label }}
           </a-button>
+          <a-dropdown :trigger="['click']">
+            <a-button>更多操作</a-button>
+            <template #overlay><a-menu>
+              <a-menu-item v-for="item in actionButtons.filter(action => !['create', 'execute', 'detail'].includes(action.key))" :key="item.key" :disabled="item.disabled" :danger="item.danger" @click="handleTopAction(item.key)">{{ item.label }}</a-menu-item>
+            </a-menu></template>
+          </a-dropdown>
         </a-space>
       </MarketingListToolbar>
       <StatefulBlock
@@ -151,12 +155,12 @@
       >
         <a-table
           :data-source="displayRows"
-          :columns="columns"
+          :columns="visibleColumns"
           :loading="loading"
           :pagination="false"
           row-key="id"
           :row-selection="rowSelection"
-          :scroll="{ x: tableScrollX }"
+          :scroll="{ x: showAllColumns ? tableScrollX : 1000 }"
         >
 
           <template #bodyCell="{ column, record }">
@@ -327,6 +331,20 @@
             </a-form-item>
           </a-col>
           <a-col :span="12">
+            <a-form-item label="预订床位" extra="锁床到下次跟进日；已入住、维修或被他人预订的床位不可选">
+              <a-select
+                v-model:value="form.reservationBedId"
+                allow-clear
+                show-search
+                option-filter-prop="label"
+                placeholder="选择要锁定的床位"
+                :options="reservationBedOptions"
+                :loading="bedsLoading"
+                @change="onReservationBedChange"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
             <a-form-item label="预订房号">
               <a-input v-model:value="form.reservationRoomNo" />
             </a-form-item>
@@ -442,46 +460,7 @@
       </a-form>
     </a-modal>
 
-    <a-drawer v-model:open="traceOpen" title="客户轨迹" width="760">
-      <a-spin :spinning="traceLoading">
-        <a-descriptions v-if="traceLead" :column="1" bordered size="small">
-          <a-descriptions-item label="客户">{{ traceLead.elderName || traceLead.consultantName || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="联系电话">{{ traceLead.elderPhone || traceLead.consultantPhone || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="当前负责人">{{ traceLead.ownerStaffName || traceLead.marketerName || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="当前阶段">
-            {{ traceStageLabel(traceLead.flowStage) || `线索状态 ${traceLead.status ?? '-'}` }}
-          </a-descriptions-item>
-          <a-descriptions-item label="下次跟进">{{ traceLead.nextFollowDate || '-' }}</a-descriptions-item>
-        </a-descriptions>
-
-        <MarketingTraceTimelineCard title="负责人分配记录" :items="leadAssignLogs" empty-text="暂无分配记录">
-          <template #default="{ item }">
-            <div class="trace-item-title">
-              {{ item.fromOwnerStaffName || '未分配' }} → {{ item.toOwnerStaffName || '未分配' }}
-            </div>
-            <div class="trace-item-meta">
-              {{ traceTime(item.assignedAt) }} · 操作人 {{ item.assignedByName || '-' }}
-            </div>
-            <div v-if="traceRemark(item.remark)" class="trace-item-remark">{{ traceRemark(item.remark) }}</div>
-          </template>
-        </MarketingTraceTimelineCard>
-
-        <MarketingTraceTimelineCard title="阶段流转记录" :items="leadStageLogs" empty-text="暂无阶段流转记录">
-          <template #default="{ item }">
-            <div class="trace-item-title">
-              {{ traceStageLabel(item.fromStage || item.fromStatus) || '起始' }} → {{ traceStageLabel(item.toStage || item.toStatus) || '当前' }}
-            </div>
-            <div class="trace-item-meta">
-              {{ traceTime(item.operatedAt) }} · {{ traceTransitionLabel(item.transitionType) }} · {{ item.operatedByName || '-' }}
-            </div>
-            <div class="trace-item-meta">
-              归属部门 {{ traceStageLabel(item.fromOwnerDept) || '-' }} → {{ traceStageLabel(item.toOwnerDept) || '-' }}
-            </div>
-            <div v-if="traceRemark(item.remark)" class="trace-item-remark">{{ traceRemark(item.remark) }}</div>
-          </template>
-        </MarketingTraceTimelineCard>
-      </a-spin>
-    </a-drawer>
+    <Customer360Drawer v-model:open="customerOpen" :lead="customerLead" :initial-tab="customerTab" @changed="fetchData" />
   </PageContainer>
 </template>
 
@@ -496,7 +475,10 @@ import PageContainer from '../../../components/PageContainer.vue'
 import SearchForm from '../../../components/SearchForm.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import MarketingListToolbar from './MarketingListToolbar.vue'
-import MarketingTraceTimelineCard from './MarketingTraceTimelineCard.vue'
+import Customer360Drawer from '../center/Customer360Drawer.vue'
+import { getCrmLead } from '../../../api/crm'
+import { getBedList } from '../../../api/bed'
+import { bedSelectOption, isBedFree, reservationRoomText } from '../../../utils/bedOptions'
 import {
   assignCrmLead,
   batchDeleteLeads,
@@ -505,22 +487,19 @@ import {
   createLeadCallbackPlan,
   executeCallbackPlan,
   getLeadDuplicates,
-  getLeadAssignLogs,
   getLeadCallbackPlans,
   getLeadCallbackPlansBatch,
   getMarketingLeadEntrySummary,
-  getLeadStageLogs,
   getLeadPage,
   updateCrmLead
 } from '../../../api/marketing'
 import { useStaffOptions } from '../../../composables/useStaffOptions'
 import { useUserStore } from '../../../stores/user'
-import { CONTRACT_FLOW_STAGE_LABELS, MARKETING_CALLBACK_TYPE_LABELS, MARKETING_CALLBACK_TYPE_OPTIONS, MARKETING_LEAD_MODE_LABELS, marketingInfoSourceLabel } from '../../../utils/marketingEnums'
+import { MARKETING_CALLBACK_TYPE_LABELS, MARKETING_CALLBACK_TYPE_OPTIONS, MARKETING_LEAD_MODE_LABELS, marketingInfoSourceLabel } from '../../../utils/marketingEnums'
 import { hasAnyRole } from '../../../utils/roleAccess'
 import type {
-  CrmLeadAssignLogItem,
+  BedItem,
   CrmLeadItem,
-  CrmStageTransitionLogItem,
   Id,
   CrmLeadDuplicateItem,
   MarketingCallbackType,
@@ -529,7 +508,7 @@ import type {
 } from '../../../types'
 
 const props = withDefaults(defineProps<{
-  mode: 'consultation' | 'intent' | 'reservation' | 'invalid' | 'callback' | 'pipeline'
+  mode: 'all' | 'consultation' | 'intent' | 'reservation' | 'invalid' | 'callback' | 'pipeline'
   title: string
   subTitle: string
   scenario?: string
@@ -543,7 +522,7 @@ const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 const pipelineTab = ref<'consultation' | 'intent' | 'callback'>('consultation')
-const effectiveMode = computed<'consultation' | 'intent' | 'reservation' | 'invalid' | 'callback'>(() => {
+const effectiveMode = computed<'all' | 'consultation' | 'intent' | 'reservation' | 'invalid' | 'callback'>(() => {
   return props.mode === 'pipeline' ? pipelineTab.value : props.mode
 })
 const loading = ref(false)
@@ -591,53 +570,37 @@ const open = ref(false)
 const submitting = ref(false)
 const formRef = ref<FormInstance>()
 const form = reactive<Partial<CrmLeadItem>>({})
+const beds = ref<BedItem[]>([])
+const bedsLoading = ref(false)
+const reservationBedOptions = computed(() => beds.value
+  // 当前已选的床即使状态变了也保留，避免编辑时只显示一个 ID
+  .filter((bed) => isBedFree(bed) || String(bed.id) === String(form.reservationBedId ?? ''))
+  .map((bed) => bedSelectOption(bed, { leadId: form.id })))
+// 每次打开表单都重新拉取，刚被别人预订的床位才能及时显示“已被预订”
+async function loadBeds() {
+  if (bedsLoading.value) return
+  bedsLoading.value = true
+  try {
+    beds.value = await getBedList({ silent403: true })
+  } catch {
+    beds.value = []
+  } finally {
+    bedsLoading.value = false
+  }
+}
+function onReservationBedChange(value?: string | number) {
+  const bed = beds.value.find((item) => String(item.id) === String(value ?? ''))
+  if (bed) form.reservationRoomNo = reservationRoomText(bed)
+}
 const assignOpen = ref(false)
 const assignSubmitting = ref(false)
 const assignForm = reactive({
   ownerStaffId: '',
   remark: ''
 })
-const traceOpen = ref(false)
-const traceLoading = ref(false)
-const traceLead = ref<CrmLeadItem>()
-const leadAssignLogs = ref<CrmLeadAssignLogItem[]>([])
-const leadStageLogs = ref<CrmStageTransitionLogItem[]>([])
-
-/** 轨迹抽屉展示口径：枚举转中文、ISO 时间转常规格式、剥离系统附带的原始 JSON */
-const TRACE_STAGE_LABELS: Record<string, string> = {
-  ...CONTRACT_FLOW_STAGE_LABELS,
-  ASSESSMENT: '评估部',
-  MARKETING: '营销部',
-  CONSULTATION: '咨询',
-  INTENT: '意向',
-  RESERVATION: '预订',
-  INVALID: '失效',
-  SIGNED: '已签约'
-}
-
-function traceStageLabel(value?: string | null) {
-  const key = String(value || '').trim()
-  if (!key) return ''
-  return TRACE_STAGE_LABELS[key] || key
-}
-
-function traceTransitionLabel(value?: string | null) {
-  const key = String(value || '').trim()
-  const map: Record<string, string> = { CREATE: '创建', UPDATE: '更新', ASSIGN: '分配', ADVANCE: '推进', ROLLBACK: '回退' }
-  return map[key] || key || '阶段变更'
-}
-
-function traceTime(value?: string | null) {
-  if (!value) return '-'
-  const parsed = dayjs(value)
-  return parsed.isValid() ? parsed.format('YYYY-MM-DD HH:mm') : value
-}
-
-function traceRemark(value?: string | null) {
-  const text = String(value || '').trim()
-  if (!text) return ''
-  return text.replace(/\s*\|\s*\{[\s\S]*\}\s*$/, '').trim()
-}
+const customerOpen = ref(false)
+const customerLead = ref<CrmLeadItem>()
+const customerTab = ref('')
 
 const infoSourceLabel = marketingInfoSourceLabel
 
@@ -684,8 +647,9 @@ const selectedRows = computed(() => rows.value.filter((item) => selectedRowKeys.
 const canManageLeadPool = computed(() => hasAnyRole(userStore.roles || [], [
   'MARKETING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'
 ]))
-const modeLabel = computed(() => MARKETING_LEAD_MODE_LABELS[effectiveMode.value] || '营销线索')
+const modeLabel = computed(() => MARKETING_LEAD_MODE_LABELS[effectiveMode.value as MarketingLeadMode] || '客户总览')
 const workspaceSummary = computed(() => {
+  if (effectiveMode.value === 'all') return '全部客户统一视图：咨询、意向、预订、签约客户一起查，点详情看完整沟通历史。'
   if (effectiveMode.value === 'consultation') {
     return '把咨询线索、负责人分配和转意向动作收进同一张工作表里，适合前置筛选和首轮判断。'
   }
@@ -724,6 +688,21 @@ const modalTitle = computed(() => form.id ? '编辑客户' : '新增客户')
 
 const columns = computed(() => {
   const mode = effectiveMode.value
+  if (mode === 'all') {
+    return [
+      { title: '长者 / 客户', dataIndex: 'elderName', key: 'elderName', width: 150 },
+      { title: '主要家属 / 电话', dataIndex: 'consultantName', key: 'consultantName', width: 150 },
+      { title: '年龄', dataIndex: 'age', key: 'age', width: 70 },
+      { title: '性别', dataIndex: 'gender', key: 'gender', width: 70 },
+      { title: '获客渠道', dataIndex: 'infoSource', key: 'infoSource', width: 120 },
+      { title: '跟进状态', dataIndex: 'followupStatus', key: 'followupStatus', width: 110 },
+      { title: '负责人', dataIndex: 'ownerDisplayName', key: 'ownerDisplayName', width: 110 },
+      { title: '下次回访', dataIndex: 'nextFollowDate', key: 'nextFollowDate', width: 120 },
+      { title: '客户标签', dataIndex: 'customerTag', key: 'customerTag', width: 120 },
+      { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 },
+      { title: '操作', key: 'action', width: 220, fixed: 'right' as const }
+    ]
+  }
   if (mode === 'consultation') {
     return [
       { title: '咨询人姓名', dataIndex: 'consultantName', key: 'consultantName', width: 130 },
@@ -807,6 +786,19 @@ const columns = computed(() => {
   ]
 })
 
+const showAllColumns = ref(false)
+const visibleColumns = computed(() => {
+  if (showAllColumns.value) return columns.value
+  const keys = effectiveMode.value === 'all'
+    ? ['elderName', 'consultantName', 'age', 'gender', 'infoSource', 'followupStatus', 'ownerDisplayName', 'nextFollowDate', 'action']
+    : effectiveMode.value === 'reservation'
+    ? ['elderName', 'elderPhone', 'reservationAmount', 'reservationRoomNo', 'ownerDisplayName', 'reservationStatus', 'action']
+    : effectiveMode.value === 'callback'
+      ? ['elderName', 'elderPhone', 'ownerDisplayName', 'nextFollowDate', 'planTitle', 'followupResult', 'action']
+      : ['consultantName', 'elderName', 'elderPhone', 'infoSource', 'ownerDisplayName', 'followupStatus', 'invalidTime', 'action']
+  return columns.value.filter(column => keys.includes(column.key))
+})
+
 const tableScrollX = computed(() => {
   const mode = effectiveMode.value
   if (mode === 'consultation') return 1700
@@ -822,7 +814,7 @@ const actionButtons = computed(() => {
     return [
       { key: 'create', label: '新增', type: 'primary' as const },
       { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
-      { key: 'detail', label: '客户轨迹', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'detail', label: '详情', type: 'default' as const, disabled: selectedCount.value !== 1 },
       { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1, hidden: !canManageLeadPool.value },
       { key: 'setIntent', label: '设为意向', type: 'default' as const, disabled: selectedCount.value === 0 },
       { key: 'abandon', label: '放弃客户', type: 'default' as const, disabled: selectedCount.value === 0, danger: true },
@@ -833,7 +825,7 @@ const actionButtons = computed(() => {
     return [
       { key: 'create', label: '新增', type: 'primary' as const },
       { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
-      { key: 'detail', label: '客户轨迹', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'detail', label: '详情', type: 'default' as const, disabled: selectedCount.value !== 1 },
       { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1, hidden: !canManageLeadPool.value },
       { key: 'toReservation', label: '转预订', type: 'default' as const, disabled: selectedCount.value === 0 },
       { key: 'tag', label: '设置客户标签', type: 'default' as const, disabled: selectedCount.value === 0 },
@@ -846,7 +838,7 @@ const actionButtons = computed(() => {
     return [
       { key: 'create', label: '新增', type: 'primary' as const },
       { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
-      { key: 'detail', label: '客户轨迹', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'detail', label: '详情', type: 'default' as const, disabled: selectedCount.value !== 1 },
       { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1, hidden: !canManageLeadPool.value },
       { key: 'toggleRefund', label: '退款切换', type: 'default' as const, disabled: selectedCount.value !== 1 },
       { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true, hidden: !canManageLeadPool.value }
@@ -854,7 +846,7 @@ const actionButtons = computed(() => {
   }
   if (mode === 'invalid') {
     return [
-      { key: 'detail', label: '客户轨迹', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'detail', label: '详情', type: 'default' as const, disabled: selectedCount.value !== 1 },
       { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1, hidden: !canManageLeadPool.value },
       { key: 'recover', label: '恢复客户', type: 'primary' as const, disabled: selectedCount.value === 0 },
       { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true, hidden: !canManageLeadPool.value }
@@ -863,7 +855,7 @@ const actionButtons = computed(() => {
   if (mode === 'callback') {
     return [
       { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
-      { key: 'detail', label: '客户轨迹', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'detail', label: '详情', type: 'default' as const, disabled: selectedCount.value !== 1 },
       { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1, hidden: !canManageLeadPool.value },
       { key: 'execute', label: '执行回访', type: 'primary' as const, disabled: selectedCount.value !== 1 },
       { key: 'setTodayFollow', label: '设今日回访', type: 'default' as const, disabled: selectedCount.value === 0 },
@@ -877,7 +869,7 @@ const actionButtons = computed(() => {
   }
   return [
     { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
-    { key: 'detail', label: '客户轨迹', type: 'default' as const, disabled: selectedCount.value !== 1 },
+    { key: 'detail', label: '详情', type: 'default' as const, disabled: selectedCount.value !== 1 },
     { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1, hidden: !canManageLeadPool.value },
     { key: 'execute', label: '执行回访', type: 'primary' as const, disabled: selectedCount.value !== 1 },
     { key: 'setTodayFollow', label: '设今日回访', type: 'default' as const, disabled: selectedCount.value === 0 },
@@ -999,6 +991,14 @@ const currentSummary = computed<MarketingLeadEntrySummary>(() => (
 const summaryCards = computed(() => {
   const mode = effectiveMode.value
   const metrics = currentSummary.value
+  if (mode === 'all') {
+    return [
+      { title: '客户总数', value: metrics.totalCount },
+      { title: '咨询', value: metrics.consultCount },
+      { title: '意向', value: metrics.intentCount },
+      { title: '已签约', value: metrics.signedContractCount }
+    ]
+  }
   if (mode === 'consultation') {
     return [
       { title: '当前咨询池', value: metrics.modeCount },
@@ -1059,9 +1059,18 @@ const warningMessage = computed(() => {
 
 function buildRowActions(record: CrmLeadItem) {
   const mode = effectiveMode.value
+  if (mode === 'all') {
+    return [
+      { key: 'detail', label: '详情' },
+      { key: 'edit', label: '编辑' },
+      { key: 'callback', label: '跟进' },
+      { key: 'assign', label: '分配', hidden: !canManageLeadPool.value },
+      { key: 'abandon', label: '放弃', danger: true }
+    ].filter((item) => !item.hidden)
+  }
   if (mode === 'consultation') {
     return [
-      { key: 'detail', label: '轨迹' },
+      { key: 'detail', label: '详情' },
       { key: 'edit', label: '编辑' },
       { key: 'assign', label: '分配', hidden: !canManageLeadPool.value },
       { key: 'setIntent', label: '转意向' },
@@ -1070,7 +1079,7 @@ function buildRowActions(record: CrmLeadItem) {
   }
   if (mode === 'intent') {
     return [
-      { key: 'detail', label: '轨迹' },
+      { key: 'detail', label: '详情' },
       { key: 'edit', label: '编辑' },
       { key: 'callback', label: '回访计划' },
       { key: 'toReservation', label: '转预订' },
@@ -1080,21 +1089,21 @@ function buildRowActions(record: CrmLeadItem) {
   }
   if (mode === 'reservation') {
     return [
-      { key: 'detail', label: '轨迹' },
+      { key: 'detail', label: '详情' },
       { key: 'edit', label: '编辑' },
       { key: 'toggleRefund', label: Number(record.refunded) === 1 ? '取消退款' : '标记退款' }
     ]
   }
   if (mode === 'invalid') {
     return [
-      { key: 'detail', label: '轨迹' },
+      { key: 'detail', label: '详情' },
       { key: 'recover', label: '恢复' },
       { key: 'assign', label: '分配', hidden: !canManageLeadPool.value },
       { key: 'delete', label: '删除', danger: true, hidden: !canManageLeadPool.value }
     ].filter((item) => !item.hidden)
   }
   return [
-    { key: 'detail', label: '轨迹' },
+    { key: 'detail', label: '详情' },
     { key: 'execute', label: '执行回访' },
     { key: 'callback', label: '补计划' },
     { key: 'postponeFollow', label: '顺延3天' },
@@ -1289,7 +1298,8 @@ function buildQueryParams() {
   return {
     pageNo: query.pageNo,
     pageSize: query.pageSize,
-    mode,
+    // 'all' 不是后端模式：不传即查全部客户
+    mode: mode === 'all' ? undefined : mode,
     status: isCallback ? undefined : defaultStatus(mode),
     consultantName: query.consultantName || undefined,
     consultantPhone: query.consultantPhone || undefined,
@@ -1445,13 +1455,24 @@ function onPipelineTabChange() {
   fetchData()
 }
 
-function consumeQuickQuery() {
-  if (String(route.query.quick || '').trim() !== '1') {
-    return
-  }
+/** 地址里的一次性动作：quick=1 打开新增；leadId=… 打开客户 360 抽屉（drawer=followup 等直接定位标签）。用完即从地址移除。 */
+async function consumeRouteActions() {
+  const quick = String(route.query.quick || '').trim() === '1'
+  const leadId = String(route.query.leadId || '').trim()
+  if (!quick && !leadId) return
   const nextQuery: Record<string, any> = { ...route.query }
   delete nextQuery.quick
+  delete nextQuery.leadId
+  delete nextQuery.drawer
+  const drawer = String(route.query.drawer || '')
   router.replace({ path: route.path, query: nextQuery })
+  if (quick) openForm()
+  if (leadId) {
+    const lead = rows.value.find((row) => String(row.id) === leadId) || await getCrmLead(leadId).catch(() => null)
+    if (!lead) { message.warning('未找到该客户，可能无权查看'); return }
+    customerTab.value = drawer
+    openTraceDrawer(lead as CrmLeadItem)
+  }
 }
 
 function onPageChange(page: number) {
@@ -1685,6 +1706,7 @@ function openForm(row?: CrmLeadItem) {
       status: effectiveMode.value === 'reservation' ? 1 : (defaultStatus(effectiveMode.value) ?? 0)
     } as Partial<CrmLeadItem>)
   }
+  loadBeds()
   open.value = true
 }
 
@@ -1827,24 +1849,10 @@ async function submitAssign() {
   }
 }
 
-async function openTraceDrawer(record: CrmLeadItem) {
-  traceLead.value = record
-  traceOpen.value = true
-  traceLoading.value = true
-  try {
-    const [assignLogs, stageLogs] = await Promise.all([
-      getLeadAssignLogs(record.id, 20),
-      getLeadStageLogs(record.id, 20)
-    ])
-    leadAssignLogs.value = assignLogs || []
-    leadStageLogs.value = stageLogs || []
-  } catch {
-    leadAssignLogs.value = []
-    leadStageLogs.value = []
-    message.warning('轨迹数据加载失败，请稍后重试')
-  } finally {
-    traceLoading.value = false
-  }
+function openTraceDrawer(record: CrmLeadItem, tab = customerTab.value) {
+  customerTab.value = tab
+  customerLead.value = record
+  customerOpen.value = true
 }
 
 function transferToAdmission(record: CrmLeadItem) {
@@ -2084,11 +2092,7 @@ watch(
     query.pageNo = 1
     selectedRowKeys.value = []
     fetchData()
-    const quick = String(route.query.quick || '').trim()
-    if (quick === '1') {
-      openForm()
-      consumeQuickQuery()
-    }
+    consumeRouteActions()
   }
 )
 
@@ -2097,11 +2101,7 @@ onMounted(() => {
   syncQueryFiltersByRoute()
   searchStaff('').catch(() => {})
   fetchData()
-  const quick = String(route.query.quick || '').trim()
-  if (quick === '1') {
-    openForm()
-    consumeQuickQuery()
-  }
+  consumeRouteActions()
 })
 
 
@@ -2490,4 +2490,22 @@ function clearListFilters() {
     font-size: 18px;
   }
 }
+
+/* Keep the record list visible before secondary explanations and large cards. */
+.marketing-workspace { gap: 10px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible; }
+.marketing-overview { display: none; }
+.summary-strip { gap: 8px; }
+.summary-strip-card { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 48px; padding: 10px 12px; border-radius: 7px; background: #f7faf8; box-shadow: none; }
+.summary-card-value { font-size: 22px; }
+.marketing-query-shell { padding: 0; border: 0; border-radius: 0; background: none; }
+.marketing-query-shell :deep(.search-form-card) { padding: 12px; border-radius: 8px; box-shadow: none; }
+.marketing-query-shell :deep(.search-form-head) { margin-bottom: 10px; padding-bottom: 8px; }
+.marketing-query-shell :deep(.search-form) { padding: 0; border-radius: 0; background: none; }
+.marketing-query-shell :deep(.search-form > .ant-form-item) { flex: 0 1 auto; min-width: 220px; }
+.marketing-table-head { padding: 0; margin: 0; min-height: 32px; }
+.marketing-table-head > div:first-child > span { display: none; }
+.marketing-workspace :deep(.list-toolbar) { margin: 0; padding: 8px 0; border: 0; background: none; }
+.marketing-workspace :deep(.toolbar-tip) { display: none; }
+@media (max-width: 760px) { .summary-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
 </style>

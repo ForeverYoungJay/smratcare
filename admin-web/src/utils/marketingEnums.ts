@@ -100,3 +100,15 @@ export function marketingInfoSourceLabel(value?: string | null) {
   if (!key) return '未标记'
   return MARKETING_INFO_SOURCE_LABELS[key.toUpperCase()] || key
 }
+
+/** 合同类型（与后端 CrmContractServiceImpl.CONTRACT_TYPES 一致） */
+export const CONTRACT_TYPE_OPTIONS = [
+  { value: 'LONG_TERM', label: '长期入住' },
+  { value: 'SHORT_TERM', label: '短期托养' },
+  { value: 'TRIAL', label: '试住' },
+  { value: 'DAY_CARE', label: '日间照料' }
+]
+
+export function contractTypeLabel(value?: string | null) {
+  return CONTRACT_TYPE_OPTIONS.find((item) => item.value === value)?.label || value || '-'
+}

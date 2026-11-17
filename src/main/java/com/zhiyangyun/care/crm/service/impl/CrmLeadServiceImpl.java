@@ -10,6 +10,10 @@ import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.common.web.PageGuard;
 import com.zhiyangyun.care.crm.constant.ContractFlowStage;
+import com.zhiyangyun.care.crm.constant.CrmReservationRules;
+import com.zhiyangyun.care.elder.entity.Bed;
+import com.zhiyangyun.care.elder.mapper.BedMapper;
+import com.zhiyangyun.care.elder.model.BedStatus;
 import com.zhiyangyun.care.crm.entity.CrmContract;
 import com.zhiyangyun.care.crm.entity.CrmCallbackPlan;
 import com.zhiyangyun.care.crm.entity.CrmLead;
@@ -40,6 +44,7 @@ import java.util.stream.Collectors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CrmLeadServiceImpl implements CrmLeadService {
@@ -56,6 +61,12 @@ public class CrmLeadServiceImpl implements CrmLeadService {
   private final StaffMapper staffMapper;
   private final AuditLogService auditLogService;
   private final CrmTraceService crmTraceService;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private BedMapper bedMapper;
+
+  void setBedMapper(BedMapper bedMapper) {
+    this.bedMapper = bedMapper;
+  }
 
   public CrmLeadServiceImpl(
       CrmLeadMapper leadMapper,
@@ -77,8 +88,10 @@ public class CrmLeadServiceImpl implements CrmLeadService {
   }
 
   @Override
+  @Transactional
   public CrmLeadResponse create(CrmLeadRequest request) {
     rejectDuplicate(request, null);
+    rejectReservationConflict(request.getTenantId(), request.getReservationBedId(), null, null);
     CrmLead lead = new CrmLead();
     lead.setTenantId(request.getTenantId());
     lead.setOrgId(request.getOrgId());
@@ -133,12 +146,14 @@ public class CrmLeadServiceImpl implements CrmLeadService {
   }
 
   @Override
+  @Transactional
   public CrmLeadResponse update(Long id, CrmLeadRequest request, Long currentStaffId, boolean adminView) {
     CrmLead lead = findAccessibleLead(id, request.getTenantId(), currentStaffId, adminView);
     if (lead == null) {
       return null;
     }
     rejectDuplicate(request, id);
+    rejectReservationConflict(request.getTenantId(), request.getReservationBedId(), id, lead.getReservationBedId());
     CrmLead before = cloneLead(lead);
     lead.setName(defaultLeadName(request));
     lead.setPhone(defaultLeadPhone(request));
@@ -1224,6 +1239,28 @@ public class CrmLeadServiceImpl implements CrmLeadService {
         .orderByDesc(ElderProfile::getAdmissionDate)
         .orderByDesc(ElderProfile::getCreateTime)
         .last("LIMIT 1"));
+  }
+
+  /**
+   * 预订床位的服务端校验：只校验新选的床位（沿用原床位不重复校验）。
+   * 先对床位行加锁（FOR UPDATE，在本事务内生效），两个人同时预订同一张床时后到的会看到前一笔并被拒绝。
+   */
+  void rejectReservationConflict(Long tenantId, Long bedId, Long excludeLeadId, Long previousBedId) {
+    if (bedId == null || bedId.equals(previousBedId) || bedMapper == null) return;
+    Bed bed = bedMapper.selectOne(Wrappers.lambdaQuery(Bed.class)
+        .eq(Bed::getId, bedId).eq(tenantId != null, Bed::getTenantId, tenantId).last("FOR UPDATE"));
+    if (bed == null || Integer.valueOf(1).equals(bed.getIsDeleted())) {
+      throw new IllegalStateException("所选床位不存在");
+    }
+    if (bed.getElderId() != null || Objects.equals(bed.getStatus(), BedStatus.OCCUPIED)) {
+      throw new IllegalStateException("所选床位已有长者入住，不能预订");
+    }
+    if (Objects.equals(bed.getStatus(), BedStatus.MAINTENANCE) || Objects.equals(bed.getStatus(), BedStatus.DISABLED)) {
+      throw new IllegalStateException("所选床位维修中或已停用，不能预订");
+    }
+    if (CrmReservationRules.bedHeldByOthers(leadMapper, contractMapper, tenantId, bedId, excludeLeadId, null, LocalDate.now())) {
+      throw new IllegalStateException("所选床位已被其他客户预订或签约占用，请重新选择");
+    }
   }
 
   private void rejectDuplicate(CrmLeadRequest request, Long excludeId) {

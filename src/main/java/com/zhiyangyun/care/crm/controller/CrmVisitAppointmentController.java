@@ -37,9 +37,10 @@ public class CrmVisitAppointmentController {
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String dateFrom,
-      @RequestParam(required = false) String dateTo) {
+      @RequestParam(required = false) String dateTo,
+      @RequestParam(required = false) Long leadId) {
     return Result.ok(service.page(AuthContext.getOrgId(), AuthContext.getStaffId(), AuthContext.isMinisterOrHigher(),
-        pageNo, pageSize, keyword, status, dateFrom, dateTo));
+        pageNo, pageSize, keyword, status, dateFrom, dateTo, leadId));
   }
 
   @PostMapping

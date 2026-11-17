@@ -2,7 +2,7 @@
   <PageContainer title="合同到期管理" sub-title="合同到期提醒、短信触达与统一维护">
     <MarketingQuickNav parent-path="/marketing/contracts" />
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline" class="search-bar">
+      <QueryBar :model="query" layout="inline" class="search-bar" @finish="fetchData">
         <a-form-item label="合同编号">
           <a-input v-model:value="query.contractNo" placeholder="请输入 合同编号" allow-clear />
         </a-form-item>
@@ -15,13 +15,15 @@
         <a-form-item label="负责人">
           <a-input v-model:value="query.marketerName" placeholder="请输入 负责人/营销人员" allow-clear />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="fetchData">搜 索</a-button>
-            <a-button @click="reset">清 空</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">搜 索</a-button>
+              <a-button @click="reset">清 空</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
@@ -29,7 +31,7 @@
         :selected-count="selectedCount"
         :tip="canDeleteContract ? '支持批量短信、批量删除' : '支持单条或批量发送续签提醒短信'"
       >
-        <a-space>
+        <ActionToolbar>
           <a-button @click="exportList">导出当前页</a-button>
           <a-button v-if="canDeleteContract" @click="reminderConfigOpen = true">提醒规则设置</a-button>
           <a-button :disabled="selectedCount !== 1" @click="sendSmsSelected">短信</a-button>
@@ -37,7 +39,7 @@
           <a-button v-if="canDeleteContract" :disabled="selectedCount !== 1" danger @click="removeSelected">删除</a-button>
           <a-button v-if="canDeleteContract" :disabled="selectedCount === 0" danger @click="batchDelete">批量删除</a-button>
           <a-button @click="showSmsTasks">短信任务记录</a-button>
-        </a-space>
+        </ActionToolbar>
       </MarketingListToolbar>
       <a-table
         :data-source="rows"
@@ -105,6 +107,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message, Modal } from 'ant-design-vue'

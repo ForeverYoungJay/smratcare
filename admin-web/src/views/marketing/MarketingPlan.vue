@@ -2,22 +2,21 @@
   <PageContainer title="营销方案" sub-title="方案起草-审批-发布-线索归因-结果复盘闭环">
     <MarketingQuickNav />
     <template #extra>
-      <a-space>
-        <a-input-search
-          v-model:value="query.keyword"
-          allow-clear
-          placeholder="搜索标题/摘要/责任部门/来源标签"
-          style="width: 280px"
-          @search="fetchData"
-        />
-        <a-select v-model:value="query.status" allow-clear placeholder="状态筛选" style="width: 160px" @change="fetchData">
-          <a-select-option v-for="item in MARKETING_PLAN_STATUS_OPTIONS" :key="item.value" :value="item.value">
-            {{ item.label }}
-          </a-select-option>
-        </a-select>
-        <a-button v-if="canManagePlanWrite" type="primary" @click="openCreate">新增方案</a-button>
-      </a-space>
+      <a-button v-if="canManagePlanWrite" type="primary" @click="openCreate">新增方案</a-button>
     </template>
+    <QueryBar :model="query" @finish="fetchData">
+      <a-form-item label="关键词">
+        <a-input v-model:value="query.keyword" allow-clear placeholder="搜索标题/摘要/责任部门/来源标签" style="width: 280px" />
+      </a-form-item>
+      <a-form-item label="状态">
+        <a-select v-model:value="query.status" allow-clear placeholder="状态筛选" style="width: 160px" @change="fetchData">
+          <a-select-option v-for="item in MARKETING_PLAN_STATUS_OPTIONS" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
+        </a-select>
+      </a-form-item>
+      <template #actions>
+        <a-button type="primary" html-type="submit">查询</a-button>
+      </template>
+    </QueryBar>
 
     <a-tabs v-model:activeKey="activeModule" class="plan-tabs" @change="onModuleChange">
       <a-tab-pane key="SPEECH" tab="营销话术库">
@@ -82,7 +81,7 @@
             :selected-count="selectedCount"
             tip="审批通过后可发布，停用后可重新发布"
           >
-            <a-space>
+            <ActionToolbar>
               <a-button :disabled="!selectedPlan" @click="previewSelected">详情</a-button>
               <a-button v-if="canManagePlanWrite" :disabled="!canEditSelected" @click="editSelected">编辑</a-button>
               <a-button v-if="canManagePlanWrite" :disabled="!canSubmitSelected" @click="submitSelected">提交审批</a-button>
@@ -91,7 +90,7 @@
               <a-button v-if="canManagePlanWrite" :disabled="!canPublishSelected" @click="publishSelected">{{ selectedPublishLabel }}</a-button>
               <a-button v-if="canManagePlanWrite" :disabled="!canDeactivateSelected" @click="deactivateSelected">停用</a-button>
               <a-button v-if="canManagePlanWrite" :disabled="selectedCount === 0" danger @click="deleteSelected">删除</a-button>
-            </a-space>
+            </ActionToolbar>
           </MarketingListToolbar>
           <a-table
             :loading="loading"
@@ -302,6 +301,9 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, h, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Input, message, Modal } from 'ant-design-vue'

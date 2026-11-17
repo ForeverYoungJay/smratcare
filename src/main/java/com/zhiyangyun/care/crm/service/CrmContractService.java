@@ -30,7 +30,32 @@ public interface CrmContractService {
       Boolean excludeSigned,
       Boolean overdueOnly,
       Boolean sortByOverdue,
-      String currentOwnerDept);
+      String currentOwnerDept,
+      java.time.LocalDate expiryReminderTo);
+
+  default IPage<CrmContractResponse> page(
+      Long tenantId,
+      long pageNo,
+      long pageSize,
+      String keyword,
+      String contractNo,
+      Long elderId,
+      String elderName,
+      String elderPhone,
+      String marketerName,
+      String orgName,
+      String flowStage,
+      String contractStatus,
+      String status,
+      String changeWorkflowStatus,
+      Boolean excludeSigned,
+      Boolean overdueOnly,
+      Boolean sortByOverdue,
+      String currentOwnerDept) {
+    return page(tenantId, pageNo, pageSize, keyword, contractNo, elderId, elderName, elderPhone, marketerName, orgName,
+        flowStage, contractStatus, status, changeWorkflowStatus, excludeSigned, overdueOnly, sortByOverdue,
+        currentOwnerDept, null);
+  }
 
   int deleteBatch(Long tenantId, List<Long> ids, List<String> contractNos);
 

@@ -2,7 +2,7 @@
   <PageContainer title="回访质量评分" sub-title="回访评分、低分预警与复访处理闭环">
     <MarketingQuickNav parent-path="/marketing/callback" />
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline">
+      <QueryBar :model="query" layout="inline" @finish="onSearch">
         <a-form-item label="姓名">
           <a-input v-model:value="query.keyword" allow-clear placeholder="姓名/电话" />
         </a-form-item>
@@ -15,16 +15,18 @@
         <a-form-item label="仅低分">
           <a-switch v-model:checked="query.lowScoreOnly" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="onSearch">查询</a-button>
-            <a-button @click="onReset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">查询</a-button>
+              <a-button @click="onReset">重置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
-    <a-row :gutter="16" style="margin-top: 16px">
+    <a-row class="business-stat-strip" :gutter="16" style="margin-top: 16px">
       <a-col :xs="24" :sm="12" :lg="6">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic title="平均回访评分" :value="averageScore" :precision="1" suffix="/5" />
@@ -49,12 +51,12 @@
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px">
       <MarketingListToolbar :tip="`当前筛选 ${filteredRows.length} 条`">
-        <a-space>
+        <ActionToolbar>
           <a-button @click="go('/marketing/callback/checkin')">入住后回访</a-button>
           <a-button @click="go('/marketing/callback/trial')">试住回访</a-button>
           <a-button @click="go('/marketing/callback/discharge')">退住回访</a-button>
           <a-button danger @click="go('/marketing/interactions/overdue')">逾期未跟进</a-button>
-        </a-space>
+        </ActionToolbar>
       </MarketingListToolbar>
       <a-table :columns="columns" :data-source="pagedRows" :pagination="false" row-key="id">
         <template #bodyCell="{ column, record }">
@@ -82,6 +84,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { useRouter } from 'vue-router'

@@ -2,29 +2,31 @@
   <PageContainer title="合同附件" sub-title="合同附件集中查看：合同、病历、医保、户口等">
     <MarketingQuickNav parent-path="/marketing/contracts" />
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline">
+      <QueryBar :model="query" layout="inline" @finish="loadContracts">
         <a-form-item label="合同编号">
           <a-input v-model:value="query.contractNo" allow-clear />
         </a-form-item>
         <a-form-item label="长者姓名">
           <a-input v-model:value="query.elderName" allow-clear placeholder="请输入 长者姓名" style="width: 220px" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="loadContracts">查询</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">查询</a-button>
+              <a-button @click="reset">重置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px">
       <MarketingListToolbar :selected-count="selectedCount" tip="可批量删除附件">
-        <a-space>
+        <ActionToolbar>
           <a-button :disabled="!hasSingleSelection" @click="openSelectedAttachments">查看附件</a-button>
           <a-button :disabled="selectedCount === 0" @click="exportSelectedAttachmentIndex">导出所选附件索引</a-button>
           <a-button @click="exportAllContractIndex">导出合同索引</a-button>
-        </a-space>
+        </ActionToolbar>
       </MarketingListToolbar>
       <a-table
         :columns="contractColumns"
@@ -80,6 +82,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'

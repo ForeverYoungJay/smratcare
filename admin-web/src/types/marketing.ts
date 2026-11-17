@@ -230,6 +230,8 @@ export interface CrmContractPageQuery extends PageQuery {
   overdueOnly?: boolean
   sortByOverdue?: boolean
   currentOwnerDept?: string
+  /** 合同到期提醒：仅返回生效中、未续签且到期日不晚于该日期的合同，按到期日升序 */
+  expiryReminderTo?: string
 }
 
 export interface MarketingDataQualityReport {
@@ -459,6 +461,16 @@ export type ContractChangeStatus = (typeof CONTRACT_CHANGE_STATUSES)[number]
 export interface CrmContractItem {
   [key: string]: any
   id: Id
+  /** 入住费用审核最新结论（财务只读）：APPROVED / PENDING / REJECTED */
+  financeAuditStatus?: string | null
+  /** 最近一次入住登记日期，空表示未移交入住 */
+  admittedDate?: string | null
+  /** LONG_TERM / SHORT_TERM / TRIAL / DAY_CARE */
+  contractType?: string | null
+  /** 参考月费（元），实际收费以财务审批为准 */
+  referenceMonthlyFee?: number | null
+  /** YYYY-MM-DD */
+  expectedAdmissionDate?: string | null
   name?: string
   phone?: string
   leadId?: Id

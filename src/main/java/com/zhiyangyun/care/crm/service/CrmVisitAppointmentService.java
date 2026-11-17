@@ -8,7 +8,7 @@ import com.zhiyangyun.care.crm.model.visit.CrmVisitAppointmentResponse;
 
 public interface CrmVisitAppointmentService {
   IPage<CrmVisitAppointmentResponse> page(Long tenantId, Long staffId, boolean manager, long pageNo, long pageSize,
-      String keyword, String status, String dateFrom, String dateTo);
+      String keyword, String status, String dateFrom, String dateTo, Long leadId);
   CrmVisitAppointmentResponse create(Long tenantId, Long orgId, Long staffId, boolean manager,
       CrmVisitAppointmentRequest request);
   CrmVisitAppointmentResponse update(Long tenantId, Long staffId, boolean manager, Long id,

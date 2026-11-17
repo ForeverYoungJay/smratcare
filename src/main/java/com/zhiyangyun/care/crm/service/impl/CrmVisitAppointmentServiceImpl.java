@@ -36,10 +36,11 @@ public class CrmVisitAppointmentServiceImpl implements CrmVisitAppointmentServic
 
   @Override
   public IPage<CrmVisitAppointmentResponse> page(Long tenantId, Long staffId, boolean manager, long pageNo, long pageSize,
-      String keyword, String status, String dateFrom, String dateTo) {
+      String keyword, String status, String dateFrom, String dateTo, Long leadId) {
     var query = Wrappers.lambdaQuery(CrmVisitAppointment.class)
         .eq(CrmVisitAppointment::getTenantId, tenantId)
-        .eq(CrmVisitAppointment::getIsDeleted, 0);
+        .eq(CrmVisitAppointment::getIsDeleted, 0)
+        .eq(leadId != null, CrmVisitAppointment::getLeadId, leadId);
     if (!manager) {
       query.and(w -> w.eq(CrmVisitAppointment::getOwnerStaffId, staffId)
           .or().eq(CrmVisitAppointment::getCreatedBy, staffId));

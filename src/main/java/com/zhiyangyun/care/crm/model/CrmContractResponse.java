@@ -35,6 +35,13 @@ public class CrmContractResponse {
   private Integer smsSendCount;
   private String remark;
   private ContractSystemLinkageSummary linkageSummary;
+  /** 入住费用审核最新状态（财务只读结论）：APPROVED / PENDING / REJECTED，无记录为 null */
+  private String financeAuditStatus;
+  private String contractType;
+  private java.math.BigDecimal referenceMonthlyFee;
+  private LocalDate expectedAdmissionDate;
+  /** 最近一次入住登记日期；为空表示尚未移交入住 */
+  private LocalDate admittedDate;
   private LocalDateTime createTime;
   private LocalDateTime updateTime;
 }

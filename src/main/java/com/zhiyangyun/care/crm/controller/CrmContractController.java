@@ -12,8 +12,10 @@ import com.zhiyangyun.care.crm.service.CrmContractService;
 import com.zhiyangyun.care.crm.model.trace.CrmContractWorkflowLogResponse;
 import com.zhiyangyun.care.crm.service.CrmTraceService;
 import com.zhiyangyun.care.common.web.ResourceNotFoundException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -88,7 +90,8 @@ public class CrmContractController {
       @RequestParam(required = false) Boolean excludeSigned,
       @RequestParam(required = false) Boolean overdueOnly,
       @RequestParam(required = false) Boolean sortByOverdue,
-      @RequestParam(required = false) String currentOwnerDept) {
+      @RequestParam(required = false) String currentOwnerDept,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate expiryReminderTo) {
     return Result.ok(contractService.page(
         AuthContext.getOrgId(),
         pageNo,
@@ -107,7 +110,8 @@ public class CrmContractController {
         excludeSigned,
         overdueOnly,
         sortByOverdue,
-        currentOwnerDept));
+        currentOwnerDept,
+        expiryReminderTo));
   }
 
   @PreAuthorize(CRM_CONTRACT_READ)

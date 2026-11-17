@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="客户预约参观" sub-title="安排潜客到访、登记签到、记录参观结果并自动生成后续跟进">
     <a-card :bordered="false" class="card-elevated">
-      <a-form layout="inline" :model="query">
+      <QueryBar layout="inline" :model="query" @finish="search">
         <a-form-item label="客户/电话">
           <a-input v-model:value="query.keyword" allow-clear placeholder="客户、联系人或电话" @press-enter="search" />
         </a-form-item>
@@ -13,13 +13,15 @@
         <a-form-item label="预约日期">
           <a-range-picker v-model:value="query.dateRange" value-format="YYYY-MM-DD" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="search">查询</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">查询</a-button>
+              <a-button @click="reset">重置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
 
       <div class="appointment-summary">
         <a-tag color="blue">今日待到访 {{ todayScheduledCount }}</a-tag>
@@ -28,13 +30,13 @@
       </div>
 
       <div class="appointment-actions">
-        <a-space wrap>
+        <ActionToolbar wrap>
           <a-button type="primary" @click="openForm()">新增预约</a-button>
           <a-button :disabled="selectedRows.length !== 1 || selectedRows[0]?.status !== 'SCHEDULED'" @click="openForm(selectedRows[0])">编辑</a-button>
           <a-button :disabled="selectedRows.length !== 1 || selectedRows[0]?.status !== 'SCHEDULED'" @click="arriveSelected">登记到访</a-button>
           <a-button :disabled="selectedRows.length !== 1 || selectedRows[0]?.status !== 'ARRIVED'" type="primary" @click="openComplete">填写参观结果</a-button>
           <a-button :disabled="selectedRows.length !== 1 || !canCancel(selectedRows[0])" danger @click="openCancel">取消预约</a-button>
-        </a-space>
+        </ActionToolbar>
       </div>
 
       <StatefulBlock :loading="loading" :error="errorText" :empty="!rows.length" @retry="fetchData">
@@ -135,6 +137,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
 import type { FormInstance, FormRules } from 'ant-design-vue'

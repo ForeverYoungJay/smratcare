@@ -8,6 +8,7 @@ import com.zhiyangyun.care.crm.model.action.CrmCallbackPlanResponse;
 import com.zhiyangyun.care.crm.model.action.CrmContractAttachmentRequest;
 import com.zhiyangyun.care.crm.model.action.CrmContractAttachmentResponse;
 import com.zhiyangyun.care.crm.model.action.CrmLeadBatchDeleteRequest;
+import com.zhiyangyun.care.crm.model.action.CrmLeadFollowupRequest;
 import com.zhiyangyun.care.crm.model.action.CrmLeadBatchStatusRequest;
 import com.zhiyangyun.care.crm.model.action.CrmSmsTaskCreateRequest;
 import com.zhiyangyun.care.crm.model.action.CrmSmsTaskResponse;
@@ -56,6 +57,13 @@ public class CrmLeadActionController {
   public Result<CrmCallbackPlanResponse> createCallbackPlan(
       @PathVariable Long leadId, @RequestBody CrmCallbackPlanRequest request) {
     return Result.ok(requireFound(leadActionService.createCallbackPlan(
+        AuthContext.getOrgId(), AuthContext.getOrgId(), AuthContext.getStaffId(), leadId, request), "客户线索"));
+  }
+
+  @PostMapping("/{leadId}/followups")
+  public Result<CrmCallbackPlanResponse> recordFollowup(
+      @PathVariable Long leadId, @RequestBody CrmLeadFollowupRequest request) {
+    return Result.ok(requireFound(leadActionService.recordFollowup(
         AuthContext.getOrgId(), AuthContext.getOrgId(), AuthContext.getStaffId(), leadId, request), "客户线索"));
   }
 

@@ -1,12 +1,13 @@
 <template>
   <PageContainer title="转化率统计" sub-title="线索到签约的漏斗转化分析与阶段诊断">
     <MarketingQuickNav parent-path="/marketing/reports" />
-    <section class="conversion-hero">
-      <div class="conversion-hero-copy">
+    <section class="conversion-hero business-overview">
+      <details class="business-help">
+        <summary>使用说明</summary>
+        <p class="business-help-title">把咨询、意向、预订到签约的每一段损耗都看清楚</p>
         <small>转化洞察</small>
-        <h2>把咨询、意向、预订到签约的每一段损耗都看清楚</h2>
         <p>统一查看阶段数量、转化率和当前筛选口径，方便从渠道、时间和负责人三个维度定位问题。</p>
-      </div>
+      </details>
       <div class="conversion-hero-side">
         <div class="hero-stat">
           <span>总线索</span>
@@ -20,7 +21,7 @@
     </section>
 
     <a-card class="card-elevated conversion-filter-card" :bordered="false">
-      <a-form :model="query" layout="inline" class="conversion-filter-form">
+      <QueryBar :model="query" layout="inline" class="conversion-filter-form" @finish="loadData">
         <a-form-item label="开始日期">
           <a-date-picker v-model:value="query.dateFrom" value-format="YYYY-MM-DD" />
         </a-form-item>
@@ -51,14 +52,16 @@
             @focus="() => !staffOptions.length && searchStaff('')"
           />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="loadData">查询</a-button>
-            <a-button @click="reset">重置</a-button>
-            <a-button @click="exportData">导出CSV</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">查询</a-button>
+              <a-button @click="reset">重置</a-button>
+              <a-button @click="exportData">导出CSV</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-row :gutter="[16, 16]" class="conversion-card-row">
@@ -116,6 +119,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../../components/ActionToolbar.vue'
+import QueryBar from '../../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import VChart from 'vue-echarts'

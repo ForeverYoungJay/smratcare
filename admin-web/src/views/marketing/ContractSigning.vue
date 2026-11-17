@@ -38,7 +38,7 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <a-form :model="query" layout="inline" class="search-bar">
+      <SearchForm :model="query" @search="runSearch" @reset="reset">
         <a-form-item label="合同编号">
           <a-input v-model:value="query.contractNo" placeholder="请输入 合同编号" allow-clear />
         </a-form-item>
@@ -88,17 +88,12 @@
         <a-form-item label="超时排序">
           <a-switch v-model:checked="sortByOverdue" @change="onSortSwitchChange" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="runSearch">搜 索</a-button>
-            <a-button @click="reset">清 空</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+
+      </SearchForm>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <FlowGuardBar
+      <FlowGuardBar v-if="hasSingleSelection"
         :title="'合同流程守卫'"
         :subject="flowGuardSubject"
         :stage-text="flowGuardStageText"
@@ -113,7 +108,7 @@
         :selected-count="selectedCount"
         :tip="canApproveContract ? '支持批量删除与流程推进' : '可查看、编辑并推进入住评估与办理；最终签署由主管完成'"
       >
-        <a-space>
+        <ActionToolbar>
           <a-button v-if="!isSignedMode" type="primary" @click="openForm()">新增合同</a-button>
           <a-button :disabled="!hasSingleSelection" @click="viewSelected">查看</a-button>
           <a-button :disabled="!hasSingleSelection" @click="openTraceSelected">轨迹</a-button>
@@ -123,16 +118,17 @@
           <a-button :disabled="!hasSingleSelection" @click="admissionSelected">入住办理</a-button>
           <a-button v-if="canApproveContract" :disabled="!hasSingleSelection" @click="finalizeSelected">最终签署</a-button>
           <a-button v-if="canApproveContract" :disabled="selectedCount === 0" danger @click="batchDelete">删除</a-button>
-        </a-space>
+        </ActionToolbar>
       </MarketingListToolbar>
+      <div style="display:flex;justify-content:flex-end"><a-button type="link" :aria-expanded="showAllColumns" @click="showAllColumns = !showAllColumns">{{ showAllColumns ? '只看常用信息' : '显示完整信息' }}</a-button></div>
       <a-table
         :data-source="tableRows"
-        :columns="columns"
+        :columns="showAllColumns ? columns : compactWorkspaceColumns(columns, route.path)"
         :loading="loading"
         :pagination="false"
         row-key="id"
         :row-selection="rowSelection"
-        :scroll="{ x: 2400 }"
+        :scroll="{ x: showAllColumns ? 2400 : 1200 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'flowStage'">
@@ -238,6 +234,18 @@
                 <div class="readonly-item">
                   <span class="readonly-label">合同有效期止</span>
                   <strong class="readonly-value">{{ form.contractExpiryDate || '-' }}</strong>
+                </div>
+                <div class="readonly-item">
+                  <span class="readonly-label">合同类型</span>
+                  <strong class="readonly-value">{{ contractTypeLabel(form.contractType) }}</strong>
+                </div>
+                <div class="readonly-item">
+                  <span class="readonly-label">参考月费</span>
+                  <strong class="readonly-value">{{ form.referenceMonthlyFee != null ? `¥${form.referenceMonthlyFee}` : '-' }}</strong>
+                </div>
+                <div class="readonly-item">
+                  <span class="readonly-label">预计入住日</span>
+                  <strong class="readonly-value">{{ form.expectedAdmissionDate || '-' }}</strong>
                 </div>
                 <div class="readonly-item readonly-policies">
                   <span class="readonly-label">优惠政策</span>
@@ -355,6 +363,21 @@
                 <a-col :xs="24" :md="8">
                   <a-form-item label="合同有效期止">
                     <a-date-picker v-model:value="form.contractExpiryDate" value-format="YYYY-MM-DD" style="width: 100%" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :md="8">
+                  <a-form-item label="合同类型">
+                    <a-select v-model:value="form.contractType" allow-clear :options="CONTRACT_TYPE_OPTIONS" placeholder="请选择合同类型" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :md="8">
+                  <a-form-item label="参考月费（元）" extra="仅作签约参考，实际收费以财务审批为准">
+                    <a-input-number v-model:value="form.referenceMonthlyFee" :min="0" :precision="2" style="width: 100%" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :md="8">
+                  <a-form-item label="预计入住日">
+                    <a-date-picker v-model:value="form.expectedAdmissionDate" value-format="YYYY-MM-DD" style="width: 100%" />
                   </a-form-item>
                 </a-col>
                 <a-col :xs="24" :md="8">
@@ -710,6 +733,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from "../../components/ActionToolbar.vue"
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'ant-design-vue'
@@ -717,6 +741,8 @@ import { message, Modal } from 'ant-design-vue'
 import { DownOutlined } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
+import SearchForm from '../../components/SearchForm.vue'
+import { compactWorkspaceColumns } from '../../workspaces/columns'
 import FlowGuardBar from '../../components/FlowGuardBar.vue'
 import MarketingQuickNav from './components/MarketingQuickNav.vue'
 import MarketingListToolbar from './components/MarketingListToolbar.vue'
@@ -748,6 +774,7 @@ import { getStaffPage } from '../../api/staff'
 import { idCardValidator, mobilePhoneValidator } from '../../utils/validators'
 import { useUserStore } from '../../stores/user'
 import { hasAnyRole } from '../../utils/roleAccess'
+import { CONTRACT_TYPE_OPTIONS, contractTypeLabel } from '../../utils/marketingEnums'
 import type {
   ContractAttachmentItem,
   ContractSystemLinkageSummary,
@@ -1324,6 +1351,7 @@ function openSignedSystem(key: string) {
   }
 }
 
+const showAllColumns = ref(false)
 const columns = [
   { title: '合同编号', dataIndex: 'contractNo', key: 'contractNo', width: 170 },
   { title: '姓名', dataIndex: 'elderName', key: 'elderName', width: 120 },
@@ -1960,6 +1988,9 @@ function openForm(record?: CrmContractItem, readonly = false) {
       flowStage: 'PENDING_ASSESSMENT',
       currentOwnerDept: 'ASSESSMENT',
       reservationRoomNo: undefined,
+      contractType: 'LONG_TERM',
+      referenceMonthlyFee: undefined,
+      expectedAdmissionDate: undefined,
       marketerName: currentStaffDisplayName.value || '',
       orgName: undefined
     } as Partial<CrmContractItem>)

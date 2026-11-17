@@ -2,7 +2,7 @@
   <PageContainer title="合同变更" sub-title="房号、到期日、备注等变更与审批流转">
     <MarketingQuickNav parent-path="/marketing/contracts" />
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline">
+      <QueryBar :model="query" layout="inline" @finish="fetchData">
         <a-form-item label="合同编号">
           <a-input v-model:value="query.contractNo" allow-clear />
         </a-form-item>
@@ -17,18 +17,20 @@
             <a-select-option value="REJECTED">已驳回</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="fetchData">查询</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">查询</a-button>
+              <a-button @click="reset">重置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px">
       <MarketingListToolbar :selected-count="selectedRowKeys.length" tip="支持批量删除与批量处理">
-        <a-space>
+        <ActionToolbar>
           <a-button :disabled="!selectedSingleRecord" @click="openEditSelected">编辑变更</a-button>
           <a-button :disabled="!canStartChangeSelected" @click="startChangeSelected">发起变更</a-button>
           <a-button :disabled="!canSubmitApprovalSelected" @click="submitApprovalSelected">提交审批</a-button>
@@ -37,7 +39,7 @@
           <a-button v-if="canApproveContract" :disabled="!canBatchApprove" @click="batchApprove">批量审批通过</a-button>
           <a-button v-if="canApproveContract" :disabled="!canRejectSelected" danger @click="rejectSelected">审批驳回</a-button>
           <a-button v-if="canApproveContract" :disabled="!canBatchReject" danger @click="batchReject">批量审批驳回</a-button>
-        </a-space>
+        </ActionToolbar>
       </MarketingListToolbar>
       <a-table
         :columns="columns"
@@ -93,6 +95,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'

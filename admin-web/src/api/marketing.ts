@@ -209,6 +209,11 @@ export function getLeadCallbackPlansBatch(leadIds: Id[]) {
   })
 }
 
+/** 记录一次已完成的跟进；带 nextFollowTime 时后端同时创建下次回访计划 */
+export function recordLeadFollowup(leadId: Id, data: { method: string; followupResult?: string; followupContent?: string; nextFollowTime?: string }) {
+  return request.post<CallbackPlanItem>(`/api/crm/leads/${leadId}/followups`, data)
+}
+
 export function executeCallbackPlan(planId: Id, data: CallbackExecuteRequest) {
   return request.post<CallbackPlanItem>(`/api/crm/leads/callback-plans/${planId}/execute`, data)
 }
@@ -329,6 +334,19 @@ export function getMarketingFollowupReport(params?: MarketingReportQuery) {
 
 export function getMarketingCallbackReport(params?: { pageNo?: number; pageSize?: number } & MarketingReportQuery) {
   return request.get<MarketingCallbackReport>('/api/marketing/report/callback', { params })
+}
+
+export interface MarketingStaffActivity {
+  /** 实际到访预约次数 */
+  arrivedVisitCount: number
+  /** 实际到访去重客户数（漏斗、到访率用这个） */
+  arrivedLeadCount: number
+  staff: Array<{ name: string; leads: number; visits: number; contracts: number; overdue: number }>
+}
+
+/** 人员协作与到访汇总（后端全量统计） */
+export function getMarketingStaffActivity(params: { dateFrom?: string; dateTo?: string }, config?: Record<string, any>) {
+  return request.get<MarketingStaffActivity>('/api/marketing/report/staff-activity', { params, ...config })
 }
 
 export function getMarketingDataQualityReport() {

@@ -153,6 +153,17 @@ public class MarketingReportController {
   }
 
   @PreAuthorize("hasAnyRole('MARKETING_EMPLOYEE','MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @GetMapping("/staff-activity")
+  public Result<com.zhiyangyun.care.crm.model.report.MarketingStaffActivityResponse> staffActivity(
+      @RequestParam(required = false) String dateFrom,
+      @RequestParam(required = false) String dateTo) {
+    Long orgId = AuthContext.getOrgId();
+    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "MARKETING_REPORT_QUERY", "MARKETING_STAFF_ACTIVITY", null, "staff activity");
+    return Result.ok(marketingReportService.staffActivity(orgId, dateFrom, dateTo));
+  }
+
+  @PreAuthorize("hasAnyRole('MARKETING_EMPLOYEE','MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/snapshots")
   public Result<List<CrmSalesReportSnapshotResponse>> snapshots(
       @RequestParam(required = false) String snapshotType,
