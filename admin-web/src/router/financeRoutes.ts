@@ -1,5 +1,8 @@
 import type { RouteRecordRaw } from 'vue-router'
 
+// 财务规则配置（计费、分摊、渠道、审批、预警）只给主管/管理员
+const FINANCE_ADMINS = ['FINANCE_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
+
 export const financeRoutes: RouteRecordRaw[] = [
   {
         path: 'finance',
@@ -151,7 +154,7 @@ export const financeRoutes: RouteRecordRaw[] = [
                 path: '/finance/accounts/warning-rules',
                 name: 'FinanceAccountsWarningRules',
                 component: () => import('../views/finance/BalanceWarningRules.vue'),
-                meta: { title: '余额预警规则' }
+                meta: { title: '余额预警规则', roles: FINANCE_ADMINS }
               },
               {
                 path: '/finance/admission-fee-audit',
@@ -408,7 +411,7 @@ export const financeRoutes: RouteRecordRaw[] = [
             path: 'config',
             name: 'FinanceConfig',
             redirect: '/finance/config/master-data',
-            meta: { title: '规则与配置' },
+            meta: { title: '规则与配置', roles: FINANCE_ADMINS },
             children: [
               {
                 path: 'master-data',

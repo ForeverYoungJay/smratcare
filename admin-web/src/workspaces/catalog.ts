@@ -6,46 +6,36 @@ import { toCanonicalRoutePath } from '../router/routeAliases'
 type Entry = [path: string, label: string, aliases?: string[]]
 export interface WorkspaceDefinition { id: string; title: string; entries: Entry[] }
 export const workspaceDefinitions: WorkspaceDefinition[] = [
-  { id: 'finance-payments', title: '收银与票据', entries: [
-    ['/finance/payments/cashier-desk', '今日收银'], ['/finance/payments/records', '收款流水'],
-    ['/finance/fees/payment-and-invoice', '发票与收据', ['/finance/reconcile/invoice']], ['/finance/payments/refund-reversal', '退款与冲正'],
-    ['/finance/payments/shift-close', '日结交班']
+  // 财务 5 个主页面 + 主管可见的规则配置；标签超过 7 个时页头改为「办理内容」下拉
+  { id: 'finance-collections', title: '收费与账户', entries: [
+    ['/finance/bills/detail-query', '账单与收银'], ['/finance/bills/in-resident', '在住账单缴费', ['/finance/payments/register']],
+    ['/finance/bills/in-admission', '入住首期账单'], ['/finance/payments/cashier-desk', '今日收银'],
+    ['/finance/payments/records', '收款流水'], ['/finance/accounts/list', '长者资金账户'],
+    ['/finance/accounts/ledger', '资金流水'], ['/finance/deposit-management', '押金'],
+    ['/finance/prepaid-recharge', '预存充值'], ['/finance/consumer-voucher', '消费券'],
+    ['/finance/fees/payment-and-invoice', '票据管理', ['/finance/reconcile/invoice']], ['/finance/payments/refund-reversal', '退款与冲正']
   ] },
-  { id: 'finance-bills', title: '账单与缴费', entries: [
-    ['/finance/bills/detail-query', '全部账单'], ['/finance/bills/in-resident', '在住账单', ['/finance/payments/register']],
-    ['/finance/bills/in-admission', '入住首期账单']
-  ] },
-  { id: 'finance-accounts', title: '长者资金账户', entries: [
-    ['/finance/accounts/list', '账户总览'], ['/finance/prepaid-recharge', '预存充值'],
-    ['/finance/deposit-management', '押金'], ['/finance/accounts/ledger', '资金流水'], ['/finance/consumer-voucher', '消费券']
-  ] },
-  { id: 'finance-consumption', title: '消费与分摊', entries: [
-    ['/finance/flows/consumption', '消费登记'], ['/finance/flows/medical', '医护费用'],
+  { id: 'finance-consumption', title: '消费与风险', entries: [
+    ['/finance/flows/consumption', '消费与分摊'], ['/finance/flows/medical', '医护费用'],
     ['/finance/flows/dining', '餐饮扣费'], ['/finance/flows/logistics', '后勤收费'],
-    ['/finance/allocation/public-cost', '公共费用分摊', ['/finance/allocation/tasks']], ['/finance/electricity-fee', '长者电费']
-  ] },
-  { id: 'finance-collection', title: '欠费与扣费', entries: [
-    ['/finance/bills/follow-up', '提醒与催缴'], ['/finance/bills/auto-deduct', '自动扣费异常', ['/finance/bills/auto-deduct-errors']]
-  ] },
-  { id: 'finance-issues', title: '财务异常处理', entries: [
-    ['/finance/reconcile/issue-center', '待处理队列'], ['/finance/reconcile/exception', '对账异常'],
-    ['/finance/reconcile/ledger-health', '一致性巡检'], ['/finance/flows/medical-errors', '医护费用异常'],
+    ['/finance/allocation/public-cost', '公共费用分摊', ['/finance/allocation/tasks']], ['/finance/electricity-fee', '长者电费'],
+    ['/finance/bills/follow-up', '欠费与催缴'], ['/finance/bills/auto-deduct', '自动扣费异常', ['/finance/bills/auto-deduct-errors']],
+    ['/finance/reconcile/issue-center', '财务异常工单'], ['/finance/flows/medical-errors', '医护费用异常'],
     ['/finance/flows/adjustments', '费用调整']
   ] },
-  { id: 'finance-settlement', title: '退住与费用审核', entries: [
+  { id: 'finance-settlement', title: '结算与月结', entries: [
     ['/finance/discharge/settlement', '退住结算', ['/finance/discharge/print-sign']],
     ['/finance/discharge/review', '退住费用审核'], ['/finance/admission-fee-audit', '入住费用审核'],
-    ['/finance/discharge/status-sync', '结算状态核对']
+    ['/finance/discharge/status-sync', '结算状态核对'], ['/finance/reconcile/center', '日对账'],
+    ['/finance/reconcile/exception', '对账异常'], ['/finance/payments/shift-close', '日结交班'],
+    ['/finance/reconcile/ledger-health', '一致性巡检'], ['/finance/reconcile/month-close', '月结关账']
   ] },
-  { id: 'finance-close', title: '对账与月结', entries: [
-    ['/finance/reconcile/center', '日对账'], ['/finance/reconcile/month-close', '月结关账']
-  ] },
-  { id: 'finance-reports', title: '财务报表', entries: [
+  { id: 'finance-reports', title: '财务经营分析', entries: [
     ['/finance/reports/overall', '总收支'], ['/finance/reports/revenue-structure', '营收结构'],
     ['/finance/reports/floor-room-profit', '楼层房间'], ['/finance/reports/occupancy-consumption', '入住消费'],
     ['/finance/reports/monthly-ops', '月运营'], ['/finance/reports/excel', '报表导出']
   ] },
-  { id: 'finance-settings', title: '财务规则', entries: [
+  { id: 'finance-settings', title: '财务规则配置', entries: [
     ['/finance/config/master-data', '配置总览'], ['/finance/allocation/subjects', '费用科目'],
     ['/finance/bills/rules', '计费规则'], ['/finance/allocation/rules', '分摊规则'],
     ['/finance/config/payment-channels', '支付渠道'], ['/finance/config/approval-flow', '审批规则'],

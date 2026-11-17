@@ -84,10 +84,10 @@ export const DEPARTMENT_HOME_CONFIG: Record<DepartmentCode, DepartmentHomeConfig
     moduleRoots: ['/finance'],
     summary: '按账单、收款、对账和结算顺序，优先处理资金风险。',
     steps: [
-      { title: '账单审核', path: '/finance/admission-fee-audit' },
-      { title: '收费开票', path: '/finance/payments/cashier-desk' },
-      { title: '对账', path: '/finance/reconcile/issue-center' },
-      { title: '欠费与结算', path: '/finance/bills/follow-up' },
+      { title: '收费与账户', path: '/finance/bills/detail-query' },
+      { title: '消费与风险', path: '/finance/flows/consumption' },
+      { title: '退住结算', path: '/finance/discharge/settlement' },
+      { title: '对账与月结', path: '/finance/reconcile/month-close' },
       { title: '财务报表', path: '/finance/reports/overall' }
     ]
   },

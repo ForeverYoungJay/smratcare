@@ -38,8 +38,6 @@ describe('two-level job navigation', () => {
   })
 
   it.each([
-    ['FINANCE_EMPLOYEE', '财务工作台', '/finance/bills/detail-query'],
-    ['FINANCE_MINISTER', '财务工作台', '/finance/accounts/list'],
     ['MARKETING_EMPLOYEE', '市场工作台', '/marketing/customers'],
     ['MARKETING_MINISTER', '市场工作台', '/marketing/operations'],
     ['HR_EMPLOYEE', '人事工作台', '/hr/overview'],
@@ -81,6 +79,14 @@ describe('two-level job navigation', () => {
     expect(paths(jobMenu('MEDICAL_MINISTER'))).toEqual(expect.arrayContaining([...main, '/medical-care/settings']))
     expect(paths(jobMenu('MEDICAL_EMPLOYEE'))).toEqual(expect.arrayContaining(main))
     expect(paths(jobMenu('MEDICAL_EMPLOYEE'))).not.toContain('/medical-care/settings')
+  })
+
+  it('gives finance five main pages and keeps rule settings for managers', () => {
+    const main = ['/finance/workbench', '/finance/bills/detail-query', '/finance/flows/consumption', '/finance/discharge/settlement', '/finance/reports/overall']
+    expect(jobMenu('FINANCE_MINISTER')[0].label).toBe('财务工作台')
+    expect(paths(jobMenu('FINANCE_MINISTER'))).toEqual(expect.arrayContaining([...main, '/finance/config/master-data']))
+    expect(paths(jobMenu('FINANCE_EMPLOYEE'))).toEqual(expect.arrayContaining(main))
+    expect(paths(jobMenu('FINANCE_EMPLOYEE'))).not.toContain('/finance/config/master-data')
   })
 
   it('links employee navigation to medical and logistics department workbenches', () => {

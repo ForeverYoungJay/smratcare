@@ -68,18 +68,14 @@ const departmentNavigation: DepartmentNavigation[] = [
     department: 'FINANCE', employeeRole: ROLE_CODES.FINANCE_EMPLOYEE, ministerRole: ROLE_CODES.FINANCE_MINISTER, section: 'operations',
     businessLabel: '财务部业务', objectLabel: '财务查询', objectPath: '/finance/bills/detail-query',
     business: [
-      { label: '今日收费', path: '/finance/workbench' },
-      { label: '收费与收款', path: '/finance/payments/cashier-desk' },
-      { label: '退款与冲正', path: '/finance/payments/refund-reversal' },
-      { label: '欠费提醒', path: '/finance/bills/follow-up' },
-      { label: '对账异常', path: '/finance/reconcile/exception' },
-      { label: '退住结算', path: '/finance/discharge/settlement' }
+      { label: '财务工作台', path: '/finance/workbench' },
+      { label: '收费与账户', path: '/finance/bills/detail-query' },
+      { label: '消费与风险', path: '/finance/flows/consumption' },
+      { label: '结算与月结', path: '/finance/discharge/settlement' }
     ],
     managementLabel: '财务部管理',
     management: [
-      { label: '费用审核', path: '/finance/admission-fee-audit' },
-      { label: '账务巡检', path: '/finance/reconcile/ledger-health' },
-      { label: '预警规则', path: '/finance/accounts/warning-rules' }
+      { label: '财务规则配置', path: '/finance/config/master-data' }
     ],
     assignmentLabel: '财务任务分配', assignmentPath: '/finance/allocation/tasks',
     reportLabel: '财务报表', reportPath: '/finance/reports/overall'
@@ -173,11 +169,8 @@ function buildConsolidatedDepartmentMenu(department: string, availablePaths: Set
   ]) }
   let entries: JobEntry[]
   if (department === 'FINANCE') entries = [
-    ...links([['财务工作台', '/finance/workbench'], ['收银与票据', '/finance/payments/cashier-desk'],
-      ['账单与缴费', '/finance/bills/detail-query'], ['长者资金账户', '/finance/accounts/list']]),
-    { label: '日常账务', path: '', children: links([['消费与分摊', '/finance/flows/consumption'], ['欠费与扣费', '/finance/bills/follow-up'],
-      ['财务异常处理', '/finance/reconcile/issue-center'], ['退住与费用审核', '/finance/discharge/settlement'], ['费用与退住', '/elder/status-change/discharge-settlement'], ['对账与月结', '/finance/reconcile/center']]) },
-    { label: '报表与规则', path: '', children: links([['财务报表', '/finance/reports/overall'], ['财务规则', '/finance/config/master-data']]) }, office
+    ...links([['财务工作台', '/finance/workbench'], ['收费与账户', '/finance/bills/detail-query'], ['消费与风险', '/finance/flows/consumption'],
+      ['结算与月结', '/finance/discharge/settlement'], ['财务经营分析', '/finance/reports/overall'], ['财务规则配置', '/finance/config/master-data']]), office
   ]
   else if (department === 'MEDICAL') entries = [
     ...links([['医务工作台', '/medical-care/workbench'], ['长者健康档案', '/medical-care/residents'], ['诊疗与医嘱', '/medical-care/clinical'],

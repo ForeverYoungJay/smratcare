@@ -50,7 +50,7 @@ describe('one page per function', () => {
     expect(profile.aliases).toContain('社保办理')
     expect(profile.aliases).not.toContain('劳动合同')
     const finance = flatten(getMenuTree(['FINANCE_MINISTER'], ['/finance']))
-    expect(finance.find(item => item.path === '/finance/accounts/list')?.aliases).toContain('押金')
+    expect(finance.find(item => item.path === '/finance/bills/detail-query')?.aliases).toContain('押金')
   })
 
   it('keeps custom narrow grants usable when the new department homepage is not authorized', async () => {
