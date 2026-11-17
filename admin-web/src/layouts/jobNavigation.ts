@@ -33,24 +33,17 @@ const departmentNavigation: DepartmentNavigation[] = [
     department: 'NURSING', employeeRole: ROLE_CODES.NURSING_EMPLOYEE, ministerRole: ROLE_CODES.NURSING_MINISTER, section: 'care',
     businessLabel: '护理部业务', objectLabel: '长者查询', objectPath: '/elder/list',
     business: [
-      { label: '护理部首页', path: '/care/home' },
-      { label: '今日护理任务', path: '/care/today' },
-      { label: '长者护理计划', path: '/care/workbench/plan' },
-      { label: '护理记录', path: '/care/service/nursing-records' },
-      { label: '交接班', path: '/medical-care/handovers' },
-      { label: '医嘱执行', path: '/medical-care/order-executions' },
-      { label: '异常任务', path: '/care/exception' },
-      { label: '长者评估', path: '/elder/assessment/ability/archive' },
-      { label: '床位与外出', path: '/elder/bed-panorama' }
+      { label: '护理工作台', path: '/care/workbench' },
+      { label: '护理任务中心', path: '/care/tasks' },
+      { label: '护理档案与评估', path: '/care/residents' },
+      { label: '交接班与安全', path: '/care/safety' }
     ],
     managementLabel: '护理部管理',
     management: [
-      { label: '护理人员', path: '/care/staff/caregiver-info' },
-      { label: '护理小组', path: '/care/staff/caregiver-groups' },
-      { label: '护理质量', path: '/medical-care/nursing-quality' }
+      { label: '排班与质控', path: '/care/operations' }
     ],
-    assignmentLabel: '护理排班', assignmentPath: '/care/scheduling/shift-calendar',
-    reportLabel: '护理报表', reportPath: '/care/service/nursing-reports'
+    assignmentLabel: '护理排班', assignmentPath: '/care/operations?tab=roster',
+    reportLabel: '护理报表', reportPath: '/care/operations?tab=quality'
   },
   {
     department: 'MEDICAL', employeeRole: ROLE_CODES.MEDICAL_EMPLOYEE, ministerRole: ROLE_CODES.MEDICAL_MINISTER, section: 'care',
@@ -189,6 +182,10 @@ function buildConsolidatedDepartmentMenu(department: string, availablePaths: Set
       ['财务异常处理', '/finance/reconcile/issue-center'], ['退住与费用审核', '/finance/discharge/settlement'], ['费用与退住', '/elder/status-change/discharge-settlement'], ['对账与月结', '/finance/reconcile/center']]) },
     { label: '报表与规则', path: '', children: links([['财务报表', '/finance/reports/overall'], ['财务规则', '/finance/config/master-data']]) }, office
   ]
+  else if (department === 'NURSING') entries = [
+    ...links([['护理工作台', '/care/workbench'], ['护理任务中心', '/care/tasks'], ['护理档案与评估', '/care/residents'],
+      ['交接班与安全', '/care/safety'], ['排班与质控', '/care/operations'], ['医嘱执行', '/medical-care/order-executions']]), office
+  ]
   else if (department === 'MARKETING') entries = [
     ...links([['市场工作台', '/marketing/workbench'], ['客户与跟进', '/marketing/customers'], ['参观与预订', '/marketing/visits'],
       ['合同与转入住', '/marketing/contracts'], ['市场运营', '/marketing/operations'], ['入住办理中心', '/elder/admission-processing']]), office
@@ -262,7 +259,7 @@ function buildDirectorMenu(availablePaths: Set<string>) {
     { label: '经营总览', path: '/portal', icon: 'HomeOutlined' },
     {
       label: '部门运行', path: '', icon: 'ApartmentOutlined', section: 'operations', children: [
-        { label: '护理运行', path: '/care/today' }, { label: '医务运行', path: '/medical-care/center' },
+        { label: '护理运行', path: '/care/workbench' }, { label: '医务运行', path: '/medical-care/center' },
         { label: '财务运行', path: '/finance/workbench' }, { label: '后勤运行', path: '/logistics/workbench' },
         { label: '行政人事', path: '/hr/overview' }, { label: '市场运行', path: '/marketing/workbench' }
       ]
@@ -314,7 +311,7 @@ function buildAdminMenu(availablePaths: Set<string>) {
     { ...personalEntries.todo, icon: 'CheckSquareOutlined', section: 'entry' },
     {
       label: '部门业务', path: '', icon: 'ApartmentOutlined', section: 'operations', children: [
-        { label: '护理业务', path: '/care/today' }, { label: '医务业务', path: '/medical-care/center' },
+        { label: '护理业务', path: '/care/workbench' }, { label: '医务业务', path: '/medical-care/center' },
         { label: '财务业务', path: '/finance/workbench' }, { label: '后勤业务', path: '/logistics/workbench' },
         { label: '行政人事', path: '/hr/overview' }, { label: '市场业务', path: '/marketing/workbench' }
       ]
@@ -349,6 +346,6 @@ export function buildJobNavigation(roles: string[], availablePaths: Set<string>)
   if (normalized.has(ROLE_CODES.ADMIN)) return buildAdminMenu(availablePaths)
   const department = departmentNavigation.find((item) => normalized.has(item.ministerRole) || normalized.has(item.employeeRole))
   if (!department) return []
-  if (['FINANCE', 'MARKETING', 'HR'].includes(department.department)) return buildConsolidatedDepartmentMenu(department.department, availablePaths)
+  if (['FINANCE', 'MARKETING', 'HR', 'NURSING'].includes(department.department)) return buildConsolidatedDepartmentMenu(department.department, availablePaths)
   return buildDepartmentMenu(department, normalized.has(department.ministerRole), availablePaths)
 }

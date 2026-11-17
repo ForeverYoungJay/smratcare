@@ -17,6 +17,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -43,6 +44,10 @@ public class ShiftHandoverServiceImpl implements ShiftHandoverService {
     ShiftHandover handover = handoverMapper.selectById(id);
     if (handover == null || request.getTenantId() == null || !request.getTenantId().equals(handover.getTenantId())) {
       return null;
+    }
+    // 双方已确认的交接是留痕记录，不能再改
+    if ("CONFIRMED".equals(handover.getStatus())) {
+      throw new IllegalStateException("交接已由双方确认，不能再修改");
     }
     fillEntity(handover, request);
     handoverMapper.updateById(handover);
@@ -96,6 +101,24 @@ public class ShiftHandoverServiceImpl implements ShiftHandoverService {
   }
 
   @Override
+  public ShiftHandoverResponse confirm(Long id, Long tenantId, Long staffId) {
+    ShiftHandover handover = handoverMapper.selectById(id);
+    if (handover == null || tenantId == null || !tenantId.equals(handover.getTenantId())) {
+      return null;
+    }
+    if (!"HANDED_OVER".equals(handover.getStatus())) {
+      throw new IllegalStateException("当前状态不允许该操作");
+    }
+    if (staffId == null || !staffId.equals(handover.getToStaffId())) {
+      throw new AccessDeniedException("仅接班人本人可确认");
+    }
+    handover.setStatus("CONFIRMED");
+    handover.setConfirmTime(LocalDateTime.now());
+    handoverMapper.updateById(handover);
+    return get(id, tenantId);
+  }
+
+  @Override
   public void delete(Long id, Long tenantId) {
     ShiftHandover handover = handoverMapper.selectById(id);
     if (handover != null && tenantId != null && tenantId.equals(handover.getTenantId())) {
@@ -117,7 +140,6 @@ public class ShiftHandoverServiceImpl implements ShiftHandoverService {
     String status = normalizeStatus(request.getStatus());
     handover.setStatus(status);
     handover.setHandoverTime(resolveHandoverTime(status, request.getHandoverTime(), handover.getHandoverTime()));
-    handover.setConfirmTime(resolveConfirmTime(status, request.getConfirmTime(), handover.getConfirmTime()));
     handover.setAttachmentUrls(normalizeText(request.getAttachmentUrls()));
   }
 
@@ -185,16 +207,4 @@ public class ShiftHandoverServiceImpl implements ShiftHandoverService {
     return null;
   }
 
-  private LocalDateTime resolveConfirmTime(String status, LocalDateTime requestTime, LocalDateTime existingTime) {
-    if (requestTime != null) {
-      return requestTime;
-    }
-    if (existingTime != null) {
-      return existingTime;
-    }
-    if ("CONFIRMED".equals(status)) {
-      return LocalDateTime.now();
-    }
-    return null;
-  }
 }

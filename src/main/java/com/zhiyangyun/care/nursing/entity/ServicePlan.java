@@ -29,6 +29,11 @@ public class ServicePlan {
   private Long defaultStaffId;
   private String status;
   private String remark;
+  private Integer revision;
+  /** PENDING 待审核 / PUBLISHED 已发布 / REJECTED 已驳回 */
+  private String approvalStatus;
+  private Long approvedBy;
+  private LocalDateTime approvedAt;
   private Long createdBy;
   @TableField(value = "create_time", fill = FieldFill.INSERT)
   private LocalDateTime createTime;

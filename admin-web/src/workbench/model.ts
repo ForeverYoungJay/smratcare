@@ -21,7 +21,7 @@ export interface WorkbenchProfile {
 }
 
 const DEPARTMENT_PROFILE: Record<DepartmentCode, Omit<WorkbenchProfile, 'key' | 'audience' | 'hasManagementView'>> = {
-  NURSING: { department: DEPARTMENT_CODES.NURSING, departmentLabel: '护理部', roleLabel: '护理人员', objectLabel: '长者', primaryEntry: '/care/today' },
+  NURSING: { department: DEPARTMENT_CODES.NURSING, departmentLabel: '护理部', roleLabel: '护理人员', objectLabel: '长者', primaryEntry: '/care/tasks' },
   MEDICAL: { department: DEPARTMENT_CODES.MEDICAL, departmentLabel: '医务部', roleLabel: '医务人员', objectLabel: '长者', primaryEntry: '/medical-care/workbench' },
   FINANCE: { department: DEPARTMENT_CODES.FINANCE, departmentLabel: '财务部', roleLabel: '财务人员', objectLabel: '长者账户', primaryEntry: '/finance/workbench' },
   LOGISTICS: { department: DEPARTMENT_CODES.LOGISTICS, departmentLabel: '后勤部', roleLabel: '后勤人员', objectLabel: '工单与设施', primaryEntry: '/logistics/workbench' },

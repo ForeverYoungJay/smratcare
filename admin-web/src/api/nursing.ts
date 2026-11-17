@@ -8,7 +8,13 @@ import type {
   ServicePlanItem,
   ServiceBookingItem,
   NursingRecordItem,
-  NursingReportSummary
+  NursingReportSummary,
+  ServicePlanRevisionItem,
+  CareIncidentItem,
+  CareIncidentSummary,
+  CareIncidentActionRequest,
+  NursingRectificationItem,
+  NursingQualityMetrics
 } from '../types'
 
 export function getCaregiverGroupPage(params: any) {
@@ -141,4 +147,60 @@ export function getNursingRecordPage(params: any) {
 
 export function getNursingReportSummary(params?: any) {
   return request.get<NursingReportSummary>('/api/nursing/reports/summary', { params })
+}
+
+export function confirmShiftHandover(id: number) {
+  return request.post<ShiftHandoverItem>(`/api/nursing/handovers/${id}/confirm`)
+}
+
+export function approveServicePlan(id: number) {
+  return request.post<ServicePlanItem>(`/api/nursing/service-plans/${id}/approve`)
+}
+
+export function rejectServicePlan(id: number, reason: string) {
+  return request.post<ServicePlanItem>(`/api/nursing/service-plans/${id}/reject`, { reason })
+}
+
+export function getServicePlanRevisions(id: number) {
+  return request.get<ServicePlanRevisionItem[]>(`/api/nursing/service-plans/${id}/revisions`)
+}
+
+export function getIncidentPage(params: any) {
+  return fetchPage<CareIncidentItem>('/api/nursing/incidents/page', params)
+}
+
+export function getIncidentSummary(month: string) {
+  return request.get<CareIncidentSummary>('/api/nursing/incidents/summary', { params: { month } })
+}
+
+export function getIncident(id: number) {
+  return request.get<CareIncidentItem>(`/api/nursing/incidents/${id}`)
+}
+
+export function createIncident(data: Partial<CareIncidentItem>) {
+  return request.post<CareIncidentItem>('/api/nursing/incidents', data)
+}
+
+export function actOnIncident(id: number, data: CareIncidentActionRequest) {
+  return request.post<CareIncidentItem>(`/api/nursing/incidents/${id}/actions`, data)
+}
+
+export function getRectificationPage(params: any) {
+  return fetchPage<NursingRectificationItem>('/api/nursing/rectifications/page', params)
+}
+
+export function createRectification(data: Partial<NursingRectificationItem>) {
+  return request.post<NursingRectificationItem>('/api/nursing/rectifications', data)
+}
+
+export function updateRectification(id: number, data: Partial<NursingRectificationItem>) {
+  return request.put<NursingRectificationItem>(`/api/nursing/rectifications/${id}`, data)
+}
+
+export function reviewRectification(id: number, passed: boolean, reviewResult: string) {
+  return request.post<NursingRectificationItem>(`/api/nursing/rectifications/${id}/review`, { passed, reviewResult })
+}
+
+export function getQualityMetrics(params: { dateFrom: string; dateTo: string }) {
+  return request.get<NursingQualityMetrics>('/api/nursing/quality/metrics', { params })
 }

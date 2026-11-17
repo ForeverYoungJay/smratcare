@@ -155,7 +155,11 @@ export const PAGE_DESCRIPTIONS: Record<string, string> = {
   ShiftTemplates: '排班方案模板',
   CareShiftCalendar: '护理排班日历',
   ShiftHandovers: '交接班',
-  CareToday: '护理今日任务',
+  CareWorkbench: '护理工作台',
+  CareTaskCenter: '护理任务中心',
+  CareResidents: '护理档案与评估',
+  CareSafety: '交接班与安全',
+  CareOperations: '排班与质控',
   CareTemplate: '护理任务模板',
 
   // ===== 财务运营中心 =====

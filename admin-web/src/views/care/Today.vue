@@ -192,22 +192,7 @@
       </a-table>
     </a-drawer>
 
-    <a-modal :mask-closable="false" v-model:open="executeOpen" title="确认执行护理任务" :confirm-loading="executing" @ok="submitExecute">
-      <a-alert type="info" show-icon message="请当面核对长者与床位二维码，系统不会自动把未执行任务标为完成。" />
-      <a-descriptions :column="1" bordered size="small" style="margin-top: 12px">
-        <a-descriptions-item label="长者">{{ executeTarget?.elderName || '-' }}</a-descriptions-item>
-        <a-descriptions-item label="房间">{{ executeTarget?.roomNo || '-' }}</a-descriptions-item>
-        <a-descriptions-item label="任务">{{ executeTarget?.taskName || '-' }}</a-descriptions-item>
-      </a-descriptions>
-      <a-form layout="vertical" style="margin-top: 12px">
-        <a-form-item label="床位二维码" required>
-          <a-input v-model:value="executeForm.bedQrCode" autofocus placeholder="请扫码或输入床位二维码" />
-        </a-form-item>
-        <a-form-item label="执行备注">
-          <a-textarea v-model:value="executeForm.remark" :rows="3" :maxlength="255" show-count placeholder="常规完成可不填；异常情况请详细说明并另行上报" />
-        </a-form-item>
-      </a-form>
-    </a-modal>
+    <TaskExecuteDrawer v-model:open="executeOpen" :task="executeTarget" @done="search" />
 
     <a-modal :mask-closable="false" v-model:open="assignOpen" title="派发任务" @ok="submitAssign" :confirm-loading="assigning">
       <a-form layout="vertical" ref="assignFormRef" :model="assignForm" :rules="assignRules">
@@ -458,7 +443,6 @@ import {
   getTaskPage,
   getTaskSummary,
   getTaskExecuteLogs,
-  executeTask,
   assignTask,
   reviewTask,
   generateTasks,
@@ -480,6 +464,7 @@ import type {
 } from '../../types'
 import { exportCsv } from '../../utils/export'
 import { resolveCareError } from './careError'
+import TaskExecuteDrawer from './center/TaskExecuteDrawer.vue'
 import { careTodayLogExportColumns, careTodayTaskExportColumns, mapCareExportRows } from '../../constants/careExport'
 
 const route = useRoute()
@@ -497,9 +482,7 @@ const logResultFilter = ref<'ALL' | 'SUCCESS' | 'FAIL'>('ALL')
 const assignOpen = ref(false)
 const reviewOpen = ref(false)
 const executeOpen = ref(false)
-const executing = ref(false)
 const executeTarget = ref<CareTaskItem | null>(null)
-const executeForm = reactive({ bedQrCode: '', remark: '' })
 const assigning = ref(false)
 const reviewing = ref(false)
 const assignFormRef = ref()
@@ -964,39 +947,7 @@ async function loadExecuteLogs(taskDailyId?: number) {
 
 function openExecute(row: CareTaskItem) {
   executeTarget.value = row
-  executeForm.bedQrCode = ''
-  executeForm.remark = ''
   executeOpen.value = true
-}
-
-async function submitExecute() {
-  if (!executeTarget.value) return
-  if (!executeForm.bedQrCode.trim()) {
-    message.warning('请扫描或输入床位二维码')
-    return
-  }
-  const staffId = Number(userStore.staffInfo?.id)
-  if (!staffId) {
-    message.error('当前账号缺少员工档案，无法记录真实执行人')
-    return
-  }
-  if (executing.value) return
-  executing.value = true
-  try {
-    await executeTask({
-      taskDailyId: executeTarget.value.taskDailyId,
-      staffId,
-      bedQrCode: executeForm.bedQrCode.trim(),
-      remark: executeForm.remark.trim() || undefined
-    })
-    message.success('护理任务已记录完成')
-    executeOpen.value = false
-    await search()
-  } catch (error) {
-    message.error(resolveCareError(error, '任务执行失败'))
-  } finally {
-    executing.value = false
-  }
 }
 
 function openAssign(row: CareTaskItem) {

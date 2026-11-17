@@ -1,0 +1,105 @@
+-- 护理部升级（主库定义见 V289）；H2 测试库此前缺 shift_handover，一并补齐
+
+CREATE TABLE IF NOT EXISTS shift_handover (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL,
+  org_id BIGINT NOT NULL,
+  duty_date DATE NOT NULL,
+  shift_code VARCHAR(32) NOT NULL,
+  from_staff_id BIGINT DEFAULT NULL,
+  to_staff_id BIGINT DEFAULT NULL,
+  summary VARCHAR(1000) DEFAULT NULL,
+  risk_note VARCHAR(1000) DEFAULT NULL,
+  todo_note VARCHAR(1000) DEFAULT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'DRAFT',
+  handover_time DATETIME DEFAULT NULL,
+  confirm_time DATETIME DEFAULT NULL,
+  attachment_urls VARCHAR(2000) DEFAULT NULL,
+  created_by BIGINT DEFAULT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS care_incident (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL,
+  org_id BIGINT NOT NULL,
+  incident_no VARCHAR(32) NOT NULL,
+  elder_id BIGINT DEFAULT NULL,
+  elder_name VARCHAR(64) DEFAULT NULL,
+  location VARCHAR(128) DEFAULT NULL,
+  incident_type VARCHAR(32) NOT NULL,
+  severity VARCHAR(16) NOT NULL,
+  occurred_at DATETIME NOT NULL,
+  reporter_id BIGINT DEFAULT NULL,
+  reporter_name VARCHAR(64) DEFAULT NULL,
+  description TEXT DEFAULT NULL,
+  measures TEXT DEFAULT NULL,
+  notify_targets VARCHAR(255) DEFAULT NULL,
+  owner_id BIGINT DEFAULT NULL,
+  owner_name VARCHAR(64) DEFAULT NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'REPORTED',
+  escalate_to VARCHAR(32) DEFAULT NULL,
+  related_task_id BIGINT DEFAULT NULL,
+  reviewer_id BIGINT DEFAULT NULL,
+  reviewer_name VARCHAR(64) DEFAULT NULL,
+  review_note TEXT DEFAULT NULL,
+  closed_at DATETIME DEFAULT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_care_incident_no ON care_incident (tenant_id, incident_no);
+
+CREATE TABLE IF NOT EXISTS care_incident_action (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL,
+  incident_id BIGINT NOT NULL,
+  action VARCHAR(32) NOT NULL,
+  from_status VARCHAR(32) DEFAULT NULL,
+  to_status VARCHAR(32) DEFAULT NULL,
+  note TEXT DEFAULT NULL,
+  operator_id BIGINT DEFAULT NULL,
+  operator_name VARCHAR(64) DEFAULT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE service_plan ADD COLUMN IF NOT EXISTS revision INT NOT NULL DEFAULT 1;
+ALTER TABLE service_plan ADD COLUMN IF NOT EXISTS approval_status VARCHAR(16) NOT NULL DEFAULT 'PUBLISHED';
+ALTER TABLE service_plan ADD COLUMN IF NOT EXISTS approved_by BIGINT;
+ALTER TABLE service_plan ADD COLUMN IF NOT EXISTS approved_at DATETIME;
+
+CREATE TABLE IF NOT EXISTS service_plan_revision (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL,
+  plan_id BIGINT NOT NULL,
+  revision INT NOT NULL,
+  snapshot_json TEXT DEFAULT NULL,
+  change_reason VARCHAR(255) DEFAULT NULL,
+  changed_by BIGINT DEFAULT NULL,
+  changed_by_name VARCHAR(64) DEFAULT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS nursing_rectification (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL,
+  org_id BIGINT NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  source VARCHAR(64) DEFAULT NULL,
+  owner_id BIGINT DEFAULT NULL,
+  owner_name VARCHAR(64) DEFAULT NULL,
+  due_date DATE DEFAULT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'OPEN',
+  evidence TEXT DEFAULT NULL,
+  review_result TEXT DEFAULT NULL,
+  reviewer_id BIGINT DEFAULT NULL,
+  reviewer_name VARCHAR(64) DEFAULT NULL,
+  closed_at DATETIME DEFAULT NULL,
+  created_by BIGINT DEFAULT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0
+);

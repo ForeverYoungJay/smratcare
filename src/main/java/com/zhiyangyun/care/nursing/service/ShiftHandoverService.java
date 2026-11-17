@@ -11,5 +11,7 @@ public interface ShiftHandoverService {
   ShiftHandoverResponse get(Long id, Long tenantId);
   IPage<ShiftHandoverResponse> page(Long tenantId, long pageNo, long pageSize, LocalDate dateFrom,
       LocalDate dateTo, String shiftCode, String status);
+  /** 仅接班人本人可确认：状态不对抛 IllegalStateException，非接班人抛 AccessDeniedException。 */
+  ShiftHandoverResponse confirm(Long id, Long tenantId, Long staffId);
   void delete(Long id, Long tenantId);
 }

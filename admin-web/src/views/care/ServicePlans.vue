@@ -22,10 +22,19 @@
           <template v-if="column.key === 'status'">
             <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
           </template>
+          <template v-else-if="column.key === 'approval'">
+            <a-tag :color="APPROVAL[record.approvalStatus || 'PUBLISHED']?.color">{{ APPROVAL[record.approvalStatus || 'PUBLISHED']?.label || record.approvalStatus }}</a-tag>
+            <span class="plan-rev">v{{ record.revision || 1 }}</span>
+          </template>
           <template v-else-if="column.key === 'actions'">
             <div class="row-action-links">
               <a-button type="link" size="small" @click="openModal(record)">编辑</a-button>
-              <a-button type="link" size="small" danger @click="remove(record.id)">删除</a-button>
+              <template v-if="canApprove && record.approvalStatus === 'PENDING'">
+                <a-button type="link" size="small" @click="approve(record)">通过发布</a-button>
+                <a-button type="link" size="small" danger @click="openReject(record)">退回</a-button>
+              </template>
+              <a-button v-if="(record.revision || 1) > 1" type="link" size="small" @click="openRevisions(record)">历史版本</a-button>
+              <a-button v-if="record.approvalStatus && record.approvalStatus !== 'PUBLISHED' && (record.revision || 1) === 1" type="link" size="small" danger @click="remove(record.id)">删除</a-button>
             </div>
           </template>
         </template>
@@ -117,7 +126,22 @@
             </a-form-item>
           </a-col>
         </a-row>
+        <a-form-item v-if="editingPublished" label="变更原因" required extra="已发布的计划修改后保留旧版本，并重新提交审核">
+          <a-input v-model:value="form.changeReason" :maxlength="120" placeholder="例如：复评结果变化，增加夜间巡视" />
+        </a-form-item>
       </a-form>
+    </a-modal>
+
+    <a-modal v-model:open="rejectOpen" title="退回护理计划" :confirm-loading="submitting" @ok="submitReject">
+      <a-textarea v-model:value="rejectReason" :rows="3" :maxlength="200" placeholder="请写明退回原因" />
+    </a-modal>
+
+    <a-modal v-model:open="revisionsOpen" title="历史版本" :footer="null" width="720">
+      <a-table row-key="id" size="small" :pagination="false" :data-source="revisions" :columns="revisionColumns">
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'content'">{{ snapshotText(record.snapshotJson) }}</template>
+        </template>
+      </a-table>
     </a-modal>
   </PageContainer>
 </template>
@@ -131,9 +155,10 @@ import PageContainer from '../../components/PageContainer.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 import { listServiceItems } from '../../api/standard'
-import { createServicePlan, deleteServicePlan, getCareLevelList, getServicePlanPage, updateServicePlan } from '../../api/nursing'
+import { approveServicePlan, createServicePlan, deleteServicePlan, getCareLevelList, getServicePlanPage, getServicePlanRevisions, rejectServicePlan, updateServicePlan } from '../../api/nursing'
+import { useUserStore } from '../../stores/user'
 import { normalizeResidentId } from '../../utils/id'
-import type { CareLevelItem, Id, PageResult, ServiceItem, ServicePlanItem } from '../../types'
+import type { CareLevelItem, Id, PageResult, ServiceItem, ServicePlanItem, ServicePlanRevisionItem } from '../../types'
 import { resolveCareError } from './careError'
 
 const rows = ref<ServicePlanItem[]>([])
@@ -142,6 +167,71 @@ const loading = ref(false)
 const modalOpen = ref(false)
 const submitting = ref(false)
 const formRef = ref<FormInstance>()
+const userStore = useUserStore()
+const canApprove = computed(() => (userStore.roles || []).some((role) => ['NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'].includes(String(role || '').toUpperCase())))
+const APPROVAL: Record<string, { label: string; color: string }> = {
+  PENDING: { label: '待审核', color: 'orange' }, PUBLISHED: { label: '已发布', color: 'green' }, REJECTED: { label: '已退回', color: 'red' }
+}
+const editingPublished = computed(() => !!form.id && editingStatus.value === 'PUBLISHED')
+const editingStatus = ref<string>()
+const rejectOpen = ref(false)
+const rejectReason = ref('')
+const rejectTarget = ref<ServicePlanItem | null>(null)
+const revisionsOpen = ref(false)
+const revisions = ref<ServicePlanRevisionItem[]>([])
+const revisionColumns = [
+  { title: '版本', dataIndex: 'revision', width: 70 },
+  { title: '当时内容', key: 'content' },
+  { title: '变更原因', dataIndex: 'changeReason', width: 180 },
+  { title: '变更人', dataIndex: 'changedByName', width: 100 },
+  { title: '时间', dataIndex: 'createTime', width: 160 }
+]
+
+function snapshotText(json?: string) {
+  try {
+    const old = JSON.parse(json || '{}')
+    return [old.planName, old.cycleType, old.frequency ? `${old.frequency}次` : '', old.startDate && `${old.startDate}起`].filter(Boolean).join(' · ')
+  } catch {
+    return '-'
+  }
+}
+
+async function approve(record: ServicePlanItem) {
+  try {
+    await approveServicePlan(record.id)
+    message.success('计划已发布')
+    await load()
+  } catch (error) {
+    message.error(resolveCareError(error, '发布失败'))
+  }
+}
+
+function openReject(record: ServicePlanItem) {
+  rejectTarget.value = record
+  rejectReason.value = ''
+  rejectOpen.value = true
+}
+
+async function submitReject() {
+  if (!rejectTarget.value) return
+  if (!rejectReason.value.trim()) return message.warning('请写明退回原因')
+  submitting.value = true
+  try {
+    await rejectServicePlan(rejectTarget.value.id, rejectReason.value.trim())
+    rejectOpen.value = false
+    message.success('已退回')
+    await load()
+  } catch (error) {
+    message.error(resolveCareError(error, '退回失败'))
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function openRevisions(record: ServicePlanItem) {
+  revisions.value = await getServicePlanRevisions(record.id).catch(() => [])
+  revisionsOpen.value = true
+}
 
 const { elderOptions, searchElders, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
 const { staffOptions, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 120 })
@@ -192,7 +282,8 @@ const columns = [
   { title: '开始', dataIndex: 'startDate', key: 'startDate', width: 110 },
   { title: '结束', dataIndex: 'endDate', key: 'endDate', width: 110 },
   { title: '状态', key: 'status', width: 100 },
-  { title: '操作', key: 'actions', width: 140 }
+  { title: '审核', key: 'approval', width: 120 },
+  { title: '操作', key: 'actions', width: 220 }
 ]
 
 const pagination = computed(() => ({ current: query.pageNo, pageSize: query.pageSize, total: query.total, showSizeChanger: true }))
@@ -226,6 +317,8 @@ function resetForm() {
 
 function openModal(record?: ServicePlanItem) {
   resetForm()
+  form.changeReason = ''
+  editingStatus.value = record ? (record.approvalStatus || 'PUBLISHED') : undefined
   if (record) {
     Object.assign(form, record)
     ensureSelectedElder(record.elderId, record.elderName)
@@ -245,6 +338,10 @@ async function submit() {
   try {
     await formRef.value?.validate()
     if (submitting.value) return
+    if (editingPublished.value && !form.changeReason?.trim()) {
+      message.warning('修改已发布的计划请填写变更原因')
+      return
+    }
     submitting.value = true
     const payload: Partial<ServicePlanItem> = {
       planName: form.planName,
@@ -257,14 +354,16 @@ async function submit() {
       endDate: form.endDate,
       defaultStaffId: form.defaultStaffId,
       status: form.status,
-      remark: form.remark
+      remark: form.remark,
+      changeReason: form.changeReason?.trim() || undefined
     }
+
     if (form.id) {
       await updateServicePlan(form.id, payload)
     } else {
       await createServicePlan(payload)
     }
-    message.success('保存成功')
+    message.success('已保存，等待护士长审核发布')
     modalOpen.value = false
     await load()
   } catch (error) {
@@ -352,3 +451,7 @@ load()
 loadBaseOptions()
 </script>
 
+
+<style scoped>
+.plan-rev { margin-left: 4px; color: #8a968f; font-size: 12px; }
+</style>

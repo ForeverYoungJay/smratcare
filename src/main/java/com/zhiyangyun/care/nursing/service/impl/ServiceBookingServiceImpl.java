@@ -125,7 +125,10 @@ public class ServiceBookingServiceImpl implements ServiceBookingService {
         .eq(tenantId != null, ServicePlan::getTenantId, tenantId)
         .eq(ServicePlan::getStatus, "ACTIVE")
         .le(ServicePlan::getStartDate, date)
-        .and(w -> w.isNull(ServicePlan::getEndDate).or().ge(ServicePlan::getEndDate, date));
+        .and(w -> w.isNull(ServicePlan::getEndDate).or().ge(ServicePlan::getEndDate, date))
+        // shortcut: a revised plan (revision>1) awaiting re-approval keeps generating from its current (edited) fields
+        // instead of the last published snapshot; upgrade by generating from service_plan_revision.snapshot_json if that matters
+        .and(w -> w.eq(ServicePlan::getApprovalStatus, "PUBLISHED").or().gt(ServicePlan::getRevision, 1));
     var plans = servicePlanMapper.selectList(wrapper);
 
     int created = 0;

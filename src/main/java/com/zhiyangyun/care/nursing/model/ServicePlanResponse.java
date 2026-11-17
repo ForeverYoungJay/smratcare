@@ -1,6 +1,7 @@
 package com.zhiyangyun.care.nursing.model;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import lombok.Data;
 
@@ -25,4 +26,8 @@ public class ServicePlanResponse {
   private String defaultStaffName;
   private String status;
   private String remark;
+  private Integer revision;
+  private String approvalStatus;
+  private Long approvedBy;
+  private LocalDateTime approvedAt;
 }

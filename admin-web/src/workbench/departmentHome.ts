@@ -38,15 +38,15 @@ export const DEPARTMENT_HOME_CONFIG: Record<DepartmentCode, DepartmentHomeConfig
   NURSING: {
     department: 'NURSING',
     label: '护理部',
-    homePath: '/care/home',
+    homePath: '/care/workbench',
     moduleRoots: ['/care'],
     summary: '从计划、执行到交接质检，按当天工作顺序快速处理。',
     steps: [
-      { title: '计划与派发', path: '/care/workbench/plan' },
-      { title: '护理执行', path: '/care/today' },
-      { title: '护理记录', path: '/care/service/nursing-records' },
-      { title: '异常处理', path: '/care/exception' },
-      { title: '交接与质检', path: '/medical-care/handovers' }
+      { title: '当班总览', path: '/care/workbench' },
+      { title: '评估与计划', path: '/care/residents' },
+      { title: '护理执行与记录', path: '/care/tasks' },
+      { title: '交接与异常', path: '/care/safety' },
+      { title: '排班与质控', path: '/care/operations' }
     ],
     extraGroups: [
       {
