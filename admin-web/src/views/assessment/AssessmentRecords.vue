@@ -1,7 +1,7 @@
 <template>
   <PageContainer :title="title" :subTitle="subTitle">
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline" class="search-bar">
+      <QueryBar :model="query" layout="inline" class="search-bar" @finish="onSearch">
         <a-form-item :label="pageConfig.keywordLabel">
           <ElderNameAutocomplete
             v-if="useElderKeywordSelect"
@@ -46,13 +46,15 @@
         <a-form-item v-if="pageConfig.showDateFilter" :label="pageConfig.dateLabel">
           <a-range-picker v-model:value="query.dateRange" value-format="YYYY-MM-DD" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="onSearch">搜索</a-button>
-            <a-button @click="reset">清空</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="onSearch">搜索</a-button>
+              <a-button @click="reset">清空</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-alert
@@ -71,7 +73,7 @@
       </template>
     </a-alert>
 
-    <a-row v-if="!isAdmissionAssessment" :gutter="[12, 12]" style="margin-top: 16px">
+    <a-row class="business-stat-strip" v-if="!isAdmissionAssessment" :gutter="[12, 12]" style="margin-top: 16px">
       <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="总记录" :value="summary.totalCount || 0" /></a-card></a-col>
       <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="草稿" :value="summary.draftCount || 0" /></a-card></a-col>
       <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已完成" :value="summary.completedCount || 0" /></a-card></a-col>
@@ -158,11 +160,11 @@
           : '提示：上方合同表用于“新建入住评估”，下方记录表用于“批量处理/导出/查看历史”。'"
       />
       <div class="table-actions">
-        <a-space wrap size="small">
+        <ActionToolbar wrap size="small">
           <a-button v-if="pageConfig.showCreateButton && !isAdmissionAssessment" type="primary" @click="openForm()">
             {{ pageConfig.createButtonText }}
           </a-button>
-          
+
           <a-dropdown trigger="click">
             <a-button :disabled="selectedRowKeys.length === 0">批量处理</a-button>
             <template #overlay>
@@ -210,7 +212,7 @@
           <a-button :disabled="!selectedSingleRecord" @click="goSelectedInHospitalOverview">在院总览</a-button>
           <a-button :disabled="!selectedSingleRecord" @click="goSelectedContractsInvoices">合同票据</a-button>
           <a-button :disabled="!selectedSingleRecord" @click="goSelectedAdmissionProcessing">入住办理</a-button>
-        </a-space>
+        </ActionToolbar>
         <a-tag color="blue">
           已勾选 {{ selectedRowKeys.length }} 条{{ selectedByFilter ? '（含跨页筛选）' : '' }}
         </a-tag>
@@ -598,6 +600,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'

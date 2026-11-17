@@ -1,12 +1,18 @@
 <template>
   <PageContainer title="分摊规则" subTitle="按床位/房间/人数/天数/面积与公共费用规则管理">
     <a-card class="card-elevated" :bordered="false">
-      <a-space wrap>
-        <a-date-picker v-model:value="query.month" picker="month" style="width: 150px" />
-        <a-button type="primary" @click="loadData">查询</a-button>
-        <a-button :loading="initLoading" @click="initTemplate">初始化默认电费模板</a-button>
-        <a-button @click="go('/finance/allocation/public-cost?period=this_month')">分摊与公共费用</a-button>
-      </a-space>
+      <QueryBar :model="query" @finish="loadData">
+        <a-form-item label="月份">
+          <a-date-picker v-model:value="query.month" picker="month" style="width: 150px" />
+        </a-form-item>
+        <template #actions>
+          <ActionToolbar>
+            <a-button type="primary" html-type="submit">查询</a-button>
+            <a-button :loading="initLoading" @click="initTemplate">初始化默认电费模板</a-button>
+            <a-button @click="go('/finance/allocation/public-cost?period=this_month')">分摊与公共费用</a-button>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
@@ -27,6 +33,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import { useRouter } from 'vue-router'

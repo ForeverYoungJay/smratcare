@@ -1,5 +1,12 @@
 <template>
   <PageContainer title="数据报表统计" subTitle="消防安全管理数据总览、日报/月报与打印版" mode="showcase" kicker="机构保障">
+    <template #extra>
+      <a-space>
+        <a-button :loading="loading" @click="fetchAll">刷新统计</a-button>
+        <a-button type="primary" :loading="exporting" @click="openReportConfig('download')">下载报告</a-button>
+        <a-button @click="openReportConfig('print')">打印版</a-button>
+      </a-space>
+    </template>
     <template #meta>
       <span class="soft-pill">统计区间 {{ printRangeText }}</span>
       <span class="soft-pill">生成时间 {{ generatedAt }}</span>
@@ -19,24 +26,18 @@
             </a-select-option>
           </a-select>
         </a-form-item>
-        <template #extra>
-          <a-space>
-            <a-button :loading="loading" @click="fetchAll">刷新统计</a-button>
-            <a-button type="primary" :loading="exporting" @click="openReportConfig('download')">下载报告</a-button>
-            <a-button @click="openReportConfig('print')">打印版</a-button>
-          </a-space>
-        </template>
+
       </SearchForm>
 
       <StatefulBlock :loading="loading" :error="errorMessage" :empty="!detail.records.length" empty-text="暂无消防统计数据" @retry="fetchAll">
-        <a-row :gutter="16" style="margin-bottom: 16px">
+        <a-row class="business-stat-strip" :gutter="16" style="margin-bottom: 16px">
           <a-col :span="6"><a-card><a-statistic title="记录总数" :value="summary.totalCount" /></a-card></a-col>
           <a-col :span="6"><a-card><a-statistic title="未关闭项" :value="summary.openCount" /></a-card></a-col>
           <a-col :span="6"><a-card><a-statistic title="已关闭" :value="summary.closedCount" /></a-card></a-col>
           <a-col :span="6"><a-card><a-statistic title="逾期项" :value="summary.overdueCount" /></a-card></a-col>
         </a-row>
 
-        <a-row :gutter="16" style="margin-bottom: 16px">
+        <a-row class="business-stat-strip" :gutter="16" style="margin-bottom: 16px">
           <a-col :span="4"><a-card><a-statistic title="日巡完成" :value="summary.dailyCompletedCount" /></a-card></a-col>
           <a-col :span="4"><a-card><a-statistic title="月检完成" :value="summary.monthlyCompletedCount" /></a-card></a-col>
           <a-col :span="4"><a-card><a-statistic title="值班记录" :value="summary.dutyRecordCount" /></a-card></a-col>

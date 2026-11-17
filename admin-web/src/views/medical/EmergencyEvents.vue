@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="120急救事件" subTitle="一键急救、120呼叫登记、送医与转归全流程闭环，含抢救记录单">
+    <template #extra>
+      <a-button type="primary" danger @click="openCreate">一键急救</a-button>
+    </template>
     <SearchForm :model="query" @search="onSearch" @reset="onReset">
       <a-form-item label="长者">
         <a-select v-model:value="query.elderId" show-search allow-clear :filter-option="false" :options="elderOptions"
@@ -10,9 +13,7 @@
           <a-select-option v-for="s in statusOptions" :key="s.value" :value="s.value">{{ s.label }}</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" danger @click="openCreate">一键急救</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable

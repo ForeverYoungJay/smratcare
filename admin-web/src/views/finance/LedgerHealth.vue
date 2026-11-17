@@ -1,18 +1,26 @@
 <template>
   <PageContainer title="财务一致性巡检" subTitle="账单/收款/消费流水三方一致性检查">
     <a-card class="card-elevated" :bordered="false">
-      <a-space wrap>
-        <a-input-number v-model:value="query.limit" :min="10" :max="200" :step="10" style="width: 140px" />
-        <a-input v-model:value="query.printRemark" allow-clear placeholder="打印备注" style="width: 200px" />
-        <a-button type="primary" :loading="loading" @click="loadData">刷新巡检</a-button>
-        <a-button :loading="exporting" @click="exportCsvReport">导出CSV</a-button>
-        <a-button @click="printCurrent">打印当前</a-button>
-        <a-button @click="go('/finance/reconcile/center')">返回对账中心</a-button>
-      </a-space>
+      <QueryBar :model="query" @finish="loadData">
+        <a-form-item label="筛选条件">
+          <a-input-number v-model:value="query.limit" :min="10" :max="200" :step="10" style="width: 140px" />
+        </a-form-item>
+        <a-form-item label="打印备注">
+          <a-input v-model:value="query.printRemark" allow-clear placeholder="打印备注" style="width: 200px" />
+        </a-form-item>
+        <template #actions>
+          <ActionToolbar>
+            <a-button type="primary" :loading="loading" html-type="submit">刷新巡检</a-button>
+            <a-button :loading="exporting" @click="exportCsvReport">导出CSV</a-button>
+            <a-button @click="printCurrent">打印当前</a-button>
+            <a-button @click="go('/finance/reconcile/center')">返回对账中心</a-button>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <StatefulBlock style="margin-top: 16px;" :loading="loading" :error="errorMessage" @retry="loadData">
-      <a-row :gutter="[12, 12]" style="margin-bottom: 12px;">
+      <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 12px;">
         <a-col :xs="12" :lg="4"><a-card size="small"><a-statistic title="账单" :value="data?.billCount || 0" /></a-card></a-col>
         <a-col :xs="12" :lg="4"><a-card size="small"><a-statistic title="收款" :value="data?.paymentCount || 0" /></a-card></a-col>
         <a-col :xs="12" :lg="4"><a-card size="small"><a-statistic title="流水" :value="data?.consumptionCount || 0" /></a-card></a-col>
@@ -57,6 +65,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'

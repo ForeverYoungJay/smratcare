@@ -1,6 +1,6 @@
 <template>
-  <div class="page-container page-shell" :class="[`page-shell--${mode}`]">
-    <section v-if="mode !== 'content'" class="page-head" :class="{ 'page-head--showcase': mode === 'showcase', 'page-head--scenic': mode === 'scenic' }" :style="mode === 'scenic' ? { '--page-scenic-image': `url(${visualAssets.scenicMountain.url})` } : undefined">
+  <div class="page-container page-shell" :class="[`page-shell--${mode}`, { 'business-page': businessLayout }]">
+    <section v-if="!embedded && mode !== 'content'" class="page-head" :class="{ 'page-head--showcase': mode === 'showcase', 'page-head--scenic': mode === 'scenic' }" :style="mode === 'scenic' ? { '--page-scenic-image': `url(${visualAssets.scenicMountain.url})` } : undefined">
       <div class="page-head-accent"></div>
       <div class="page-head-glow" v-if="mode === 'showcase'"></div>
       <div class="page-head-main">
@@ -15,7 +15,7 @@
           <p class="page-subtitle" v-if="subTitle || subTitleAlias">{{ subTitle || subTitleAlias }}</p>
         </div>
         <div class="page-head-extra" v-if="$slots.extra">
-          <slot name="extra" />
+          <ActionToolbar v-if="businessLayout"><slot name="extra" /></ActionToolbar><slot v-else name="extra" />
         </div>
       </div>
       <div class="page-head-foot" v-if="$slots.meta || $slots.stats">
@@ -28,15 +28,22 @@
       </div>
     </section>
     <section class="page-body">
-      <div v-if="mode === 'content' && $slots.extra" class="page-content-actions"><slot name="extra" /></div>
+      <Teleport v-if="(embedded || mode === 'content') && $slots.extra" :to="workspaceActions || 'body'" :disabled="!embedded || !workspaceActions"><div class="page-content-actions"><ActionToolbar v-if="businessLayout"><slot name="extra" /></ActionToolbar><slot v-else name="extra" /></div></Teleport>
+      <div v-if="embedded && ($slots.meta || $slots.stats)" class="page-embedded-meta"><slot name="meta" /><slot name="stats" /></div>
       <slot />
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
+import { inject, provide, ref, type Ref } from 'vue'
+import ActionToolbar from './ActionToolbar.vue'
 import { visualAssets } from '../config/visualAssets'
 
+const embedded = inject('function-workspace-embedded', false)
+const businessLayout = inject('business-page-layout', embedded)
+const workspaceActions = inject<Ref<HTMLElement | null>>('workspace-actions', ref(null))
+provide('business-page-layout', businessLayout)
 const props = withDefaults(defineProps<{ title: string; subTitle?: string; subTitleAlias?: string; mode?: 'workspace' | 'showcase' | 'scenic' | 'content'; kicker?: string }>(), {
   mode: 'workspace'
 })
@@ -46,6 +53,7 @@ const kicker = props.kicker
 </script>
 
 <style scoped>
+.page-embedded-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .page-shell {
   gap: 18px;
 }

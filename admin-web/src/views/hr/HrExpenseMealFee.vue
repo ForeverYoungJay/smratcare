@@ -1,12 +1,22 @@
 <template>
   <PageContainer title="员工餐费" subTitle="后勤餐饮管理 / 员工月度餐费">
+    <template #extra>
+      <ActionToolbar wrap>
+        <a-button @click="openPlanDrawer()">维护用餐方案</a-button>
+        <a-button type="primary" :loading="generating" @click="generateMonthBill">生成本月餐费</a-button>
+        <a-button :loading="syncing" @click="syncFinance">同步财务</a-button>
+        <a-button @click="printCurrentView">一键打印</a-button>
+        <a-button @click="exportCurrentCsv">导出 CSV</a-button>
+        <a-button @click="exportCurrentExcel">导出 Excel</a-button>
+      </ActionToolbar>
+    </template>
     <div class="ops-shell">
-      <section class="hero-panel">
-        <div>
-          <p class="eyebrow">餐费结算台</p>
-          <h2>员工用餐方案、月度扣缴、财务同步放在一页处理</h2>
+      <section class="hero-panel business-overview">
+        <details class="business-help">
+          <summary>使用说明</summary>
+          <p class="business-help-title">员工用餐方案、月度扣缴、财务同步放在一页处理</p>
           <p class="hero-copy">按月份生成员工餐费账单，自动汇总早餐/中餐/晚餐方案，支持一键同步财务与打印台账。</p>
-        </div>
+        </details>
         <div class="hero-metrics">
           <div class="metric-card">
             <span>本月账单数</span>
@@ -36,16 +46,7 @@
         <a-form-item label="财务同步">
           <a-select v-model:value="query.financeSyncStatus" allow-clear style="width: 180px" :options="syncOptions" />
         </a-form-item>
-        <template #extra>
-          <a-space wrap>
-            <a-button @click="openPlanDrawer()">维护用餐方案</a-button>
-            <a-button type="primary" :loading="generating" @click="generateMonthBill">生成本月餐费</a-button>
-            <a-button :loading="syncing" @click="syncFinance">同步财务</a-button>
-            <a-button @click="printCurrentView">一键打印</a-button>
-            <a-button @click="exportCurrentCsv">导出 CSV</a-button>
-            <a-button @click="exportCurrentExcel">导出 Excel</a-button>
-          </a-space>
-        </template>
+
       </SearchForm>
 
       <DataTable
@@ -93,7 +94,7 @@
       </DataTable>
     </div>
 
-    <a-drawer v-model:open="planDrawerOpen" title="员工用餐与宿舍方案" width="620">
+    <a-drawer v-model:open="planDrawerOpen" title="员工用餐方案" width="620">
       <a-form :model="planForm" layout="vertical">
         <a-form-item label="员工" required>
           <a-select
@@ -138,33 +139,10 @@
 
         <a-divider />
 
-        <div class="dorm-head">
-          <span>宿舍联动</span>
-          <a-switch :checked="Number(planForm.liveInDormitory) === 1" @change="(checked) => (planForm.liveInDormitory = checked ? 1 : 0)" />
-        </div>
-
-        <a-row :gutter="12">
-          <a-col :span="12">
-            <a-form-item label="宿舍楼栋">
-              <a-input v-model:value="planForm.dormitoryBuilding" placeholder="如 A栋" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="宿舍房间">
-              <a-input v-model:value="planForm.dormitoryRoomNo" placeholder="如 3-201" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="床位号">
-              <a-input v-model:value="planForm.dormitoryBedNo" placeholder="如 B02" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="电表编号">
-              <a-input v-model:value="planForm.meterNo" placeholder="用于电费上传联动" />
-            </a-form-item>
-          </a-col>
-        </a-row>
+        <a-form-item label="宿舍信息">
+          <span>{{ [planForm.dormitoryBuilding, planForm.dormitoryRoomNo, planForm.dormitoryBedNo].filter(Boolean).join(' / ') || '未分配宿舍' }}</span>
+          <a-button type="link" @click="router.push('/hr/expense/dormitory')">到员工宿舍维护</a-button>
+        </a-form-item>
 
         <a-form-item label="备注">
           <a-textarea v-model:value="planForm.remark" :rows="3" placeholder="例如仅工作日用中餐，晚餐按排班补扣" />
@@ -181,7 +159,9 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
@@ -191,6 +171,7 @@ import { generateHrMealFee, getHrMealFeePage, getHrStaffServicePlan, syncHrMonth
 import type { HrStaffMonthlyFeeBillItem, HrStaffServicePlan, PageResult } from '../../types'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 
+const router = useRouter()
 const currentMonth = new Date().toISOString().slice(0, 7)
 
 const query = reactive({
@@ -380,7 +361,12 @@ async function submitPlan() {
   }
   savingPlan.value = true
   try {
-    await upsertHrStaffServicePlan({ ...planForm })
+    const current = await getHrStaffServicePlan(planForm.staffId)
+    await upsertHrStaffServicePlan({ ...planForm,
+      liveInDormitory: current?.liveInDormitory || 0,
+      dormitoryBuilding: current?.dormitoryBuilding, dormitoryRoomNo: current?.dormitoryRoomNo,
+      dormitoryBedNo: current?.dormitoryBedNo, meterNo: current?.meterNo
+    })
     message.success('用餐方案已保存')
     planDrawerOpen.value = false
     fetchData()

@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="行政人事部工作台" subTitle="用专业的人力资源管理，支撑更温暖、更高效的颐养服务。" mode="scenic">
     <a-card :bordered="false" class="card-elevated hr-primary-metrics" style="margin-bottom: 12px" title="今日人事重点">
-      <a-row :gutter="[12, 12]">
+      <a-row class="business-stat-strip" :gutter="[12, 12]">
         <a-col :xs="12" :md="6">
           <div class="stat-clickable" @click="goFirstAvailable(['/hr/profile/basic?status=1', '/hr/profile/social-security-reminders?scope=active'])">
             <a-statistic title="在职人数" :value="summary.onJobCount" />
@@ -26,7 +26,7 @@
     </a-card>
 
     <a-card :bordered="false" class="card-elevated hr-secondary-metrics" style="margin-bottom: 12px" title="人事提醒与关怀">
-      <a-row :gutter="[12, 12]">
+      <a-row class="business-stat-strip" :gutter="[12, 12]">
         <a-col :xs="12" :md="4">
           <div class="stat-clickable" @click="goFirstAvailable(['/hr/attendance/abnormal?date=today', '/workbench/attendance'])">
             <a-statistic title="考勤异常" :value="summary.attendanceAbnormalCount" />
@@ -77,7 +77,7 @@
     <a-row :gutter="12">
       <a-col v-for="section in visibleSections" :key="section.title" :xs="24" :xl="8" style="margin-bottom: 12px">
         <a-card :bordered="false" class="card-elevated" :title="section.title">
-          <a-space wrap>
+          <ActionToolbar wrap>
             <template v-for="action in section.actions" :key="action.path">
               <div class="action-entry">
                 <a-badge v-if="action.path === '/workbench/todo?keyword=生日提醒'" :count="summary.birthdayTodoCount || 0" :offset="[2, -2]">
@@ -92,7 +92,7 @@
                 </a-tooltip>
               </div>
             </template>
-          </a-space>
+          </ActionToolbar>
         </a-card>
       </a-col>
     </a-row>
@@ -126,6 +126,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from "../../components/ActionToolbar.vue"
 import { StarFilled, StarOutlined } from '@ant-design/icons-vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'

@@ -1,11 +1,16 @@
 <template>
   <section class="table-shell card-elevated">
-    <div class="table-shell-head" v-if="$slots.toolbar">
+    <div class="table-shell-head" v-if="$slots.toolbar || canCollapseColumns">
       <slot name="toolbar" />
+      <a-button v-if="canCollapseColumns" type="link" :aria-expanded="showAllColumns" @click="showAllColumns = !showAllColumns">{{ showAllColumns ? '只看常用信息' : '显示完整信息' }}</a-button>
+    </div>
+    <div v-if="selectionCount" class="business-selection" role="status">
+      <span>已选 {{ selectionCount }} 条</span>
+      <a-button v-if="rowSelection?.onChange" type="link" @click="rowSelection.onChange([], [])">取消选择</a-button>
     </div>
     <a-table
       class="data-table"
-      :columns="columns"
+      :columns="displayColumns"
       :data-source="dataSource"
       :row-key="rowKey"
       :row-class-name="mergedRowClassName"
@@ -36,7 +41,9 @@
 
 <script setup lang="ts">
 import type { TablePaginationConfig } from 'ant-design-vue'
-import { computed } from 'vue'
+import { computed, inject, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import { emphasizeColumns, compactWorkspaceColumns } from '../workspaces/columns'
 import { clearFilters, countActiveFilters } from '../utils/filterState'
 import TableEmpty from './TableEmpty.vue'
 
@@ -57,6 +64,14 @@ const props = defineProps<{
   /** 传入页面的查询表单对象后，空状态会区分「被筛掉了」和「本来就没有」 */
   filterModel?: Record<string, any> | null
 }>()
+
+const embedded = inject('function-workspace-embedded', false)
+const route = useRoute()
+const showAllColumns = ref(false)
+const selectionCount = computed(() => props.rowSelection?.selectedRowKeys?.length || 0)
+const compactColumns = computed(() => embedded ? compactWorkspaceColumns(props.columns, route?.path || '') : props.columns)
+const canCollapseColumns = computed(() => compactColumns.value.length < props.columns.length)
+const displayColumns = computed(() => emphasizeColumns(showAllColumns.value ? props.columns : compactColumns.value))
 
 /** 有筛选条件、且当前结果为空 —— 和「一条数据都还没建」是两件事 */
 const isFilteredEmpty = computed(
@@ -106,6 +121,7 @@ function onClearFilters() {
 </script>
 
 <style scoped>
+.business-selection { display:flex;align-items:center;gap:12px;padding:6px 12px;border-radius:6px;background:var(--primary-soft);color:var(--primary); }
 .table-shell {
   overflow: hidden;
 }

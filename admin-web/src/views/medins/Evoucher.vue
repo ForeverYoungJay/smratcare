@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="医保电子凭证" subTitle="长者医保电子凭证绑定登记与有效性校验（令牌仅存授权引用）">
+    <template #extra>
+      <a-button type="primary" @click="openBind">绑定登记</a-button>
+    </template>
     <SearchForm :model="query" @search="onSearch" @reset="onReset">
       <a-form-item label="长者">
         <a-select v-model:value="query.elderId" show-search allow-clear :filter-option="false" :options="elderOptions"
@@ -18,9 +21,7 @@
           <a-select-option value="FAILED">失败</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openBind">绑定登记</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable

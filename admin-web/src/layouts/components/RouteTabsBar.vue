@@ -75,7 +75,7 @@ function onEdit(targetKey: string | MouseEvent, action: 'add' | 'remove') {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 20px 4px;
+  padding: 3px 16px;
 }
 
 .route-tabs-bar__tabs {

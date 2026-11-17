@@ -35,7 +35,7 @@
         style="margin-bottom: 12px"
         :message="`协同提醒：余额预警 ${warningCount} 人，护理超时 ${medicalSummary.overdueCareTaskCount} 条，用药待执行 ${medicalSummary.todayMedicationPendingCount} 条。`"
       />
-      <a-row :gutter="16" style="margin-bottom: 16px">
+      <a-row class="business-stat-strip" :gutter="16" style="margin-bottom: 16px">
         <a-col :span="6"><a-card><a-statistic title="今日待执行医嘱" :value="medicalSummary.pendingMedicalOrderCount" /></a-card></a-col>
         <a-col :span="6"><a-card><a-statistic title="护理超时任务" :value="medicalSummary.overdueCareTaskCount" /></a-card></a-col>
         <a-col :span="6"><a-card><a-statistic title="余额预警人数" :value="warningCount" /></a-card></a-col>
@@ -44,11 +44,11 @@
 
       <a-card title="账户预警与医护协同" style="margin-bottom: 16px">
         <template #extra>
-          <a-space>
+          <ActionToolbar>
             <a-button @click="go('/finance/accounts/list')">老人账户</a-button>
             <a-button @click="go('/health/medication/medication-registration?date=today')">用药登记</a-button>
             <a-button type="primary" @click="go('/care/workbench/task-board?date=today')">护理任务看板</a-button>
-          </a-space>
+          </ActionToolbar>
         </template>
         <a-table :columns="warningColumns" :data-source="warningRows" :pagination="false" row-key="id" size="small">
           <template #bodyCell="{ column, record }">
@@ -67,6 +67,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'

@@ -1,5 +1,13 @@
 <template>
   <PageContainer title="智慧设备告警" subTitle="设备接入、事件上报、实时风险确认与处置闭环">
+    <template #extra>
+      <a-space>
+        <a-button @click="openDeviceModal()">新增设备</a-button>
+        <a-button @click="openEventModal()">上报事件</a-button>
+        <a-button :loading="refreshingDerived" @click="refreshDerivedAlerts">刷新趋势预警</a-button>
+        <a-button type="primary" :loading="loading" @click="fetchAll">刷新</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="alertQuery" @search="fetchAll" @reset="onReset">
       <a-form-item label="告警状态">
         <a-select v-model:value="alertQuery.status" allow-clear style="width: 150px">
@@ -18,18 +26,11 @@
       <a-form-item label="关键词">
         <a-input v-model:value="alertQuery.keyword" allow-clear placeholder="标题/位置/内容" style="width: 220px" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="openDeviceModal()">新增设备</a-button>
-          <a-button @click="openEventModal()">上报事件</a-button>
-          <a-button :loading="refreshingDerived" @click="refreshDerivedAlerts">刷新趋势预警</a-button>
-          <a-button type="primary" :loading="loading" @click="fetchAll">刷新</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <StatefulBlock :loading="loading" :error="errorMessage" @retry="fetchAll">
-      <a-row :gutter="[12, 12]" style="margin-bottom: 16px">
+      <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 16px">
         <a-col :xs="12" :lg="4"><a-card><a-statistic title="设备总数" :value="summary.totalDeviceCount" /></a-card></a-col>
         <a-col :xs="12" :lg="4"><a-card><a-statistic title="在线设备" :value="summary.onlineDeviceCount" /></a-card></a-col>
         <a-col :xs="12" :lg="4"><a-card><a-statistic title="离线设备" :value="summary.offlineDeviceCount" /></a-card></a-col>

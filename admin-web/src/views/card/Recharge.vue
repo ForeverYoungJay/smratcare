@@ -1,12 +1,13 @@
 <template>
   <PageContainer title="充值记录" subTitle="一卡通充值与流水">
+    <template #extra>
+      <a-button type="primary" @click="openRecharge">发起充值</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openRecharge">发起充值</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable

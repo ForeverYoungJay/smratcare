@@ -1,5 +1,14 @@
 <template>
   <PageContainer :title="title" :subTitle="subTitle">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新增{{ title }}</a-button>
+      <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
+      <a-button :disabled="!canSubmitSingle" @click="submitSelected">提交</a-button>
+      <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+      <a-button :disabled="selectedRowKeys.length === 0" @click="batchSubmit">批量提交</a-button>
+      <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+      <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="标题/概述/完成工作/风险/计划/总结人" allow-clear style="width: 280px" />
@@ -10,19 +19,11 @@
       <a-form-item label="日期范围">
         <a-range-picker v-model:value="dateRange" style="width: 260px" />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openCreate">新增{{ title }}</a-button>
-        <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
-        <a-button :disabled="!canSubmitSingle" @click="submitSelected">提交</a-button>
-        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" @click="batchSubmit">批量提交</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
-        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
-      </template>
+
     </SearchForm>
 
     <StatefulBlock :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
-      <a-row :gutter="[12, 12]" style="margin-bottom: 12px">
+      <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 12px">
         <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="总数" :value="summary.totalCount || 0" /></a-card></a-col>
         <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已提交" :value="summary.submittedCount || 0" /></a-card></a-col>
         <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="草稿" :value="summary.draftCount || 0" /></a-card></a-col>

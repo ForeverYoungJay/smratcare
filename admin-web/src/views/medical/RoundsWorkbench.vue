@@ -1,5 +1,11 @@
 <template>
   <PageContainer title="巡诊工作台" subTitle="医生巡诊排班与逐长者巡诊记录（可联动生成病程记录与医嘱）">
+    <template #extra>
+      <a-space>
+        <a-button type="primary" @click="openCreatePlan">新建巡诊排班</a-button>
+        <a-button @click="openCreateRecord()">登记巡诊记录</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="onSearch" @reset="onReset">
       <a-form-item label="日期">
         <a-range-picker v-model:value="query.dateRange" value-format="YYYY-MM-DD" style="width: 240px" />
@@ -9,12 +15,7 @@
           <a-select-option v-for="s in planStatusOptions" :key="s.value" :value="s.value">{{ s.label }}</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button type="primary" @click="openCreatePlan">新建巡诊排班</a-button>
-          <a-button @click="openCreateRecord()">登记巡诊记录</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable rowKey="id" :columns="planColumns" :data-source="plans" :loading="planLoading" :pagination="planPagination" @change="handlePlanTableChange">

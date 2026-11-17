@@ -23,13 +23,13 @@
           <a-tag color="purple">重点居民 Top{{ configuredQuery.topResidentLimit }}</a-tag>
           <a-tag color="geekblue">风险评估回溯 {{ configuredQuery.riskResidentLookbackDays }} 天</a-tag>
         </a-space>
-        <a-space wrap>
+        <ActionToolbar wrap>
           <a-tooltip title="口径最宽：事件统计近 45 天，超过 18 小时才算超时。报警最少，风险指数最低。"><a-button size="small" @click="applyPreset('stable')">稳健</a-button></a-tooltip>
           <a-tooltip title="默认口径：事件统计近 30 天，超过 12 小时算超时。"><a-button size="small" @click="applyPreset('balanced')">平衡</a-button></a-tooltip>
           <a-tooltip title="口径最严：事件统计近 14 天，超过 6 小时就算超时。同样的现场情况会算出更高的风险指数。"><a-button size="small" @click="applyPreset('sensitive')">敏感</a-button></a-tooltip>
           <a-button size="small" type="primary" @click="applyFilters">应用参数</a-button>
           <a-button size="small" @click="resetFilters">恢复默认</a-button>
-        </a-space>
+        </ActionToolbar>
       </div>
       <a-form layout="inline" class="filter-form" @submit.prevent>
         <a-form-item label="统计日期">
@@ -160,6 +160,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'

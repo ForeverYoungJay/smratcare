@@ -1,8 +1,9 @@
 <template>
-  <PageContainer title="行政人事部工作台" subTitle="用专业的人力资源管理，支撑更温暖、更高效的颐养服务。" mode="scenic">
+  <PageContainer title="人事工作台" subTitle="集中处理人员手续、考勤异常与合同社保提醒。">
     <DepartmentHomeOverview
       department="HR"
       :show-header="false"
+      :show-catalog="false"
       :metrics="metrics"
       :data-state="dataState"
       :data-message="errorMessage"
@@ -13,6 +14,7 @@
       show-refresh
       @refresh="load"
     />
+    <WorkQueuePanel :items="queue" />
   </PageContainer>
 </template>
 
@@ -21,6 +23,7 @@ import { computed, onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import DepartmentHomeOverview from '../../components/workbench/DepartmentHomeOverview.vue'
+import WorkQueuePanel from '../../components/workbench/WorkQueuePanel.vue'
 import { getHrWorkbenchSummary } from '../../api/hr'
 import type { HrWorkbenchSummary } from '../../types'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
@@ -49,6 +52,14 @@ const metrics = computed<DepartmentHomeMetric[]>(() => {
   ]
 })
 
+const queue = computed(() => [
+  { label: '办理入职', path: '/hr/profile/onboarding', hint: '建立档案、配置账号、维护合同并归档' },
+  { label: '核验考勤异常', path: '/hr/attendance/abnormal', value: summary.value?.attendanceAbnormalCount },
+  { label: '处理合同临期', path: '/hr/profile/contract-reminders', value: summary.value?.contractExpiringCount },
+  { label: '办理社保', path: '/hr/profile/social-security-reminders', hint: '查看到期与未办理事项' },
+  { label: '查看制度与文档', path: '/oa/document' },
+  { label: '查看我的考勤', path: '/workbench/attendance' }
+])
 async function load() {
   dataState.value = 'loading'
   errorMessage.value = ''

@@ -1,16 +1,17 @@
 <template>
   <PageContainer title="合同模板库" subTitle="员工档案中心 / 合同模板库">
+    <template #extra>
+      <ActionToolbar>
+        <a-button @click="onExportCsv">导出 CSV</a-button>
+        <a-button @click="onExportExcel">导出 Excel</a-button>
+        <a-button type="primary" @click="openDrawer">新增模板</a-button>
+      </ActionToolbar>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="模板名/上传人/备注" allow-clear />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="onExportCsv">导出 CSV</a-button>
-          <a-button @click="onExportExcel">导出 Excel</a-button>
-          <a-button type="primary" @click="openDrawer">新增模板</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable
@@ -64,6 +65,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'

@@ -105,7 +105,7 @@
         style="margin-bottom: 8px"
         :message="`最近回执：${lastBatchReceipt.action}｜开始 ${lastBatchReceipt.startAt}｜结束 ${lastBatchReceipt.finishAt}｜成功 ${lastBatchReceipt.success}/${lastBatchReceipt.total}｜失败 ${lastBatchReceipt.failed}`"
       />
-      <a-row v-if="batchFailures.length > 0" :gutter="12" style="margin-bottom: 8px">
+      <a-row class="business-stat-strip" v-if="batchFailures.length > 0" :gutter="12" style="margin-bottom: 8px">
         <a-col :span="8"><a-statistic title="失败总数" :value="batchFailures.length" /></a-col>
         <a-col :span="8"><a-statistic title="可重试失败" :value="retryableBatchFailures.length" /></a-col>
         <a-col :span="8"><a-statistic title="错误码种类" :value="batchFailureCodeSummary.length" /></a-col>

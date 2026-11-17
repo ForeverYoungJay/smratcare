@@ -1,14 +1,14 @@
 <template>
   <PageContainer title="员工移动端 / 小程序" subTitle="护理员、医生和后勤的一线手机操作闭环">
     <template #extra>
-      <a-space wrap>
+      <ActionToolbar wrap>
         <a-tag :color="levelMeta.color">{{ levelMeta.text }}</a-tag>
         <a-button :loading="loading" @click="loadData">刷新</a-button>
         <a-button @click="openHealthData()">体征补录</a-button>
         <a-button @click="go('/oa/staff-collaboration')">员工协同</a-button>
         <a-button @click="go('/stats/staff-mobile-ledger')">现场台账</a-button>
         <a-button @click="go('/stats/operations')">返回驾驶舱</a-button>
-      </a-space>
+      </ActionToolbar>
     </template>
 
     <a-alert
@@ -144,6 +144,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'

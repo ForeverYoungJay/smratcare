@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="活动管理" subTitle="院内活动安排与记录">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新增活动</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="日期范围">
         <a-range-picker v-model:value="query.range" />
@@ -10,9 +13,7 @@
       <a-form-item label="状态">
         <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 140px" />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openCreate">新增活动</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable

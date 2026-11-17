@@ -1,33 +1,35 @@
 <template>
   <PageContainer title="月结进度" subTitle="按月追踪账单、收款、票据、异常与催缴的关账状态">
     <div class="close-shell">
-      <a-card class="close-hero card-elevated" :bordered="false">
-        <div>
-          <div class="close-hero__eyebrow">月度结账</div>
-          <h2>财务月结不再靠口头确认，而是直接看到哪一步卡住。</h2>
+      <a-card class="close-hero card-elevated business-overview" :bordered="false">
+        <details class="business-help">
+          <summary>使用说明</summary>
+          <p class="business-help-title">财务月结不再靠口头确认，而是直接看到哪一步卡住。</p>
           <p>这页把本月账单、票据、异常修复和催缴收口状态压成一张进度图。</p>
-        </div>
-        <a-form layout="inline" :model="query" class="search-form">
+        </details>
+        <QueryBar layout="inline" :model="query" class="search-form" @finish="loadData">
           <a-form-item label="月份">
             <a-date-picker v-model:value="query.month" picker="month" style="width: 160px" />
           </a-form-item>
-          <a-form-item>
-            <a-space>
-              <a-button type="primary" @click="loadData">刷新摘要</a-button>
-              <a-button @click="exportData">导出月结单</a-button>
-              <a-button @click="printSummary">打印月结单</a-button>
-              <a-button type="primary" :disabled="summary?.locked" @click="openCloseModal">发起关账</a-button>
-              <a-button v-if="summary?.locked" @click="openCrossPeriodModal">跨期申请</a-button>
-              <a-button @click="go('/finance/reconcile/issue-center')">异常修复中心</a-button>
-              <a-button @click="go('/finance/bills/follow-up')">催缴跟进</a-button>
-              <a-button v-if="summary?.locked" danger @click="openUnlockModal">反锁账</a-button>
-            </a-space>
-          </a-form-item>
-        </a-form>
+          <template #actions>
+            <ActionToolbar>
+              <a-space>
+                <a-button type="primary" html-type="submit">刷新摘要</a-button>
+                <a-button @click="exportData">导出月结单</a-button>
+                <a-button @click="printSummary">打印月结单</a-button>
+                <a-button type="primary" :disabled="summary?.locked" @click="openCloseModal">发起关账</a-button>
+                <a-button v-if="summary?.locked" @click="openCrossPeriodModal">跨期申请</a-button>
+                <a-button @click="go('/finance/reconcile/issue-center')">异常修复中心</a-button>
+                <a-button @click="go('/finance/bills/follow-up')">催缴跟进</a-button>
+                <a-button v-if="summary?.locked" danger @click="openUnlockModal">反锁账</a-button>
+              </a-space>
+            </ActionToolbar>
+          </template>
+        </QueryBar>
       </a-card>
 
       <StatefulBlock style="margin-top: 16px;" :loading="loading" :error="errorMessage" @retry="loadData">
-        <a-row :gutter="[14, 14]">
+        <a-row class="business-stat-strip" :gutter="[14, 14]">
           <a-col :xs="24" :xl="8">
             <a-card class="progress-card card-elevated" :bordered="false">
               <div class="progress-card__header">
@@ -49,7 +51,7 @@
             </a-card>
           </a-col>
           <a-col :xs="24" :xl="16">
-            <a-row :gutter="[14, 14]">
+            <a-row class="business-stat-strip" :gutter="[14, 14]">
               <a-col :xs="24" :md="8"><a-card class="card-elevated summary-slab" :bordered="false"><a-statistic title="本月账单" :value="summary?.billCount || 0" /></a-card></a-col>
               <a-col :xs="24" :md="8"><a-card class="card-elevated summary-slab" :bordered="false"><a-statistic title="本月收款" :value="summary?.paymentCount || 0" /></a-card></a-col>
               <a-col :xs="24" :md="8"><a-card class="card-elevated summary-slab" :bordered="false"><a-statistic title="未结账单" :value="summary?.outstandingBillCount || 0" /></a-card></a-col>
@@ -154,6 +156,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

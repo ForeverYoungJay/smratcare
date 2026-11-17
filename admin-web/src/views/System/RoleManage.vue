@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="角色管理" subTitle="只维护角色名称、所属部门、上级领导角色和页面权限">
+    <template #extra>
+      <a-button type="primary" @click="openDrawer()">新增角色</a-button>
+    </template>
     <template #meta>
       <span class="soft-pill">角色总数 {{ pagination.total || rows.length }}</span>
       <span class="soft-pill">启用 {{ enabledRoleCount }}</span>
@@ -7,30 +10,6 @@
       <span v-for="tag in activeFilterTags" :key="tag" class="selection-pill">{{ tag }}</span>
     </template>
 
-    <template #stats>
-      <div class="metric-grid">
-        <div class="metric-card metric-card--primary">
-          <span class="metric-card__label">当前页角色</span>
-          <strong class="metric-card__value">{{ rows.length }}</strong>
-          <span class="metric-card__hint">用于快速核对组织分工</span>
-        </div>
-        <div class="metric-card metric-card--success">
-          <span class="metric-card__label">启用角色</span>
-          <strong class="metric-card__value">{{ enabledRoleCount }}</strong>
-          <span class="metric-card__hint">可参与当前权限与监管链</span>
-        </div>
-        <div class="metric-card metric-card--warning">
-          <span class="metric-card__label">停用角色</span>
-          <strong class="metric-card__value">{{ disabledRoleCount }}</strong>
-          <span class="metric-card__hint">建议确认是否仍需保留</span>
-        </div>
-        <div class="metric-card">
-          <span class="metric-card__label">编辑中权限</span>
-          <strong class="metric-card__value">{{ checkedPagePermissions.length }}</strong>
-          <span class="metric-card__hint">当前已勾选页面权限数</span>
-        </div>
-      </div>
-    </template>
 
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
@@ -56,9 +35,7 @@
           style="width: 140px"
         />
       </a-form-item>
-    <template #extra>
-        <a-button type="primary" @click="openDrawer()">新增角色</a-button>
-      </template>
+
     </SearchForm>
 
     <div class="status-chips" role="tablist" aria-label="按状态筛选">

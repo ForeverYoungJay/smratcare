@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="床位使用统计" subTitle="机构床位使用概况">
     <template #extra>
-      <a-space>
+      <ActionToolbar>
         <a-button type="primary" @click="loadData">刷新</a-button>
         <a-button @click="exportSummary">导出汇总</a-button>
         <a-dropdown>
@@ -15,7 +15,7 @@
             </a-menu>
           </template>
         </a-dropdown>
-      </a-space>
+      </ActionToolbar>
     </template>
     <a-card class="card-elevated" :bordered="false" style="margin-bottom: 16px;">
       <a-form layout="inline">
@@ -36,7 +36,7 @@
       </a-form>
     </a-card>
 
-    <a-row :gutter="16">
+    <a-row class="business-stat-strip" :gutter="16">
       <a-col :span="4">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic title="总床位" :value="stats.totalBeds || 0" />
@@ -111,6 +111,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'

@@ -1,5 +1,13 @@
 <template>
   <PageContainer title="社保到期/未办理明细" subTitle="按提醒日期跟进待办理、即将提醒和已参保员工">
+    <template #extra>
+      <ActionToolbar>
+        <a-button type="primary" :loading="generatingBills" @click="generateCurrentMonthBills()">生成本月社保记账</a-button>
+        <a-button @click="onExportCsv">导出 CSV</a-button>
+        <a-button @click="onExportExcel">导出 Excel</a-button>
+        <a-tag color="blue">当前范围：{{ scopeText(query.scope) }}</a-tag>
+      </ActionToolbar>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="姓名/工号/手机号" allow-clear style="width: 240px" />
@@ -10,14 +18,7 @@
       <a-form-item label="社保状态">
         <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 180px" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button type="primary" :loading="generatingBills" @click="generateCurrentMonthBills()">生成本月社保记账</a-button>
-          <a-button @click="onExportCsv">导出 CSV</a-button>
-          <a-button @click="onExportExcel">导出 Excel</a-button>
-          <a-tag color="blue">当前范围：{{ scopeText(query.scope) }}</a-tag>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable
@@ -130,6 +131,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message, Modal } from 'ant-design-vue'

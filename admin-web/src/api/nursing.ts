@@ -83,8 +83,8 @@ export function getCareLevelPage(params: any) {
   return fetchPage<CareLevelItem>('/api/nursing/care-levels/page', params)
 }
 
-export function getCareLevelList(params?: any) {
-  return request.get<CareLevelItem[]>('/api/nursing/care-levels/list', { params })
+export function getCareLevelList(params?: any, config?: Record<string, any>) {
+  return request.get<CareLevelItem[]>('/api/nursing/care-levels/list', { params, ...config })
 }
 
 export function createCareLevel(data: Partial<CareLevelItem>) {

@@ -1,15 +1,16 @@
 <template>
   <PageContainer title="剩余用药" subTitle="按老人和药品统计剩余数量与预警">
+    <template #extra>
+      <a-space>
+        <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
+        <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
-          <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable

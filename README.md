@@ -241,6 +241,7 @@ OpenAPI：
 - 家属旧接口下线计划：`docs/FAMILY_LEGACY_API_SUNSET_PLAN.md`
 - 家属支付/OSS 配置说明：`docs/FAMILY_PAYMENT_OSS_WECHAT_CONFIG.md`
 - 员工移动端补齐方案：`docs/STAFF_MOBILE_APP_PLAN.md`
+- 消防安全摄像头录像（私有存储、90天留存、网关接入）：`docs/LOGISTICS_VIDEO_MANAGEMENT.md`
 
 ## 备注
 - 上传文件默认映射目录：`output/uploads`（容器内 `/app/uploads`）

@@ -1,6 +1,13 @@
 <template>
   <PageContainer title="护理日志" subTitle="记录护理执行过程与质量">
-    <a-row :gutter="16" class="summary-row">
+    <template #extra>
+      <a-space>
+        <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
+        <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
+        <a-button type="primary" @click="openCreate">新增日志</a-button>
+      </a-space>
+    </template>
+    <a-row :gutter="16" class="summary-row business-stat-strip">
       <a-col :xs="24" :md="6"><a-card :bordered="false"><a-statistic title="日志总数" :value="summary.totalCount" /></a-card></a-col>
       <a-col :xs="24" :md="6"><a-card :bordered="false"><a-statistic title="待处理" :value="summary.pendingCount" /></a-card></a-col>
       <a-col :xs="24" :md="6"><a-card :bordered="false"><a-statistic title="已完成" :value="summary.doneCount" /></a-card></a-col>
@@ -17,12 +24,12 @@
       </a-space>
     </a-card>
     <a-card v-if="residentContext.active" :bordered="false" class="summary-row context-card">
-      <a-space wrap>
+      <ActionToolbar wrap>
         <a-tag color="processing">当前长者：{{ residentContext.name }}</a-tag>
         <a-button size="small" @click="goWithResident('/medical-care/inspection')">查看巡检</a-button>
         <a-button size="small" @click="goWithResident('/medical-care/medication-registration')">查看用药登记</a-button>
         <a-button size="small" @click="clearResidentContext">清除长者上下文</a-button>
-      </a-space>
+      </ActionToolbar>
     </a-card>
 
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
@@ -36,13 +43,7 @@
       <a-form-item label="时间">
         <a-range-picker v-model:value="query.logRange" show-time style="width: 320px" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
-          <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
-          <a-button type="primary" @click="openCreate">新增日志</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable
@@ -125,6 +126,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'

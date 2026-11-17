@@ -1,7 +1,7 @@
 <template>
   <div class="excel-report-panel">
     <a-card class="card-elevated" :bordered="false">
-      <a-form layout="inline" :model="query">
+      <QueryBar layout="inline" :model="query">
         <a-form-item label="账期">
           <a-date-picker v-model:value="query.month" picker="month" :allow-clear="false" style="width: 160px" />
         </a-form-item>
@@ -13,7 +13,7 @@
             <a-select-option value="CLOSED">已结清</a-select-option>
           </a-select>
         </a-form-item>
-      </a-form>
+      </QueryBar>
       <div class="form-tip">账期只作用于代养费登记表、电费月报与欠费催缴清单；押金台账按状态导出当前全量。</div>
     </a-card>
 
@@ -38,6 +38,7 @@
 </template>
 
 <script setup lang="ts">
+import QueryBar from '../../../components/QueryBar.vue'
 import { reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'

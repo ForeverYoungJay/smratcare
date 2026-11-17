@@ -1,16 +1,17 @@
 <template>
   <PageContainer title="药品字典" subTitle="维护药品基础信息">
+    <template #extra>
+      <a-space>
+        <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
+        <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
+        <a-button type="primary" @click="openCreate">新增药品</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="药品名称/编码/分类" allow-clear />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
-          <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
-          <a-button type="primary" @click="openCreate">新增药品</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable

@@ -1,5 +1,11 @@
 <template>
   <PageContainer title="护理任务" subTitle="任务执行与异常监控">
+    <template #extra>
+      <a-space>
+        <a-button @click="openGenerate">生成任务</a-button>
+        <a-button type="primary" @click="generateNow">一键生成今日</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="日期">
         <a-date-picker v-model:value="query.date" value-format="YYYY-MM-DD" />
@@ -14,12 +20,7 @@
       <a-form-item label="关键字">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="openGenerate">生成任务</a-button>
-          <a-button type="primary" @click="generateNow">一键生成今日</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable

@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="点餐" subTitle="创建老人点餐并在下单前执行风险预检">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新增点餐</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="日期范围">
         <a-range-picker v-model:value="query.range" />
@@ -13,9 +16,7 @@
       <a-form-item label="关键词">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openCreate">新增点餐</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable

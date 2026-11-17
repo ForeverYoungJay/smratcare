@@ -1,33 +1,42 @@
 <template>
-  <PageContainer title="审批中心" subTitle="请假/加班/报销/采购/收入证明/物资申请/用章审批/营销方案审批" mode="content">
-    <ScenicHeader
-      eyebrow="统一审批中心"
-      title="今天需要你决策的事项"
-      description="审批来源、超时风险和处理进度集中呈现，选中记录后可继续批量处理。"
-    >
-      <div class="approval-overview-grid">
-        <div class="overview-card">
-          <span>审批总单</span>
-          <strong>{{ summary.totalCount || 0 }}</strong>
-          <small>覆盖当前筛选口径与工作视角</small>
-        </div>
-        <div class="overview-card">
-          <span>待审批</span>
-          <strong>{{ summary.pendingCount || 0 }}</strong>
-          <small>优先处理待我审批与超时任务</small>
-        </div>
-        <div class="overview-card">
-          <span>超时待审</span>
-          <strong>{{ summary.timeoutPendingCount || 0 }}</strong>
-          <small>需要尽快推进，避免流程积压</small>
-        </div>
-        <div class="overview-card">
-          <span>批量可处理</span>
-          <strong>{{ canApproveFlow ? selectedPendingCount : selectedCount }}</strong>
-          <small>{{ canApproveFlow ? '已选待审批记录可直接批量处理' : '当前账号以我的申请与跟进为主' }}</small>
-        </div>
+  <PageContainer title="审批中心" subTitle="请假/加班/报销/采购/收入证明/物资申请/用章审批/营销方案审批">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新增审批</a-button>
+      <a-button @click="downloadExport">导出CSV</a-button>
+      <a-button :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="editSelected">编辑</a-button>
+      <a-button v-if="canApproveFlow" :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="approveSelected">同意</a-button>
+      <a-button v-if="canApproveFlow" :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="rejectSelected">驳回</a-button>
+      <a-button :disabled="!selectedSingleRecord || !isSelectedSingleRejected" @click="resubmitSelected">驳回后重提</a-button>
+      <a-button :disabled="!selectedSingleRecord" @click="openSelectedTimeline">查看时间线</a-button>
+      <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+      <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchApprove">批量同意</a-button>
+      <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchReject">批量驳回</a-button>
+      <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchUrge">批量催办</a-button>
+      <a-button :disabled="selectedCount === 0" danger @click="batchRemove">批量删除</a-button>
+    </template>
+    <div class="approval-overview-grid">
+      <div class="overview-card">
+        <span>审批总单</span>
+        <strong>{{ summary.totalCount || 0 }}</strong>
+        <small>覆盖当前筛选口径与工作视角</small>
       </div>
-    </ScenicHeader>
+      <div class="overview-card">
+        <span>待审批</span>
+        <strong>{{ summary.pendingCount || 0 }}</strong>
+        <small>优先处理待我审批与超时任务</small>
+      </div>
+      <div class="overview-card">
+        <span>超时待审</span>
+        <strong>{{ summary.timeoutPendingCount || 0 }}</strong>
+        <small>需要尽快推进，避免流程积压</small>
+      </div>
+      <div class="overview-card">
+        <span>批量可处理</span>
+        <strong>{{ canApproveFlow ? selectedPendingCount : selectedCount }}</strong>
+        <small>{{ canApproveFlow ? '已选待审批记录可直接批量处理' : '当前账号以我的申请与跟进为主' }}</small>
+      </div>
+    </div>
+
 
     <SearchForm class="approval-filters" :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
@@ -65,55 +74,10 @@
           <a-checkbox v-model:checked="query.overdueOnly">仅看超时</a-checkbox>
         </a-space>
       </a-form-item>
-      <template #extra>
-        <div class="approval-commandbar">
-          <div class="command-group">
-            <span class="action-group-title">快捷操作</span>
-            <a-space wrap>
-              <a-button type="primary" @click="openCreate">新增审批</a-button>
-              <a-button @click="downloadExport">导出CSV</a-button>
-            </a-space>
-          </div>
-          <div class="command-group">
-            <span class="action-group-title">单条处理</span>
-            <a-space wrap>
-              <a-button :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="editSelected">编辑</a-button>
-              <a-button v-if="canApproveFlow" :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="approveSelected">同意</a-button>
-              <a-button v-if="canApproveFlow" :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="rejectSelected">驳回</a-button>
-              <a-button :disabled="!selectedSingleRecord || !isSelectedSingleRejected" @click="resubmitSelected">驳回后重提</a-button>
-              <a-button :disabled="!selectedSingleRecord" @click="openSelectedTimeline">查看时间线</a-button>
-              <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
-            </a-space>
-          </div>
-          <div class="command-group">
-            <span class="action-group-title">批量处理</span>
-            <a-space wrap>
-              <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchApprove">批量同意</a-button>
-              <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchReject">批量驳回</a-button>
-              <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchUrge">批量催办</a-button>
-              <a-button :disabled="selectedCount === 0" danger @click="batchRemove">批量删除</a-button>
-            </a-space>
-            <div class="command-group-meta">
-              <a-tag color="blue">已勾选 {{ selectedCount }} 条</a-tag>
-              <span class="selection-tip">{{ canApproveFlow ? '批量审批仅对待审批生效' : '当前账号仅可发起和编辑本人申请' }}</span>
-            </div>
-          </div>
-        </div>
-      </template>
+
     </SearchForm>
 
-    <section class="surface-toolbar approval-toolbar">
-      <div class="surface-toolbar-title">
-        <strong>审批工作台</strong>
-        <span>当前视角为 {{ approvalScopeLabel }}，优先处理超时待审、催办单和需要你立即决策的事项。</span>
-      </div>
-      <a-space wrap>
-        <a-tag color="processing">视角 {{ approvalScopeLabel }}</a-tag>
-        <a-tag color="gold">已催办 {{ urgedRecordCount }}</a-tag>
-        <a-tag color="volcano">在途超时 {{ overduePendingCount }}</a-tag>
-        <span class="selection-pill">已勾选 {{ selectedCount }} 条</span>
-      </a-space>
-    </section>
+
 
     <a-alert
       v-if="lifecycleContext.active"
@@ -140,63 +104,66 @@
           {{ item.label }}
         </a-tag>
       </a-space>
-      <a-row :gutter="[12, 12]" style="margin-bottom: 12px">
-        <a-col :xs="12" :lg="3">
-          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'total' }" :bordered="false" size="small" @click="applySummaryFilter('total')">
-            <a-statistic title="总单数" :value="summary.totalCount || 0" />
-          </a-card>
-        </a-col>
-        <a-col :xs="12" :lg="3">
-          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'pending' }" :bordered="false" size="small" @click="applySummaryFilter('pending')">
-            <a-statistic title="待审批" :value="summary.pendingCount || 0" />
-          </a-card>
-        </a-col>
-        <a-col :xs="12" :lg="3">
-          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'approved' }" :bordered="false" size="small" @click="applySummaryFilter('approved')">
-            <a-statistic title="已通过" :value="summary.approvedCount || 0" />
-          </a-card>
-        </a-col>
-        <a-col :xs="12" :lg="3">
-          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'rejected' }" :bordered="false" size="small" @click="applySummaryFilter('rejected')">
-            <a-statistic title="已驳回" :value="summary.rejectedCount || 0" />
-          </a-card>
-        </a-col>
-        <a-col :xs="12" :lg="3">
-          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'timeoutPending' }" :bordered="false" size="small" @click="applySummaryFilter('timeoutPending')">
-            <a-statistic title="超时待审" :value="summary.timeoutPendingCount || 0" />
-          </a-card>
-        </a-col>
-        <a-col :xs="12" :lg="3">
-          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'leavePending' }" :bordered="false" size="small" @click="applySummaryFilter('leavePending')">
-            <a-statistic title="请假待审" :value="summary.leavePendingCount || 0" />
-          </a-card>
-        </a-col>
-        <a-col :xs="12" :lg="3">
-          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'reimbursePending' }" :bordered="false" size="small" @click="applySummaryFilter('reimbursePending')">
-            <a-statistic title="报销待审" :value="summary.reimbursePendingCount || 0" />
-          </a-card>
-        </a-col>
-        <a-col :xs="12" :lg="3">
-          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'purchasePending' }" :bordered="false" size="small" @click="applySummaryFilter('purchasePending')">
-            <a-statistic title="采购待审" :value="summary.purchasePendingCount || 0" />
-          </a-card>
-        </a-col>
-        <a-col :xs="12" :lg="3">
-          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'marketingPlanPending' }" :bordered="false" size="small" @click="applySummaryFilter('marketingPlanPending')">
-            <a-statistic title="营销待审" :value="summary.marketingPlanPendingCount || 0" />
-          </a-card>
-        </a-col>
-        <a-col :xs="12" :lg="3">
-          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'urged' }" :bordered="false" size="small" @click="applySummaryFilter('urged')">
-            <a-statistic title="已催办" :value="urgedRecordCount" />
-          </a-card>
-        </a-col>
-        <a-col :xs="12" :lg="3">
-          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'overdue' }" :bordered="false" size="small" @click="applySummaryFilter('overdue')">
-            <a-statistic title="在途超时" :value="overduePendingCount" />
-          </a-card>
-        </a-col>
-      </a-row>
+      <details class="business-help">
+        <summary>查看详细统计与分类筛选</summary>
+        <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 12px">
+          <a-col :xs="12" :lg="3">
+            <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'total' }" :bordered="false" size="small" @click="applySummaryFilter('total')">
+              <a-statistic title="总单数" :value="summary.totalCount || 0" />
+            </a-card>
+          </a-col>
+          <a-col :xs="12" :lg="3">
+            <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'pending' }" :bordered="false" size="small" @click="applySummaryFilter('pending')">
+              <a-statistic title="待审批" :value="summary.pendingCount || 0" />
+            </a-card>
+          </a-col>
+          <a-col :xs="12" :lg="3">
+            <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'approved' }" :bordered="false" size="small" @click="applySummaryFilter('approved')">
+              <a-statistic title="已通过" :value="summary.approvedCount || 0" />
+            </a-card>
+          </a-col>
+          <a-col :xs="12" :lg="3">
+            <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'rejected' }" :bordered="false" size="small" @click="applySummaryFilter('rejected')">
+              <a-statistic title="已驳回" :value="summary.rejectedCount || 0" />
+            </a-card>
+          </a-col>
+          <a-col :xs="12" :lg="3">
+            <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'timeoutPending' }" :bordered="false" size="small" @click="applySummaryFilter('timeoutPending')">
+              <a-statistic title="超时待审" :value="summary.timeoutPendingCount || 0" />
+            </a-card>
+          </a-col>
+          <a-col :xs="12" :lg="3">
+            <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'leavePending' }" :bordered="false" size="small" @click="applySummaryFilter('leavePending')">
+              <a-statistic title="请假待审" :value="summary.leavePendingCount || 0" />
+            </a-card>
+          </a-col>
+          <a-col :xs="12" :lg="3">
+            <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'reimbursePending' }" :bordered="false" size="small" @click="applySummaryFilter('reimbursePending')">
+              <a-statistic title="报销待审" :value="summary.reimbursePendingCount || 0" />
+            </a-card>
+          </a-col>
+          <a-col :xs="12" :lg="3">
+            <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'purchasePending' }" :bordered="false" size="small" @click="applySummaryFilter('purchasePending')">
+              <a-statistic title="采购待审" :value="summary.purchasePendingCount || 0" />
+            </a-card>
+          </a-col>
+          <a-col :xs="12" :lg="3">
+            <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'marketingPlanPending' }" :bordered="false" size="small" @click="applySummaryFilter('marketingPlanPending')">
+              <a-statistic title="营销待审" :value="summary.marketingPlanPendingCount || 0" />
+            </a-card>
+          </a-col>
+          <a-col :xs="12" :lg="3">
+            <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'urged' }" :bordered="false" size="small" @click="applySummaryFilter('urged')">
+              <a-statistic title="已催办" :value="urgedRecordCount" />
+            </a-card>
+          </a-col>
+          <a-col :xs="12" :lg="3">
+            <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'overdue' }" :bordered="false" size="small" @click="applySummaryFilter('overdue')">
+              <a-statistic title="在途超时" :value="overduePendingCount" />
+            </a-card>
+          </a-col>
+        </a-row>
+      </details>
       <a-alert
         v-if="(summary.timeoutPendingCount || 0) > 0"
         type="warning"
@@ -606,7 +573,6 @@ import dayjs from 'dayjs'
 import { useRoute } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import ScenicHeader from '../../components/smartcare/ScenicHeader.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
@@ -2169,10 +2135,6 @@ useLiveSyncRefresh({
 
 <style scoped>
 .approval-master-detail { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr); align-items: start; gap: 12px; }
-.approval-master-detail { order: 1; }
-.approval-filters { order: 2; }
-.approval-toolbar { order: 3; }
-.approval-summary-block { order: 4; }
 .approval-master-detail > * { min-width: 0; }
 .approval-list-tabs { display: flex; gap: 5px; margin: 13px 0 8px; overflow-x: auto; }
 .approval-list-tabs button { flex: 0 0 auto; padding: 7px 10px; border: 0; border-radius: 7px; background: #f3f5f3; color: #66736a; cursor: pointer; }

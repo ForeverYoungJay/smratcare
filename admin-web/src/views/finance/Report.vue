@@ -16,20 +16,22 @@
           </button>
         </div>
         <div class="report-nav__controls">
-          <a-form layout="inline" :model="query" class="search-form">
+          <QueryBar layout="inline" :model="query" class="search-form" @finish="loadCharts">
             <a-form-item label="起始月份">
               <a-date-picker v-model:value="query.from" picker="month" style="width: 160px" />
             </a-form-item>
             <a-form-item label="结束月份">
               <a-date-picker v-model:value="query.to" picker="month" style="width: 160px" />
             </a-form-item>
-            <a-form-item>
-              <a-space>
-                <a-button type="primary" @click="loadCharts">刷新</a-button>
-                <a-button @click="reset">重置</a-button>
-              </a-space>
-            </a-form-item>
-          </a-form>
+            <template #actions>
+              <ActionToolbar>
+                <a-space>
+                  <a-button type="primary" html-type="submit">刷新</a-button>
+                  <a-button @click="reset">重置</a-button>
+                </a-space>
+              </ActionToolbar>
+            </template>
+          </QueryBar>
           <div class="range-strip">
             <button
               v-for="preset in rangePresets"
@@ -205,16 +207,16 @@
               <div class="stage-kicker">分类分析</div>
               <h3>类目消费比例与盈利分析</h3>
             </div>
-            <a-space wrap>
+            <ActionToolbar wrap>
               <a-button type="primary" @click="loadCategoryAnalysis">查询</a-button>
               <a-button @click="queryAllCategories">查看全部类目</a-button>
               <a-button @click="exportCategoryProfit">导出盈利报表</a-button>
               <a-button @click="exportCategoryTrend">导出趋势</a-button>
               <a-button @click="printCategoryAnalysis">打印</a-button>
-            </a-space>
+            </ActionToolbar>
           </div>
 
-          <a-form layout="inline" :model="categoryQuery" class="search-form">
+          <QueryBar layout="inline" :model="categoryQuery" class="search-form">
             <a-form-item label="开始日期">
               <a-date-picker v-model:value="categoryQuery.from" />
             </a-form-item>
@@ -230,7 +232,7 @@
             <a-form-item label="楼层">
               <a-input v-model:value="categoryQuery.floorNo" allow-clear placeholder="例如：2F" style="width: 120px" />
             </a-form-item>
-          </a-form>
+          </QueryBar>
 
           <div class="category-metrics">
             <div class="category-metric">
@@ -291,6 +293,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

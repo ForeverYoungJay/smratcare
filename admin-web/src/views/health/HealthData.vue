@@ -1,6 +1,16 @@
 <template>
   <PageContainer title="健康数据" subTitle="采集血压、血糖、体温等数据">
-    <a-row :gutter="16" class="summary-row">
+    <template #extra>
+      <a-space>
+        <a-button @click="applyQuickFilter('staff-mobile')">员工补录</a-button>
+        <a-button @click="applyQuickFilter('staff-mobile-abnormal-today')">今日异常体征</a-button>
+        <a-button @click="applyQuickFilter('today')">今日记录</a-button>
+        <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
+        <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
+        <a-button type="primary" @click="openCreate">新增数据</a-button>
+      </a-space>
+    </template>
+    <a-row :gutter="16" class="summary-row business-stat-strip">
       <a-col :xs="24" :md="6">
         <a-card :bordered="false">
           <a-statistic title="记录总数" :value="summary.totalCount" />
@@ -46,16 +56,7 @@
       <a-form-item label="时间">
         <a-range-picker v-model:value="query.measuredRange" show-time style="width: 320px" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="applyQuickFilter('staff-mobile')">员工补录</a-button>
-          <a-button @click="applyQuickFilter('staff-mobile-abnormal-today')">今日异常体征</a-button>
-          <a-button @click="applyQuickFilter('today')">今日记录</a-button>
-          <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
-          <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
-          <a-button type="primary" @click="openCreate">新增数据</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable

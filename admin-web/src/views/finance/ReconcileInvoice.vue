@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="发票对账" subTitle="收款、账单与发票关联核验（实时口径）">
     <a-card class="card-elevated" :bordered="false">
-      <a-form layout="inline" :model="query">
+      <QueryBar layout="inline" :model="query" @finish="fetchData">
         <a-form-item label="日期">
           <a-date-picker v-model:value="query.date" style="width: 160px" />
         </a-form-item>
@@ -25,20 +25,22 @@
         <a-form-item label="长者">
           <ElderNameAutocomplete v-model:value="query.keyword" allow-clear placeholder="姓名(编号)" width="220px" @select="() => { query.pageNo = 1; fetchData() }" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="fetchData">查询</a-button>
-            <a-button @click="reset">重置</a-button>
-            <a-button @click="exportCsvReport">导出CSV</a-button>
-            <a-button @click="printCurrent">打印当前</a-button>
-            <a-button @click="go('/finance/reconcile/center')">返回对账中心</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">查询</a-button>
+              <a-button @click="reset">重置</a-button>
+              <a-button @click="exportCsvReport">导出CSV</a-button>
+              <a-button @click="printCurrent">打印当前</a-button>
+              <a-button @click="go('/finance/reconcile/center')">返回对账中心</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <StatefulBlock style="margin-top: 16px;" :loading="loading" :error="errorMessage" @retry="fetchData">
-      <a-row :gutter="[12, 12]" style="margin-bottom: 12px;">
+      <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 12px;">
         <a-col :xs="12" :lg="6"><a-card size="small"><a-statistic title="总收款笔数" :value="summary.totalCount" /></a-card></a-col>
         <a-col :xs="12" :lg="6"><a-card size="small"><a-statistic title="已关联发票" :value="summary.linkedCount" /></a-card></a-col>
         <a-col :xs="12" :lg="6"><a-card size="small"><a-statistic title="未关联发票" :value="summary.unlinkedCount" /></a-card></a-col>
@@ -94,6 +96,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

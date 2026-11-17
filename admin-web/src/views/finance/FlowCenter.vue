@@ -1,7 +1,7 @@
 <template>
   <PageContainer :title="props.moduleName" :subTitle="props.description || '业务动作自动入账，实时查看金额与异常'">
     <a-card class="card-elevated" :bordered="false">
-      <a-form layout="inline" :model="query">
+      <QueryBar layout="inline" :model="query" @finish="loadData">
         <a-form-item label="日期范围">
           <a-range-picker v-model:value="query.range" style="width: 260px" />
         </a-form-item>
@@ -11,20 +11,22 @@
         <a-form-item label="打印备注">
           <a-input v-model:value="query.printRemark" allow-clear style="width: 180px" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" :loading="loading" @click="loadData">查询</a-button>
-            <a-button @click="reset">重置</a-button>
-            <a-button @click="exportCurrent">导出CSV</a-button>
-            <a-button @click="printCurrent">打印当前</a-button>
-            <a-button v-for="item in props.links" :key="item.to" @click="go(item.to)">{{ item.label }}</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" :loading="loading" html-type="submit">查询</a-button>
+              <a-button @click="reset">重置</a-button>
+              <a-button @click="exportCurrent">导出CSV</a-button>
+              <a-button @click="printCurrent">打印当前</a-button>
+              <a-button v-for="item in props.links" :key="item.to" @click="go(item.to)">{{ item.label }}</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <StatefulBlock style="margin-top: 16px;" :loading="loading" :error="errorMessage" @retry="loadData">
-      <a-row :gutter="[12, 12]" style="margin-bottom: 12px;">
+      <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 12px;">
         <a-col :xs="12" :lg="6"><a-card size="small"><a-statistic title="今日金额" :value="summary.todayAmount || 0" :precision="2" suffix="元" /></a-card></a-col>
         <a-col :xs="12" :lg="6"><a-card size="small"><a-statistic title="本月金额" :value="summary.monthAmount || 0" :precision="2" suffix="元" /></a-card></a-col>
         <a-col :xs="12" :lg="6"><a-card size="small"><a-statistic title="待处理" :value="summary.pendingCount || 0" /></a-card></a-col>
@@ -70,6 +72,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, ref, withDefaults } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'

@@ -1,5 +1,13 @@
 <template>
   <PageContainer :title="title" :subTitle="subTitle">
+    <template #extra>
+      <a-space>
+        <a-button v-if="props.recordType === 'MAINTENANCE_REPORT'" @click="downloadMaintenanceLog">一键下载维护保养日志</a-button>
+        <a-button v-if="canPrintSelected" :disabled="!selectedRows.length" @click="printSelectedRows">打印勾选记录</a-button>
+        <a-button v-if="viewConfig.supportsQr" @click="openScan">扫码完成</a-button>
+        <a-button type="primary" @click="openCreate">新增记录</a-button>
+      </a-space>
+    </template>
     <template #meta>
       <a-space wrap size="small">
         <span class="soft-pill">记录类型：{{ recordTypeLabel }}</span>
@@ -22,17 +30,10 @@
       <a-form-item label="检查时间">
         <a-range-picker v-model:value="query.checkTimeRange" value-format="YYYY-MM-DDTHH:mm:ss" show-time />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button v-if="props.recordType === 'MAINTENANCE_REPORT'" @click="downloadMaintenanceLog">一键下载维护保养日志</a-button>
-          <a-button v-if="canPrintSelected" :disabled="!selectedRows.length" @click="printSelectedRows">打印勾选记录</a-button>
-          <a-button v-if="viewConfig.supportsQr" @click="openScan">扫码完成</a-button>
-          <a-button type="primary" @click="openCreate">新增记录</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
-    <a-row :gutter="[12, 12]">
+    <a-row class="business-stat-strip" :gutter="[12, 12]">
       <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="记录总数" :value="summary.totalCount || 0" /></a-card></a-col>
       <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="未关闭项" :value="summary.openCount || 0" /></a-card></a-col>
       <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已关闭" :value="summary.closedCount || 0" /></a-card></a-col>

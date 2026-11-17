@@ -31,7 +31,7 @@
           <a-tag color="purple">重点长者 Top{{ configuredQuery.topResidentLimit }}</a-tag>
           <a-tag color="gold">回溯 {{ configuredQuery.riskResidentLookbackDays }} 天</a-tag>
         </a-space>
-        <a-space wrap>
+        <ActionToolbar wrap>
           <a-tooltip title="口径最宽：事件统计近 45 天，超过 18 小时才算超时。报警最少，风险指数最低。">
             <a-button size="small" @click="applyPreset('stable')">稳健</a-button>
           </a-tooltip>
@@ -43,7 +43,7 @@
           </a-tooltip>
           <a-button size="small" type="primary" @click="applyFilters">应用参数</a-button>
           <a-button size="small" @click="resetFilters">重置</a-button>
-        </a-space>
+        </ActionToolbar>
       </div>
       <a-form layout="inline" class="medical-filter__form" @submit.prevent>
         <a-form-item label="统计日期">
@@ -73,12 +73,12 @@
       :description="signedLinkageContext.description"
     >
       <template #action>
-        <a-space wrap>
+        <ActionToolbar wrap>
           <a-button size="small" @click="go('/elder/resident-360', { residentId: signedLinkageContext.elderId, residentName: signedLinkageContext.elderName })">长者360</a-button>
           <a-button size="small" @click="go('/medical-care/basic-diseases', { elderId: signedLinkageContext.elderId, residentId: signedLinkageContext.elderId, residentName: signedLinkageContext.elderName })">基础疾病</a-button>
           <a-button size="small" @click="go('/medical-care/assessment/tcm', { residentId: signedLinkageContext.elderId, residentName: signedLinkageContext.elderName })">中医评估</a-button>
           <a-button size="small" @click="go('/medical-care/inspection', { residentId: signedLinkageContext.elderId, residentName: signedLinkageContext.elderName })">健康巡检</a-button>
-        </a-space>
+        </ActionToolbar>
       </template>
     </a-alert>
 
@@ -180,12 +180,12 @@
       <a-row :gutter="16" style="margin-top: 4px">
         <a-col :xs="24" :xl="12" style="margin-bottom: 12px">
           <a-card class="card-elevated" :bordered="false" title="执行任务总览">
-            <a-space wrap>
+            <ActionToolbar wrap>
               <a-button @click="go('/medical-care/order-risk-overview', { status: 'PENDING' })">待执行医嘱 {{ summary.medicalOrderPendingCount || 0 }}</a-button>
               <a-button @click="go('/medical-care/care-task-board', { status: 'OVERDUE' })">超时护理 {{ summary.overdueCareTaskCount || 0 }}</a-button>
               <a-button @click="go('/medical-care/inspection', { status: 'ABNORMAL' })">异常巡检 {{ summary.abnormalInspectionOpenCount || 0 }}</a-button>
               <a-button @click="go('/medical-care/nursing-log', { status: 'PENDING' })">日志待补录 {{ summary.nursingLogPendingCount || 0 }}</a-button>
-            </a-space>
+            </ActionToolbar>
             <a-descriptions :column="2" size="small" bordered style="margin-top: 12px">
               <a-descriptions-item label="医嘱完成率">{{ formatPercent(summary.medicalOrderExecutionRate, 1) }}%</a-descriptions-item>
               <a-descriptions-item label="护理完成率">{{ formatPercent(summary.careTaskCompletionRate, 1) }}%</a-descriptions-item>
@@ -218,6 +218,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

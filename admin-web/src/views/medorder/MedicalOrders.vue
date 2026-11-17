@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="医嘱管理" subTitle="长期/临时医嘱开立与停嘱（长期医嘱按频次自动生成执行单）">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">开立医嘱</a-button>
+    </template>
     <SearchForm :model="query" @search="onSearch" @reset="onReset">
       <a-form-item label="长者">
         <a-select v-model:value="query.elderId" show-search allow-clear :filter-option="false" :options="elderOptions"
@@ -17,9 +20,7 @@
           <a-select-option v-for="c in categoryOptions" :key="c.value" :value="c.value">{{ c.label }}</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openCreate">开立医嘱</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable

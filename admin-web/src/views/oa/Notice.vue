@@ -1,5 +1,15 @@
 <template>
   <PageContainer title="公告管理" subTitle="公告发布与维护">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新增公告</a-button>
+      <a-button :disabled="!selectedSingleRecord || !isSelectedSingleDraft" @click="editSelected">编辑</a-button>
+      <a-button :disabled="!selectedSingleRecord || !isSelectedSingleDraft" @click="publishSelected">发布</a-button>
+      <a-button :disabled="selectedDraftCount === 0" @click="batchPublish">批量发布</a-button>
+      <a-button @click="downloadExport">导出CSV</a-button>
+      <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+      <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+      <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，批量发布仅对“草稿”生效</span>
+    </template>
     <template #meta>
       <span class="soft-pill">当前列表 {{ rows.length }} 条</span>
       <span class="soft-pill">已勾选 {{ selectedRowKeys.length }} 条</span>
@@ -38,16 +48,7 @@
       <a-form-item label="状态">
         <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 160px" />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openCreate">新增公告</a-button>
-        <a-button :disabled="!selectedSingleRecord || !isSelectedSingleDraft" @click="editSelected">编辑</a-button>
-        <a-button :disabled="!selectedSingleRecord || !isSelectedSingleDraft" @click="publishSelected">发布</a-button>
-        <a-button :disabled="selectedDraftCount === 0" @click="batchPublish">批量发布</a-button>
-        <a-button @click="downloadExport">导出CSV</a-button>
-        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
-        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，批量发布仅对“草稿”生效</span>
-      </template>
+
     </SearchForm>
 
     <DataTable

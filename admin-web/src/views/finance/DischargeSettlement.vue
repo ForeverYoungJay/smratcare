@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="退住结算" subTitle="预存账户抵扣、退款与结算确认">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新建结算单</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="老人姓名">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
@@ -7,12 +10,10 @@
       <a-form-item label="状态">
         <a-select v-model:value="query.status" allow-clear style="width: 180px" :options="statusOptions" />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openCreate">新建结算单</a-button>
-      </template>
+
     </SearchForm>
 
-    <a-row :gutter="[12, 12]" style="margin-bottom: 12px;">
+    <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 12px;">
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="结算单数" :value="rows.length" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="待退款数" :value="pendingRefundCount" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="应退款金额" :value="refundTotal" suffix="元" :precision="2" /></a-card></a-col>

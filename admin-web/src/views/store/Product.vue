@@ -1,11 +1,11 @@
 <template>
   <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
     <template #extra>
-      <a-space wrap>
+      <ActionToolbar wrap>
         <a-button @click="exportCsvData">导出CSV</a-button>
         <a-button v-if="!isStorageMode" type="primary" @click="openCreate">新增商品</a-button>
         <a-button v-else type="primary" @click="goToCommerceProduct">去商城维护</a-button>
-      </a-space>
+      </ActionToolbar>
     </template>
     <template #stats>
       <div class="product-overview-grid">
@@ -39,14 +39,14 @@
         message="当前为仓储视角：商品主数据与商城共享，商品维护统一在「商城与商品 > 商品管理」完成。"
       />
       <div class="link-actions">
-        <a-space wrap>
+        <ActionToolbar wrap>
           <a-button type="primary" @click="goToCommerceProduct">去商城维护商品</a-button>
           <a-button @click="goToCategory">商品大类</a-button>
           <a-button @click="goToTag">商品标签</a-button>
           <a-button @click="goToStockQuery">库存查询</a-button>
           <a-button @click="goToInbound">入库管理</a-button>
           <a-button @click="goToOutbound">出库管理</a-button>
-        </a-space>
+        </ActionToolbar>
       </div>
     </a-card>
 
@@ -237,6 +237,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { useRouter } from 'vue-router'

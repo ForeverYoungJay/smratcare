@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="老人管理" subTitle="档案维护与床位管理">
+    <template #extra>
+      <a-button type="primary" @click="openDrawer()">新增老人</a-button>
+    </template>
     <SearchForm :model="query" @search="onSearch" @reset="onReset">
       <a-form-item label="关键字">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="姓名(编号)" width="220px" />
@@ -11,9 +14,7 @@
           <a-select-option :value="3">离院</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openDrawer()">新增老人</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable

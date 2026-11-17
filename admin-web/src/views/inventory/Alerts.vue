@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="库存预警" subTitle="低库存与临期预警中心">
     <a-card class="card-elevated" :bordered="false">
-      <a-space>
+      <ActionToolbar>
         <a-button @click="exportSuggestions">导出采购建议</a-button>
         <a-button @click="exportPhotoIndex" :disabled="photoAttachments.length === 0">导出附件清单</a-button>
         <a-button danger @click="clearPhotos" :disabled="photoAttachments.length === 0">清空附件</a-button>
@@ -13,8 +13,8 @@
           <a-button :loading="uploadingTotal">上传合计数量图</a-button>
         </a-upload>
         <a-button @click="fetchAll">刷新</a-button>
-      </a-space>
-      <a-row :gutter="12" style="margin-top: 12px">
+      </ActionToolbar>
+      <a-row class="business-stat-strip" :gutter="12" style="margin-top: 12px">
         <a-col :span="6"><a-statistic title="固定资产预警" :value="summaryStats.assetCount" /></a-col>
         <a-col :span="6"><a-statistic title="耗材预警" :value="summaryStats.consumableCount" /></a-col>
         <a-col :span="6"><a-statistic title="食材预警" :value="summaryStats.foodCount" /></a-col>
@@ -83,6 +83,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from "../../components/ActionToolbar.vue"
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'

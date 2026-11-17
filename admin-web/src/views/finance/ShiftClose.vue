@@ -1,28 +1,30 @@
 <template>
   <PageContainer title="日结/交班" subTitle="按业务日期确认收款、票据、修正和异常是否可以完成交班">
     <div class="shift-shell">
-      <a-card class="shift-hero card-elevated" :bordered="false">
-        <div>
-          <div class="shift-hero__eyebrow">交班结账</div>
-          <h2>交班前只看今天该收口的四件事。</h2>
+      <a-card class="shift-hero card-elevated business-overview" :bordered="false">
+        <details class="business-help">
+          <summary>使用说明</summary>
+          <p class="business-help-title">交班前只看今天该收口的四件事。</p>
           <p>收款流水、票据关联、退款修正和对账异常缺一不可，避免第二天继续挂账。</p>
-        </div>
-        <a-form layout="inline" :model="query" class="search-form">
+        </details>
+        <QueryBar layout="inline" :model="query" class="search-form" @finish="loadData">
           <a-form-item label="业务日期">
             <a-date-picker v-model:value="query.date" />
           </a-form-item>
-          <a-form-item>
-            <a-space>
-              <a-button type="primary" @click="loadData">刷新交班摘要</a-button>
-              <a-button @click="runReconcile">重新生成对账</a-button>
-              <a-button @click="go('/finance/payments/cashier-desk')">收银台</a-button>
-            </a-space>
-          </a-form-item>
-        </a-form>
+          <template #actions>
+            <ActionToolbar>
+              <a-space>
+                <a-button type="primary" html-type="submit">刷新交班摘要</a-button>
+                <a-button @click="runReconcile">重新生成对账</a-button>
+                <a-button @click="go('/finance/payments/cashier-desk')">收银台</a-button>
+              </a-space>
+            </ActionToolbar>
+          </template>
+        </QueryBar>
       </a-card>
 
       <StatefulBlock style="margin-top: 16px;" :loading="loading" :error="errorMessage" @retry="loadData">
-        <a-row :gutter="[14, 14]">
+        <a-row class="business-stat-strip" :gutter="[14, 14]">
           <a-col :xs="24" :xl="6"><a-card class="card-elevated shift-stat shift-stat--ink" :bordered="false"><a-statistic title="收款笔数" :value="payments.length" /></a-card></a-col>
           <a-col :xs="24" :xl="6"><a-card class="card-elevated shift-stat shift-stat--amber" :bordered="false"><a-statistic title="待补票据" :value="pendingInvoices.length" /></a-card></a-col>
           <a-col :xs="24" :xl="6"><a-card class="card-elevated shift-stat shift-stat--red" :bordered="false"><a-statistic title="修正记录" :value="sameDayAdjustments.length" /></a-card></a-col>
@@ -81,6 +83,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

@@ -1,13 +1,13 @@
 <template>
   <div class="collection-followup-panel">
     <div class="follow-shell">
-      <a-card class="follow-hero card-elevated" :bordered="false">
-        <div>
-          <div class="follow-hero__eyebrow">催缴跟进</div>
-          <h2>把欠费、低余额和续约临界放进同一张跟进清单。</h2>
+      <a-card class="follow-hero card-elevated business-overview" :bordered="false">
+        <details class="business-help">
+          <summary>使用说明</summary>
+          <p class="business-help-title">把欠费、低余额和续约临界放进同一张跟进清单。</p>
           <p>每位长者只保留一行，优先看谁最需要今天联系，而不是按账单散落处理。</p>
-        </div>
-        <a-form layout="inline" :model="query" class="search-form">
+        </details>
+        <QueryBar layout="inline" :model="query" class="search-form" @finish="loadData">
           <a-form-item label="月份">
             <a-date-picker v-model:value="query.month" picker="month" style="width: 160px" />
           </a-form-item>
@@ -25,21 +25,23 @@
               <a-select-option value="WATCH">持续观察</a-select-option>
             </a-select>
           </a-form-item>
-          <a-form-item>
+          <a-form-item label="关键词">
             <a-input v-model:value="query.keyword" allow-clear placeholder="长者 / 账单ID" style="width: 220px" />
           </a-form-item>
-          <a-form-item>
-            <a-space>
-              <a-button type="primary" @click="loadData">查询</a-button>
-              <a-button @click="exportData">导出</a-button>
-              <a-button @click="reset">重置</a-button>
-            </a-space>
-          </a-form-item>
-        </a-form>
+          <template #actions>
+            <ActionToolbar>
+              <a-space>
+                <a-button type="primary" html-type="submit">查询</a-button>
+                <a-button @click="exportData">导出</a-button>
+                <a-button @click="reset">重置</a-button>
+              </a-space>
+            </ActionToolbar>
+          </template>
+        </QueryBar>
       </a-card>
 
       <StatefulBlock style="margin-top: 16px;" :loading="loading" :error="errorMessage" @retry="loadData">
-        <a-row :gutter="[14, 14]">
+        <a-row class="business-stat-strip" :gutter="[14, 14]">
           <a-col :xs="24" :xl="6"><a-card class="card-elevated meter-card" :bordered="false"><a-statistic title="跟进人数" :value="rows.length" /></a-card></a-col>
           <a-col :xs="24" :xl="6"><a-card class="card-elevated meter-card" :bordered="false"><a-statistic title="欠费金额" :value="totalOutstanding" suffix="元" :precision="2" /></a-card></a-col>
           <a-col :xs="24" :xl="6"><a-card class="card-elevated meter-card" :bordered="false"><a-statistic title="高风险" :value="highRiskCount" /></a-card></a-col>
@@ -168,6 +170,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../../components/ActionToolbar.vue'
+import QueryBar from '../../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

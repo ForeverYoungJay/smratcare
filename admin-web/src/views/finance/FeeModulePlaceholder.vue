@@ -2,7 +2,7 @@
   <PageContainer :title="props.moduleName" :subTitle="props.description || '费用模块统一入口，实时展示资金与风险摘要'">
     <a-card :bordered="false" class="card-elevated">
       <StatefulBlock :loading="loading" :error="errorMessage" @retry="loadData">
-        <a-row :gutter="[12, 12]">
+        <a-row class="business-stat-strip" :gutter="[12, 12]">
           <a-col :xs="12" :lg="6">
             <a-statistic title="今日金额" :value="summary.todayAmount" suffix="元" :precision="2" />
           </a-col>
@@ -25,17 +25,18 @@
           </vxe-table>
         </a-card>
         <a-divider />
-        <a-space wrap>
+        <ActionToolbar wrap>
           <a-button v-for="item in props.links" :key="item.to" @click="go(item.to)">{{ item.label }}</a-button>
           <a-button type="primary" @click="go('/finance/reports/overall')">进入财务报表</a-button>
           <a-button @click="go('/finance/accounts/list')">进入账户管理</a-button>
-        </a-space>
+        </ActionToolbar>
       </StatefulBlock>
     </a-card>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from "../../components/ActionToolbar.vue"
 import { onMounted, ref, withDefaults } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'

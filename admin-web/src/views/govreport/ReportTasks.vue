@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="监管上报" subTitle="民政金民工程 / 医保结算上报：构建报文 → 发送 → 回执 → 重试">
+    <template #extra>
+      <a-button type="primary" @click="openBuild">构建上报任务</a-button>
+    </template>
     <SearchForm :model="query" @search="onSearch" @reset="onReset">
       <a-form-item label="渠道">
         <a-select v-model:value="query.channel" allow-clear style="width: 160px" placeholder="全部渠道">
@@ -20,9 +23,7 @@
           <a-select-option value="FAILED">失败</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openBuild">构建上报任务</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable

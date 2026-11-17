@@ -114,6 +114,7 @@
 </template>
 
 <script setup lang="ts">
+import { useCompletionGuide } from '../../composables/useCompletionGuide'
 import { computed, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance } from 'ant-design-vue'
@@ -133,6 +134,7 @@ import { normalizeResidentId } from '../../utils/id'
 import type { Id, PageResult, ServiceBookingItem, ServiceItem, ServicePlanItem } from '../../types'
 import { resolveCareError } from './careError'
 
+const showCompletion = useCompletionGuide()
 const rows = ref<ServiceBookingItem[]>([])
 const route = useRoute()
 const loading = ref(false)
@@ -265,6 +267,7 @@ async function submit() {
       await createServiceBooking(payload)
     }
     message.success('保存成功')
+    showCompletion('服务预约已保存', [{ label: '查看今日任务', path: '/care/today' }, { label: '查看服务计划', path: '/care/service/service-plans' }])
     modalOpen.value = false
     await load()
   } catch (error) {

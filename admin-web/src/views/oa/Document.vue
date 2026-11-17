@@ -1,5 +1,13 @@
 <template>
   <PageContainer title="文档管理" subTitle="文档库档案夹 + Word/PDF 上传">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新增文档</a-button>
+      <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
+      <a-button @click="downloadExport">导出CSV</a-button>
+      <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+      <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+      <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
+    </template>
     <a-row :gutter="16">
       <a-col :xs="24" :md="6">
         <a-card class="card-elevated folder-card" :bordered="false">
@@ -44,14 +52,7 @@
           <a-form-item label="当前档案夹">
             <a-tag color="blue">{{ selectedFolderName }}</a-tag>
           </a-form-item>
-          <template #extra>
-            <a-button type="primary" @click="openCreate">新增文档</a-button>
-            <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
-            <a-button @click="downloadExport">导出CSV</a-button>
-            <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
-            <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
-            <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
-          </template>
+
         </SearchForm>
 
         <div v-if="isComplianceMode" class="compliance-panel">

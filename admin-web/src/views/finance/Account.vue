@@ -1,15 +1,16 @@
 <template>
   <PageContainer title="老人账户" subTitle="余额、预警阈值与账户流水">
+    <template #extra>
+      <a-space>
+        <a-button @click="openWarnings">余额预警</a-button>
+        <a-button type="primary" @click="openAdjust">余额调整</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="老人姓名">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="姓名(编号)" width="220px" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="openWarnings">余额预警</a-button>
-          <a-button type="primary" @click="openAdjust">余额调整</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <a-alert
@@ -21,7 +22,7 @@
       :description="'当前可直接查看余额、押金/预存与账户流水。'"
     />
 
-    <a-row :gutter="[12, 12]" style="margin-bottom: 12px;">
+    <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 12px;">
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="账户总数" :value="rows.length" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="低余额账户" :value="lowBalanceCount" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="账户总余额" :value="totalBalance" suffix="元" :precision="2" /></a-card></a-col>

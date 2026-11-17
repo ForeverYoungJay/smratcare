@@ -1,5 +1,11 @@
 <template>
   <PageContainer title="一卡通数据对接" subTitle="考勤与班组 / 一卡通数据对接">
+    <template #extra>
+      <a-space>
+        <a-button @click="onExportCsv">导出 CSV</a-button>
+        <a-button @click="onExportExcel">导出 Excel</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="长者姓名(编号)" width="220px" />
@@ -7,12 +13,7 @@
       <a-form-item label="卡状态">
         <a-input v-model:value="query.status" placeholder="如 ACTIVE/INACTIVE" allow-clear />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="onExportCsv">导出 CSV</a-button>
-          <a-button @click="onExportExcel">导出 Excel</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable

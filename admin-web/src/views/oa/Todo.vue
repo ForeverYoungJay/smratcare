@@ -113,7 +113,7 @@
           普通待办
         </a-tag>
       </a-space>
-      <a-row :gutter="[12, 12]" style="margin-bottom: 12px">
+      <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 12px">
         <a-col :xs="12" :lg="3">
           <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'total' }" :bordered="false" size="small" @click="applySummaryFilter('total')">
             <a-statistic title="总待办" :value="summary.totalCount || 0" />

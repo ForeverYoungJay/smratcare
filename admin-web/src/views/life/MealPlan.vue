@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="膳食计划" subTitle="按日期维护每日菜单">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新增菜单</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="日期范围">
         <a-range-picker v-model:value="query.range" />
@@ -7,9 +10,7 @@
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="菜品/餐次" allow-clear />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openCreate">新增菜单</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable

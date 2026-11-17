@@ -13,14 +13,14 @@
     </template>
 
     <template #extra>
-      <a-space wrap>
+      <ActionToolbar wrap>
         <a-button :loading="loading" @click="loadData">刷新</a-button>
         <a-button @click="openPath('/oa/family-users')">家属账号</a-button>
         <a-button @click="openPath('/oa/family-recharge')">充值台账</a-button>
         <a-button @click="openPath('/oa/family-service-health')">运行健康</a-button>
         <a-button @click="openPath('/oa/work-execution/family-communication')">反馈与沟通</a-button>
         <a-button type="primary" @click="openPath('/elder/status-change/visit-register')">探访登记</a-button>
-      </a-space>
+      </ActionToolbar>
     </template>
 
     <section class="family-metric-grid">
@@ -126,6 +126,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'

@@ -43,10 +43,10 @@ export const DEFAULT_HOME_BY_ROLE: Readonly<Partial<Record<RoleCode, string>>> =
   SYS_ADMIN: '/system', DIRECTOR: '/portal', ADMIN: '/portal',
   NURSING_EMPLOYEE: '/workbench/overview', NURSING_MINISTER: '/workbench/overview',
   MEDICAL_EMPLOYEE: '/workbench/overview', MEDICAL_MINISTER: '/workbench/overview',
-  FINANCE_EMPLOYEE: '/workbench/overview', FINANCE_MINISTER: '/workbench/overview',
+  FINANCE_EMPLOYEE: '/finance/workbench', FINANCE_MINISTER: '/finance/workbench',
   LOGISTICS_EMPLOYEE: '/workbench/overview', LOGISTICS_MINISTER: '/workbench/overview',
-  HR_EMPLOYEE: '/workbench/overview', HR_MINISTER: '/workbench/overview',
-  MARKETING_EMPLOYEE: '/workbench/overview', MARKETING_MINISTER: '/workbench/overview'
+  HR_EMPLOYEE: '/hr/overview', HR_MINISTER: '/hr/overview',
+  MARKETING_EMPLOYEE: '/marketing/workbench', MARKETING_MINISTER: '/marketing/workbench'
 }
 
 const DEFAULT_HOME_PRIORITY: RoleCode[] = [ROLE_CODES.SYS_ADMIN, ROLE_CODES.DIRECTOR, ROLE_CODES.ADMIN, ...DEPARTMENT_MINISTER_ROLES, ...DEPARTMENT_EMPLOYEE_ROLES]

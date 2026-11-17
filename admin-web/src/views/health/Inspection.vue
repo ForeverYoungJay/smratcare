@@ -1,13 +1,13 @@
 <template>
   <PageContainer title="健康巡检" subTitle="日常巡检项目与整改闭环">
     <template #extra>
-      <a-space wrap>
+      <ActionToolbar wrap>
         <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
         <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
         <a-button type="primary" @click="openCreate">新增巡检</a-button>
-      </a-space>
+      </ActionToolbar>
     </template>
-    <a-row :gutter="16" class="summary-row">
+    <a-row :gutter="16" class="summary-row business-stat-strip">
       <a-col :xs="24" :md="6"><a-card :bordered="false"><a-statistic title="巡检总数" :value="summary.totalCount" /></a-card></a-col>
       <a-col :xs="24" :md="6"><a-card :bordered="false"><a-statistic title="异常数" :value="summary.abnormalCount" /></a-card></a-col>
       <a-col :xs="24" :md="6"><a-card :bordered="false"><a-statistic title="跟进中" :value="summary.followingCount" /></a-card></a-col>
@@ -32,12 +32,12 @@
       </a-space>
     </a-card>
     <a-card v-if="residentContext.active" :bordered="false" class="summary-row context-card">
-      <a-space wrap>
+      <ActionToolbar wrap>
         <a-tag color="processing">当前长者：{{ residentContext.name }}</a-tag>
         <a-button size="small" @click="goWithResident('/medical-care/medication-registration')">查看用药登记</a-button>
         <a-button size="small" @click="goWithResident('/medical-care/nursing-log')">查看护理日志</a-button>
         <a-button size="small" @click="clearResidentContext">清除长者上下文</a-button>
-      </a-space>
+      </ActionToolbar>
     </a-card>
 
     <a-card :bordered="false" class="summary-row" title="基础健康限值">
@@ -321,6 +321,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'

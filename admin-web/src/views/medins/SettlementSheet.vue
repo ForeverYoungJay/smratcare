@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="医保结算清单" subTitle="由长护险结算单生成：草稿 → 已上传 → 已回执 → 已对账（金额单位：元）">
+    <template #extra>
+      <a-button type="primary" @click="openGenerate">生成结算清单</a-button>
+    </template>
     <SearchForm :model="query" @search="onSearch" @reset="onReset">
       <a-form-item label="长者">
         <a-select v-model:value="query.elderId" show-search allow-clear :filter-option="false" :options="elderOptions"
@@ -17,9 +20,7 @@
           <a-select-option value="REJECTED">已驳回</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openGenerate">生成结算清单</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable

@@ -1,6 +1,7 @@
 import type { Router } from 'vue-router'
 import { normalizeRoutePath, toCanonicalRoutePath } from '../router/routeAliases'
 import { hasRouteAccess, moduleRolesByPath } from './roleAccess'
+import { canUseWorkspaceTab, getFunctionWorkspace } from '../workspaces/catalog'
 
 export interface RouteAccessResult {
   canAccess: boolean
@@ -50,6 +51,16 @@ export function resolveRouteAccess(
   const resolved = router.resolve(path)
   if (!resolved.matched.length) {
     return { canAccess: false, requiredRoles: [], requiredPermissions: [] }
+  }
+
+  const workspace = getFunctionWorkspace(resolved.meta.workspaceId)
+  if (workspace) {
+    const requested = typeof resolved.query.view === 'string' ? resolved.query.view : ''
+    const tabs = requested ? workspace.tabs.filter((tab) => tab.key === requested) : workspace.tabs
+    return {
+      canAccess: tabs.some((tab) => canUseWorkspaceTab(tab, roles, pagePermissions, permissions)),
+      requiredRoles: [], requiredPermissions: []
+    }
   }
 
   // 未知地址命中 NotFound 兜底路由时直接放行，让用户看到 404 而不是被页面权限校验误判为 403

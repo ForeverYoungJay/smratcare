@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="电费管理" subTitle="按房间登记电表读数，自动核算用电量与电费，跟踪缴费状态">
     <a-card class="card-elevated" :bordered="false">
-      <a-form layout="inline" :model="query">
+      <QueryBar layout="inline" :model="query" @finish="runSearch">
         <a-form-item label="账期">
           <a-date-picker v-model:value="query.month" picker="month" :allow-clear="false" style="width: 150px" />
         </a-form-item>
@@ -23,15 +23,17 @@
             <a-select-option value="PAID">已缴</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="runSearch">查询</a-button>
-            <a-button @click="reset">重置</a-button>
-            <a-button type="primary" ghost @click="openReading()">登记读数</a-button>
-            <a-button @click="openPrice">电价设置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">查询</a-button>
+              <a-button @click="reset">重置</a-button>
+              <a-button type="primary" ghost @click="openReading()">登记读数</a-button>
+              <a-button @click="openPrice">电价设置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-alert
@@ -43,7 +45,7 @@
       description="电费按「用电量 × 电价」自动核算，请先在「电价设置」里填写元/度单价，否则无法登记读数。"
     />
 
-    <a-row :gutter="[16, 16]" style="margin-top: 16px;">
+    <a-row class="business-stat-strip" :gutter="[16, 16]" style="margin-top: 16px;">
       <a-col :xs="24" :md="12" :xl="6">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic title="当期电价" :value="Number(summary?.unitPrice || 0)" :precision="4" suffix="元/度" />
@@ -238,6 +240,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'

@@ -1,4 +1,5 @@
 import type { RouteRecordRaw } from 'vue-router'
+import { redirectPreservingLocation } from './routeAliases'
 
 export const logisticsRoutes: RouteRecordRaw[] = [
   {
@@ -23,6 +24,12 @@ export const logisticsRoutes: RouteRecordRaw[] = [
             name: 'LogisticsTaskCenter',
             component: () => import('../views/logistics/TaskCenter.vue'),
             meta: { title: '后勤任务中心' }
+          },
+          {
+            path: 'video',
+            name: 'LogisticsVideoManagement',
+            redirect: redirectPreservingLocation('/fire/video'),
+            meta: { title: '摄像头录像管理', hidden: true, legacy: true }
           },
           {
             path: 'assets',

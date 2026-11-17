@@ -56,7 +56,7 @@
       </div>
     </a-card>
 
-    <a-row :gutter="16" class="metrics-row">
+    <a-row :gutter="16" class="metrics-row business-stat-strip">
       <a-col :xs="24" :sm="12" :lg="6">
         <a-card class="metric-card metric-card-teal" :bordered="false">
           <a-statistic title="当月在岗天数" :value="overview.onDutyDays || 0" />
@@ -121,7 +121,7 @@
 
       <a-col :xs="24" :xl="8">
         <a-card class="grid-card today-panel" :bordered="false" title="今日状态">
-          <a-space direction="vertical" style="width: 100%">
+          <ActionToolbar direction="vertical" style="width: 100%">
             <div class="today-line">
               <span>当前员工：</span>
               <strong>{{ currentStaffName || '-' }}</strong>
@@ -143,7 +143,7 @@
               <a-button v-if="showPunchOutButton" :loading="punching" @click="handlePunch('OUT')">下班打卡</a-button>
               <span v-if="!showPunchInButton && !showStartLunchButton && !showEndLunchButton && !showStartOutingButton && !showEndOutingButton && !showPunchOutButton" class="muted">当前状态无需再次打卡</span>
             </a-space>
-          </a-space>
+          </ActionToolbar>
         </a-card>
 
         <a-card v-if="canManageAttendance" class="grid-card" :bordered="false" title="季节考勤规则" style="margin-top: 16px">
@@ -202,6 +202,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from "../../components/ActionToolbar.vue"
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

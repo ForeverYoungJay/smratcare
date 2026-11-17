@@ -13,7 +13,7 @@
     </template>
 
     <a-spin :spinning="loading">
-      <a-row :gutter="16" style="margin-bottom: 16px;">
+      <a-row class="business-stat-strip" :gutter="16" style="margin-bottom: 16px;">
         <a-col :span="6">
           <a-card class="card-elevated" :bordered="false">
             <a-statistic title="入住率 (%)" :value="overview.occupancyRate || 0" :precision="2" />
@@ -40,7 +40,7 @@
         </a-col>
       </a-row>
 
-      <a-row :gutter="16" style="margin-bottom: 16px;">
+      <a-row class="business-stat-strip" :gutter="16" style="margin-bottom: 16px;">
         <a-col :span="6">
           <a-card class="card-elevated" :bordered="false">
             <a-statistic title="本月营收 (元)" :value="overview.revenueAmount || 0" :precision="2" />

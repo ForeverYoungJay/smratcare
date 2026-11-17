@@ -1,5 +1,9 @@
 <template>
   <PageContainer title="退住费用审核" subTitle="审核通过后自动生成退住结算单">
+    <template #extra>
+      <a-button @click="quickHighRisk">仅看高风险</a-button>
+      <a-button type="primary" @click="openCreate">新建审核单</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="老人">
         <ElderNameAutocomplete v-model:value="query.keyword" allow-clear placeholder="老人姓名(编号)" width="220px" />
@@ -14,13 +18,10 @@
           <a-select-option value="LOW">低风险</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-button @click="quickHighRisk">仅看高风险</a-button>
-        <a-button type="primary" @click="openCreate">新建审核单</a-button>
-      </template>
+
     </SearchForm>
 
-    <a-row :gutter="[12, 12]" style="margin-bottom: 12px;">
+    <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 12px;">
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="审核单数" :value="filteredRows.length" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="待审核" :value="pendingCount" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="高风险单" :value="highRiskCount" /></a-card></a-col>

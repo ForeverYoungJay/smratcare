@@ -26,7 +26,7 @@
           />
           <a-button size="small" :loading="loading" @click="load">刷新</a-button>
         </a-space>
-        <a-space>
+        <ActionToolbar>
           <span class="zoom-label">缩放 {{ zoom }}%</span>
           <a-button size="small" :disabled="zoom <= 60" @click="stepZoom(-10)">－</a-button>
           <a-slider
@@ -38,11 +38,11 @@
           />
           <a-button size="small" :disabled="zoom >= 150" @click="stepZoom(10)">＋</a-button>
           <a-button size="small" @click="zoom = 100">还原</a-button>
-        </a-space>
+        </ActionToolbar>
       </div>
     </a-card>
 
-    <a-row :gutter="[16, 16]" style="margin-top: 16px;">
+    <a-row class="business-stat-strip" :gutter="[16, 16]" style="margin-top: 16px;">
       <a-col :xs="12" :md="6">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic title="总房间" :value="plan?.totalRooms || 0" suffix="间" />
@@ -209,6 +209,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from "../../../components/ActionToolbar.vue"
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'

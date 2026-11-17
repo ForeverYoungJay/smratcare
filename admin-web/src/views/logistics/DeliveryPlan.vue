@@ -13,7 +13,7 @@
       <div style="display: flex; justify-content: flex-end; margin-bottom: 12px">
         <a-button type="primary" :loading="optionsLoading && createOpen" @click="openCreate">新增送餐计划</a-button>
       </div>
-      <a-row :gutter="12">
+      <a-row class="business-stat-strip" :gutter="12">
         <a-col :span="8"><a-statistic title="总任务" :value="summary.total" /></a-col>
         <a-col :span="8"><a-statistic title="已送达" :value="summary.delivered" /></a-col>
         <a-col :span="8"><a-statistic title="未送达" :value="summary.undelivered" /></a-col>
@@ -114,6 +114,7 @@
 </template>
 
 <script setup lang="ts">
+import { useCompletionGuide } from '../../composables/useCompletionGuide'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
@@ -130,6 +131,7 @@ import {
 } from '../../api/dining'
 import type { DiningDeliveryArea, DiningDeliveryRecord, DiningMealOrder, PageResult } from '../../types'
 
+const showCompletion = useCompletionGuide()
 const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
@@ -406,6 +408,7 @@ async function submitCreate() {
     })
     createOpen.value = false
     message.success('送餐计划已创建')
+    showCompletion('送餐计划已创建', [{ label: '查看送餐任务', path: '/logistics/dining/delivery-plan' }])
     await fetchData()
   } catch (error: any) {
     message.error(error?.message || '新增送餐计划失败')

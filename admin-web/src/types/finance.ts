@@ -800,6 +800,16 @@ export interface FinanceConfigImpactPreviewRequest {
   configKeys: string[]
 }
 
+export interface BillingCareLevelFee {
+  id?: Id
+  orgId: Id
+  careLevel: string
+  feeMonthly: number
+  effectiveMonth: string
+  status: number
+  remark?: string
+}
+
 export interface FinanceBillingConfigEntry {
   id: Id
   orgId: Id

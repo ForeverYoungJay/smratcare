@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="送餐区域" subTitle="维护送餐覆盖区域和责任人">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新增区域</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="区域编码/名称/负责人" allow-clear />
@@ -7,9 +10,7 @@
       <a-form-item label="状态">
         <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 140px" />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openCreate">新增区域</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable

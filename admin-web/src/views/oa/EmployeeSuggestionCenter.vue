@@ -1,5 +1,14 @@
 <template>
   <PageContainer title="员工建议中心" subTitle="集中处理员工小程序提交的流程优化、物资补给、护理协同和现场改进建议">
+    <template #extra>
+      <a-space wrap>
+        <a-button type="primary" @click="fetchData">刷新</a-button>
+        <a-button @click="openPath('/oa/staff-collaboration')">员工协同</a-button>
+        <a-button :disabled="!selectedRecord" @click="markSelected('PROCESSING')">标记处理中</a-button>
+        <a-button :disabled="!selectedRecord" type="primary" @click="openHandle(selectedRecord, 'DONE')">采纳反馈</a-button>
+        <a-button :disabled="!selectedRecord" danger @click="openHandle(selectedRecord, 'CLOSED')">关闭归档</a-button>
+      </a-space>
+    </template>
     <template #meta>
       <span class="soft-pill">待处理 {{ pendingCount }}</span>
       <span class="soft-pill">处理中 {{ processingCount }}</span>
@@ -18,15 +27,7 @@
           <a-select-option value="CLOSED">已关闭</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-space wrap>
-          <a-button type="primary" @click="fetchData">刷新</a-button>
-          <a-button @click="openPath('/oa/staff-collaboration')">员工协同</a-button>
-          <a-button :disabled="!selectedRecord" @click="markSelected('PROCESSING')">标记处理中</a-button>
-          <a-button :disabled="!selectedRecord" type="primary" @click="openHandle(selectedRecord, 'DONE')">采纳反馈</a-button>
-          <a-button :disabled="!selectedRecord" danger @click="openHandle(selectedRecord, 'CLOSED')">关闭归档</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <a-alert

@@ -22,6 +22,7 @@ import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderChangeLogMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeApplyMapper;
+import com.zhiyangyun.care.elder.model.lifecycle.DischargeProgressRules;
 import com.zhiyangyun.care.elder.model.lifecycle.ResidenceLifecycleConstants;
 import com.zhiyangyun.care.elder.service.ElderLifecycleStateService;
 import com.zhiyangyun.care.elder.service.ElderOccupancyReadService;
@@ -390,6 +391,9 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     if (!Integer.valueOf(1).equals(current.getFrontdeskApproved())
         || !Integer.valueOf(1).equals(current.getNursingApproved())) {
       throw new IllegalStateException("需前台与护理部审核签字后，方可财务退款");
+    }
+    if (current.getDischargeApplyId() != null) {
+      DischargeProgressRules.assertReadyForRelease(elderDischargeApplyMapper.selectById(current.getDischargeApplyId()));
     }
 
     int claimed = dischargeSettlementMapper.update(

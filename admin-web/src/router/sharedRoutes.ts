@@ -1,5 +1,6 @@
 import type { RouteRecordRaw } from 'vue-router'
 import { DEPARTMENT_MINISTER_ROLES, ROLE_CODES } from '../access/policy'
+import { legacyResidentRedirect } from './residentRedirects'
 
 export const sharedRoutes: RouteRecordRaw[] = [
   {
@@ -85,20 +86,23 @@ export const sharedRoutes: RouteRecordRaw[] = [
           {
             path: 'resident-360',
             name: 'ElderResident360',
-            component: () => import('../views/elder/resident360/Resident360.vue'),
+            // 一人一档：带长者 ID 时进一体化详情，否则进长者工作台
+            redirect: (to) => to.query.residentId
+              ? { path: `/elder/detail/${String(to.query.residentId)}`, query: { ...to.query, residentId: undefined } }
+              : { path: '/elder/in-hospital-overview' },
             meta: { title: '长者总览', hidden: true }
           },
           {
             path: 'in-hospital-overview',
             name: 'ElderInHospitalOverview',
             component: () => import('../views/elder/resident360/InHospitalOverview.vue'),
-            meta: { title: '在院服务总览' }
+            meta: { title: '长者工作台' }
           },
           {
             path: 'bed-panorama',
             name: 'ElderBedPanorama',
             component: () => import('../views/elder/resident360/BedPanorama.vue'),
-            meta: { title: '床态全景' }
+            meta: { title: '床位与状态管理' }
           },
           {
             path: 'list',
@@ -176,33 +180,33 @@ export const sharedRoutes: RouteRecordRaw[] = [
           {
             path: 'contracts-invoices',
             name: 'ElderContractsInvoices',
-            component: () => import('../views/elder/resident360/ContractsInvoices.vue'),
-            meta: { title: '合同与票据' }
+            redirect: (to) => legacyResidentRedirect('contracts-invoices', to.query),
+            meta: { title: '合同与票据', hidden: true }
           },
           {
             path: 'admission-processing',
             name: 'ElderAdmissionProcessing',
             component: () => import('../views/elder/Admission.vue'),
-            meta: { title: '入住办理' }
+            meta: { title: '入住办理中心' }
           },
           {
             path: 'status-change',
             name: 'ElderStatusChangeCenter',
             component: () => import('../layouts/RouteView.vue'),
             meta: { title: '入住状态变更' },
-            redirect: '/elder/status-change/center',
+            redirect: '/elder/bed-panorama',
             children: [
               {
                 path: 'center',
                 name: 'ElderStatusChangeOverview',
-                component: () => import('../views/elder/resident360/StatusChangeCenter.vue'),
-                meta: { title: '变更总览' }
+                redirect: (to) => legacyResidentRedirect('center', to.query),
+                meta: { title: '变更总览', hidden: true }
               },
               {
                 path: 'outing',
                 name: 'ElderStatusChangeOuting',
-                component: () => import('../views/elder/Outing.vue'),
-                meta: { title: '外出登记' }
+                redirect: (to) => legacyResidentRedirect('outing', to.query),
+                meta: { title: '外出登记', hidden: true }
               },
               {
                 path: 'visit-register',
@@ -213,20 +217,21 @@ export const sharedRoutes: RouteRecordRaw[] = [
               {
                 path: 'discharge-apply',
                 name: 'ElderStatusChangeDischargeApply',
-                component: () => import('../views/elder/DischargeApply.vue'),
-                meta: { title: '退住申请' }
+                redirect: (to) => legacyResidentRedirect('discharge-apply', to.query),
+                meta: { title: '退住申请', hidden: true }
               },
               {
                 path: 'trial-stay',
                 name: 'ElderStatusChangeTrialStay',
-                component: () => import('../views/elder/TrialStay.vue'),
-                meta: { title: '试住登记' }
+                redirect: (to) => legacyResidentRedirect('trial-stay', to.query),
+                meta: { title: '试住登记', hidden: true }
               },
               {
                 path: 'medical-outing',
                 name: 'ElderStatusChangeMedicalOuting',
-                component: () => import('../views/elder/MedicalOuting.vue'),
+                redirect: (to) => legacyResidentRedirect('medical-outing', to.query),
                 meta: {
+                  hidden: true,
                   title: '外出就医登记',
                   roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'NURSING_EMPLOYEE', 'NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
                 }
@@ -234,8 +239,9 @@ export const sharedRoutes: RouteRecordRaw[] = [
               {
                 path: 'death-register',
                 name: 'ElderStatusChangeDeathRegister',
-                component: () => import('../views/elder/DeathRegister.vue'),
+                redirect: (to) => legacyResidentRedirect('death-register', to.query),
                 meta: {
+                  hidden: true,
                   title: '死亡登记',
                   roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'NURSING_EMPLOYEE', 'NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
                 }
@@ -244,7 +250,7 @@ export const sharedRoutes: RouteRecordRaw[] = [
                 path: 'discharge-settlement',
                 name: 'ElderStatusChangeDischargeSettlement',
                 component: () => import('../views/elder/resident360/DischargeSettlement.vue'),
-                meta: { title: '退院结算' }
+                meta: { title: '费用与退住' }
               }
             ]
           },
@@ -264,7 +270,7 @@ export const sharedRoutes: RouteRecordRaw[] = [
             path: 'detail/:id',
             name: 'ElderDetail',
             component: () => import('../views/elder/Detail.vue'),
-            meta: { title: '老人详情', hidden: true }
+            meta: { title: '长者一体化详情', hidden: true }
           },
           {
             path: 'crm',

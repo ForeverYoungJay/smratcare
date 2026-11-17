@@ -1,5 +1,17 @@
 <template>
   <PageContainer title="分组设置" subTitle="跨业务团队与工作组配置">
+    <template #extra>
+      <a-button type="primary" @click="openEdit()">新增分组</a-button>
+      <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
+      <a-button :disabled="!selectedSingleRecord || !canEnableSelected" @click="enableSelected">启用</a-button>
+      <a-button :disabled="!selectedSingleRecord || !canDisableSelected" @click="disableSelected">停用</a-button>
+      <a-button :disabled="selectedEnableIds.length === 0" @click="batchEnable">批量启用</a-button>
+      <a-button :disabled="selectedDisableIds.length === 0" @click="batchDisable">批量停用</a-button>
+      <a-button @click="downloadExport">导出CSV</a-button>
+      <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+      <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+      <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，批量启停只对状态不同项生效</span>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="分组名/组长" allow-clear />
@@ -10,18 +22,7 @@
       <a-form-item label="状态">
         <a-select v-model:value="query.status" allow-clear style="width: 140px" :options="statusOptions" />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openEdit()">新增分组</a-button>
-        <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
-        <a-button :disabled="!selectedSingleRecord || !canEnableSelected" @click="enableSelected">启用</a-button>
-        <a-button :disabled="!selectedSingleRecord || !canDisableSelected" @click="disableSelected">停用</a-button>
-        <a-button :disabled="selectedEnableIds.length === 0" @click="batchEnable">批量启用</a-button>
-        <a-button :disabled="selectedDisableIds.length === 0" @click="batchDisable">批量停用</a-button>
-        <a-button @click="downloadExport">导出CSV</a-button>
-        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
-        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，批量启停只对状态不同项生效</span>
-      </template>
+
     </SearchForm>
 
     <DataTable

@@ -18,10 +18,7 @@ describe('two-level job navigation', () => {
   it.each([
     ['NURSING_EMPLOYEE', '护理部业务', '长者查询'],
     ['MEDICAL_EMPLOYEE', '医务部业务', '长者查询'],
-    ['FINANCE_EMPLOYEE', '财务部业务', '财务查询'],
     ['LOGISTICS_EMPLOYEE', '后勤部业务', '房态查询'],
-    ['HR_EMPLOYEE', '行政人事业务', '部门工作台'],
-    ['MARKETING_EMPLOYEE', '市场部业务', '客户查询']
   ])('%s receives the five employee entry types', (role, businessLabel, objectLabel) => {
     const menu = jobMenu(role)
     expect(menu.map((item) => item.label)).toEqual([
@@ -35,16 +32,29 @@ describe('two-level job navigation', () => {
   it.each([
     ['NURSING_MINISTER', '护理部管理', '护理排班', '护理报表'],
     ['MEDICAL_MINISTER', '医务部管理', '医护任务分配', '医务报表'],
-    ['FINANCE_MINISTER', '财务部管理', '财务任务分配', '财务报表'],
     ['LOGISTICS_MINISTER', '后勤部管理', '后勤任务分配', '后勤报表'],
-    ['HR_MINISTER', '行政人事管理', '排班与任务分配', '人事报表'],
-    ['MARKETING_MINISTER', '市场部管理', '客户任务分配', '市场报表']
   ])('%s receives minister-only management entries', (role, management, assignment, report) => {
     const labels = jobMenu(role).map((item) => item.label)
     expect(labels).toContain(management)
     expect(labels).toContain('待我审批')
     expect(labels).toContain(assignment)
     expect(labels).toContain(report)
+  })
+
+  it.each([
+    ['FINANCE_EMPLOYEE', '财务工作台', '/finance/bills/detail-query'],
+    ['FINANCE_MINISTER', '财务工作台', '/finance/accounts/list'],
+    ['MARKETING_EMPLOYEE', '市场工作台', '/marketing/customers'],
+    ['MARKETING_MINISTER', '市场工作台', '/marketing/operations'],
+    ['HR_EMPLOYEE', '人事工作台', '/hr/overview'],
+    ['HR_MINISTER', '人事工作台', '/hr/profile/basic']
+  ])('%s starts with its department and uses consolidated function entries', (role, title, path) => {
+    const menu = jobMenu(role)
+    expect(menu[0].label).toBe(title)
+    expect(paths(menu)).toContain(path)
+    expect(paths(menu)).not.toContain('/finance/allocation/tasks')
+    expect(paths(menu)).not.toContain('/hr/profile/certificates')
+    expect(paths(menu)).not.toContain('/marketing/interactions/due')
   })
 
   it('gives the director a concise operating and risk navigation', () => {
@@ -55,12 +65,11 @@ describe('two-level job navigation', () => {
     expect(paths(menu)).not.toContain('/system')
   })
 
-  it('exposes one customer follow-up entry with in-page views', () => {
-    const business = jobMenu('MARKETING_EMPLOYEE').find((item) => item.label === '市场部业务')
-    const followupEntries = business?.children?.filter((item) => item.path?.startsWith('/marketing/interactions/')) || []
-    expect(followupEntries).toEqual([
-      expect.objectContaining({ label: '客户跟进', path: '/marketing/interactions/today' })
-    ])
+  it('gives marketing five main entries and keeps operations manager-only', () => {
+    const main = ['/marketing/workbench', '/marketing/customers', '/marketing/visits', '/marketing/contracts', '/marketing/operations']
+    expect(paths(jobMenu('MARKETING_MINISTER'))).toEqual(expect.arrayContaining(main))
+    expect(paths(jobMenu('MARKETING_EMPLOYEE'))).toEqual(expect.arrayContaining(main.slice(0, 4)))
+    expect(paths(jobMenu('MARKETING_EMPLOYEE'))).not.toContain('/marketing/operations')
   })
 
   it('links employee navigation to medical and logistics department workbenches', () => {
@@ -71,7 +80,7 @@ describe('two-level job navigation', () => {
   it('keeps system administration separate from daily business', () => {
     const menu = jobMenu('SYS_ADMIN')
     expect(menu.map((item) => item.label)).toEqual([
-      '系统管理首页', '角色与权限', '组织与账号', '基础配置', '安全与审计', '我的信息'
+      '系统管理首页', '我的工作台', '我的待办', '组织与权限', '安全与审计', '我的信息'
     ])
     expect(paths(menu)).not.toContain('/portal')
     expect(paths(menu)).not.toContain('/medical-care')

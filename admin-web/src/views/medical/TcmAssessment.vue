@@ -1,5 +1,12 @@
 <template>
   <PageContainer title="中医体质评估" subTitle="评估中心 > 中医体质评估">
+    <template #extra>
+      <a-space>
+        <a-button @click="exportCsvData">导出CSV</a-button>
+        <a-button @click="exportExcelData">导出Excel</a-button>
+        <a-button type="primary" @click="openCreate">新建评估</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="长者"><ElderNameAutocomplete v-model:value="query.keyword" placeholder="姓名(编号)" width="220px" /></a-form-item>
       <a-form-item label="评估人"><a-input v-model:value="query.assessorName" placeholder="评估人姓名" allow-clear style="width: 140px" /></a-form-item>
@@ -25,17 +32,11 @@
         </a-select>
       </a-form-item>
       <a-form-item label="日期"><a-range-picker v-model:value="query.dateRange" /></a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="exportCsvData">导出CSV</a-button>
-          <a-button @click="exportExcelData">导出Excel</a-button>
-          <a-button type="primary" @click="openCreate">新建评估</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <StatefulBlock :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
-      <a-row :gutter="[12, 12]" style="margin-bottom: 12px">
+      <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 12px">
         <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="总评估" :value="summary.totalCount || 0" /></a-card></a-col>
         <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已发布" :value="summary.publishedCount || 0" /></a-card></a-col>
         <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="复评记录" :value="summary.reassessmentCount || 0" /></a-card></a-col>

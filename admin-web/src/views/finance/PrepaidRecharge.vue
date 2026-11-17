@@ -1,6 +1,6 @@
 <template>
   <PageContainer title="预存充值" subTitle="按老人账户登记充值并写入账户流水">
-    <a-row :gutter="[12, 12]" style="margin-bottom: 12px;">
+    <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 12px;">
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="今日充值总额" :value="todayRechargeAmount" suffix="元" :precision="2" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="低余额人数" :value="lowBalanceCount" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="欠费人数" :value="overdueCount" /></a-card></a-col>

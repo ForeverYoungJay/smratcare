@@ -162,6 +162,7 @@
       </div>
     </template>
 
+    <CompletionGuide />
     <router-view v-slot="{ Component }">
       <keep-alive :max="aliveViewMax">
         <component v-if="shouldCacheCurrentRoute" :is="Component" :key="viewRenderKey" />
@@ -898,12 +899,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import CompletionGuide from '../components/CompletionGuide.vue'
+import { completionGuideKey, type CompletionGuide as CompletionGuideState } from '../composables/useCompletionGuide'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch, provide } from 'vue'
 import { message, notification } from 'ant-design-vue'
 import type { UploadProps } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
+import { workspaceLocation } from '../workspaces/catalog'
 import { getMenuTree, supportsJobNavigation } from './menu'
 import { getMe } from '../api/auth'
 import {
@@ -935,6 +939,9 @@ import { resolveRouteAccess } from '../utils/routeAccess'
 import { resolveDefaultHome } from '../access/policy'
 import { buildQuickChatPreviews, QUICK_CHAT_OPEN_EVENT } from '../utils/quickChatPreview'
 
+const completionGuide = ref<CompletionGuideState | null>(null)
+provide(completionGuideKey, completionGuide)
+provide('business-page-layout', true)
 const MAX_RESTORED_ROUTE_TABS = 8
 const MAX_ALIVE_VIEW_CACHE = 3
 const NON_CACHED_ROUTE_NAME_KEYWORDS = ['portal', 'dashboard', 'workbench', 'taskcenter', 'todo', 'approval', 'calendar', 'panorama']
@@ -958,6 +965,7 @@ const siderCollapsed = computed(() => {
   return manualCollapsed.value && !sidebarPeekOpen.value
 })
 const route = useRoute()
+watch(() => route.fullPath, () => { completionGuide.value = null })
 const router = useRouter()
 const userStore = useUserStore()
 
@@ -2092,7 +2100,7 @@ function normalizeTabKey(pathLike: string) {
   if (purePath === '/workbench') {
     return '/workbench/overview'
   }
-  return purePath || text
+  return workspaceLocation(purePath.split('#')[0])?.path || purePath || text
 }
 
 function shouldCacheRouteView(pathLike: string, routeName: unknown, keepAliveMeta?: unknown) {

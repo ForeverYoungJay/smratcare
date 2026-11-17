@@ -1,6 +1,16 @@
 <template>
   <PageContainer title="会员生日" subTitle="生日提醒与关怀安排">
-    <a-row :gutter="[12, 12]" style="margin-bottom: 10px;">
+    <template #extra>
+      <a-space wrap>
+        <a-button @click="quickMonth(currentMonth)">本月清单</a-button>
+        <a-button @click="quickDays(7)">未来7天</a-button>
+        <a-button @click="quickAge(80)">80+统计</a-button>
+        <a-button @click="quickAge(90)">90+统计</a-button>
+        <a-button @click="exportCsv">导出</a-button>
+        <a-button @click="printYearPlan">打印年度表</a-button>
+      </a-space>
+    </template>
+    <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 10px;">
       <a-col :xs="24" :sm="8">
         <a-card class="card-elevated" :bordered="false" size="small" @click="quickDays(0)">
           <a-statistic title="今日生日" :value="todayCount" />
@@ -31,16 +41,7 @@
       <a-form-item label="年龄下限">
         <a-input-number v-model:value="query.minAge" :min="0" :max="130" style="width: 140px" />
       </a-form-item>
-      <template #extra>
-        <a-space wrap>
-          <a-button @click="quickMonth(currentMonth)">本月清单</a-button>
-          <a-button @click="quickDays(7)">未来7天</a-button>
-          <a-button @click="quickAge(80)">80+统计</a-button>
-          <a-button @click="quickAge(90)">90+统计</a-button>
-          <a-button @click="exportCsv">导出</a-button>
-          <a-button @click="printYearPlan">打印年度表</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable

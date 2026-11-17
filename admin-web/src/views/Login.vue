@@ -98,7 +98,6 @@ import brandLogoUrl from '../assets/guifeng-logo.png'
 import { login } from '../api/auth'
 import { verifyTwoFactor, resendTwoFactorCode } from '../api/complianceSecurity'
 import { useUserStore } from '../stores/user'
-import { resolveDefaultHome } from '../access/policy'
 import { resolveAuthorizedLoginTarget } from '../router/permission'
 import { resetBedMapDatasetState } from '../composables/useBedMapDataset'
 
@@ -225,10 +224,6 @@ function fillDemo(username: string) {
   form.password = '123456'
 }
 
-function resolvePostLoginPath(roles: string[]) {
-  return resolveDefaultHome(roles)
-}
-
 async function onSubmit() {
   loading.value = true
   try {
@@ -281,10 +276,7 @@ async function finishLogin(res: any) {
   resetBedMapDatasetState()
   userStore.setAuth(res)
   const redirect = normalizeRedirectPath(typeof route.query.redirect === 'string' ? route.query.redirect : '')
-  const fallbackPath = resolvePostLoginPath(res.roles || [])
-  const nextPath = redirect
-    ? resolveAuthorizedLoginTarget(router, redirect, userStore.roles || [], userStore.pagePermissions || [], userStore.permissions || [])
-    : fallbackPath
+  const nextPath = resolveAuthorizedLoginTarget(router, redirect, userStore.roles || [], userStore.pagePermissions || [], userStore.permissions || [])
   await router.replace(nextPath)
   message.success(nextPath.startsWith('/workbench') ? '登录成功，已进入个人工作台' : '登录成功')
 }

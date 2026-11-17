@@ -1,5 +1,11 @@
 <template>
   <PageContainer title="制度更新预警" subTitle="超期未更新制度识别与提醒">
+    <template #extra>
+      <a-space>
+        <a-button @click="onExportCsv">导出 CSV</a-button>
+        <a-button @click="onExportExcel">导出 Excel</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="文档名/目录/上传人" allow-clear />
@@ -7,12 +13,7 @@
       <a-form-item label="超期天数">
         <a-input-number v-model:value="query.staleDays" :min="30" :max="2000" style="width: 160px" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="onExportCsv">导出 CSV</a-button>
-          <a-button @click="onExportExcel">导出 Excel</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable

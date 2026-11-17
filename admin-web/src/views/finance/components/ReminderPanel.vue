@@ -1,7 +1,7 @@
 <template>
   <div class="reminder-panel">
     <a-card class="card-elevated" :bordered="false">
-      <a-form layout="inline" :model="query">
+      <QueryBar layout="inline" :model="query" @finish="runSearch">
         <a-form-item label="状态">
           <a-select v-model:value="query.status" allow-clear placeholder="全部" style="width: 140px">
             <a-select-option value="PENDING">未处理</a-select-option>
@@ -16,22 +16,24 @@
             <a-select-option value="ELECTRICITY_UNPAID">电费未缴</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="runSearch">查询</a-button>
-            <a-button @click="reset">重置</a-button>
-            <a-button :loading="generating" @click="doGenerate">立即检查生成</a-button>
-            <a-button
-              danger
-              :disabled="!Number(summary?.pendingCount || 0)"
-              @click="confirmHandleAll"
-            >一键全部处理</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">查询</a-button>
+              <a-button @click="reset">重置</a-button>
+              <a-button :loading="generating" @click="doGenerate">立即检查生成</a-button>
+              <a-button
+                danger
+                :disabled="!Number(summary?.pendingCount || 0)"
+                @click="confirmHandleAll"
+              >一键全部处理</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
-    <a-row :gutter="[16, 16]" style="margin-top: 16px;">
+    <a-row class="business-stat-strip" :gutter="[16, 16]" style="margin-top: 16px;">
       <a-col :xs="24" :md="12" :xl="6">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic
@@ -108,6 +110,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../../components/ActionToolbar.vue'
+import QueryBar from '../../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { useRouter } from 'vue-router'

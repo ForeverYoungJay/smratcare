@@ -1,5 +1,11 @@
 <template>
   <PageContainer title="排班" subTitle="排班落日程、值班提醒、换班申请一体化管理">
+    <template #extra>
+      <a-space>
+        <a-button v-if="canManageSchedule" type="primary" @click="openEdit()">新增排班</a-button>
+        <a-button @click="fetchSwaps">刷新换班申请</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item v-if="canManageSchedule" label="员工">
         <a-select
@@ -24,12 +30,7 @@
       <a-form-item label="日期范围">
         <a-range-picker v-model:value="query.range" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button v-if="canManageSchedule" type="primary" @click="openEdit()">新增排班</a-button>
-          <a-button @click="fetchSwaps">刷新换班申请</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable

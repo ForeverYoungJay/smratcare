@@ -1,11 +1,11 @@
 <template>
   <PageContainer title="基础疾病维护" subTitle="医护侧统一维护长者基础疾病，并联动商城禁忌与配餐风险">
     <template #extra>
-      <a-space wrap>
+      <ActionToolbar wrap>
         <a-button @click="go('/medical-care/center')">服务中心</a-button>
         <a-button @click="go('/logistics/commerce/risk')">疾病字典/禁忌规则</a-button>
         <a-button type="primary" @click="fetchData">刷新</a-button>
-      </a-space>
+      </ActionToolbar>
     </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="长者">
@@ -60,6 +60,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'

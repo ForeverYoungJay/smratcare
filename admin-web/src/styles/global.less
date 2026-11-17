@@ -693,7 +693,7 @@ button.metric-chip:hover {
 }
 
 /* 适老：加高行高、放大正文字号，便于中老年工作人员长时间查看 */
-.ant-table-wrapper .ant-table-tbody > tr > td {
+.ant-table-wrapper .ant-table-tbody > tr:not(.ant-table-measure-row) > td {
   padding: 16px !important;
   color: var(--ink) !important;
   font-size: 14px !important;
@@ -705,9 +705,15 @@ button.metric-chip:hover {
   background: rgba(var(--primary-rgb), 0.04) !important;
 }
 
-.ant-table-wrapper .ant-table-cell-fix-right,
-.ant-table-wrapper .ant-table-cell-fix-left {
-  background: inherit !important;
+/* 固定列必须是实色，否则横向滚动时后面的列会透出来 */
+.ant-table-wrapper .ant-table-tbody > tr > td.ant-table-cell-fix-right,
+.ant-table-wrapper .ant-table-tbody > tr > td.ant-table-cell-fix-left {
+  background: #fff !important;
+}
+
+.ant-table-wrapper .ant-table-tbody > tr.ant-table-row:hover > td.ant-table-cell-fix-right,
+.ant-table-wrapper .ant-table-tbody > tr.ant-table-row:hover > td.ant-table-cell-fix-left {
+  background: #f8faf9 !important;
 }
 
 .ant-table-wrapper .ant-pagination {

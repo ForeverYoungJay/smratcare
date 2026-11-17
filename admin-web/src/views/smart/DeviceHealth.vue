@@ -1,6 +1,9 @@
 <template>
   <PageContainer title="设备健康监控" subTitle="心跳在线率 / 电量 / 信号巡检（心跳超时自动离线并生成设备离线告警）">
-    <a-row :gutter="16" class="stat-row">
+    <template #extra>
+      <a-button @click="fetchAll">刷新</a-button>
+    </template>
+    <a-row :gutter="16" class="stat-row business-stat-strip">
       <a-col :xs="12" :md="4">
         <a-card size="small"><a-statistic title="设备总数" :value="summary.totalCount" /></a-card>
       </a-col>
@@ -43,9 +46,7 @@
       <a-form-item label="仅弱信号">
         <a-switch v-model:checked="query.weakSignalOnly" />
       </a-form-item>
-      <template #extra>
-        <a-button @click="fetchAll">刷新</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable

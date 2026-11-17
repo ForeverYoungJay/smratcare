@@ -1,5 +1,12 @@
 <template>
   <PageContainer title="证书上传" subTitle="员工档案中心 / 证书上传">
+    <template #extra>
+      <ActionToolbar>
+        <a-button @click="onExportCsv">导出 CSV</a-button>
+        <a-button @click="onExportExcel">导出 Excel</a-button>
+        <a-button type="primary" @click="openDrawer">新增证书</a-button>
+      </ActionToolbar>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="证书名称/证书编号/颁发机构" allow-clear />
@@ -7,13 +14,7 @@
       <a-form-item label="有效期范围">
         <a-range-picker v-model:value="query.range" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="onExportCsv">导出 CSV</a-button>
-          <a-button @click="onExportExcel">导出 Excel</a-button>
-          <a-button type="primary" @click="openDrawer">新增证书</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable
@@ -81,6 +82,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import type { Dayjs } from 'dayjs'

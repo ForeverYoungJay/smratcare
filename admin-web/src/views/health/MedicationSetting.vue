@@ -1,16 +1,17 @@
 <template>
   <PageContainer title="用药设置" subTitle="维护老人用药方案与阈值">
+    <template #extra>
+      <a-space>
+        <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
+        <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
+        <a-button type="primary" @click="openCreate">新增设置</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
-          <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
-          <a-button type="primary" @click="openCreate">新增设置</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable
@@ -76,6 +77,7 @@
 </template>
 
 <script setup lang="ts">
+import { useCompletionGuide } from '../../composables/useCompletionGuide'
 import { reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'
@@ -97,6 +99,7 @@ import {
 } from '../../api/health'
 import type { HealthMedicationSetting, Id, PageResult } from '../../types'
 
+const showCompletion = useCompletionGuide()
 const loading = ref(false)
 const exporting = ref(false)
 const route = useRoute()
@@ -257,6 +260,7 @@ async function submit() {
       await createHealthMedicationSetting(payload)
     }
     message.success('保存成功')
+    showCompletion('用药设置已保存', [{ label: '查看用药登记', path: '/health/medication/medication-registration' }, { label: '查看药品余量', path: '/health/medication/medication-remaining' }])
     editOpen.value = false
     fetchData()
   } catch (error) {

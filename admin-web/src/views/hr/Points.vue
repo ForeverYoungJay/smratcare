@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="积分台账" subTitle="任务积分、奖励扣减与人工调整。">
+    <template #extra>
+      <a-button type="primary" @click="openAdjust">积分调整</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="员工">
         <a-select
@@ -18,9 +21,7 @@
       <a-form-item label="日期范围">
         <a-range-picker v-model:value="query.range" />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openAdjust">积分调整</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable

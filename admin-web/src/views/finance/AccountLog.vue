@@ -1,15 +1,16 @@
 <template>
   <PageContainer title="账户流水" subTitle="按老人查询流水记录">
+    <template #extra>
+      <a-button @click="printCurrentElderLogs">打印当前流水</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="老人姓名">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="姓名(编号)" width="220px" />
       </a-form-item>
-      <template #extra>
-        <a-button @click="printCurrentElderLogs">打印当前流水</a-button>
-      </template>
+
     </SearchForm>
 
-    <a-row :gutter="[12, 12]" style="margin-bottom: 12px;">
+    <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 12px;">
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="流水笔数" :value="rows.length" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="收入合计" :value="creditAmount" suffix="元" :precision="2" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="支出合计" :value="debitAmount" suffix="元" :precision="2" /></a-card></a-col>

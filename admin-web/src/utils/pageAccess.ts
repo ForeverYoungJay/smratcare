@@ -2,6 +2,7 @@ import type { RouteRecordRaw } from 'vue-router'
 import { routes } from '../router/routes'
 import rolePagePresets from '../../../src/main/resources/security/role-page-presets.json'
 import { toCanonicalRoutePath } from '../router/routeAliases'
+import { functionWorkspaces, getFunctionWorkspace, retainedWorkspacePermissionPaths } from '../workspaces/catalog'
 
 export interface PagePermissionNode {
   title: string
@@ -39,7 +40,7 @@ function joinPath(base: string, path: string): string {
 }
 
 function shouldIncludeRoute(route: RouteRecordRaw, fullPath: string) {
-  if (route.meta?.hidden || !route.meta?.title) {
+  if ((route.meta?.hidden && !retainedWorkspacePermissionPaths.has(fullPath)) || !route.meta?.title) {
     return false
   }
   if (fullPath.includes('/:')) {
@@ -51,9 +52,12 @@ function shouldIncludeRoute(route: RouteRecordRaw, fullPath: string) {
 function buildTree(routeList: RouteRecordRaw[], basePath = ''): PagePermissionNode[] {
   return (routeList || [])
     .map((route) => {
-      if (route.meta?.hidden || route.meta?.legacy) return null
       const fullPath = joinPath(basePath, String(route.path || ''))
-      const children = Array.isArray(route.children) ? buildTree(route.children, fullPath) : []
+      if ((route.meta?.hidden || route.meta?.legacy) && !retainedWorkspacePermissionPaths.has(fullPath)) return null
+      const workspace = getFunctionWorkspace(route.meta?.workspaceId)
+      const children = workspace
+        ? workspace.tabs.flatMap((tab) => tab.sources.filter((source) => source.path !== fullPath).map((source) => ({ title: tab.label, key: source.path })))
+        : Array.isArray(route.children) ? buildTree(route.children, fullPath) : []
       const includeSelf = shouldIncludeRoute(route, fullPath)
       if (!includeSelf && children.length === 0) {
         return null
@@ -82,6 +86,12 @@ const pagePermissionFlat: Array<{ path: string; title: string }> = []
 flattenTree(pagePermissionTree, pagePermissionFlat)
 const pageTitleMap = new Map(pagePermissionFlat.map((item) => [item.path, item.title]))
 const knownPagePaths = new Set(pagePermissionFlat.map((item) => item.path))
+// A hidden legacy entry can still be an existing account's exact grant.
+functionWorkspaces.forEach((workspace) => workspace.tabs.forEach((tab) => tab.sources.forEach((source) => {
+  const path = toCanonicalPermissionPath(source.path)
+  knownPagePaths.add(path)
+  if (!pageTitleMap.has(path)) pageTitleMap.set(path, `${workspace.title} / ${tab.label}`)
+})))
 
 export const ROLE_PAGE_PRESETS: Record<string, RolePagePreset> = rolePagePresets
 

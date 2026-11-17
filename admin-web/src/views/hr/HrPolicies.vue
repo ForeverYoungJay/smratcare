@@ -1,5 +1,13 @@
 <template>
   <PageContainer title="规章制度库" subTitle="制度文档归档与检索">
+    <template #extra>
+      <ActionToolbar>
+        <a-button @click="onExportCsv">导出 CSV</a-button>
+        <a-button @click="onExportExcel">导出 Excel</a-button>
+        <a-button type="primary" @click="openDrawer">新增制度</a-button>
+        <a-button @click="fetchData">刷新</a-button>
+      </ActionToolbar>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="文档名/上传人/备注" allow-clear />
@@ -7,14 +15,7 @@
       <a-form-item label="目录">
         <a-input v-model:value="query.folder" placeholder="默认检索制度相关目录" allow-clear />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="onExportCsv">导出 CSV</a-button>
-          <a-button @click="onExportExcel">导出 Excel</a-button>
-          <a-button type="primary" @click="openDrawer">新增制度</a-button>
-          <a-button @click="fetchData">刷新</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable
@@ -68,6 +69,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
 import { message } from 'ant-design-vue'

@@ -2,6 +2,7 @@ import type { Router } from 'vue-router'
 import { getPagePermissions, getPermissions, getRoles, getToken } from '../utils/auth'
 import { resolveRouteAccess } from '../utils/routeAccess'
 import { resolveDefaultHome } from '../access/policy'
+import { functionWorkspaces } from '../workspaces/catalog'
 
 function normalizeRedirectPath(path?: string | null) {
   const raw = String(path || '').trim()
@@ -20,8 +21,9 @@ export function resolveAuthorizedLoginTarget(router: Router, redirect: string, r
   const resolved = target ? router.resolve(target) : null
   if (resolved && resolved.matched.length && !resolved.matched.some((record) => record.name === 'NotFound')
     && resolved.path !== '/403'
-    && resolveRouteAccess(router, roles, resolved.path, pagePermissions, permissions).canAccess) return target
-  return resolveDefaultHome(roles)
+    && resolveRouteAccess(router, roles, resolved.fullPath, pagePermissions, permissions).canAccess) return target
+  const candidates = [resolveDefaultHome(roles), '/workbench/overview', ...functionWorkspaces.map((workspace) => workspace.path)]
+  return candidates.find((path) => resolveRouteAccess(router, roles, path, pagePermissions, permissions).canAccess) || '/403'
 }
 
 function resolveLoginRedirectTarget(fullPath: string) {
@@ -58,8 +60,12 @@ export function setupPermission(router: Router) {
 
     const roles = getRoles()
     const pagePermissions = getPagePermissions()
-    const access = resolveRouteAccess(router, roles, to.path, pagePermissions, getPermissions())
+    const access = resolveRouteAccess(router, roles, to.fullPath, pagePermissions, getPermissions())
     if (!access.canAccess) {
+      if (to.path === resolveDefaultHome(roles)) {
+        next(resolveAuthorizedLoginTarget(router, '', roles, pagePermissions, getPermissions()))
+        return
+      }
       next('/403')
       return
     }

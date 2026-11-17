@@ -1,5 +1,11 @@
 <template>
   <PageContainer title="事故登记" subTitle="事故/意外记录与追踪">
+    <template #extra>
+      <a-space>
+        <a-button @click="exportRows">导出</a-button>
+        <a-button type="primary" @click="openCreate">新增事故</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="老人姓名">
         <ElderNameAutocomplete v-model:value="query.elderName" placeholder="请输入老人姓名(编号)" width="240px" />
@@ -29,12 +35,7 @@
           show-time
         />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="exportRows">导出</a-button>
-          <a-button type="primary" @click="openCreate">新增事故</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable

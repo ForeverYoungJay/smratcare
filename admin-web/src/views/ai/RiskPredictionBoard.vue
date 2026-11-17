@@ -1,6 +1,6 @@
 <template>
   <PageContainer title="健康风险预测看板" subTitle="跌倒 / 压疮 / 再入院风险评分，高风险自动生成告警">
-    <a-row :gutter="12">
+    <a-row class="business-stat-strip" :gutter="12">
       <a-col :xs="12" :md="6">
         <a-card :bordered="false" class="card-elevated stat-card">
           <a-statistic title="覆盖长者" :value="summary.elderCount" />

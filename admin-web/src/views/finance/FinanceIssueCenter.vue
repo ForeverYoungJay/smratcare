@@ -1,13 +1,13 @@
 <template>
   <PageContainer title="异常修复中心" subTitle="统一承接对账、一致性巡检、催缴异常与退款修正">
     <div class="issue-shell">
-      <a-card class="issue-hero card-elevated" :bordered="false">
-        <div>
-          <div class="issue-hero__eyebrow">异常处置</div>
-          <h2>把分散在多个菜单里的财务异常压平到一个队列里。</h2>
+      <a-card class="issue-hero card-elevated business-overview" :bordered="false">
+        <details class="business-help">
+          <summary>使用说明</summary>
+          <p class="business-help-title">把分散在多个菜单里的财务异常压平到一个队列里。</p>
           <p>按风险和来源聚焦处理，减少“先找问题在哪个页面”的切换成本。</p>
-        </div>
-        <a-form layout="inline" :model="query" class="search-form">
+        </details>
+        <QueryBar layout="inline" :model="query" class="search-form" @finish="loadData">
           <a-form-item label="日期">
             <a-date-picker v-model:value="query.date" />
           </a-form-item>
@@ -26,21 +26,23 @@
               <a-select-option value="PAYMENT_ADJUSTMENT">退款/冲正</a-select-option>
             </a-select>
           </a-form-item>
-          <a-form-item>
+          <a-form-item label="关键词">
             <a-input v-model:value="query.keyword" allow-clear placeholder="长者 / 账单ID / 描述" style="width: 220px" />
           </a-form-item>
-          <a-form-item>
-            <a-space>
-              <a-button type="primary" @click="loadData">查询</a-button>
-              <a-button @click="exportData">导出</a-button>
-              <a-button @click="reset">重置</a-button>
-            </a-space>
-          </a-form-item>
-        </a-form>
+          <template #actions>
+            <ActionToolbar>
+              <a-space>
+                <a-button type="primary" html-type="submit">查询</a-button>
+                <a-button @click="exportData">导出</a-button>
+                <a-button @click="reset">重置</a-button>
+              </a-space>
+            </ActionToolbar>
+          </template>
+        </QueryBar>
       </a-card>
 
       <StatefulBlock style="margin-top: 16px;" :loading="loading" :error="errorMessage" @retry="loadData">
-        <a-row :gutter="[14, 14]">
+        <a-row class="business-stat-strip" :gutter="[14, 14]">
           <a-col :xs="24" :xl="6"><a-card class="card-elevated stat-slab" :bordered="false"><a-statistic title="当前异常数" :value="rows.length" /></a-card></a-col>
           <a-col :xs="24" :xl="6"><a-card class="card-elevated stat-slab" :bordered="false"><a-statistic title="高风险" :value="highRiskCount" /></a-card></a-col>
           <a-col :xs="24" :xl="6"><a-card class="card-elevated stat-slab" :bordered="false"><a-statistic title="涉及金额" :value="totalAmount" suffix="元" :precision="2" /></a-card></a-col>
@@ -141,6 +143,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

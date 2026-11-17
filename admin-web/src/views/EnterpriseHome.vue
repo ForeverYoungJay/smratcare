@@ -21,7 +21,7 @@
 
     <main id="main-content">
       <section class="hero">
-        <img class="hero-landscape" :src="images.guifeng" alt="龟峰山水风光" referrerpolicy="no-referrer" />
+        <img class="hero-landscape" :src="images.guifeng" alt="龟峰山水风光" fetchpriority="high" referrerpolicy="no-referrer" />
         <div class="hero-wash"></div>
         <div class="container hero-content">
           <div class="hero-copy">
@@ -37,7 +37,7 @@
 
       <section id="about" class="about-section section-pattern">
         <div class="container about-grid">
-          <figure class="about-photo"><img :src="images.guifeng" alt="龟峰山水风光" referrerpolicy="no-referrer" /><figcaption>山水福地</figcaption></figure>
+          <figure class="about-photo"><img :src="images.guifeng" alt="龟峰山水风光" loading="lazy" referrerpolicy="no-referrer" /><figcaption>山水福地</figcaption></figure>
           <div class="about-copy"><p class="eyebrow">认识龟峰颐养中心</p><h2>依山傍水，颐养天年</h2><p>弋阳龟峰颐养中心立足本地养老服务需求，以专业照护为基础，以长者尊严、健康与生活感受为中心，营造安全、舒适、温馨的颐养环境。</p><p>生活照护、健康管理、康复支持、营养膳食与文化娱乐协同，让晚年生活既有保障，也有温度。</p><a class="small-button" href="/about.html">了解更多 →</a></div>
           <div class="about-features"><article v-for="item in featureCards" :key="item.title"><span>{{ item.icon }}</span><div><h3>{{ item.title }}</h3><p>{{ item.desc }}</p></div></article></div>
         </div>

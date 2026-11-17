@@ -16,7 +16,7 @@
       <template #after-metrics>
         <div class="nursing-dashboard">
           <section class="nursing-panel nursing-panel--tasks" aria-label="当前班次任务">
-            <div class="nursing-panel__heading"><h2>当前班次任务 <small>({{ tasks.length }})</small></h2><a-button type="link" @click="open('/care/today')">查看全部 →</a-button></div>
+            <div class="nursing-panel__heading"><h2>当前班次任务 <small>({{ tasks.length }})</small></h2><a-space><a-button v-if="canViewTaskBoard" type="link" @click="open('/medical-care/care-task-board?view=time')">时段/长者看板</a-button><a-button type="link" @click="open('/care/today')">查看全部 →</a-button></a-space></div>
             <div class="nursing-tabs" role="group" aria-label="任务状态筛选">
               <button v-for="item in taskTabs" :key="item.key" type="button" :aria-pressed="taskTab === item.key" :class="{ active: taskTab === item.key }" @click="taskTab = item.key">{{ item.label }}</button>
             </div>
@@ -47,6 +47,8 @@
 import { computed, onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '../../stores/user'
+import { resolveRouteAccess } from '../../utils/routeAccess'
 import PageContainer from '../../components/PageContainer.vue'
 import DepartmentHomeOverview from '../../components/workbench/DepartmentHomeOverview.vue'
 import { getTaskSummary, getTodayTasks } from '../../api/care'
@@ -60,6 +62,8 @@ const taskError = ref('')
 const taskTab = ref<'all' | 'pending' | 'done'>('all')
 const taskTabs = [{ key: 'all', label: '全部' }, { key: 'pending', label: '待执行' }, { key: 'done', label: '已完成' }] as const
 const router = useRouter()
+const user = useUserStore()
+const canViewTaskBoard = computed(() => resolveRouteAccess(router, user.roles, '/medical-care/care-task-board', user.pagePermissions, user.permissions).canAccess)
 const dataState = ref<DepartmentHomeDataState>('loading')
 const errorMessage = ref('')
 const updatedAt = ref('')

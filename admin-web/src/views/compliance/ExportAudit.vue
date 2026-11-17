@@ -5,7 +5,7 @@
     </template>
 
     <a-card class="card-elevated" :bordered="false" style="margin-bottom: 16px;">
-      <a-form layout="inline">
+      <QueryBar :model="query" @finish="search">
         <a-form-item label="模块">
           <a-input v-model:value="query.module" allow-clear placeholder="如 ELDER_LIST" style="width: 180px" />
         </a-form-item>
@@ -19,13 +19,13 @@
         <a-form-item label="日期">
           <a-range-picker v-model:value="dateRange" value-format="YYYY-MM-DD" />
         </a-form-item>
-        <a-form-item>
+        <template #actions>
           <a-space>
-            <a-button type="primary" @click="search">查询</a-button>
+            <a-button type="primary" html-type="submit">查询</a-button>
             <a-button @click="reset">重置</a-button>
           </a-space>
-        </a-form-item>
-      </a-form>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false">
@@ -52,6 +52,7 @@
 </template>
 
 <script setup lang="ts">
+import QueryBar from '../../components/QueryBar.vue'
 import { onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'

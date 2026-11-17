@@ -140,7 +140,8 @@ public class SecurityConfig {
                 "GUARD",
                 "LOGISTICS_EMPLOYEE", "LOGISTICS_MINISTER",
                 "DIRECTOR", "SYS_ADMIN", "ADMIN")
-            .requestMatchers("/api/guard/**").hasAnyRole("GUARD", "ADMIN")
+            // 来访登记由门卫和后勤（前台）办理
+            .requestMatchers("/api/guard/**").hasAnyRole("GUARD", "LOGISTICS_EMPLOYEE", "LOGISTICS_MINISTER", "ADMIN")
             .requestMatchers("/api/family/**").hasRole("FAMILY")
             .requestMatchers("/api/**").hasAnyRole(STAFF_ROLES)
             .anyRequest().authenticated())

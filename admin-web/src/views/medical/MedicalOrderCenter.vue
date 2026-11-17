@@ -114,7 +114,7 @@
       </a-col>
     </a-row>
 
-    <a-space wrap style="margin-bottom: 12px">
+    <ActionToolbar wrap style="margin-bottom: 12px">
       <a-checkable-tag :checked="activeQuickFilter === 'ALL'" @change="() => applyQuickFilter('ALL')">全部</a-checkable-tag>
       <a-checkable-tag :checked="activeQuickFilter === 'PENDING'" @change="() => applyQuickFilter('PENDING')">待执行</a-checkable-tag>
       <a-checkable-tag :checked="activeQuickFilter === 'DONE'" @change="() => applyQuickFilter('DONE')">已执行</a-checkable-tag>
@@ -129,7 +129,7 @@
       <a-tag color="orange">逾期待执行 {{ overduePendingCount }} 条</a-tag>
       <a-tag color="volcano">高风险 {{ highRiskCount }} 条</a-tag>
       <a-tag color="gold">即将超时 {{ imminentCount }} 条</a-tag>
-    </a-space>
+    </ActionToolbar>
 
     <DataTable
       :filter-model="query"
@@ -173,6 +173,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs, { type Dayjs } from 'dayjs'

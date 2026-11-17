@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="出库记录" subTitle="销售/领用出库明细">
     <a-card class="card-elevated" :bordered="false">
-      <a-form layout="inline" :model="query" class="search-form">
+      <QueryBar layout="inline" :model="query" class="search-form">
         <a-form-item label="出库类型">
           <a-select v-model:value="query.outType" allow-clear style="width: 140px">
             <a-select-option value="SALE">销售</a-select-option>
@@ -41,13 +41,15 @@
         <a-form-item label="日期">
           <a-range-picker v-model:value="query.range" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="handleSearch">搜索</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="handleSearch">搜索</a-button>
+              <a-button @click="reset">重置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
@@ -57,7 +59,7 @@
           <a-button @click="exportCsvData">导出CSV</a-button>
         </a-space>
       </div>
-      <a-row :gutter="12" style="margin-bottom: 12px">
+      <a-row class="business-stat-strip" :gutter="12" style="margin-bottom: 12px">
         <a-col :span="6"><a-statistic title="固定资产出库" :value="summaryStats.assetQty" /></a-col>
         <a-col :span="6"><a-statistic title="耗材出库" :value="summaryStats.consumableQty" /></a-col>
         <a-col :span="6"><a-statistic title="食材出库" :value="summaryStats.foodQty" /></a-col>
@@ -121,7 +123,7 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="领用单待确认">
-      <a-form layout="inline" :model="sheetQuery" class="search-form" style="margin-bottom: 12px;">
+      <QueryBar layout="inline" :model="sheetQuery" class="search-form" style="margin-bottom: 12px;" @finish="fetchSheetData">
         <a-form-item label="状态">
           <a-select v-model:value="sheetQuery.status" allow-clear style="width: 140px">
             <a-select-option value="DRAFT">待确认</a-select-option>
@@ -131,20 +133,22 @@
         <a-form-item label="关键字">
           <a-input v-model:value="sheetQuery.keyword" placeholder="领用单号/领取人" allow-clear />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="fetchSheetData">查询</a-button>
-            <a-button @click="resetSheetQuery">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
-      <a-row :gutter="12" class="sheet-summary">
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="fetchSheetData">查询</a-button>
+              <a-button @click="resetSheetQuery">重置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
+      <a-row :gutter="12" class="sheet-summary business-stat-strip">
         <a-col :span="6"><a-statistic title="关联长者领用单" :value="sheetSummary.elderLinkedCount" /></a-col>
         <a-col :span="6"><a-statistic title="耗材领用数量" :value="sheetSummary.consumableQty" /></a-col>
         <a-col :span="6"><a-statistic title="待确认领用单" :value="sheetSummary.draftCount" /></a-col>
         <a-col :span="6"><a-statistic title="已确认领用单" :value="sheetSummary.confirmedCount" /></a-col>
       </a-row>
-      <a-space style="margin-bottom: 8px" wrap>
+      <ActionToolbar style="margin-bottom: 8px" wrap>
         <a-button :disabled="selectedSheetRowKeys.length !== 1" @click="openSelectedSheetDetail">详情</a-button>
         <a-button :disabled="selectedSheetRowKeys.length === 0" @click="printSelectedSheets">打印领取单</a-button>
         <a-button :disabled="selectedSheetRowKeys.length === 0" @click="downloadSelectedSheetsPdf">导出PDF</a-button>
@@ -152,7 +156,7 @@
         <a-button :disabled="selectedDraftSheetIds.length === 0" @click="submitSelectedSheetsApproval">发起出库审批</a-button>
         <a-button type="primary" :disabled="selectedDraftSheetIds.length === 0" @click="confirmSelectedSheets">确认出库</a-button>
         <a-button :disabled="selectedSheetRowKeys.length === 0" @click="clearSheetSelection">清空勾选</a-button>
-      </a-space>
+      </ActionToolbar>
       <a-table
         row-key="id"
         :loading="sheetLoading"
@@ -356,6 +360,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'

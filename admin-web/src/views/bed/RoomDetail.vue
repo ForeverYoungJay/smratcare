@@ -28,7 +28,7 @@
         <a-date-picker v-model:value="opsMonth" picker="month" :allow-clear="false" style="width: 150px" />
       </div>
       <a-spin :spinning="opsLoading">
-        <a-row :gutter="[16, 16]">
+        <a-row class="business-stat-strip" :gutter="[16, 16]">
           <a-col :xs="24" :sm="12" :xl="6">
             <a-statistic title="收入" :value="Number(ops?.income || 0)" :precision="2" suffix="元" />
           </a-col>
@@ -109,7 +109,7 @@
                 <a-empty v-if="!families.length" description="暂无绑定家属" />
 
                 <div class="block-title">缴费摘要</div>
-                <a-row :gutter="[12, 12]">
+                <a-row class="business-stat-strip" :gutter="[12, 12]">
                   <a-col :xs="12" :md="6">
                     <a-statistic title="本月应收" :value="Number(billSummary.total)" :precision="2" suffix="元" />
                   </a-col>

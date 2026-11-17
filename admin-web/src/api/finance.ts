@@ -42,6 +42,7 @@ import type {
   FinanceConfigImpactPreview,
   FinanceConfigImpactPreviewRequest,
   FinanceBillingConfigEntry,
+  BillingCareLevelFee,
   FinanceBillingConfigUpsertRequest,
   FinanceBillingConfigBatchUpsertRequest,
   FinanceConfigChangeLogItem,
@@ -515,6 +516,18 @@ export function getFinanceBillingConfig(params?: { month?: string; keyPrefix?: s
 
 export function upsertFinanceBillingConfig(data: FinanceBillingConfigUpsertRequest) {
   return request.post<FinanceBillingConfigEntry>('/api/finance/workbench/billing-config', data)
+}
+
+export function getBillingCareLevelFees(orgId: Id) {
+  return request.get<BillingCareLevelFee[]>('/api/admin/billing/care-level', { params: { orgId } })
+}
+
+export function getBillingFeeHistory(orgId: Id) {
+  return request.get<FinanceBillingConfigEntry[]>('/api/admin/billing/config', { params: { orgId } })
+}
+
+export function upsertBillingCareLevelFee(data: BillingCareLevelFee) {
+  return request.post<BillingCareLevelFee>('/api/admin/billing/care-level', data)
 }
 
 export function batchUpsertFinanceBillingConfig(data: FinanceBillingConfigBatchUpsertRequest) {

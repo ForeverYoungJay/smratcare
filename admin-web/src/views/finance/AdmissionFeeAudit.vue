@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="入住费用审核" subTitle="登记并审核入住费用与押金信息">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新建审核单</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <ElderNameAutocomplete v-model:value="query.keyword" allow-clear placeholder="老人姓名(编号)" width="220px" />
@@ -7,9 +10,7 @@
       <a-form-item label="状态">
         <a-select v-model:value="query.status" allow-clear style="width: 180px" :options="statusOptions" />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openCreate">新建审核单</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable

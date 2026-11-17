@@ -1,5 +1,13 @@
 <template>
   <PageContainer title="家属反馈与沟通" subTitle="处理家属端在线沟通、语音留言、满意度评价、投诉建议与探视预约">
+    <template #extra>
+      <a-space wrap>
+        <a-button type="primary" @click="fetchData">刷新</a-button>
+        <a-button :disabled="!selectedRecord" @click="markSelected('PROCESSING')">标记处理中</a-button>
+        <a-button :disabled="!selectedRecord" type="primary" @click="openHandle(selectedRecord, 'DONE')">处理反馈</a-button>
+        <a-button :disabled="!selectedRecord" danger @click="openHandle(selectedRecord, 'CLOSED')">关闭</a-button>
+      </a-space>
+    </template>
     <template #meta>
       <span class="soft-pill">待处理 {{ pendingCount }}</span>
       <span class="soft-pill">处理中 {{ processingCount }}</span>
@@ -18,14 +26,7 @@
           <a-select-option value="CLOSED">已关闭</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-space wrap>
-          <a-button type="primary" @click="fetchData">刷新</a-button>
-          <a-button :disabled="!selectedRecord" @click="markSelected('PROCESSING')">标记处理中</a-button>
-          <a-button :disabled="!selectedRecord" type="primary" @click="openHandle(selectedRecord, 'DONE')">处理反馈</a-button>
-          <a-button :disabled="!selectedRecord" danger @click="openHandle(selectedRecord, 'CLOSED')">关闭</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <a-alert

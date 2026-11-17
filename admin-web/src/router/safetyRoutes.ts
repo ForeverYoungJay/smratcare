@@ -20,6 +20,12 @@ export const safetyRoutes: RouteRecordRaw[] = [
             meta: { title: '消防导航', hidden: true }
           },
           {
+            path: 'video',
+            name: 'FireVideoManagement',
+            component: () => import('../views/fire/VideoManagement.vue'),
+            meta: { title: '摄像头录像管理', roles: ['LOGISTICS_EMPLOYEE', 'LOGISTICS_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
+          },
+          {
             path: 'facility-management',
             name: 'FireFacilityManagement',
             component: () => import('../views/fire/FacilityManagement.vue'),

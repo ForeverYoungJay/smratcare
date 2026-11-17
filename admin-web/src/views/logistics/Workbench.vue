@@ -39,7 +39,7 @@
           <a-tag color="volcano">维修超时 {{ configuredQuery.overdueDays }} 天</a-tag>
           <a-tag color="cyan">维保临近 {{ configuredQuery.maintenanceDueDays }} 天</a-tag>
         </a-space>
-        <a-space wrap>
+        <ActionToolbar wrap>
           <a-tooltip title="口径最宽：统计近 60 天，临期 45 天、维修超时 4 天才算。报警最少，风险指数最低。">
             <a-button size="small" @click="applyPreset('stable')">稳健预设</a-button>
           </a-tooltip>
@@ -51,7 +51,7 @@
           </a-tooltip>
           <a-button size="small" type="primary" @click="applyFilters">应用参数</a-button>
           <a-button size="small" @click="resetFilters">恢复默认</a-button>
-        </a-space>
+        </ActionToolbar>
       </div>
       <a-form layout="inline" class="filter-form" @submit.prevent>
         <a-form-item label="统计窗口">
@@ -78,11 +78,11 @@
       :description="signedLinkageContext.description"
     >
       <template #action>
-        <a-space wrap>
+        <ActionToolbar wrap>
           <a-button size="small" @click="go('/elder/resident-360?residentId=' + signedLinkageContext.residentId + '&from=contractSigned')">长者总览</a-button>
           <a-button size="small" @click="go('/logistics/assets/room-state-map?from=contractSigned')">房态图</a-button>
           <a-button size="small" @click="go('/logistics/task-center?source=contract_signed&entryScene=signed_onboarding&residentId=' + signedLinkageContext.residentId + '&residentName=' + encodeURIComponent(signedLinkageContext.residentName || '') + '&tab=delivery')">后勤任务中心</a-button>
-        </a-space>
+        </ActionToolbar>
       </template>
     </a-alert>
 
@@ -179,6 +179,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'

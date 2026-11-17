@@ -42,7 +42,7 @@
         :message="summary.aiCareSummary || '暂无AI护理摘要'"
         :description="summary.familyReadableSummary || '暂无家属可读摘要'"
       />
-      <a-row :gutter="16" class="quality-row">
+      <a-row :gutter="16" class="quality-row business-stat-strip">
         <a-col :span="6">
           <a-statistic title="计划达成率" :value="pct(summary.planAchievementRate)" />
         </a-col>
@@ -56,7 +56,7 @@
           <a-statistic title="可疑执行" :value="summary.suspiciousExecutionCount || 0" />
         </a-col>
       </a-row>
-      <a-row :gutter="16" class="quality-row">
+      <a-row :gutter="16" class="quality-row business-stat-strip">
         <a-col :span="6">
           <a-statistic title="异常任务" :value="summary.exceptionTaskCount || 0" />
         </a-col>

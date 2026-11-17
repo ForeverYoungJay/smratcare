@@ -1,16 +1,16 @@
 <template>
   <PageContainer title="家属充值台账" subTitle="集中查看家属端充值、待支付、异常关闭与到账情况，方便运营和财务协同处理">
     <template #extra>
-      <a-space wrap>
+      <ActionToolbar wrap>
         <a-button :loading="loading" @click="loadData">刷新</a-button>
         <a-button @click="go('/oa/family-users')">家属账号</a-button>
         <a-button @click="go('/oa/family-service-health')">运行健康</a-button>
         <a-button @click="go('/oa/work-execution/family-communication')">沟通处理</a-button>
-      </a-space>
+      </ActionToolbar>
     </template>
 
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline" class="search-form">
+      <QueryBar :model="query" layout="inline" class="search-form" @finish="applySearch">
         <a-form-item label="状态">
           <a-select v-model:value="query.status" allow-clear style="width: 150px">
             <a-select-option value="INIT">待创建</a-select-option>
@@ -32,13 +32,15 @@
         <a-form-item label="关键字">
           <a-input v-model:value="query.keyword" allow-clear placeholder="家属/老人/订单号/备注" style="width: 260px" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="applySearch">搜索</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="applySearch">搜索</a-button>
+              <a-button @click="reset">重置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <section class="summary-grid">
@@ -127,6 +129,8 @@
 </template>
 
 <script setup lang="ts">
+import QueryBar from '../../components/QueryBar.vue'
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'

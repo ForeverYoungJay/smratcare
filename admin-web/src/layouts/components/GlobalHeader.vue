@@ -94,7 +94,8 @@ defineEmits<{
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 56px;
+  min-height: 52px;
+  height: auto;
   padding: 0 16px;
   border-bottom: 1px solid var(--border-soft);
   background: rgba(255, 255, 255, 0.95);
@@ -324,5 +325,14 @@ defineEmits<{
   .global-header__user {
     padding: 2px;
   }
+}
+@media (max-width: 768px) {
+  .global-header { flex-direction:row;align-items:center;gap:8px;min-height:52px;padding:6px 10px; }
+  .global-header__left { flex:1;min-width:0; }
+  .global-header__title-block { min-width:0; }
+  .global-header__page-title { white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+  .global-header__right { flex:0 0 auto;flex-wrap:nowrap;gap:4px; }
+  .global-header__search { flex:none;min-width:0;width:36px;padding:0;justify-content:center; }
+  .global-header__search-label,.global-header__search-shortcut,.global-header__user strong { display:none; }
 }
 </style>

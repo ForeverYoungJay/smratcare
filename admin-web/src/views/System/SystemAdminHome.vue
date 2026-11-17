@@ -2,7 +2,7 @@
   <PageContainer
     title="系统管理首页"
     subTitle="集中管理角色权限、组织信息和系统安全配置，不承载护理、医务、收费等日常业务操作"
-    mode="showcase"
+    mode="workspace"
     kicker="系统治理"
   >
     <template #meta>
@@ -11,15 +11,6 @@
         <StatusTag text="配置与业务分离" tone="normal" />
       </a-space>
     </template>
-
-    <section class="system-command">
-      <div>
-        <span>ACCESS · ORGANIZATION · SECURITY</span>
-        <h2>先确认授权边界，再维护组织与安全策略。</h2>
-        <p>这里只呈现当前账号真正有权进入的系统能力。未授权页面不会出现在入口中，直接访问仍由统一路由守卫拦截。</p>
-      </div>
-      <StatusTag :text="`${visibleActions.length} 个授权入口`" tone="normal" />
-    </section>
 
     <section class="system-action-grid" aria-label="系统管理快捷入口">
       <button v-for="action in visibleActions" :key="action.path" type="button" @click="open(action.path)">
@@ -30,6 +21,7 @@
       </button>
     </section>
 
+    <details class="system-help"><summary>查看配置顺序与职责说明</summary>
     <div class="system-columns">
       <WorkbenchModuleCard title="建议管理顺序" eyebrow="配置流程">
         <ol class="system-steps">
@@ -53,6 +45,7 @@
         </div>
       </WorkbenchModuleCard>
     </div>
+    </details>
   </PageContainer>
 </template>
 
@@ -69,12 +62,10 @@ import { resolveRouteAccess } from '../../utils/routeAccess'
 const router = useRouter()
 const userStore = useUserStore()
 const actions = [
-  { code: 'RBAC', title: '角色与权限', description: '维护角色页面范围和操作授权。', path: '/system/role' },
-  { code: 'DEPT', title: '部门管理', description: '维护部门结构与岗位归属。', path: '/system/department' },
-  { code: 'ORG', title: '机构信息', description: '核对机构基础信息和主体资料。', path: '/system/org-info' },
-  { code: 'SAFE', title: '安全策略', description: '配置访问规则和敏感操作保护。', path: '/stats/security-policy' },
-  { code: 'AUDIT', title: '敏感访问审计', description: '检查敏感数据访问和异常记录。', path: '/stats/sensitive-access-audit' },
-  { code: 'EXPORT', title: '导出审计', description: '追踪数据导出及责任账号。', path: '/stats/export-audit' }
+  { code: 'ORG', title: '组织与权限', description: '维护机构、部门和岗位授权。', path: '/system/department' },
+  { code: 'SAFE', title: '安全与审计', description: '核对访问、导出记录与登录安全策略。', path: '/stats/sensitive-access-audit' },
+  { code: 'DATA', title: '基础数据', description: '维护分类、渠道、费用与业务字典。', path: '/base-config/elder-type' },
+  { code: 'SITE', title: '官网配置', description: '维护机构展示内容与预约留言。', path: '/system/site-config' }
 ]
 
 function canAccess(path: string) {
@@ -93,6 +84,8 @@ function open(path: string) {
 </script>
 
 <style scoped>
+.system-help { margin-top:18px; }
+.system-help summary { cursor:pointer; padding:12px 0; color:var(--primary, #27785c); }
 .system-command { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 24px; border: 1px solid #cfd9df; border-left: 6px solid #315b70; background: #f2f6f8; }
 .system-command span { color: #60717a; font-size: 12px; font-weight: 700; letter-spacing: .1em; }
 .system-command h2 { margin: 7px 0; color: #253a45; font-size: 22px; }

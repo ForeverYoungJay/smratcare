@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="菜单预览" subTitle="当前用户可见菜单树">
     <a-card class="card-elevated" :bordered="false">
-      <a-row :gutter="[12, 12]">
+      <a-row class="business-stat-strip" :gutter="[12, 12]">
         <a-col :xs="12" :lg="6">
           <a-statistic title="角色数" :value="roles.length" />
         </a-col>

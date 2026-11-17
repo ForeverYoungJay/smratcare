@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="运营看板" subTitle="实时运行明细与趋势下钻；首页只给院长视角的汇总结论">
     <StatefulBlock :loading="loading" :error="errorMessage" @retry="loadSummary">
-      <a-row :gutter="16">
+      <a-row class="business-stat-strip" :gutter="16">
         <a-col :xs="24" :sm="12" :lg="6" v-for="card in coreCards" :key="card.title">
           <PermissionGuardCard
             :can-access="card.canAccess"
@@ -33,7 +33,7 @@
           口径说明：{{ metricCatalog.defaultWindow || '最近6个月' }}；总消费=账单消费+商城消费；总收入=账单总额。
         </div>
         <div class="window-toolbar">
-          <a-space size="small" wrap>
+          <ActionToolbar size="small" wrap>
             <span class="hint-text">统计窗口</span>
             <a-button size="small" :type="activeWindowPreset === 3 ? 'primary' : 'default'" @click="applyWindowPreset(3)">
               近3个月
@@ -48,9 +48,9 @@
               全部口径
             </a-button>
             <a-tag color="cyan">{{ activeWindowText }}</a-tag>
-          </a-space>
+          </ActionToolbar>
         </div>
-        <a-row :gutter="[16, 16]">
+        <a-row class="business-stat-strip" :gutter="[16, 16]">
           <a-col :xs="24" :sm="12" :lg="8" v-for="item in visibleUnifiedCards" :key="item.title">
             <PermissionGuardCard
               size="small"
@@ -251,6 +251,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../components/ActionToolbar.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import VChart from 'vue-echarts'
 import PageContainer from '../components/PageContainer.vue'

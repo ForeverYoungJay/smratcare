@@ -1,5 +1,5 @@
 <template>
-  <section class="department-home" :class="[`department-home--${department.toLowerCase()}`, { 'department-home--embedded': !showHeader }]">
+  <section class="department-home" :class="[`department-home--${department.toLowerCase()}`, { 'department-home--embedded': !showHeader, 'department-home--compact': !showCatalog }]">
     <header v-if="showHeader" class="department-home__header">
       <img :src="visualAssets.scenicMountain.url" alt="" aria-hidden="true" class="department-home__scenery" />
       <span class="department-home__scenery-veil" aria-hidden="true"></span>
@@ -23,7 +23,7 @@
       <button v-for="metric in visibleMetrics" :key="metric.key" type="button" :class="`is-${metric.tone || 'normal'}`" @click="go(metric.path)">
         <span>{{ metric.label }}</span>
         <strong>{{ formatMetric(metric) }}</strong>
-        <small>{{ metric.helper || '查看明细' }}</small>
+        <small v-if="metric.helper || showCatalog">{{ metric.helper || '查看明细' }}</small>
         <span class="department-home__metric-arrow" aria-hidden="true">›</span>
       </button>
     </div>
@@ -298,4 +298,10 @@ function go(path: string) {
 .department-home button:focus-visible { outline: 3px solid color-mix(in srgb, var(--dept-accent) 30%, transparent); outline-offset: 2px; }
 @media (max-width: 1100px) { .department-home__metrics, .department-home__tiles { grid-template-columns: repeat(2, 1fr); } .department-home__flow ol { grid-template-columns: 1fr; } .department-home__flow button { grid-template-columns: 40px 1fr auto; } }
 @media (max-width: 720px) { .department-home { padding: 15px; } .department-home__header { align-items: stretch; flex-direction: column; } .department-home__tools { min-width: 0; } .department-home__metrics, .department-home__tiles { grid-template-columns: 1fr; } .department-home h2 { font-size: 23px; } }
+
+@media(max-width:700px) {
+  .department-home--compact .department-home__metrics { grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; }
+  .department-home--compact .department-home__metrics button { min-height:88px; padding:12px; }
+  .department-home--compact .department-home__metrics strong { font-size:22px; }
+}
 </style>

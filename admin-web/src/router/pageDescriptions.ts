@@ -258,6 +258,7 @@ export const PAGE_DESCRIPTIONS: Record<string, string> = {
   MedicalCareAiReports: 'AI 健康评估报告',
 
   // ===== 消防安全 =====
+  FireVideoManagement: '摄像头档案、私有录像回放与90天留存管理',
   FireSafety: '消防设施、值班巡查与维保管理',
   FireFacilityManagement: '消防设施台账',
   FireControlRoomDuty: '控制室值班记录',

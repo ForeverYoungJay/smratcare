@@ -1,47 +1,26 @@
 <template>
   <PageContainer :title="pageTitle" subTitle="统一维护老人、营销、入住、活动、社区及费用等基础字典">
+    <template #extra>
+      <a-button type="primary" @click="openCreate" :disabled="!activeGroup">新增配置项</a-button>
+    </template>
     <template #meta>
       <a-space wrap size="small">
         <span class="soft-pill">当前分组：{{ activeGroupLabel }}</span>
-        <span class="soft-pill">可维护分组：{{ displayGroups.length }}</span>
         <span class="selection-pill">已勾选：{{ selectedRowKeys.length }} 项</span>
         <span v-for="tag in filterSummaryTags" :key="tag" class="soft-pill">{{ tag }}</span>
       </a-space>
     </template>
 
-    <template #stats>
-      <div class="metric-grid metric-grid--4">
-        <div class="metric-card">
-          <span>当前分组记录</span>
-          <strong>{{ total }}</strong>
-          <small>便于快速掌握该字典规模</small>
-        </div>
-        <div class="metric-card">
-          <span>当前页启用项</span>
-          <strong>{{ currentPageEnabledCount }}</strong>
-          <small>优先确认实际生效配置</small>
-        </div>
-        <div class="metric-card">
-          <span>当前页停用项</span>
-          <strong>{{ currentPageDisabledCount }}</strong>
-          <small>减少误用历史配置</small>
-        </div>
-        <div class="metric-card">
-          <span>待批量处理</span>
-          <strong>{{ selectedRowKeys.length }}</strong>
-          <small>支持启停和导出前集中确认</small>
-        </div>
-      </div>
-    </template>
+
 
     <a-card class="card-elevated" :bordered="false">
       <a-tabs v-if="showTabs" v-model:activeKey="activeGroup" @change="onGroupChange">
         <a-tab-pane v-for="item in displayGroups" :key="item.code" :tab="item.label" />
       </a-tabs>
 
-      <a-form :model="query" layout="inline" class="search-bar">
+      <QueryBar :model="query" layout="inline" class="search-bar" @finish="fetchData">
         <a-form-item label="关键词">
-          <a-input v-model:value="query.keyword" placeholder="名称/编码" allow-clear @pressEnter="fetchData" />
+          <a-input v-model:value="query.keyword" placeholder="名称/编码" allow-clear  />
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="query.status" allow-clear style="width: 140px">
@@ -49,25 +28,31 @@
             <a-select-option :value="0">停用</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item class="search-actions-item">
+        <template #actions>
           <a-space class="search-actions" wrap>
-            <a-button type="primary" @click="fetchData">查询</a-button>
+            <a-button type="primary" html-type="submit">查询</a-button>
             <a-button @click="reset">重置</a-button>
-            <a-button type="primary" @click="openCreate" :disabled="!activeGroup">新增配置项</a-button>
-            <a-button :disabled="selectedRowKeys.length === 0" @click="batchToggleStatus(1)">批量启用</a-button>
-            <a-button :disabled="selectedRowKeys.length === 0" @click="batchToggleStatus(0)">批量停用</a-button>
-            <a-button v-if="showResidencePresetAction" @click="fillResidencePresets" :disabled="!activeGroup">一键补全默认项</a-button>
-            <a-button v-if="showBuildingSyncAction" @click="syncBuildingsToPanorama" :loading="syncingBuildings" :disabled="!activeGroup">
-              同步到床态全景
-            </a-button>
-            <a-button @click="downloadExport" :disabled="!activeGroup">导出CSV</a-button>
-            <a-button @click="downloadImportTemplate">导入模板</a-button>
-            <a-upload :before-upload="beforeImport" :show-upload-list="false" accept=".csv" :disabled="!activeGroup">
-              <a-button :disabled="!activeGroup">导入CSV/错误文件</a-button>
-            </a-upload>
+            <a-popover trigger="click" placement="bottomRight">
+              <template #content>
+                <div class="config-secondary-actions">
+                  <a-button :disabled="selectedRowKeys.length === 0" @click="batchToggleStatus(1)">批量启用</a-button>
+                  <a-button :disabled="selectedRowKeys.length === 0" @click="batchToggleStatus(0)">批量停用</a-button>
+                  <a-button v-if="showResidencePresetAction" @click="fillResidencePresets" :disabled="!activeGroup">一键补全默认项</a-button>
+                  <a-button v-if="showBuildingSyncAction" @click="syncBuildingsToPanorama" :loading="syncingBuildings" :disabled="!activeGroup">
+                    同步到床态全景
+                  </a-button>
+                  <a-button @click="downloadExport" :disabled="!activeGroup">导出CSV</a-button>
+                  <a-button @click="downloadImportTemplate">导入模板</a-button>
+                  <a-upload :before-upload="beforeImport" :show-upload-list="false" accept=".csv" :disabled="!activeGroup">
+                    <a-button :disabled="!activeGroup">导入CSV/错误文件</a-button>
+                  </a-upload>
+                </div>
+              </template>
+              <a-button>更多操作</a-button>
+            </a-popover>
           </a-space>
-        </a-form-item>
-      </a-form>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
@@ -210,6 +195,7 @@
 </template>
 
 <script setup lang="ts">
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
@@ -291,12 +277,12 @@ const rules: FormRules = {
 }
 
 const columns = computed(() => [
-  { title: '分组', dataIndex: 'configGroup', key: 'configGroup', width: 180 },
+  ...(!props.groupCode ? [{ title: '分组', dataIndex: 'configGroup', key: 'configGroup', width: 180 }] : []),
   { title: '配置名称', dataIndex: 'itemName', key: 'itemName', width: 180 },
   { title: '配置编码', dataIndex: 'itemCode', key: 'itemCode', width: 180 },
   { title: '排序', dataIndex: 'sortNo', key: 'sortNo', width: 100 },
   { title: '状态', key: 'status', width: 100 },
-  { title: '备注', dataIndex: 'remark', key: 'remark' },
+  { title: '备注', dataIndex: 'remark', key: 'remark', width: 180 },
   { title: '操作', key: 'action', width: 140 }
 ])
 
@@ -989,6 +975,8 @@ watch(
 </script>
 
 <style scoped>
+.config-secondary-actions { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; max-width:460px; }
+:deep(.ant-table-thead > tr > th) { white-space:nowrap; }
 .search-bar {
   margin-bottom: 12px;
 }

@@ -1,5 +1,12 @@
 <template>
   <PageContainer title="长者患者列表" subTitle="护理/医护共同入口">
+    <template #extra>
+      <a-space>
+        <a-button @click="go('/medical-care/basic-diseases')">基础疾病维护</a-button>
+        <a-button @click="go('/medical-care/center')">服务中心</a-button>
+        <a-button type="primary" @click="fetchData">刷新</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="长者">
         <ElderNameAutocomplete v-model:value="query.fullName" allow-clear placeholder="姓名(编号)" width="220px" />
@@ -17,13 +24,7 @@
           <a-select-option :value="3">离院</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="go('/medical-care/basic-diseases')">基础疾病维护</a-button>
-          <a-button @click="go('/medical-care/center')">服务中心</a-button>
-          <a-button type="primary" @click="fetchData">刷新</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable

@@ -17,6 +17,8 @@ npm run dev
 ```
 
 ## Docker
+`npm run build` 会从 `EnterpriseHome.vue` 预渲染官网首页，并检查静态正文和首批脚本体积。正式首页直接显示新版内容，浏览器随后接管菜单等交互，避免先显示另一套静态页面。不要跳过构建后的预渲染步骤；已有产物可用 `npm run check:home` 检查。
+
 构建前端镜像：
 ```bash
 docker build -t smartcare-admin:local ./admin-web

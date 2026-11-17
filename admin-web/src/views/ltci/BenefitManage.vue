@@ -1,11 +1,11 @@
 <template>
   <PageContainer title="长护险待遇管理" subTitle="参保登记 · 待遇核定 · 护理服务记录 · 服务包">
     <template #extra>
-      <a-space>
+      <ActionToolbar>
         <a-button @click="openInsured">参保登记</a-button>
         <a-button @click="openBenefit">待遇核定</a-button>
         <a-button type="primary" @click="openRecord">录入服务记录</a-button>
-      </a-space>
+      </ActionToolbar>
     </template>
 
     <a-card title="护理服务包" size="small">
@@ -133,6 +133,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

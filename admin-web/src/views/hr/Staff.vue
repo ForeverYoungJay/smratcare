@@ -1,5 +1,25 @@
 <template>
   <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
+    <template #extra>
+      <a-button @click="router.push('/hr/profile/onboarding')">入职向导</a-button>
+      <a-button type="primary" @click="openDrawer()">新增人员</a-button>
+      <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑档案</a-button>
+      <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
+      <a-popover trigger="click" placement="bottomRight">
+        <template #content>
+          <div class="secondary-actions">
+            <a-button :disabled="!selectedSingleRecord" @click="viewSelected">查看</a-button>
+            <a-button :disabled="!selectedSingleRecord" @click="openEffectivePermissionPanel()">生效页面权限</a-button>
+            <a-button :disabled="!canReinstateSingle" @click="reinstateSelected">复职</a-button>
+            <a-button :disabled="selectedRowKeys.length === 0" @click="batchReinstate">批量复职</a-button>
+            <a-button @click="printBirthdayLedger">打印生日台账</a-button>
+            <a-button danger :disabled="!canTerminateSingle" @click="terminateSelected">离职</a-button>
+            <a-button danger :disabled="selectedRowKeys.length === 0" @click="batchTerminate">批量离职</a-button>
+          </div>
+        </template>
+        <a-button>更多操作</a-button>
+      </a-popover>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="姓名/工号/手机号" allow-clear />
@@ -27,19 +47,7 @@
           style="width: 220px"
         />
       </a-form-item>
-      <template #extra>
-        <a-button @click="router.push('/hr/profile/onboarding')">入职向导</a-button>
-        <a-button type="primary" @click="openDrawer()">新增人员</a-button>
-        <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑档案</a-button>
-        <a-button :disabled="!selectedSingleRecord" @click="viewSelected">查看</a-button>
-        <a-button :disabled="!selectedSingleRecord" @click="openEffectivePermissionPanel()">生效页面权限</a-button>
-        <a-button :disabled="!canReinstateSingle" @click="reinstateSelected">复职</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" @click="batchReinstate">批量复职</a-button>
-        <a-button @click="printBirthdayLedger">打印生日台账</a-button>
-        <a-button danger :disabled="!canTerminateSingle" @click="terminateSelected">离职</a-button>
-        <a-button danger :disabled="selectedRowKeys.length === 0" @click="batchTerminate">批量离职</a-button>
-        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
-      </template>
+
     </SearchForm>
 
     <a-alert
@@ -355,6 +363,7 @@
 </template>
 
 <script setup lang="ts">
+import { useCompletionGuide } from '../../composables/useCompletionGuide'
 import { computed, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
@@ -370,6 +379,7 @@ import { useStaffOptions } from '../../composables/useStaffOptions'
 import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
 import type { HrSocialSecuritySummary, HrStaffProfile, PageResult, RoleItem, StaffItem } from '../../types'
 
+const showCompletion = useCompletionGuide()
 const RESERVED_ROLE_CODES = new Set(['SYS_ADMIN'])
 import { getPageTitle, getRecommendedPagePermissions, parseRoutePermissionsJson } from '../../utils/pageAccess'
 import { resolveHrError } from './hrError'
@@ -825,6 +835,7 @@ async function submit(nextStep: 'save' | 'account' | 'contract' | 'attachment' =
     }
     Object.assign(form, saved || {})
     message.success(saved?.contractNo ? `保存成功，合同编号：${saved.contractNo}` : '保存成功')
+    if (nextStep === 'save' && staffId) showCompletion('员工档案已保存', [{ label: '维护劳动合同', path: `/hr/profile/contracts?staffId=${encodeURIComponent(staffId)}` }, { label: '归档附件', path: `/hr/profile/attachments?staffId=${encodeURIComponent(staffId)}` }])
     drawerOpen.value = false
     await fetchData()
     await fetchSocialSecuritySummary()
@@ -1046,6 +1057,7 @@ maybeAutoOpenProfile()
 </script>
 
 <style scoped>
+.secondary-actions { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; max-width:420px; }
 .selection-tip {
   color: var(--muted);
   font-size: 12px;

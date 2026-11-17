@@ -1,6 +1,6 @@
 <template>
   <PageContainer title="护理看板" subTitle="任务完成与质量概览">
-    <a-row :gutter="16">
+    <a-row class="business-stat-strip" :gutter="16">
       <a-col :xs="24" :md="6">
         <a-card class="stat-card" :bordered="false">
           <a-statistic title="今日任务" :value="stats.total" />

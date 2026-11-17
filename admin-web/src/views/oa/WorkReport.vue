@@ -1,5 +1,14 @@
 <template>
   <PageContainer title="工作总结" subTitle="日/周/月/年总结统一管理">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新增总结</a-button>
+      <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
+      <a-button :disabled="!canSubmitSingle" @click="submitSelected">提交</a-button>
+      <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+      <a-button :disabled="selectedRowKeys.length === 0" @click="batchSubmit">批量提交</a-button>
+      <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+      <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="类型">
         <a-select v-model:value="query.reportType" :options="reportTypeOptions" allow-clear style="width: 160px" />
@@ -10,15 +19,7 @@
       <a-form-item label="日期范围">
         <a-range-picker v-model:value="dateRange" style="width: 260px" />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openCreate">新增总结</a-button>
-        <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
-        <a-button :disabled="!canSubmitSingle" @click="submitSelected">提交</a-button>
-        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" @click="batchSubmit">批量提交</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
-        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
-      </template>
+
     </SearchForm>
 
     <DataTable

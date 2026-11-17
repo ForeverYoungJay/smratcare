@@ -1,39 +1,8 @@
 <template>
-  <PageContainer title="首页" subTitle="机构经营与安全总览" mode="showcase" kicker="机构总览">
-    <template #meta>
-      <a-space wrap>
-        <StatusTag text="经营总览" tone="pending" />
-        <StatusTag text="安全关注" tone="warning" />
-        <StatusTag :text="`最近刷新 ${refreshedAt}`" tone="offline" />
-      </a-space>
-    </template>
-
+  <PageContainer title="经营总览" subTitle="查看机构运行情况，优先处理风险与待办。">
     <template #extra>
-      <a-space wrap>
-        <a-button @click="router.push('/workbench/overview')">进入工作台</a-button>
-        <a-button type="primary" :loading="loading" @click="loadOverview">刷新首页</a-button>
-      </a-space>
+      <a-button :loading="loading" @click="loadOverview">刷新</a-button>
     </template>
-
-    <section class="portal-entry-strip">
-      <button class="entry-card entry-card--employee" type="button" @click="router.push('/workbench/overview')">
-        <div>
-          <span>员工入口</span>
-          <strong>先进入个人工作台</strong>
-          <small>打卡、待办、审批、日程和岗位任务都从个人视角开始处理。</small>
-        </div>
-        <StatusTag text="个人优先" tone="normal" />
-      </button>
-      <button class="entry-card entry-card--manager" type="button" @click="router.push('/stats/org/monthly-operation')">
-        <div>
-          <span>管理入口</span>
-          <strong>再看机构经营与风险</strong>
-          <small>院长、主管和管理员适合从经营首页或月报继续下钻。</small>
-        </div>
-        <StatusTag text="经营总览" tone="pending" />
-      </button>
-    </section>
-
     <section class="portal-grid portal-grid--metrics">
       <OverviewMetricCard
         v-for="item in primaryMetrics"
@@ -48,18 +17,21 @@
         @click="router.push(item.path)"
       />
     </section>
-
-    <section class="portal-grid portal-grid--command">
+    <div class="portal-compact-grid">
+      <WorkQueuePanel title="今日待办" :items="todayWorkItems" />
+      <SectionPanel title="风险预警"><RiskList :items="riskItems" @select="router.push($event.path)" /></SectionPanel>
+    </div>
+    <details class="portal-more"><summary>查看经营明细、趋势与生日关怀</summary><section class="portal-grid portal-grid--command">
       <SectionPanel
         title="院长运营指挥台"
         description="把经营结果、服务风险、家属体验和现金流放在一个可追责的月度闭环里，先看是否偏离，再点进对应业务处理。"
       >
         <template #extra>
-          <a-space wrap>
-            <StatusTag :text="commandCenterStatus.text" :tone="commandCenterStatus.tone" />
-            <a-button size="small" @click="router.push('/stats/org/monthly-operation')">经营月报</a-button>
-          </a-space>
-        </template>
+            <a-space wrap>
+              <StatusTag :text="commandCenterStatus.text" :tone="commandCenterStatus.tone" />
+              <a-button size="small" @click="router.push('/stats/org/monthly-operation')">经营月报</a-button>
+            </a-space>
+          </template>
 
         <div class="command-scoreboard">
           <button
@@ -119,10 +91,9 @@
         </div>
       </SectionPanel>
 
-      
-    </section>
 
-    <section v-if="financeHome" class="portal-grid portal-grid--main">
+    </section>
+<section v-if="financeHome" class="portal-grid portal-grid--main">
       <SectionPanel
         title="收费与押金总览"
         :description="`账期 ${financeHome.billMonth}：在住规模、代养费结清率、押金与电费的未收口径集中在这里。`"
@@ -185,8 +156,7 @@
         <a-empty v-else description="暂无操作记录" />
       </SectionPanel>
     </section>
-
-    <section class="portal-grid portal-grid--main">
+<section class="portal-grid portal-grid--main">
       <SectionPanel title="本月收入趋势" description="最近 6 个月收费收入走势">
             <v-chart class="trend-chart" :option="revenueTrendOption" autoresize />
           </SectionPanel>
@@ -213,13 +183,8 @@
         <RiskList :items="riskItems" @select="router.push($event.path)" />
       </SectionPanel>
     </section>
+<section class="portal-grid portal-grid--secondary">
 
-    <section class="portal-grid portal-grid--more">
-      
-    </section>
-
-    <section class="portal-grid portal-grid--secondary">
-      
 
       <SectionPanel
         title="快捷入口"
@@ -237,20 +202,19 @@
         </div>
       </SectionPanel>
     </section>
+<section class="portal-grid portal-grid--support">
 
-    <section class="portal-grid portal-grid--support">
-      
 
       <SectionPanel
         title="协同与待办速览"
         description="首页保留最值得院长和主管第一眼看到的协同信号：待办、审批、今日日程、生日关怀和超时事项。"
       >
         <template #extra>
-          <a-space wrap>
-            <a-button size="small" @click="router.push('/workbench/todo')">待办中心</a-button>
-            <a-button size="small" @click="router.push('/workbench/schedule')">我的日程</a-button>
-          </a-space>
-        </template>
+            <a-space wrap>
+              <a-button size="small" @click="router.push('/workbench/todo')">待办中心</a-button>
+              <a-button size="small" @click="router.push('/workbench/schedule')">我的日程</a-button>
+            </a-space>
+          </template>
 
         <div class="portal-grid portal-grid--collab-metrics">
           <OverviewMetricCard
@@ -282,8 +246,7 @@
           <a-empty v-if="!collaborationFocusList.length" description="暂无需要特别关注的协同事项" />
         </div>
       </SectionPanel>
-    </section>
-
+    </section></details>
     <a-modal
       v-model:open="birthdayModalOpen"
       :title="birthdayModalTitle"
@@ -325,6 +288,7 @@ import { getFinanceHomeSummary, type FinanceHomeSummary } from '../api/financeHo
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import VChart from 'vue-echarts'
+import WorkQueuePanel from '../components/workbench/WorkQueuePanel.vue'
 import PageContainer from '../components/PageContainer.vue'
 import { getBirthdayAll } from '../api/life'
 import EntitySummaryCard from '../components/smartcare/EntitySummaryCard.vue'
@@ -1079,6 +1043,11 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.portal-compact-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+.portal-more { margin-top:18px; }
+.portal-more summary { padding:12px 0; cursor:pointer; color:var(--primary, #27785c); font-size:15px; font-weight:600; }
+@media(max-width:900px) { .portal-compact-grid { grid-template-columns:1fr; } }
+
 .portal-entry-strip,
 .portal-grid {
   display: grid;

@@ -1,5 +1,11 @@
 <template>
   <PageContainer title="消费登记" subTitle="手工登记消费流水，支持按日期筛选">
+    <template #extra>
+      <a-button @click="quickFilterHighRisk">仅看高风险</a-button>
+      <a-button @click="exportData">导出</a-button>
+      <a-button @click="printCurrent">打印当前结果</a-button>
+      <a-button type="primary" @click="openCreate">新增消费</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="开始日期">
         <a-date-picker v-model:value="query.from" />
@@ -20,15 +26,10 @@
       <a-form-item label="老人">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
       </a-form-item>
-      <template #extra>
-        <a-button @click="quickFilterHighRisk">仅看高风险</a-button>
-        <a-button @click="exportData">导出</a-button>
-        <a-button @click="printCurrent">打印当前结果</a-button>
-        <a-button type="primary" @click="openCreate">新增消费</a-button>
-      </template>
+
     </SearchForm>
 
-    <a-row :gutter="[12, 12]" style="margin-bottom: 12px;">
+    <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 12px;">
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="流水数" :value="filteredRows.length" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="消费总额" :value="totalAmount" suffix="元" :precision="2" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="高风险数" :value="highRiskCount" /></a-card></a-col>

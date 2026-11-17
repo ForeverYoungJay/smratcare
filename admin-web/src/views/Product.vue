@@ -1,12 +1,13 @@
 <template>
   <PageContainer title="商品管理" subTitle="商品与库存信息维护">
+    <template #extra>
+      <a-button type="primary" @click="openDrawer()">新增商品</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="商品名称/编码" />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openDrawer()">新增商品</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable

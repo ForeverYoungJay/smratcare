@@ -11,7 +11,7 @@
       </a-space>
     </template>
 
-    <a-row :gutter="16" style="margin-bottom: 16px;">
+    <a-row class="business-stat-strip" :gutter="16" style="margin-bottom: 16px;">
       <a-col :span="4">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic title="访问总次数" :value="summary.totalAccess || 0" />
@@ -40,7 +40,7 @@
     </a-row>
 
     <a-card class="card-elevated" :bordered="false" style="margin-bottom: 16px;">
-      <a-form layout="inline">
+      <QueryBar :model="query" @finish="loadPage">
         <a-form-item label="数据类别">
           <a-select v-model:value="query.dataCategory" allow-clear style="width: 180px" placeholder="全部">
             <a-select-option value="ELDER_HEALTH">长者健康</a-select-option>
@@ -63,13 +63,13 @@
         <a-form-item label="日期">
           <a-range-picker v-model:value="dateRange" value-format="YYYY-MM-DD" />
         </a-form-item>
-        <a-form-item>
+        <template #actions>
           <a-space>
-            <a-button type="primary" @click="loadPage">查询</a-button>
+            <a-button type="primary" html-type="submit">查询</a-button>
             <a-button @click="reset">重置</a-button>
           </a-space>
-        </a-form-item>
-      </a-form>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false">
@@ -98,6 +98,7 @@
 </template>
 
 <script setup lang="ts">
+import QueryBar from '../../components/QueryBar.vue'
 import { onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'

@@ -1,12 +1,19 @@
 <template>
   <PageContainer title="员工宿舍管理" subTitle="人事后勤协同 / 员工住宿台账、空床位与房间基础配置">
+    <template #extra>
+      <ActionToolbar wrap>
+        <a-button type="primary" @click="openDrawer()">新增住宿安排</a-button>
+        <a-button @click="router.push('/hr/expense/dormitory-map')">打开房态图</a-button>
+        <a-button @click="fetchData">刷新统计</a-button>
+      </ActionToolbar>
+    </template>
     <div class="dorm-shell">
-      <section class="hero-panel">
-        <div>
-          <p class="eyebrow">宿舍管理台</p>
-          <h2>把员工入住台账和宿舍基础配置放在同一个入口统一维护</h2>
+      <section class="hero-panel business-overview">
+        <details class="business-help">
+          <summary>使用说明</summary>
+          <p class="business-help-title">把员工入住台账和宿舍基础配置放在同一个入口统一维护</p>
           <p class="hero-copy">支持床位分配、电表维护、冲突检查，以及楼栋/楼层/房间标准床位数配置，房态图会直接使用这里的基础数据补齐空床位。</p>
-        </div>
+        </details>
         <div class="hero-actions">
           <a-button type="primary" size="large" @click="openDrawer()">新增住宿安排</a-button>
           <a-button size="large" @click="openBatchGenerateDrawer()">批量生成房间</a-button>
@@ -77,13 +84,7 @@
         <a-form-item label="房间">
           <a-input v-model:value="query.roomNo" placeholder="如 3-201" allow-clear />
         </a-form-item>
-        <template #extra>
-          <a-space wrap>
-            <a-button type="primary" @click="openDrawer()">新增住宿安排</a-button>
-            <a-button @click="router.push('/hr/expense/dormitory-map')">打开房态图</a-button>
-            <a-button @click="fetchData">刷新统计</a-button>
-          </a-space>
-        </template>
+
       </SearchForm>
 
       <DataTable
@@ -442,9 +443,10 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -464,9 +466,10 @@ import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 
 const router = useRouter()
+const route = useRoute()
 
 const query = reactive({
-  keyword: undefined as string | undefined,
+  keyword: String(route.query.keyword || '') || undefined,
   departmentId: undefined as number | undefined,
   status: 1,
   dormitoryState: undefined as string | undefined,

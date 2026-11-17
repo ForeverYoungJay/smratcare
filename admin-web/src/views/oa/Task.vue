@@ -1,5 +1,23 @@
 <template>
   <PageContainer title="日程与任务" subTitle="任务列表与日历视图联动">
+    <template #extra>
+      <a-space wrap>
+        <a-button type="primary" @click="openCreate">新增任务</a-button>
+        <a-button @click="openCalendarView">查看日历</a-button>
+        <a-button @click="downloadExport">导出CSV</a-button>
+        <a-divider type="vertical" />
+        <span class="action-group-title">单条操作</span>
+        <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="editSelected">编辑</a-button>
+        <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="doneSelected">完成</a-button>
+        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+        <a-divider type="vertical" />
+        <span class="action-group-title">批量操作</span>
+        <a-button :disabled="selectedOpenCount === 0" @click="batchDone">批量完成</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+        <a-tag color="blue">已勾选 {{ selectedRowKeys.length }} 条</a-tag>
+        <span class="selection-tip">批量完成仅对进行中生效</span>
+      </a-space>
+    </template>
     <a-tabs v-model:activeKey="activeKey">
       <a-tab-pane key="list" tab="任务列表">
         <SearchForm :model="query" @search="fetchData" @reset="onReset">
@@ -12,24 +30,7 @@
           <a-form-item label="自动刷新">
             <a-switch v-model:checked="autoRefresh" />
           </a-form-item>
-          <template #extra>
-            <a-space wrap>
-              <a-button type="primary" @click="openCreate">新增任务</a-button>
-              <a-button @click="openCalendarView">查看日历</a-button>
-              <a-button @click="downloadExport">导出CSV</a-button>
-              <a-divider type="vertical" />
-              <span class="action-group-title">单条操作</span>
-              <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="editSelected">编辑</a-button>
-              <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="doneSelected">完成</a-button>
-              <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
-              <a-divider type="vertical" />
-              <span class="action-group-title">批量操作</span>
-              <a-button :disabled="selectedOpenCount === 0" @click="batchDone">批量完成</a-button>
-              <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
-              <a-tag color="blue">已勾选 {{ selectedRowKeys.length }} 条</a-tag>
-              <span class="selection-tip">批量完成仅对进行中生效</span>
-            </a-space>
-          </template>
+
         </SearchForm>
 
         <a-alert
@@ -49,7 +50,7 @@
         </a-alert>
 
         <StatefulBlock :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
-          <a-row :gutter="[12, 12]" style="margin-bottom: 12px">
+          <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 12px">
             <a-col :xs="12" :lg="4">
               <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'total' }" :bordered="false" size="small" @click="applySummaryFilter('total')">
                 <a-statistic title="总任务" :value="summary.totalCount || 0" />

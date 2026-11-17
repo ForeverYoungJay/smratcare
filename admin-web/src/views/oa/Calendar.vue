@@ -1,11 +1,11 @@
 <template>
   <PageContainer title="我的日程" subTitle="聚合个人、部门工作、日常计划和协同安排，按我的工作视角查看、创建和闭环每一天。" kicker="个人工作区">
     <template #extra>
-      <a-space wrap>
+      <ActionToolbar wrap>
         <a-button @click="applyQuickScope('today')">回到今天</a-button>
         <a-button @click="openPath('/oa/work-execution/task')">任务管理</a-button>
         <a-button type="primary" @click="openCreate(selectedDate || dayjs())">新增日程</a-button>
-      </a-space>
+      </ActionToolbar>
     </template>
 
     <SearchForm :model="query" @search="fetchAll" @reset="onReset">
@@ -395,6 +395,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'

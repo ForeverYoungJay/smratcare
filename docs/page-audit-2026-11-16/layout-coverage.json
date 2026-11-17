@@ -1,0 +1,3396 @@
+{
+  "date": "2026-11-16",
+  "scope": "Management web roles and shared view components; source inventory, not a count of manually verified business transactions.",
+  "views": [
+    {
+      "file": "admin-web/src/views/Bill.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/Care.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/Dashboard.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/Elder.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/EnterpriseHome.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/Forbidden.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/FunctionMap.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/FunctionWorkspace.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/Login.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/ModuleHub.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/NotFound.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/Order.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/Portal.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/Product.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/Staff.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/System/DepartmentManage.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/System/MenuPreview.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/System/OrgInfo.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/System/PermissionOverview.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/System/RoleManage.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/System/SiteConfigCenter.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/System/SystemAdminHome.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/ai/RiskPredictionBoard.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/ai/SmartScheduleWorkbench.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/assessment/Admission.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/assessment/Archive.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/assessment/AssessmentRecords.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/assessment/Cognitive.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/assessment/Continuous.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/assessment/OtherScale.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/assessment/Registration.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/assessment/SelfCare.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/assessment/Template.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/base-config/Index.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/bed/Manage.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/bed/Map.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/bed/RoomDetail.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/bed/components/FloorPlanBoard.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/card/Account.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/card/Consume.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/card/Recharge.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/Audit.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/CareHome.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/CareLevels.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/CarePackages.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/CaregiverGroups.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/Dashboard.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/care/ElderPackages.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/Exception.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/Handovers.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/NursingRecords.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/NursingReports.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/care/PackageItems.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/ServiceBookings.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/ServiceItems.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/ServicePlans.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/ShiftCalendar.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/ShiftTemplates.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/TaskGenerate.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/Template.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/Today.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/workbench/CarePlan.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/workbench/ScanExecute.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/workbench/ServiceBooking.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/care/workbench/TaskBoard.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/cockpit/ExecutiveBiScreen.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/cockpit/ExecutiveCockpit.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/common/ModulePlaceholder.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/compliance/ExportAudit.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/compliance/SecurityPolicyConfig.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/compliance/SensitiveAccessAudit.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/demo/AntdxChatDemo.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/demo/CalendarDemo.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/demo/ChartsDemo.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/demo/EditorDemo.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/demo/FlowDemo.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/demo/VxeTableDemo.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/dining/DeliveryArea.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/dining/DeliveryRecord.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/dining/Dish.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/dining/Order.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/dining/PrepZone.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/dining/ProcurementPlan.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/dining/Recipe.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/dining/Stats.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/elder/Admission.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/elder/ChangeLog.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/elder/Create.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/elder/Crm.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/elder/DeathRegister.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/elder/Detail.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/elder/Discharge.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/elder/DischargeApply.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/elder/Edit.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/elder/Family.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/elder/List.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/elder/MedicalOuting.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/elder/Outing.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/elder/TrialStay.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/elder/VisitRegister.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/elder/resident360/AdmissionAssessment.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/elder/resident360/BedPanorama.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/elder/resident360/ContractsInvoices.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/elder/resident360/DischargeSettlement.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/elder/resident360/InHospitalOverview.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/elder/resident360/Panorama3D.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/elder/resident360/Resident360.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/elder/resident360/StatusChangeCenter.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/emr/EmrRecords.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/finance/Account.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/AccountLog.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/AdmissionBillPayment.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/finance/AdmissionFeeAudit.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/finance/AllocationRules.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/finance/AutoDebitManagement.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/BalanceWarningRules.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/BillCenter.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/finance/BillDetail.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/BillingRulesConfig.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/finance/CashierDesk.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/finance/CollectionCenter.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/finance/ConsumerVoucher.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/ConsumptionRegister.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/DepositManagement.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/DischargeFeeAudit.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/DischargeSettlement.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/DischargeStatusSync.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/ElectricityFee.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/FeeModulePlaceholder.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/FeeSubjectDictionary.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/finance/FinanceApprovalFlowConfig.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/FinanceConfigChangeLog.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/FinanceIssueCenter.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/FinanceMasterData.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/FinanceMonthClose.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/FinanceSearch.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/FinanceWorkbench.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/finance/FlowCenter.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/InvoiceReceiptManagement.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/LedgerHealth.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/MonthlyAllocation.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/finance/PaymentChannelConfig.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/finance/PaymentRecords.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/finance/PaymentRefundReversal.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/PrepaidRecharge.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/Reconcile.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/ReconcileException.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/ReconcileInvoice.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/Report.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/finance/ResidentBillPayment.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/finance/ShiftClose.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/components/CollectionFollowUpPanel.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/finance/components/ExcelReportPanel.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/finance/components/ReminderPanel.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/fire/ControlRoomDuty.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/fire/DataStats.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/fire/DayPatrol.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/fire/FacilityManagement.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/fire/FaultMaintenance.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/fire/MaintenanceReport.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/fire/MonthlyCheck.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/fire/NightPatrol.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/fire/components/FireSafetyBoard.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/govreport/ChannelConfig.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/govreport/ReportTasks.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/health/DrugDeposit.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/health/DrugDictionary.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/health/HealthArchive.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/health/HealthData.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/health/Inspection.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/health/MedicationRegistration.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/health/MedicationRemaining.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/health/MedicationSetting.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/health/NursingLog.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/hr/HrAccessControl.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrAttendanceAbnormal.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrAttendanceApprovalPage.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrAttendanceRecords.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrAttendanceSchemes.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrCardSync.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrCenter.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrCertificateReminders.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrContractPrint.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrContractReminder.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrDormitoryManagement.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrDormitoryMap.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/hr/HrExpenseApprovalFlow.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrExpenseElectricityFee.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrExpenseMealFee.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrExpenseScenePage.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrModulePlaceholder.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrOnboardingWizard.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrPolicies.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrPolicyAlerts.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrProfileAttachments.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrProfileCertificates.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrProfileContracts.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrProfileTemplates.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrRecruitmentNeeds.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrSocialSecurityReminder.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/HrWorkbench.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/hr/Performance.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/hr/Points.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/PointsRule.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/Staff.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/hr/Training.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/inventory/Adjustments.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/inventory/Alerts.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/inventory/Inbound.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/inventory/Outbound.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/inventory/Overview.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/life/Activity.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/life/Birthday.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/life/HealthBasic.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/life/Incident.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/life/Maintenance.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/life/MealPlan.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/life/RoomCleaning.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/logistics/DeliveryPlan.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/logistics/EquipmentArchive.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/logistics/MaintenanceCost.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/logistics/MaintenanceTodoJobLog.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/logistics/TaskCenter.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/logistics/VideoManagement.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/logistics/Workbench.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/ltci/AssessmentRecords.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/ltci/BenefitManage.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/ltci/Settlement.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/CallbackQuality.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/marketing/CallbackScenarioPage.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/ContractAttachments.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/ContractChange.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/ContractManagement.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/ContractSigning.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/ElderProfile.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/LeadScenarioPage.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/MarketingPlan.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/RoomPanorama.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/VisitAppointments.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/Workbench.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/components/LeadPipelineTable.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/components/MarketingListToolbar.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/components/MarketingQuickNav.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/components/MarketingTraceTimelineCard.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/report/Callback.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/marketing/report/Channel.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/report/ChannelRank.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/report/Consultation.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/report/Conversion.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/report/Followup.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/marketing/report/SalesPerformance.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/report/Snapshots.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/marketing/report/UnknownChannel.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/material/Purchase.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/material/StockAmount.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/material/Supplier.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/material/Transfer.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/material/Warehouse.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/medical/AiHealthReport.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/medical/AlertRuleConfig.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/medical/ChronicFollowup.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/medical/CvdRiskAssessment.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/medical/EmergencyEvents.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/medical/IntegratedHealthAccount.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/medical/MedicalHealthCenter.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/medical/MedicalOrderCenter.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/medical/NursingQualityCenter.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/medical/ResidentDiseaseManager.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/medical/ResidentList.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/medical/RoundsWorkbench.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/medical/SmartDeviceAlerts.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/medical/TcmAssessment.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/medical/UnifiedTaskCenter.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/medical/Workbench.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/medins/ChannelConfig.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/medins/Evoucher.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/medins/SettlementSheet.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/medorder/MedicalOrders.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/medorder/OrderExecutions.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/oa/ActivityPlan.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/oa/AdminCenter.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/oa/Album.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/oa/Approval.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/oa/AttendanceLeave.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/oa/Calendar.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/oa/DailyReport.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/oa/Document.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/oa/EmployeeSuggestionCenter.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/oa/FamilyCommunication.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/oa/GroupSettings.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/oa/Knowledge.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/oa/MonthlyReport.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/oa/MyInfo.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/oa/Notice.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/oa/Portal.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/oa/RewardPunishment.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/oa/StaffCollaborationCenter.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/oa/Task.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/oa/Todo.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/oa/WeeklyReport.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/oa/WorkReport.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/oa/YearlyReport.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/oa/components/WorkReportBoard.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/operations/FamilyRechargeLedgerCenter.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/operations/FamilyServiceCenter.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/operations/FamilyServiceHealthCenter.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/operations/IntelligenceCenter.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/operations/LogisticsCenter.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/operations/MarketingCenter.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/operations/OperationsDashboard.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/operations/SafetyRiskCenter.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/operations/ServiceComplianceCenter.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/operations/StaffMobileCenter.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/operations/StaffMobileLedgerCenter.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/operations/WorkforceCenter.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/pharmacy/Pharmacy.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/smart/AlertRules.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/smart/DeviceHealth.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/smart/DispatchBoard.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": true,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/stats/CheckInStats.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/stats/ConsumptionStats.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/stats/ElderFlowReport.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/stats/ElderInfoStats.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/stats/MonthlyRevenueStats.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/stats/OrgBedUsage.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": true
+    },
+    {
+      "file": "admin-web/src/views/stats/OrgElderFlow.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/stats/OrgMonthlyOperation.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/store/Category.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/store/Order.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/store/Points.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/store/Product.vue",
+      "pageContainer": true,
+      "searchForm": true,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/store/Risk.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/store/Tag.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/survey/Performance.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/survey/QuestionBank.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/survey/Stats.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/survey/Submit.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": false,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/survey/Template.vue",
+      "pageContainer": true,
+      "searchForm": false,
+      "queryBar": true,
+      "dataTable": false,
+      "actionToolbar": true,
+      "headerActions": true,
+      "statStrip": false
+    },
+    {
+      "file": "admin-web/src/views/workbench/WorkbenchHome.vue",
+      "pageContainer": false,
+      "searchForm": false,
+      "queryBar": false,
+      "dataTable": false,
+      "actionToolbar": false,
+      "headerActions": true,
+      "statStrip": false
+    }
+  ]
+}

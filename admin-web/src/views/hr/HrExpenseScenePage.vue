@@ -1,5 +1,15 @@
 <template>
   <PageContainer :title="pageTitle" :subTitle="`薪酬与费用 / ${pageTitle}`">
+    <template #extra>
+      <a-space>
+        <a-button @click="onExportCsv">导出 CSV</a-button>
+        <a-button @click="onExportExcel">导出 Excel</a-button>
+      </a-space>
+    </template>
+    <div class="hr-scene-switch" style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <label :for="'HrExpenseScenePage-scene'">办理事项</label>
+      <a-select id="HrExpenseScenePage-scene" :value="activeScene" :options="[{ value: 'training-reimburse', label: '培训报销' }, { value: 'subsidy', label: '补贴申请' }, { value: 'salary-subsidy', label: '工资补贴' }]" style="width:220px" @change="switchScene" />
+    </div>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="标题/申请人/备注" allow-clear />
@@ -7,12 +17,7 @@
       <a-form-item label="审批状态">
         <a-select v-model:value="query.status" allow-clear style="width: 180px" :options="statusOptions" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="onExportCsv">导出 CSV</a-button>
-          <a-button @click="onExportExcel">导出 Excel</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
     <DataTable
       :filter-model="query"
@@ -30,7 +35,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -39,7 +44,11 @@ import { getHrSalarySubsidyPage, getHrSubsidyPage, getHrTrainingReimbursePage } 
 import type { HrExpenseItem, PageResult } from '../../types'
 import { HR_EXPENSE_EXPORT_FIELDS, mapByDict } from './hrExportFields'
 
+function switchScene(scene: string) {
+  router.replace({ path: route.path, query: { ...route.query, scene }, hash: route.hash })
+}
 const route = useRoute()
+const router = useRouter()
 
 type ExpenseScene = 'training-reimburse' | 'subsidy' | 'salary-subsidy'
 

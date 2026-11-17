@@ -5,12 +5,12 @@
     mode="content"
   >
     <template #extra>
-      <a-space wrap>
+      <ActionToolbar wrap>
         <a-button :loading="loading" @click="loadData">刷新</a-button>
         <a-button @click="openPath('/stats/staff-mobile')">员工移动端中心</a-button>
         <a-button @click="openPath('/stats/staff-mobile-ledger')">现场台账</a-button>
         <a-button type="primary" @click="openPath('/oa/approval')">审批中心</a-button>
-      </a-space>
+      </ActionToolbar>
     </template>
 
     <ScenicHeader
@@ -70,11 +70,11 @@
     <section class="panel-grid">
       <a-card class="card-elevated" :bordered="false" title="审批联动预览">
         <template #extra>
-          <a-space wrap>
+          <ActionToolbar wrap>
             <a-button size="small" @click="openRoute('/oa/approval', { type: 'LEAVE' })">请假</a-button>
             <a-button size="small" @click="openRoute('/oa/approval', { type: 'SHIFT_CHANGE' })">调班</a-button>
             <a-button size="small" type="primary" @click="openRoute('/oa/approval', { type: 'MATERIAL_APPLY' })">物资申领</a-button>
-          </a-space>
+          </ActionToolbar>
         </template>
         <div v-if="approvalPreview.length" class="preview-list">
           <button
@@ -204,11 +204,11 @@
     <section id="suggestions">
       <a-card class="card-elevated" :bordered="false" title="员工建议与现场反馈">
         <template #extra>
-          <a-space wrap>
+          <ActionToolbar wrap>
             <a-button size="small" @click="openPath('/oa/employee-suggestions')">员工建议中心</a-button>
             <a-button size="small" @click="openPath('/oa/work-execution/family-communication')">反馈处理台</a-button>
             <a-button size="small" @click="openPath('/stats/staff-mobile-ledger')">查看现场回执</a-button>
-          </a-space>
+          </ActionToolbar>
         </template>
         <div v-if="employeeSuggestions.length" class="preview-list">
           <div v-for="item in employeeSuggestions" :key="String(item.id)" class="preview-item static">
@@ -258,6 +258,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

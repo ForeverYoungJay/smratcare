@@ -1,17 +1,19 @@
 <template>
   <PageContainer title="商品标签" subTitle="维护标签与分类">
     <a-card class="card-elevated" :bordered="false">
-      <a-form layout="inline" class="search-form" :model="query">
+      <QueryBar layout="inline" class="search-form" :model="query" @finish="fetchData">
         <a-form-item label="关键词">
           <a-input v-model:value="query.keyword" placeholder="标签名称/编码" allow-clear />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="fetchData">搜索</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="fetchData">搜索</a-button>
+              <a-button @click="reset">重置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
@@ -78,6 +80,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { onMounted, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'

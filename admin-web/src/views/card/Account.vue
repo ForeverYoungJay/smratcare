@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="卡务管理" subTitle="开卡、挂失与状态管理">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">开卡</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="状态">
         <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 160px" />
@@ -7,9 +10,7 @@
       <a-form-item label="关键词">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="卡号/老人姓名(编号)" width="220px" />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openCreate">开卡</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable

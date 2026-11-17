@@ -6,7 +6,7 @@
       </a-form-item>
     </SearchForm>
 
-    <a-row :gutter="16" class="summary-row">
+    <a-row :gutter="16" class="summary-row business-stat-strip">
       <a-col :xs="24" :md="8">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic title="月采购菜品数" :value="monthlyItems.length" />

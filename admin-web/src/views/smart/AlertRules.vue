@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="安全场景规则" subTitle="跌倒/SOS/离床/离院/久滞/体征异常等场景告警规则（内置全局规则只读，机构可新增定制）">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新增规则</a-button>
+    </template>
     <SearchForm :model="query" @search="onSearch" @reset="onReset">
       <a-form-item label="事件类型">
         <a-select v-model:value="query.eventType" allow-clear style="width: 180px" placeholder="全部">
@@ -12,9 +15,7 @@
           <a-select-option :value="0">停用</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openCreate">新增规则</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable

@@ -14,6 +14,7 @@ import { sharedRoutes } from './sharedRoutes'
 import { systemRoutes } from './systemRoutes'
 import { getRoles } from '../utils/auth'
 import { resolveDefaultHome } from '../access/policy'
+import { consolidateFunctionRoutes } from '../workspaces/catalog'
 
 export const routes: RouteRecordRaw[] = [
   {
@@ -58,7 +59,7 @@ export const routes: RouteRecordRaw[] = [
     name: 'Root',
     component: () => import('../layouts/BasicLayout.vue'),
     redirect: () => resolveDefaultHome(getRoles()),
-    children: [
+    children: consolidateFunctionRoutes([
       ...sharedRoutes,
       ...marketingRoutes,
       ...legacyModuleRedirects,
@@ -72,7 +73,7 @@ export const routes: RouteRecordRaw[] = [
       ...administrationRoutes,
       ...hrRoutes,
       ...systemRoutes
-    ]
+    ])
   },
   {
     path: '/:pathMatch(.*)*',

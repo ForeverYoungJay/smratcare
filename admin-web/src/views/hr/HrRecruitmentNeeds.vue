@@ -1,5 +1,32 @@
 <template>
   <PageContainer :title="pageTitle" :subTitle="subTitle">
+    <template #extra>
+      <ActionToolbar wrap>
+        <a-button type="primary" @click="openDrawer()">新增</a-button>
+        <a-button :disabled="!selectedSingle" @click="openDrawer(selectedSingle)">编辑</a-button>
+        <a-popover trigger="click" placement="bottomRight">
+          <template #content>
+            <div class="secondary-actions">
+              <a-button v-if="sceneMode === 'materials'" :loading="folderBootstrapping" @click="bootstrapFolders">一键建档案夹(年度/部门)</a-button>
+              <a-button :disabled="selectedRowKeys.length === 0" @click="batchUpdateStatus('IN_PROGRESS')">批量进行中</a-button>
+              <a-button :disabled="selectedRowKeys.length === 0" @click="batchUpdateStatus('DONE')">批量完成</a-button>
+              <a-button danger :disabled="selectedRowKeys.length === 0" @click="batchUpdateStatus('REJECTED')">批量驳回</a-button>
+              <a-button @click="onExportCsv">导出 CSV</a-button>
+              <a-button @click="onExportExcel">导出 Excel</a-button>
+              <a-button :disabled="!selectedSingle" @click="downloadSheet">下载办理单</a-button>
+              <a-button :disabled="!selectedSingle" @click="printSheet">打印办理单</a-button>
+              <a-button @click="applyStandardTemplate">标准模板填充</a-button>
+              <a-button danger :disabled="!selectedSingle" @click="removeSelected">删除</a-button>
+            </div>
+          </template>
+          <a-button>更多操作</a-button>
+        </a-popover>
+      </ActionToolbar>
+    </template>
+    <div class="hr-scene-switch" style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <label :for="'HrRecruitmentNeeds-scene'">办理事项</label>
+      <a-select id="HrRecruitmentNeeds-scene" :value="sceneMode" :options="[{ value: 'needs', label: '招聘需求' }, { value: 'job-posting', label: '岗位发布' }, { value: 'candidates', label: '候选人' }, { value: 'interviews', label: '面试' }, { value: 'onboarding', label: '入职办理' }, { value: 'materials', label: '资料收集' }, { value: 'offboarding', label: '离职办理' }]" style="width:220px" @change="switchScene" />
+    </div>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" :placeholder="keywordPlaceholder" allow-clear />
@@ -16,22 +43,7 @@
       <a-form-item v-if="sceneMode === 'materials'" label="部门">
         <a-input v-model:value="materialsDept" style="width: 180px" placeholder="部门名称（如护理部）" />
       </a-form-item>
-      <template #extra>
-        <a-space wrap>
-          <a-button v-if="sceneMode === 'materials'" :loading="folderBootstrapping" @click="bootstrapFolders">一键建档案夹(年度/部门)</a-button>
-          <a-button :disabled="selectedRowKeys.length === 0" @click="batchUpdateStatus('IN_PROGRESS')">批量进行中</a-button>
-          <a-button :disabled="selectedRowKeys.length === 0" @click="batchUpdateStatus('DONE')">批量完成</a-button>
-          <a-button danger :disabled="selectedRowKeys.length === 0" @click="batchUpdateStatus('REJECTED')">批量驳回</a-button>
-          <a-button @click="onExportCsv">导出 CSV</a-button>
-          <a-button @click="onExportExcel">导出 Excel</a-button>
-          <a-button :disabled="!selectedSingle" @click="downloadSheet">下载办理单</a-button>
-          <a-button :disabled="!selectedSingle" @click="printSheet">打印办理单</a-button>
-          <a-button type="primary" @click="openDrawer()">新增</a-button>
-          <a-button @click="applyStandardTemplate">标准模板填充</a-button>
-          <a-button :disabled="!selectedSingle" @click="openDrawer(selectedSingle)">编辑</a-button>
-          <a-button danger :disabled="!selectedSingle" @click="removeSelected">删除</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable
@@ -185,10 +197,11 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import dayjs, { type Dayjs } from 'dayjs'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -207,7 +220,11 @@ import { formatChineseDate } from '../../utils/dateLocale'
 import { exportCsv, exportExcel } from '../../utils/export'
 import { mapByDict } from './hrExportFields'
 
+function switchScene(scene: string) {
+  router.replace({ path: route.path, query: { ...route.query, scene }, hash: route.hash })
+}
 const route = useRoute()
+const router = useRouter()
 
 const query = reactive({
   keyword: undefined as string | undefined,
@@ -793,6 +810,7 @@ watch(
 </script>
 
 <style scoped>
+.secondary-actions { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; max-width:420px; }
 :deep(.hr-row-danger) {
   background: rgba(var(--danger-rgb), 0.08) !important;
 }

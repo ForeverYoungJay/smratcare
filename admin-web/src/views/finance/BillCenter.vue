@@ -56,18 +56,7 @@
       </a-form-item>
     </SearchForm>
 
-    <section class="surface-toolbar">
-      <div class="surface-toolbar-title">
-        <strong>账单生成与收款工作台</strong>
-        <span>先锁定账期和长者，再完成生成、收款登记、异常识别与历史追溯。</span>
-      </div>
-      <a-space wrap>
-        <a-tag color="processing">账期 {{ currentMonthLabel }}</a-tag>
-        <a-tag :color="query.scene ? 'blue' : 'default'">{{ currentSceneLabel }}</a-tag>
-        <a-tag color="gold">欠费 {{ overdueCount }} 笔</a-tag>
-        <a-tag color="green">收款完成率 {{ collectionRate }}%</a-tag>
-      </a-space>
-    </section>
+
 
     <a-alert
       v-if="signedLinkageContext.active"
@@ -86,24 +75,13 @@
     </a-alert>
 
     <section class="card-elevated bill-workspace">
-      <div class="bill-insight-grid">
-        <div class="bill-insight-card">
-          <span>全院风险摘要</span>
-          <strong>{{ riskSummaryText }}</strong>
-          <small>{{ riskSummaryDescription }}</small>
-        </div>
-        <div class="bill-insight-card is-soft">
-          <span>当前页工作提示</span>
-          <strong>{{ total }} 条账单，{{ invalidBillCount }} 条已作废</strong>
-          <small>支持直接查看详情、登记收款、修正最近收款与查看消费明细。</small>
-        </div>
-      </div>
+      <a-alert v-if="summary.warningMessage || Number(summary.totalCount) > 0 || Number(summary.pendingCount) > 0 || Number(summary.exceptionCount) > 0" type="warning" show-icon :message="riskSummaryText" />
 
       <div class="action-toolbar">
         <div class="table-head">
           <div>
             <strong>账单列表</strong>
-            <span>保留原有账单业务逻辑，优化筛选、风险识别和收款操作的工作顺序。</span>
+
           </div>
           <a-space wrap>
             <a-tag color="default">共 {{ total }} 条</a-tag>
@@ -111,6 +89,7 @@
           </a-space>
         </div>
         <div class="action-toolbar-main">
+          <a-button type="link" :aria-expanded="showBillDetails" @click="showBillDetails = !showBillDetails">{{ showBillDetails ? '只看常用信息' : '完整费用构成' }}</a-button>
           <a-button @click="exportCsvData">导出CSV</a-button>
           <a-button type="primary" @click="openGenerate">生成账单</a-button>
         </div>
@@ -129,8 +108,8 @@
           :column-config="{ resizable: true }"
           :row-class-name="billRowClassName"
         >
-          <vxe-column field="billMonth" title="账单月份" width="120" />
-          <vxe-column field="elderName" title="老人" min-width="180">
+          <vxe-column field="billMonth" title="账单月份" width="100" />
+          <vxe-column field="elderName" title="老人" min-width="150">
             <template #default="{ row }">
               <div class="bill-person-cell">
                 <strong>{{ row.elderName || '未知老人' }}</strong>
@@ -138,59 +117,64 @@
               </div>
             </template>
           </vxe-column>
-          <vxe-column field="careLevel" title="护理级别" width="120" />
-          <vxe-column field="totalAmount" title="总额" width="120">
+          <vxe-column v-if="showBillDetails" field="careLevel" title="护理级别" width="120" />
+          <vxe-column field="totalAmount" title="总额" width="100">
             <template #default="{ row }">
               <span class="amount-text">{{ formatAmount(row.totalAmount) }}</span>
             </template>
           </vxe-column>
-          <vxe-column field="nursingFee" title="护理费" width="120">
+          <vxe-column v-if="showBillDetails" field="nursingFee" title="护理费" width="120">
             <template #default="{ row }">
               <span class="amount-subtext">{{ formatAmount(row.nursingFee) }}</span>
             </template>
           </vxe-column>
-          <vxe-column field="bedFee" title="床位费" width="120">
+          <vxe-column v-if="showBillDetails" field="bedFee" title="床位费" width="120">
             <template #default="{ row }">
               <span class="amount-subtext">{{ formatAmount(row.bedFee) }}</span>
             </template>
           </vxe-column>
-          <vxe-column field="insuranceFee" title="保险费" width="120">
+          <vxe-column v-if="showBillDetails" field="insuranceFee" title="保险费" width="120">
             <template #default="{ row }">
               <span class="amount-subtext">{{ formatAmount(row.insuranceFee) }}</span>
             </template>
           </vxe-column>
-          <vxe-column field="paidAmount" title="已付" width="120">
+          <vxe-column field="paidAmount" title="已付" width="100">
             <template #default="{ row }">
               <span class="amount-text is-positive">{{ formatAmount(row.paidAmount) }}</span>
             </template>
           </vxe-column>
-          <vxe-column field="outstandingAmount" title="欠费" width="120">
+          <vxe-column field="outstandingAmount" title="欠费" width="100">
             <template #default="{ row }">
               <span class="amount-chip" :class="Number(row.outstandingAmount || 0) > 0 ? 'is-danger' : 'is-safe'">
                 {{ formatAmount(row.outstandingAmount) }}
               </span>
             </template>
           </vxe-column>
-          <vxe-column field="lastPayMethod" title="收款方式" width="130">
+          <vxe-column field="lastPayMethod" title="收款方式" width="100">
             <template #default="{ row }">
               <span class="pay-method-pill">{{ payMethodText(row.lastPayMethod) }}</span>
             </template>
           </vxe-column>
-          <vxe-column field="status" title="状态" width="140">
+          <vxe-column field="status" title="状态" width="100">
             <template #default="{ row }">
               <a-tag :color="statusColor(row.status)">{{ statusText(row.status) }}</a-tag>
             </template>
           </vxe-column>
-          <vxe-column title="操作" width="320" fixed="right">
+          <vxe-column title="操作" width="220" fixed="right">
             <template #default="{ row }">
               <div class="row-action-links">
                 <a-button type="link" size="small" @click="openDetail(row)">查看</a-button>
                 <a-button v-if="row.status !== 9" type="link" size="small" @click="openPay(row)">登记收款</a-button>
-                <a-button v-if="row.status !== 9 && row.lastPaymentId" type="link" size="small" @click="openEditLatestPayment(row)">改最近收款</a-button>
-                <a-button type="link" size="small" @click="openHistory(row)">收款历史</a-button>
-                <a-button type="link" size="small" @click="goConsumption(row)">消费明细</a-button>
+                <a-dropdown :trigger="['click']">
+                  <a-button type="link" size="small">更多</a-button>
+                  <template #overlay><a-menu>
+                    <a-menu-item v-if="row.status !== 9 && row.lastPaymentId" @click="openEditLatestPayment(row)">修改最近收款</a-menu-item>
+                    <a-menu-item @click="openHistory(row)">收款历史</a-menu-item>
+                    <a-menu-item @click="goConsumption(row)">消费明细</a-menu-item>
+                    <a-menu-item v-if="row.status !== 9" danger @click="markInvalid(row)">无效账单</a-menu-item>
+                  </a-menu></template>
+                </a-dropdown>
                 <a-tag v-if="row.status === 9" color="default">已无效</a-tag>
-                <a-button v-else type="link" size="small" danger @click="markInvalid(row)">无效账单</a-button>
               </div>
             </template>
           </vxe-column>
@@ -386,6 +370,7 @@
 </template>
 
 <script setup lang="ts">
+import { useCompletionGuide } from '../../composables/useCompletionGuide'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
@@ -417,6 +402,7 @@ import {
   type BillCenterScene
 } from '../../utils/billCenterQuery'
 
+const showCompletion = useCompletionGuide()
 const props = withDefaults(defineProps<{
   title?: string
   subTitle?: string
@@ -438,6 +424,7 @@ const router = useRouter()
 const billRouteSignature = ref('')
 const skipNextBillRouteWatch = ref(false)
 
+const showBillDetails = ref(false)
 const loading = ref(false)
 const rows = ref<BillItem[]>([])
 const total = ref(0)
@@ -663,7 +650,7 @@ const currentSceneLabel = computed(() => {
 })
 const riskSummaryText = computed(() => (
   summary.value.warningMessage
-    || `欠费 ${summary.value.totalCount} 人，低余额 ${summary.value.pendingCount} 人，合同到期风险 ${summary.value.exceptionCount} 人`
+    || `欠费 ${summary.value.totalCount ?? '—'} 人，低余额 ${summary.value.pendingCount ?? '—'} 人，合同到期风险 ${summary.value.exceptionCount ?? '—'} 人`
 ))
 const riskSummaryDescription = computed(() => (
   `今日收款 ${formatAmount(summary.value.todayAmount)} 元，累计欠费 ${formatAmount(summary.value.monthAmount)} 元`
@@ -758,7 +745,7 @@ async function syncQueryToRoute() {
   }
   skipNextBillRouteWatch.value = true
   billRouteSignature.value = buildBillCenterRouteSignature(nextQuery)
-  await router.replace({ path: route.path, query: nextQuery })
+  await router.replace({ path: route.path, query: nextQuery, hash: route.hash })
 }
 
 async function fetchData() {
@@ -972,6 +959,7 @@ async function submitPay() {
     } else {
       await payBill(activeBillId.value, payload)
       message.success('收款登记成功')
+    showCompletion('收款已登记', [{ label: '查看收款流水', path: '/finance/payments/records' }, { label: '办理票据', path: '/finance/fees/payment-and-invoice' }])
     }
     payOpen.value = false
     activePaymentId.value = null
@@ -1410,4 +1398,11 @@ onMounted(async () => {
 .finance-vxe-table :deep(.vxe-body--row.is-overdue-row) td:first-child {
   box-shadow: inset 3px 0 0 #cf1322;
 }
+
+.bill-overview-grid { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px; width:100%; }
+.overview-card { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:48px; padding:10px 12px; border-radius:7px; }
+.overview-card strong { font-size:22px; margin:0; }
+.overview-card small { display:none; }
+.bill-workspace { padding:12px 0 0; border:0; border-radius:0; box-shadow:none; background:none; }
+@media(max-width:760px) { .bill-overview-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
 </style>

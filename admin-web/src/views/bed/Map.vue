@@ -1,7 +1,7 @@
 <template>
   <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline" class="search-bar">
+      <QueryBar :model="query" layout="inline" class="search-bar" @finish="applySearch">
         <a-form-item label="床位号">
           <a-input v-model:value="query.bedNo" placeholder="请输入床位号" allow-clear />
         </a-form-item>
@@ -33,15 +33,17 @@
             <a-select-option v-for="item in bedTypeOptions" :key="item.value" :value="item.value" :label="item.label">{{ item.label }}</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="applySearch">搜索</a-button>
-            <a-button @click="reset">清空</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">搜索</a-button>
+              <a-button @click="reset">清空</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
 
-      <a-row :gutter="[16, 16]" class="overview-cards">
+      <a-row :gutter="[16, 16]" class="overview-cards business-stat-strip">
         <a-col :xs="24" :sm="12" :md="8" :lg="4">
           <a-card size="small"><a-statistic title="楼栋" :value="buildingCount" /></a-card>
         </a-col>
@@ -70,7 +72,7 @@
             <a-radio-button value="list">卡片列表</a-radio-button>
           </a-radio-group>
           <a-button v-if="!isMarketingMode" @click="openBedManage">床位管理</a-button>
-          <a-button v-if="!isMarketingMode" type="primary" @click="openElderBedPanorama">3D 床态全景</a-button>
+          <a-button v-if="!isMarketingMode" type="primary" @click="openElderBedPanorama">床态全景</a-button>
         </a-space>
         <a-radio-group v-if="viewMode === 'grid'" v-model:value="matrixQuickFilter" size="small" class="matrix-filter-switch">
           <a-radio-button value="all">全部</a-radio-button>
@@ -266,6 +268,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'

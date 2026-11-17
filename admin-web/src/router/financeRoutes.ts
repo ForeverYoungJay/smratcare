@@ -16,7 +16,7 @@ export const financeRoutes: RouteRecordRaw[] = [
             path: 'workbench',
             name: 'FinanceWorkbench',
             component: () => import('../views/finance/FinanceWorkbench.vue'),
-            meta: { title: '财务部工作台' }
+            meta: { title: '财务工作台' }
           },
           {
             path: 'search',

@@ -29,7 +29,8 @@ function loadModule(file) {
     module: moduleObj,
     exports: moduleObj.exports,
     require: requireShim,
-    Promise
+    Promise,
+    URL
   }
   vm.runInNewContext(code, sandbox, { timeout: 3000 })
   return moduleObj.exports || {}

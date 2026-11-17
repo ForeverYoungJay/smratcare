@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="电子病历" subTitle="入院/病程/诊断/检查记录">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新建病历</a-button>
+    </template>
     <SearchForm :model="query" @search="onSearch" @reset="onReset">
       <a-form-item label="长者">
         <a-select v-model:value="query.elderId" show-search allow-clear :filter-option="false" :options="elderOptions"
@@ -10,9 +13,7 @@
           <a-select-option v-for="t in typeOptions" :key="t.value" :value="t.value">{{ t.label }}</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openCreate">新建病历</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable

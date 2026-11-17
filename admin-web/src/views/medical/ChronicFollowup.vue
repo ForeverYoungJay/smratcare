@@ -1,5 +1,11 @@
 <template>
   <PageContainer title="慢病随访管理" subTitle="随访计划（病种/频次/目标指标）与随访记录，下次随访日期自动排程，到期自动生成护理待办">
+    <template #extra>
+      <a-space>
+        <a-button type="primary" @click="openCreatePlan">新建随访计划</a-button>
+        <a-button :loading="generating" @click="generateReminders">生成到期待办</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="onSearch" @reset="onReset">
       <a-form-item label="长者">
         <a-select v-model:value="query.elderId" show-search allow-clear :filter-option="false" :options="elderOptions"
@@ -20,12 +26,7 @@
       <a-form-item label="仅看到期">
         <a-switch v-model:checked="query.dueOnly" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button type="primary" @click="openCreatePlan">新建随访计划</a-button>
-          <a-button :loading="generating" @click="generateReminders">生成到期待办</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable rowKey="id" :columns="planColumns" :data-source="plans" :loading="planLoading" :pagination="planPagination" @change="handlePlanTableChange">

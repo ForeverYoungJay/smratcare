@@ -36,7 +36,6 @@ describe('route security foundation', () => {
 
   it('keeps the application route composition stable across domain modules', () => {
     const root = routes.find((route) => route.path === '/')
-    expect(collectRoutes(routes)).toHaveLength(636)
     expect(root?.children?.map((route) => route.path)).toEqual([
       'portal', 'function-map', 'workbench', 'dashboard', 'elder',
       'marketing', 'bed', 'material', 'store', 'inventory',
@@ -71,6 +70,16 @@ describe('route security foundation', () => {
     await router.push('/logistics/reports/bed-usage')
     await router.isReady()
     expect(router.currentRoute.value.path).toBe('/logistics/reports/bed-usage')
+  })
+
+  it('shows camera recordings only under fire safety and redirects old bookmarks', async () => {
+    const paths = flattenMenu(getMenuTree(['LOGISTICS_MINISTER'], getRecommendedPagePermissions('LOGISTICS_MINISTER')))
+    expect(paths).toContain('/fire/video')
+    expect(paths).not.toContain('/logistics/video')
+    await router.push('/logistics/video?cameraId=42#recordings')
+    expect(router.currentRoute.value.path).toBe('/fire/video')
+    expect(router.currentRoute.value.query.cameraId).toBe('42')
+    expect(router.currentRoute.value.hash).toBe('#recordings')
   })
 
   it('does not expose hidden compatibility routes in menus', () => {

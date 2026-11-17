@@ -1,50 +1,55 @@
 <template>
   <PageContainer title="账单模板/计费规则" subTitle="费用科目、价格表、计费规则与减免策略配置">
     <a-card class="card-elevated" :bordered="false">
-      <a-form layout="inline" :model="query">
+      <QueryBar layout="inline" :model="query" @finish="loadData">
         <a-form-item label="生效月份">
-          <a-date-picker v-model:value="query.month" picker="month" style="width: 150px" />
+          <a-date-picker v-model:value="query.month" :allow-clear="false" picker="month" style="width: 150px" />
         </a-form-item>
         <a-form-item label="关键字">
-          <a-input v-model:value="query.keyword" allow-clear placeholder="配置键/备注" style="width: 220px" />
+          <a-input v-model:value="query.keyword" allow-clear placeholder="收费项目/备注" style="width: 220px" />
         </a-form-item>
         <a-form-item label="打印备注">
           <a-input v-model:value="query.printRemark" allow-clear placeholder="例如：规则评审版" style="width: 180px" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="loadData">查询</a-button>
-            <a-button @click="openEdit()">新增规则</a-button>
-            <a-button @click="batchToggleStatus(1)">批量启用</a-button>
-            <a-button @click="batchToggleStatus(0)">批量停用</a-button>
-            <a-button @click="exportData">导出</a-button>
-            <a-button @click="printCurrent">打印当前</a-button>
-            <a-button @click="triggerImport">导入CSV</a-button>
-            <a-button @click="go('/finance/config/change-log')">查看变更记录</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">查询</a-button>
+              <a-button @click="openEdit()">新增规则</a-button>
+              <a-button @click="batchToggleStatus(1)">批量启用</a-button>
+              <a-button @click="batchToggleStatus(0)">批量停用</a-button>
+              <a-button @click="exportData">导出</a-button>
+              <a-button @click="printCurrent">打印当前</a-button>
+              <a-button @click="triggerImport">导入CSV</a-button>
+              <a-button @click="go('/finance/config/change-log')">查看变更记录</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 12px;">
       <a-row :gutter="[12, 12]">
         <a-col :xs="24" :xl="12">
-          <a-space wrap>
-            <a-button :loading="saving" @click="applyTemplate('STANDARD')">应用标准规则模板</a-button>
-            <a-button :loading="saving" @click="applyTemplate('NURSING')">应用护理分级模板</a-button>
-            <a-button :loading="saving" @click="applyTemplate('UTILITY')">应用水电分摊模板</a-button>
-          </a-space>
+          <ActionToolbar wrap>
+            <a-button :loading="saving" :disabled="loading || !!loadError" @click="applyTemplate('STANDARD')">补齐基础收费标准</a-button>
+            <a-button v-if="canManageCareFees" @click="careFeesOpen = true">护理等级收费</a-button>
+            <a-button :loading="saving" :disabled="loading || !!loadError" @click="applyTemplate('UTILITY')">补齐水电分摊标准</a-button>
+          </ActionToolbar>
         </a-col>
         <a-col :xs="24" :xl="12">
           <a-alert
             :type="healthWarnings.length ? 'warning' : 'success'"
             show-icon
             :message="healthWarnings.length ? `规则健康检查发现 ${healthWarnings.length} 项风险` : '规则健康检查通过'"
-            :description="healthWarnings.length ? healthWarnings.join('；') : '配置键、启停状态、数值范围均正常'"
+            :description="healthWarnings.length ? healthWarnings.join('；') : '收费项目、启停状态和标准值均正常'"
           />
         </a-col>
       </a-row>
     </a-card>
+    <a-alert style="margin-top: 12px" type="info" show-icon message="床位费按月维护；餐费月标准大于零时优先按月计费，否则使用日标准。护理费按护理等级单独维护，账单按实际计费天数折算。" />
+    <a-alert v-if="legacyRules.length" style="margin-top: 12px" type="warning" show-icon :message="`发现 ${legacyRules.length} 条旧版收费模板规则`" description="BILL_ 开头的旧模板不作为现行床位费、餐费或护理费的计价来源。请核对现行标准后维护，原记录继续保留。" />
+    <a-alert v-if="loadError" style="margin-top:12px" type="error" show-icon :message="loadError" />
     <a-card v-if="impactPreview" class="card-elevated" :bordered="false" style="margin-top: 12px;">
       <a-alert
         type="info"
@@ -58,8 +63,11 @@
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <vxe-table ref="tableRef" border stripe show-overflow="title" :loading="loading" :data="filteredRows" height="560">
         <vxe-column type="checkbox" width="50" />
-        <vxe-column field="configKey" title="配置键" min-width="280" />
-        <vxe-column field="configValue" title="配置值" width="150" />
+        <vxe-column field="configKey" title="收费项目" min-width="230">
+          <template #default="{ row }">{{ billingRuleLabel(row.configKey, row.remark) }}</template>
+        </vxe-column>
+        <vxe-column field="configValue" title="标准值" width="150" />
+        <vxe-column title="计费单位" width="130"><template #default="{ row }">{{ billingRuleUnit(row.configKey) }}</template></vxe-column>
         <vxe-column field="effectiveMonth" title="生效月份" width="120" />
         <vxe-column field="status" title="状态" width="100">
           <template #default="{ row }">
@@ -76,17 +84,20 @@
         </vxe-column>
       </vxe-table>
     </a-card>
+    <CareLevelFeeEditor v-if="careFeesOpen" :month="dayjs(query.month).format('YYYY-MM')" @close="careFeesOpen = false" />
 
     <a-modal :mask-closable="false" v-model:open="editOpen" title="计费规则" @ok="submitEdit" :confirm-loading="saving">
       <a-form layout="vertical" :model="form">
-        <a-form-item label="配置键">
-          <a-input v-model:value="form.configKey" placeholder="如 BILL_ROOM_PRICE / DISCOUNT_LIMIT" />
+        <a-form-item label="收费项目" required>
+          <a-select v-if="!customRule" v-model:value="form.configKey" :options="billingRuleOptions" :disabled="editing" placeholder="选择要维护的收费项目" />
+          <a-input v-else v-model:value="form.configKey" :disabled="editing" placeholder="请输入已有业务使用的规则编码" />
+          <a-checkbox v-if="!editing" v-model:checked="customRule" @change="form.configKey = ''">维护其他业务规则</a-checkbox>
         </a-form-item>
-        <a-form-item label="配置值">
-          <a-input-number v-model:value="form.configValue" style="width: 100%" :min="0" />
+        <a-form-item :label="`收费标准（${billingRuleUnit(form.configKey)}）`" required>
+          <a-input-number v-model:value="form.configValue" style="width: 100%" :min="0" :precision="2" />
         </a-form-item>
         <a-form-item label="生效月份">
-          <a-date-picker v-model:value="form.effectiveMonth" picker="month" style="width: 100%" />
+          <a-date-picker v-model:value="form.effectiveMonth" :allow-clear="false" picker="month" style="width: 100%" />
         </a-form-item>
         <a-form-item label="状态">
           <a-switch v-model:checked="formEnabled" />
@@ -94,12 +105,16 @@
         <a-form-item label="备注">
           <a-input v-model:value="form.remark" />
         </a-form-item>
+        <a-alert type="info" show-icon :message="`${billingRuleLabel(form.configKey) || '请选择收费项目'}：${form.configValue ?? '待填写'} ${billingRuleUnit(form.configKey)}`" description="修改同一生效月份会更新该月标准；选择其他月份会维护对应月份版本。保存前将展示影响范围，已有账单不会自动重算。" />
       </a-form>
     </a-modal>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
+import CareLevelFeeEditor from './components/CareLevelFeeEditor.vue'
 import { computed, onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
@@ -110,10 +125,19 @@ import type { FinanceBillingConfigEntry, FinanceConfigImpactPreview } from '../.
 import { exportCsv } from '../../utils/export'
 import { printTableReport } from '../../utils/print'
 import { confirmAction } from '../../utils/actionConfirm'
+import { billingRuleOptions, billingRuleLabel, billingRuleUnit, isBusinessBillingRule } from '../../constants/billingRules'
+import { useUserStore } from '../../stores/user'
 
 const loading = ref(false)
 const saving = ref(false)
 const router = useRouter()
+const user = useUserStore()
+const canManageCareFees = computed(() => user.roles.some(role => ['FINANCE_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'].includes(role)))
+const careFeesOpen = ref(false)
+const customRule = ref(false)
+const editing = ref(false)
+const loadError = ref('')
+const legacyRules = computed(() => rows.value.filter(row => /^BILL_(ROOM|NURSING|DEPOSIT)/.test(row.configKey)))
 const rows = ref<FinanceBillingConfigEntry[]>([])
 const tableRef = ref<any>()
 const importInputRef = ref<HTMLInputElement | null>(null)
@@ -143,7 +167,7 @@ const formEnabled = computed({
 const filteredRows = computed(() => {
   const keyword = query.value.keyword.trim().toLowerCase()
   if (!keyword) return rows.value
-  return rows.value.filter(item => (`${item.configKey || ''} ${item.remark || ''}`).toLowerCase().includes(keyword))
+  return rows.value.filter(item => (`${billingRuleLabel(item.configKey)} ${item.configKey || ''} ${item.remark || ''}`).toLowerCase().includes(keyword))
 })
 const healthWarnings = computed(() => {
   const warnings: string[] = []
@@ -182,18 +206,21 @@ function validateConfigKey(key: string) {
 
 async function loadData() {
   loading.value = true
+  loadError.value = ''
   try {
     rows.value = await getFinanceBillingConfig({
       month: dayjs(query.value.month).format('YYYY-MM')
     })
+  } catch (error: any) {
+    rows.value = []
+    loadError.value = error?.message || '收费规则加载失败，请重新查询'
   } finally {
     loading.value = false
   }
 }
 
-async function confirmWithImpact(configKeys: string[], actionTitle: string, content: string) {
+async function confirmWithImpact(configKeys: string[], actionTitle: string, content: string, month = dayjs(query.value.month).format('YYYY-MM')) {
   try {
-    const month = dayjs(query.value.month).format('YYYY-MM')
     const preview = await getFinanceConfigImpactPreview({
       month,
       configKeys
@@ -222,6 +249,8 @@ async function confirmWithImpact(configKeys: string[], actionTitle: string, cont
 }
 
 function openEdit(row?: FinanceBillingConfigEntry) {
+  editing.value = !!row
+  customRule.value = !!row && !isBusinessBillingRule(row.configKey)
   if (!row) {
     form.value = {
       configKey: '',
@@ -237,13 +266,14 @@ function openEdit(row?: FinanceBillingConfigEntry) {
     configKey: row.configKey,
     configValue: Number(row.configValue || 0),
     effectiveMonth: dayjs(row.effectiveMonth),
-    status: Number(row.status || 1),
+    status: Number(row.status ?? 1),
     remark: row.remark || ''
   }
   editOpen.value = true
 }
 
 async function submitEdit() {
+  if (saving.value) return
   const normalizedKey = normalizeConfigKey(form.value.configKey)
   if (!normalizedKey) {
     message.warning('请输入配置键')
@@ -253,10 +283,15 @@ async function submitEdit() {
     message.warning('配置键仅支持大写字母、数字、下划线，长度 3-64')
     return
   }
+  if (form.value.configValue == null || !Number.isFinite(Number(form.value.configValue)) || Number(form.value.configValue) < 0 || !form.value.effectiveMonth?.isValid()) {
+    message.warning('请填写不小于零的收费标准，并选择有效的生效月份')
+    return
+  }
   const confirmed = await confirmWithImpact(
     [normalizedKey],
     '确认保存计费规则？',
-    `即将保存规则 ${normalizedKey}@${dayjs(form.value.effectiveMonth).format('YYYY-MM')}`
+    `即将保存 ${billingRuleLabel(normalizedKey)}，生效月份 ${dayjs(form.value.effectiveMonth).format('YYYY-MM')}`,
+    dayjs(form.value.effectiveMonth).format('YYYY-MM')
   )
   if (!confirmed) return
   if (saving.value) return
@@ -266,11 +301,12 @@ async function submitEdit() {
       configKey: normalizedKey,
       configValue: Number(form.value.configValue || 0),
       effectiveMonth: dayjs(form.value.effectiveMonth).format('YYYY-MM'),
-      status: Number(form.value.status || 1),
+      status: Number(form.value.status ?? 1),
       remark: form.value.remark || undefined
     })
     message.success('保存成功')
     editOpen.value = false
+    query.value.month = dayjs(form.value.effectiveMonth)
     loadData()
   } finally {
     saving.value = false
@@ -312,29 +348,28 @@ async function batchToggleStatus(status: 0 | 1) {
   }
 }
 
-async function applyTemplate(type: 'STANDARD' | 'NURSING' | 'UTILITY') {
+async function applyTemplate(type: 'STANDARD' | 'UTILITY') {
   const month = dayjs(query.value.month).format('YYYY-MM')
   const templates = {
     STANDARD: [
-      { configKey: 'BILL_ROOM_BASE_PRICE', configValue: 1800, remark: '房费基础单价（月）' },
-      { configKey: 'BILL_NURSING_BASE_PRICE', configValue: 1600, remark: '护理费基础单价（月）' },
-      { configKey: 'BILL_DEPOSIT_MIN', configValue: 5000, remark: '入住押金下限' }
-    ],
-    NURSING: [
-      { configKey: 'BILL_NURSING_L1_PRICE', configValue: 1200, remark: '护理一级价格' },
-      { configKey: 'BILL_NURSING_L2_PRICE', configValue: 1800, remark: '护理二级价格' },
-      { configKey: 'BILL_NURSING_L3_PRICE', configValue: 2600, remark: '护理三级价格' }
+      { configKey: 'BED_FEE_MONTHLY', configValue: 1800, remark: '床位费月标准' },
+      { configKey: 'MEAL_FEE_MONTHLY', configValue: 0, remark: '餐费月标准（0 时使用日标准）' },
+      { configKey: 'MEAL_FEE_PER_DAY', configValue: 0, remark: '餐费日标准' }
     ],
     UTILITY: [
       { configKey: 'ALLOC_ELECTRIC_BASE_PRICE', configValue: 1, remark: '电费基础单价（元/度）' },
       { configKey: 'ALLOC_ELECTRIC_FREE_KWH_PER_PERSON', configValue: 10, remark: '每人每月免费电量（度）' },
       { configKey: 'ALLOC_WATER_BASE_PRICE', configValue: 0, remark: '水费基础单价（默认0）' }
     ]
-  }[type]
+  }[type].filter(item => !rows.value.some(row => row.configKey === item.configKey))
+  if (!templates.length) {
+    message.info('本月已包含这些收费标准，请直接编辑已有项目')
+    return
+  }
   const confirmed = await confirmWithImpact(
     templates.map(item => item.configKey),
     '确认应用模板规则？',
-    `模板类型：${type}，共 ${templates.length} 条规则`
+    `将补齐 ${month} 缺少的 ${templates.length} 项：${templates.map(item => `${billingRuleLabel(item.configKey)} ${item.configValue} ${billingRuleUnit(item.configKey)}`).join('；')}。已有项目不会被覆盖。`
   )
   if (!confirmed) return
   if (saving.value) return

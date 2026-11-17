@@ -3,6 +3,7 @@ import type { ActionPermission, DataScope, DepartmentCode, RouteAudience, RoleCo
 
 declare module 'vue-router' {
   interface RouteMeta {
+    workspaceId?: string
     title?: string
     icon?: string
     hidden?: boolean

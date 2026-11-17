@@ -1,17 +1,18 @@
 <template>
   <PageContainer title="积分规则" subTitle="按护理模板/评分/异常配置">
+    <template #extra>
+      <a-button type="primary" @click="openDrawer()">新增规则</a-button>
+      <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
+      <a-button :disabled="!canEnableSingle" @click="enableSelected">启用</a-button>
+      <a-button :disabled="!canDisableSingle" @click="disableSelected">停用</a-button>
+      <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+      <a-button :disabled="selectedRowKeys.length === 0" @click="batchEnable">批量启用</a-button>
+      <a-button :disabled="selectedRowKeys.length === 0" @click="batchDisable">批量停用</a-button>
+      <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+      <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
-      <template #extra>
-        <a-button type="primary" @click="openDrawer()">新增规则</a-button>
-        <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
-        <a-button :disabled="!canEnableSingle" @click="enableSelected">启用</a-button>
-        <a-button :disabled="!canDisableSingle" @click="disableSelected">停用</a-button>
-        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" @click="batchEnable">批量启用</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" @click="batchDisable">批量停用</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
-        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
-      </template>
+
     </SearchForm>
 
     <DataTable

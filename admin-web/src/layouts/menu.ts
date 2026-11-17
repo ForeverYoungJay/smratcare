@@ -3,6 +3,7 @@ import { routes } from '../router/routes'
 import { canAccessRoleGroups, hasExplicitPageAccess } from '../utils/routeAccess'
 import { getPageDescription, getPageAliases } from '../router/pageDescriptions'
 import { buildJobNavigation, supportsJobNavigation } from './jobNavigation'
+import { canUseWorkspaceTab, getFunctionWorkspace } from '../workspaces/catalog'
 
 export interface MenuItem {
   key: string
@@ -53,13 +54,19 @@ function buildMenu(
           ? canAccessRoleGroups(roles, roleGroups, routePath, pagePermissions)
           : permissionGroups.length > 0 ? pageAllowed : canAccessRoleGroups(roles, roleGroups, routePath, pagePermissions)
         // 通用页面（功能地图等）对所有登录用户可见，与 pagePermissions 白名单无关
-        const selfAccessible = Boolean(r.meta?.publicForAuthenticated) || (permissionAllowed && roleAllowed)
+        const workspace = getFunctionWorkspace(r.meta?.workspaceId)
+        const workspaceTabs = workspace?.tabs.filter((tab) => canUseWorkspaceTab(tab, roles, pagePermissions, permissions)) || []
+        const selfAccessible = workspace
+          ? workspaceTabs.length > 0
+          : Boolean(r.meta?.publicForAuthenticated) || (permissionAllowed && roleAllowed)
         const children = r.children?.length
           ? buildMenu(r.children, roles, pagePermissions, permissions, routePath, roleGroups, permissionGroups)
           : []
+        if (r.children?.length && children.length === 0) return null
         if (!selfAccessible && children.length === 0) {
           return null
         }
+        if (r.children?.length && children.length === 1 && !r.component && /^\/(finance|marketing|hr|base-config|system)\/.+/.test(routePath)) return children[0]
         const fullPath = r.children && children.length > 0 ? undefined : joinPath(basePath, r.path || '')
         const routeName = r.name ? String(r.name) : ''
         const node: MenuItem = {
@@ -67,8 +74,10 @@ function buildMenu(
           label: String(r.meta?.title || r.name || r.path),
           icon: r.meta?.icon as string | undefined,
           roles: r.meta?.roles as string[] | undefined,
-          desc: getPageDescription(routeName),
-          aliases: getPageAliases(routeName),
+          desc: workspace ? `同页办理：${workspaceTabs.map((tab) => tab.label).join('、')}` : getPageDescription(routeName),
+          aliases: workspace ? workspaceTabs.flatMap((tab) => [tab.label, ...tab.sources
+            .filter((source) => canUseWorkspaceTab({ ...tab, sources: [source] }, roles, pagePermissions, permissions))
+            .map((source) => source.title || '')]) : getPageAliases(routeName),
           navSection: r.meta?.navSection as MenuItem['navSection'],
           navOrder: r.meta?.navOrder,
           navPinned: r.meta?.navPinned
