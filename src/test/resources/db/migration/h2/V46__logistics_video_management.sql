@@ -1,0 +1,46 @@
+CREATE TABLE logistics_camera (
+  id BIGINT NOT NULL PRIMARY KEY,
+  org_id BIGINT NOT NULL,
+  camera_code VARCHAR(64) NOT NULL,
+  camera_name VARCHAR(128) NOT NULL,
+  location VARCHAR(128) NOT NULL,
+  channel_ref VARCHAR(128) NOT NULL,
+  protocol VARCHAR(16) NOT NULL,
+  responsible_name VARCHAR(64) DEFAULT NULL,
+  enabled TINYINT NOT NULL DEFAULT 1,
+  bitrate_mbps DECIMAL(8,2) NOT NULL DEFAULT 2,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uk_camera_org_code UNIQUE (org_id, camera_code)
+);
+
+CREATE TABLE logistics_video_policy (
+  id BIGINT NOT NULL PRIMARY KEY,
+  org_id BIGINT NOT NULL,
+  provider VARCHAR(16) NOT NULL DEFAULT 'UNDECIDED',
+  retention_days INT NOT NULL DEFAULT 90,
+  auto_cleanup TINYINT NOT NULL DEFAULT 0,
+  basis VARCHAR(255) DEFAULT NULL,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uk_video_policy_org UNIQUE (org_id)
+);
+
+CREATE TABLE logistics_video_recording (
+  id BIGINT NOT NULL PRIMARY KEY,
+  org_id BIGINT NOT NULL,
+  camera_id BIGINT NOT NULL,
+  ingest_key VARCHAR(64) NOT NULL,
+  provider VARCHAR(16) NOT NULL,
+  object_key VARCHAR(255) NOT NULL,
+  started_at DATETIME NOT NULL,
+  ended_at DATETIME NOT NULL,
+  expires_at DATETIME NOT NULL,
+  size_bytes BIGINT NOT NULL,
+  sha256 VARCHAR(64) NOT NULL,
+  held TINYINT NOT NULL DEFAULT 0,
+  hold_reason VARCHAR(255) DEFAULT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'AVAILABLE',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uk_video_ingest UNIQUE (org_id, camera_id, ingest_key)
+);
