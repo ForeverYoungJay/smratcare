@@ -14,7 +14,8 @@ import type {
   CareIncidentSummary,
   CareIncidentActionRequest,
   NursingRectificationItem,
-  NursingQualityMetrics
+  NursingQualityMetrics,
+  NursingResidentItem
 } from '../types'
 
 export function getCaregiverGroupPage(params: any) {
@@ -203,4 +204,8 @@ export function reviewRectification(id: number, passed: boolean, reviewResult: s
 
 export function getQualityMetrics(params: { dateFrom: string; dateTo: string }) {
   return request.get<NursingQualityMetrics>('/api/nursing/quality/metrics', { params })
+}
+
+export function getNursingResidentPage(params: { pageNo: number; pageSize: number; keyword?: string; reassessDue?: boolean }) {
+  return fetchPage<NursingResidentItem>('/api/nursing/residents/page', params)
 }

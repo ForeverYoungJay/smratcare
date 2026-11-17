@@ -79,7 +79,9 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import { useRoute } from 'vue-router'
 import { useElderOptions } from '../../composables/useElderOptions'
+import { normalizeResidentId } from '../../utils/id'
 import { getEmrPage, saveEmr } from '../../api/emr'
 import type { EmrRecord, Id, PageResult } from '../../types'
 
@@ -95,7 +97,13 @@ const saving = ref(false)
 const rows = ref<EmrRecord[]>([])
 const query = reactive({ elderId: undefined as Id | undefined, recordType: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
-const { elderOptions, searchElders } = useElderOptions({ pageSize: 50 })
+const { elderOptions, searchElders, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
+// 从长者健康档案进入时按 residentId 预先筛选该长者
+const routeResidentId = normalizeResidentId(useRoute().query as Record<string, unknown>)
+if (routeResidentId) {
+  query.elderId = routeResidentId
+  ensureSelectedElder(routeResidentId)
+}
 
 const columns = [
   { title: '长者ID', dataIndex: 'elderId', key: 'elderId', width: 100 },

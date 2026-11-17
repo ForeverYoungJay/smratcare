@@ -18,7 +18,7 @@
       <EmbeddedPage :key="tab">
         <Handovers v-if="tab === 'handover'" />
         <Inspection v-else-if="tab === 'patrol'" />
-        <IncidentBoard v-else-if="tab === 'incident'" @changed="loadSummary" />
+        <IncidentBoard v-else-if="tab === 'incident'" />
         <Exception v-else />
       </EmbeddedPage>
     </section>
@@ -26,7 +26,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import { AlertOutlined, CheckCircleOutlined, SafetyOutlined, SwapOutlined } from '@ant-design/icons-vue'
@@ -37,6 +37,7 @@ import Inspection from '../../health/Inspection.vue'
 import Exception from '../Exception.vue'
 import IncidentBoard from './IncidentBoard.vue'
 import { getIncidentSummary, getShiftHandoverPage } from '../../../api/nursing'
+import { subscribeLiveSync } from '../../../utils/liveSync'
 import type { CareIncidentSummary } from '../../../types'
 import { SAFETY_TABS, resolveTab } from './nursingModel'
 import '../../elder/residentUi.css'
@@ -69,7 +70,10 @@ async function loadSummary() {
   handoverWaiting.value = waiting.status === 'fulfilled' ? waiting.value.total : undefined
 }
 
+// 交接确认、异常处置后刷新顶部指标
+const stopSync = subscribeLiveSync((payload) => { if (payload.topics.includes('care')) loadSummary() })
 onMounted(loadSummary)
+onUnmounted(stopSync)
 </script>
 
 <style scoped>

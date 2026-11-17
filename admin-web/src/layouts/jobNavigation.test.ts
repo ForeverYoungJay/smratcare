@@ -16,7 +16,6 @@ function depth(items: MenuItem[], current = 1): number {
 
 describe('two-level job navigation', () => {
   it.each([
-    ['MEDICAL_EMPLOYEE', '医务部业务', '长者查询'],
     ['LOGISTICS_EMPLOYEE', '后勤部业务', '房态查询'],
   ])('%s receives the five employee entry types', (role, businessLabel, objectLabel) => {
     const menu = jobMenu(role)
@@ -29,7 +28,6 @@ describe('two-level job navigation', () => {
   })
 
   it.each([
-    ['MEDICAL_MINISTER', '医务部管理', '医护任务分配', '医务报表'],
     ['LOGISTICS_MINISTER', '后勤部管理', '后勤任务分配', '后勤报表'],
   ])('%s receives minister-only management entries', (role, management, assignment, report) => {
     const labels = jobMenu(role).map((item) => item.label)
@@ -77,8 +75,16 @@ describe('two-level job navigation', () => {
     expect(paths(jobMenu('NURSING_EMPLOYEE'))).not.toContain('/care/today')
   })
 
+  it('gives medical seven main pages and keeps settings for managers', () => {
+    const main = ['/medical-care/workbench', '/medical-care/residents', '/medical-care/clinical', '/medical-care/medication',
+      '/medical-care/monitoring', '/medical-care/coordination', '/medical-care/alerts']
+    expect(paths(jobMenu('MEDICAL_MINISTER'))).toEqual(expect.arrayContaining([...main, '/medical-care/settings']))
+    expect(paths(jobMenu('MEDICAL_EMPLOYEE'))).toEqual(expect.arrayContaining(main))
+    expect(paths(jobMenu('MEDICAL_EMPLOYEE'))).not.toContain('/medical-care/settings')
+  })
+
   it('links employee navigation to medical and logistics department workbenches', () => {
-    expect(paths(jobMenu('MEDICAL_EMPLOYEE'))).toContain('/medical-care/center')
+    expect(paths(jobMenu('MEDICAL_EMPLOYEE'))).toContain('/medical-care/workbench')
     expect(paths(jobMenu('LOGISTICS_EMPLOYEE'))).toContain('/logistics/workbench')
   })
 

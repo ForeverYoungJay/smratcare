@@ -1,5 +1,12 @@
 package com.zhiyangyun.care.nursing.service.impl;
 
+import com.zhiyangyun.care.auth.entity.StaffAccount;
+import com.zhiyangyun.care.auth.mapper.StaffMapper;
+import com.zhiyangyun.care.oa.entity.OaTodo;
+import com.zhiyangyun.care.oa.mapper.OaTodoMapper;
+import java.util.Map;
+import org.springframework.dao.DuplicateKeyException;
+
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -27,12 +34,22 @@ public class CareIncidentServiceImpl implements CareIncidentService {
   private static final String INVALID_TRANSITION = "当前状态不允许该操作";
   private static final Set<String> ESCALATE_TARGETS = Set.of("MEDICAL", "LOGISTICS", "ADMIN_DUTY");
 
+  /** 升级去向 → 接收待办的岗位 */
+  private static final Map<String, String> ESCALATE_ROLE = Map.of(
+      "MEDICAL", "MEDICAL_MINISTER", "LOGISTICS", "LOGISTICS_MINISTER", "ADMIN_DUTY", "DIRECTOR");
+  private static final String TODO_PREFIX = "【护理异常】";
+
   private final CareIncidentMapper incidentMapper;
   private final CareIncidentActionMapper actionMapper;
+  private final StaffMapper staffMapper;
+  private final OaTodoMapper oaTodoMapper;
 
-  public CareIncidentServiceImpl(CareIncidentMapper incidentMapper, CareIncidentActionMapper actionMapper) {
+  public CareIncidentServiceImpl(CareIncidentMapper incidentMapper, CareIncidentActionMapper actionMapper,
+      StaffMapper staffMapper, OaTodoMapper oaTodoMapper) {
     this.incidentMapper = incidentMapper;
     this.actionMapper = actionMapper;
+    this.staffMapper = staffMapper;
+    this.oaTodoMapper = oaTodoMapper;
   }
 
   @Override
@@ -89,10 +106,10 @@ public class CareIncidentServiceImpl implements CareIncidentService {
   @Transactional
   public CareIncidentDetailResponse create(Long tenantId, CareIncidentRequest request, Long operatorId,
       String operatorName) {
+    operatorName = displayName(operatorId, operatorName);
     CareIncident incident = new CareIncident();
     incident.setTenantId(tenantId);
     incident.setOrgId(tenantId);
-    incident.setIncidentNo(nextIncidentNo(tenantId));
     incident.setElderId(request.getElderId());
     incident.setElderName(trim(request.getElderName()));
     incident.setLocation(trim(request.getLocation()));
@@ -108,8 +125,11 @@ public class CareIncidentServiceImpl implements CareIncidentService {
     incident.setOwnerName(trim(request.getOwnerName()));
     incident.setRelatedTaskId(request.getRelatedTaskId());
     incident.setStatus("REPORTED");
-    incidentMapper.insert(incident);
+    insertWithNumber(incident);
     appendAction(incident, "REPORT", null, "REPORTED", incident.getDescription(), operatorId, operatorName);
+    // 有责任人通知责任人，没有就通知护士长受理
+    notify(incident, "待受理", incident.getOwnerId() != null ? staffList(incident.getOwnerId())
+        : staffMapper.selectByRoleCode(tenantId, "NURSING_MINISTER"), operatorId);
     return detail(incident);
   }
 
@@ -121,6 +141,7 @@ public class CareIncidentServiceImpl implements CareIncidentService {
     if (incident == null) {
       return null;
     }
+    operatorName = displayName(operatorId, operatorName);
     String action = request.getAction() == null ? "" : request.getAction().trim().toUpperCase();
     String note = trim(request.getNote());
     String from = incident.getStatus();
@@ -179,16 +200,85 @@ public class CareIncidentServiceImpl implements CareIncidentService {
       incidentMapper.updateById(incident);
     }
     appendAction(incident, action, from, to, note, operatorId, operatorName);
+    switch (action) {
+      case "ASSIGN" -> notify(incident, "请负责处置", staffList(incident.getOwnerId()), operatorId);
+      case "ESCALATE" -> notify(incident, "已升级，请协同处置",
+          staffMapper.selectByRoleCode(tenantId, ESCALATE_ROLE.get(incident.getEscalateTo())), operatorId);
+      case "SUBMIT_REVIEW" -> notify(incident, "待复核结案", staffMapper.selectByRoleCode(tenantId, "NURSING_MINISTER"), operatorId);
+      case "CLOSE" -> closeTodos(incident);
+      default -> { }
+    }
     return detail(incident);
   }
 
-  private String nextIncidentNo(Long tenantId) {
+  /** 编号按当天已有最大号 +1；并发上报撞号时唯一键会拒绝，换下一个号重试 */
+  private void insertWithNumber(CareIncident incident) {
+    for (int attempt = 0; ; attempt++) {
+      incident.setIncidentNo(nextIncidentNo(incident.getTenantId(), attempt));
+      try {
+        incidentMapper.insert(incident);
+        return;
+      } catch (DuplicateKeyException ex) {
+        incident.setId(null);
+        if (attempt >= 4) {
+          throw new IllegalStateException("事件编号生成冲突，请稍后重试");
+        }
+      }
+    }
+  }
+
+  private String nextIncidentNo(Long tenantId, int offset) {
     String prefix = "YC" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
-    // shortcut: count+1 can collide under concurrent reports (unique key rejects the second), upgrade to a sequence table if that happens in practice
-    long count = incidentMapper.selectCount(Wrappers.lambdaQuery(CareIncident.class)
+    CareIncident last = incidentMapper.selectOne(Wrappers.lambdaQuery(CareIncident.class)
         .eq(CareIncident::getTenantId, tenantId)
-        .likeRight(CareIncident::getIncidentNo, prefix));
-    return prefix + String.format("%03d", count + 1);
+        .likeRight(CareIncident::getIncidentNo, prefix)
+        .orderByDesc(CareIncident::getIncidentNo)
+        .last("LIMIT 1"));
+    int seq = last == null ? 0 : Integer.parseInt(last.getIncidentNo().substring(prefix.length()));
+    return prefix + String.format("%03d", seq + 1 + offset);
+  }
+
+  /** 操作人显示真实姓名，查不到时退回登录名 */
+  private String displayName(Long staffId, String fallback) {
+    StaffAccount staff = staffId == null ? null : staffMapper.selectById(staffId);
+    return staff != null && staff.getRealName() != null && !staff.getRealName().isBlank() ? staff.getRealName() : fallback;
+  }
+
+  private List<StaffAccount> staffList(Long staffId) {
+    StaffAccount staff = staffId == null ? null : staffMapper.selectById(staffId);
+    return staff == null ? List.of() : List.of(staff);
+  }
+
+  /** 发到「我的待办」；操作人自己不给自己发，高风险 1 小时内到期，其余当天 */
+  private void notify(CareIncident incident, String what, List<StaffAccount> receivers, Long operatorId) {
+    LocalDateTime due = "HIGH".equals(incident.getSeverity()) ? LocalDateTime.now().plusHours(1) : LocalDateTime.now().plusHours(8);
+    String title = TODO_PREFIX + incident.getIncidentNo() + " " + what;
+    String place = incident.getElderName() != null ? incident.getElderName() : incident.getLocation();
+    for (StaffAccount receiver : receivers == null ? List.<StaffAccount>of() : receivers) {
+      if (receiver.getId().equals(operatorId)) {
+        continue;
+      }
+      OaTodo todo = new OaTodo();
+      todo.setTenantId(incident.getTenantId());
+      todo.setOrgId(incident.getOrgId());
+      todo.setTitle(title);
+      todo.setContent((place == null ? "" : place + "：") + incident.getDescription());
+      todo.setDueTime(due);
+      todo.setStatus("OPEN");
+      todo.setAssigneeId(receiver.getId());
+      todo.setAssigneeName(receiver.getRealName());
+      todo.setCreatedBy(operatorId == null ? 0L : operatorId);
+      oaTodoMapper.insert(todo);
+    }
+  }
+
+  private void closeTodos(CareIncident incident) {
+    OaTodo done = new OaTodo();
+    done.setStatus("DONE");
+    oaTodoMapper.update(done, Wrappers.lambdaUpdate(OaTodo.class)
+        .eq(OaTodo::getOrgId, incident.getOrgId())
+        .eq(OaTodo::getStatus, "OPEN")
+        .likeRight(OaTodo::getTitle, TODO_PREFIX + incident.getIncidentNo() + " "));
   }
 
   private CareIncident load(Long id, Long tenantId) {

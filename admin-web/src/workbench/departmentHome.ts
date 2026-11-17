@@ -59,15 +59,15 @@ export const DEPARTMENT_HOME_CONFIG: Record<DepartmentCode, DepartmentHomeConfig
   MEDICAL: {
     department: 'MEDICAL',
     label: '医务部',
-    homePath: '/medical-care/center',
+    homePath: '/medical-care/workbench',
     moduleRoots: ['/medical-care'],
     summary: '围绕长者健康风险，完成评估、医嘱、执行与随访闭环。',
     steps: [
-      { title: '评估与巡诊', path: '/medical-care/rounds' },
-      { title: '医嘱', path: '/medical-care/orders' },
-      { title: '用药与执行', path: '/medical-care/medication-registration' },
-      { title: '异常处置', path: '/medical-care/unified-task-center' },
-      { title: '交接随访', path: '/medical-care/handovers' }
+      { title: '健康档案', path: '/medical-care/residents' },
+      { title: '诊疗与医嘱', path: '/medical-care/clinical' },
+      { title: '用药与执行', path: '/medical-care/medication' },
+      { title: '监测与随访', path: '/medical-care/monitoring' },
+      { title: '告警与应急', path: '/medical-care/alerts' }
     ],
     extraGroups: [
       {

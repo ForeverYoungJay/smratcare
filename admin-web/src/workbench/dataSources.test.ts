@@ -48,7 +48,7 @@ describe('department workbench data source', () => {
   })
 
   it('normalizes real nursing summary fields into shared metrics', async () => {
-    vi.mocked(getTaskSummary).mockResolvedValue({ pendingCount: 8, overdueCount: 2, exceptionCount: 1, completionRate: 75 } as any)
+    vi.mocked(getTaskSummary).mockResolvedValue({ pendingCount: 8, overdueCount: 2, exceptionCount: 1, completionRate: 0.75 } as any)
     const result = await loadDepartmentWorkbenchSnapshot(resolveWorkbenchProfile(['NURSING_EMPLOYEE']), () => true, { staffId: '88' })
     expect(result.status).toBe('ready')
     expect(result.snapshot?.metrics.map((item) => [item.key, item.value])).toEqual([

@@ -1,0 +1,1 @@
+ALTER TABLE service_plan ADD COLUMN IF NOT EXISTS reject_reason VARCHAR(255);

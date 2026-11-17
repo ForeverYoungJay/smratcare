@@ -1,6 +1,7 @@
 <template>
   <PageContainer title="健康服务与医护账户一体化" subTitle="医护执行 + 老人账户联动总览">
     <StatefulBlock :loading="loading" :error="errorText" :empty="false" @retry="load">
+      <a-alert v-if="financeDenied" type="info" show-icon style="margin-bottom: 12px" message="当前账号没有财务权限，账户预警和流水不显示；医护部分正常展示。" />
       <a-card class="card-elevated risk-hero" :bordered="false" style="margin-bottom: 12px">
         <a-row :gutter="[12, 12]" align="middle">
           <a-col :xs="24" :xl="9">
@@ -135,21 +136,25 @@ function go(path: string) {
   router.push(path)
 }
 
+const financeDenied = ref(false)
+
 async function load() {
   loading.value = true
   errorText.value = ''
   try {
-    const [medicalData, warningData, logData] = await Promise.all([
-      getMedicalCareWorkbenchSummary(),
-      getElderAccountWarnings(),
-      getElderAccountLogPage({ pageNo: 1, pageSize: 10 })
-    ])
+    const medicalData = await getMedicalCareWorkbenchSummary()
     medicalSummary.value = {
       ...createMedicalWorkbenchSummaryDefaults(),
       ...(medicalData || {})
     }
-    warningRows.value = warningData || []
-    const page = logData as PageResult<ElderAccountLog>
+    // 账户数据归财务权限：医务人员没有财务权限时只看医护部分，不让整页失败
+    const [warningData, logData] = await Promise.allSettled([
+      getElderAccountWarnings({ silent403: true }),
+      getElderAccountLogPage({ pageNo: 1, pageSize: 10 }, { silent403: true })
+    ])
+    financeDenied.value = warningData.status === 'rejected' || logData.status === 'rejected'
+    warningRows.value = warningData.status === 'fulfilled' ? warningData.value || [] : []
+    const page = logData.status === 'fulfilled' ? (logData.value as PageResult<ElderAccountLog>) : null
     logRows.value = page?.list || []
   } catch (error: any) {
     errorText.value = resolveMedicalError(error, '加载失败，请稍后重试')

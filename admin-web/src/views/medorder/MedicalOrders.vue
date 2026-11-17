@@ -94,7 +94,9 @@ import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import { useRoute } from 'vue-router'
 import { useElderOptions } from '../../composables/useElderOptions'
+import { normalizeResidentId } from '../../utils/id'
 import { getMedicalOrderPage, createMedicalOrder, stopMedicalOrder } from '../../api/medOrder'
 import { getDrugPage } from '../../api/pharmacy'
 import type { Id, MedicalOrder, PageResult } from '../../types'
@@ -116,7 +118,13 @@ const saving = ref(false)
 const rows = ref<MedicalOrder[]>([])
 const query = reactive({ elderId: undefined as Id | undefined, status: undefined as string | undefined, category: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
-const { elderOptions, searchElders } = useElderOptions({ pageSize: 50 })
+const { elderOptions, searchElders, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
+// 从长者健康档案进入时按 residentId 预先筛选该长者
+const routeResidentId = normalizeResidentId(useRoute().query as Record<string, unknown>)
+if (routeResidentId) {
+  query.elderId = routeResidentId
+  ensureSelectedElder(routeResidentId)
+}
 
 const drugOptions = ref<Array<{ label: string; value: Id }>>([])
 const drugLoading = ref(false)

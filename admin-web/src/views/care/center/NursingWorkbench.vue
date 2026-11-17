@@ -90,7 +90,7 @@ import { getElderPage } from '../../../api/elder'
 import { getAssessmentRecordSummary } from '../../../api/assessment'
 import { getIncidentPage, getIncidentSummary } from '../../../api/nursing'
 import type { CareIncidentItem, CareIncidentSummary, CareTaskItem, CareTaskSummary } from '../../../types'
-import { INCIDENT_TYPES, hourlyCompletion, progressByStaff, sortTodo } from './nursingModel'
+import { INCIDENT_TYPES, hourlyCompletion, progressByStaff, ratioPercent, sortTodo } from './nursingModel'
 import '../../elder/residentUi.css'
 
 const router = useRouter()
@@ -111,7 +111,7 @@ const trend = computed(() => hourlyCompletion(tasks.value))
 const kpis = computed(() => [
   { key: 'resident', label: '在住长者', value: residentCount.value, unit: '人', hint: '可在护理档案中查看', icon: TeamOutlined, path: '/care/residents' },
   { key: 'tasks', label: '今日护理任务', value: summary.value?.totalCount, unit: '项', hint: `已完成 ${summary.value?.doneCount ?? '--'} 项`, icon: ContainerOutlined, path: '/care/tasks?tab=today' },
-  { key: 'rate', label: '任务完成率', value: summary.value?.completionRate, unit: '%', hint: `超时 ${summary.value?.overdueCount ?? '--'} 项`, icon: CheckCircleOutlined, path: '/care/tasks?tab=today&metric=overdue' },
+  { key: 'rate', label: '任务完成率', value: ratioPercent(summary.value?.completionRate), unit: '%', hint: `超时 ${summary.value?.overdueCount ?? '--'} 项`, icon: CheckCircleOutlined, path: '/care/tasks?tab=today&metric=overdue' },
   { key: 'incident', label: '待处理异常', value: incidents.value ? Number(incidents.value.processingCount) + Number(incidents.value.pendingReviewCount) : undefined, unit: '项', hint: `高风险未闭环 ${incidents.value?.openHighCount ?? '--'} 项`, icon: AlertOutlined, tone: 'danger', path: '/care/safety?tab=incident' },
   { key: 'reassess', label: '待复评长者', value: reassessDue.value, unit: '人', hint: '复评日期已到', icon: CalendarOutlined, tone: 'warning', path: '/care/residents?filter=reassess' }
 ])

@@ -37,6 +37,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 /** 护理部升级：异常事件流转、交接班双方确认、计划审核版本、整改复核、质控指标。 */
@@ -57,6 +58,19 @@ class NursingIncidentFlowTest {
   @Autowired private ServiceBookingService bookingService;
   // H2 测试库没有 service_item 表；计划/预约只用它补名称和时长
   @MockBean private ServiceItemMapper serviceItemMapper;
+  @Autowired private JdbcTemplate jdbc;
+
+  /** 护士长账号：用于验证待办通知和真实姓名 */
+  private void seedMinister() {
+    jdbc.update("MERGE INTO staff (id, org_id, department_id, staff_no, username, password_hash, real_name) KEY(id) "
+        + "VALUES (?, ?, 1, 'N501', 'u501', 'x', '周护士长')", MINISTER_ID, ORG_ID);
+    jdbc.update("MERGE INTO role (id, org_id, role_name, role_code) KEY(id) VALUES (99210, ?, '护士长', 'NURSING_MINISTER')", ORG_ID);
+    jdbc.update("MERGE INTO staff_role (id, org_id, staff_id, role_id) KEY(id) VALUES (99211, ?, ?, 99210)", ORG_ID, MINISTER_ID);
+  }
+
+  private List<Map<String, Object>> todos(String incidentNo) {
+    return jdbc.queryForList("SELECT assignee_id, status FROM oa_todo WHERE title LIKE ?", "【护理异常】" + incidentNo + " %");
+  }
 
   @AfterEach
   void clear() {
@@ -97,8 +111,30 @@ class NursingIncidentFlowTest {
   }
 
   @Test
+  void incident_notifies_minister_and_closes_todos() {
+    seedMinister();
+    loginAs(NURSE_ID, "NURSING_EMPLOYEE");
+    Long id = reportIncident(88101L);
+    String no = incidentController.get(id).getData().getIncident().getIncidentNo();
+    // 上报 → 护士长收到待受理待办
+    assertEquals(1, todos(no).size());
+    assertEquals(MINISTER_ID, ((Number) todos(no).get(0).get("ASSIGNEE_ID")).longValue());
+    act(id, "ACCEPT", null);
+    act(id, "PROCESS", null);
+    act(id, "SUBMIT_REVIEW", "已处理");
+    assertEquals(2, todos(no).size());
+
+    loginAs(MINISTER_ID, "NURSING_MINISTER");
+    Result<CareIncidentDetailResponse> closed = act(id, "CLOSE", "复核通过");
+    // 操作人显示真实姓名；结案后相关待办全部完成
+    assertEquals("周护士长", closed.getData().getIncident().getReviewerName());
+    assertTrue(todos(no).stream().allMatch(t -> "DONE".equals(t.get("STATUS"))));
+  }
+
+  @Test
   void incident_happy_path_and_rules() {
     loginAs(NURSE_ID, "NURSING_EMPLOYEE");
+    long closedBefore = incidentController.summary(null).getData().getClosedCount();
     Long id = reportIncident(88001L);
     reportIncident(88002L);
     assertEquals(1, incidentController.page(1, 20, null, null, null, null, null, null, 88001L, null)
@@ -130,7 +166,7 @@ class NursingIncidentFlowTest {
     assertNotNull(closed.getData().getIncident().getClosedAt());
     assertEquals(List.of("REPORT", "ACCEPT", "PROCESS", "CORRECT", "SUBMIT_REVIEW", "CLOSE"),
         incidentController.get(id).getData().getActions().stream().map(a -> a.getAction()).toList());
-    assertEquals(1, incidentController.summary(null).getData().getClosedCount());
+    assertEquals(closedBefore + 1, incidentController.summary(null).getData().getClosedCount());
   }
 
   @Test
@@ -179,6 +215,7 @@ class NursingIncidentFlowTest {
     assertEquals(400, planController.approve(planId).getCode());
 
     request.setPlanName("翻身拍背（加频）");
+    request.setFrequency(3);
     request.setChangeReason("压疮风险升高");
     planController.update(planId, request);
     ServicePlan plan = planMapper.selectById(planId);
@@ -190,8 +227,21 @@ class NursingIncidentFlowTest {
     assertTrue(revisions.get(0).getSnapshotJson().contains("翻身拍背"));
     assertEquals("压疮风险升高", revisions.get(0).getChangeReason());
 
-    // 修订中的计划仍可生成（shortcut）
-    assertTrue(bookingService.generateFromPlans(ORG_ID, LocalDate.now(), false) > 0);
+    // 审核信息只属于当前版本，修改后清空
+    assertNull(plan.getApprovedBy());
+    assertNull(plan.getApprovedAt());
+
+    // 修订待审期间按上一次发布的版本（每天 1 次）生成，不用修改后的每天 3 次
+    bookingService.generateFromPlans(ORG_ID, LocalDate.now(), false);
+    assertEquals(1, jdbc.queryForObject(
+        "SELECT COUNT(*) FROM service_booking WHERE plan_id = ? AND is_deleted = 0", Integer.class, planId));
+
+    assertEquals(400, planController.reject(planId, Map.of()).getCode());
+    assertEquals("REJECTED", planController.reject(planId, Map.of("reason", "频次过高")).getData().getApprovalStatus());
+    assertEquals("频次过高", planController.get(planId).getData().getRejectReason());
+    planController.update(planId, request);
+    assertEquals("PENDING", planController.get(planId).getData().getApprovalStatus());
+    assertNull(planController.get(planId).getData().getRejectReason());
     assertEquals("PUBLISHED", planController.approve(planId).getData().getApprovalStatus());
   }
 

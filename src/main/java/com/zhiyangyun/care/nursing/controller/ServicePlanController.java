@@ -83,9 +83,12 @@ public class ServicePlanController {
       @RequestBody(required = false) Map<String, String> body) {
     Long tenantId = AuthContext.getOrgId();
     String reason = body == null ? null : body.get("reason");
+    if (reason == null || reason.isBlank()) {
+      return Result.error(400, "请填写退回原因");
+    }
     ServicePlanResponse response;
     try {
-      response = servicePlanService.reject(id, tenantId);
+      response = servicePlanService.reject(id, tenantId, reason.trim());
     } catch (IllegalStateException ex) {
       return Result.error(400, ex.getMessage());
     }

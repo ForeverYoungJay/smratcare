@@ -24,7 +24,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import { CheckCircleOutlined, ClockCircleOutlined, ContainerOutlined, WarningOutlined } from '@ant-design/icons-vue'
@@ -35,8 +35,9 @@ import TaskBoard from '../workbench/TaskBoard.vue'
 import NursingRecords from '../NursingRecords.vue'
 import NursingReports from '../NursingReports.vue'
 import { getTaskSummary } from '../../../api/care'
+import { subscribeLiveSync } from '../../../utils/liveSync'
 import type { CareTaskSummary } from '../../../types'
-import { TASK_TABS, resolveTab } from './nursingModel'
+import { TASK_TABS, ratioPercent, resolveTab } from './nursingModel'
 import '../../elder/residentUi.css'
 
 const route = useRoute()
@@ -48,7 +49,7 @@ const kpis = computed((): Array<{ key: string; label: string; value?: number; hi
   const s = summary.value
   return [
     { key: 'total', label: '今日总任务', value: s?.totalCount, hint: `未分配 ${s?.unassignedCount ?? '--'} 项`, icon: ContainerOutlined, query: {} },
-    { key: 'done', label: '已完成任务', value: s?.doneCount, hint: `完成率 ${s?.completionRate ?? '--'}%`, icon: CheckCircleOutlined, query: { metric: 'done' } },
+    { key: 'done', label: '已完成任务', value: s?.doneCount, hint: `完成率 ${ratioPercent(s?.completionRate) ?? '--'}%`, icon: CheckCircleOutlined, query: { metric: 'done' } },
     { key: 'pending', label: '待执行任务', value: s?.pendingCount, hint: '按计划时间执行', icon: ClockCircleOutlined, tone: 'info', query: { metric: 'pending' } },
     { key: 'overdue', label: '超时 / 异常', value: s ? Number(s.overdueCount ?? 0) + Number(s.exceptionCount ?? 0) : undefined, hint: '未完成必须写明原因', icon: WarningOutlined, tone: 'danger', query: { metric: 'overdue' } }
   ]
@@ -59,8 +60,13 @@ function go(next: string, query: Record<string, string> = {}) {
   router.replace({ path: route.path, query: { tab: next, ...query } })
 }
 
-onMounted(async () => {
+async function loadSummary() {
   const today = dayjs().format('YYYY-MM-DD')
   summary.value = await getTaskSummary({ dateFrom: today, dateTo: today }).catch(() => null)
-})
+}
+
+// 嵌入页里新建、执行、派发任务后，顶部指标跟着刷新
+const stopSync = subscribeLiveSync((payload) => { if (payload.topics.includes('care')) loadSummary() })
+onMounted(loadSummary)
+onUnmounted(stopSync)
 </script>

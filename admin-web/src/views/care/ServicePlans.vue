@@ -25,6 +25,7 @@
           <template v-else-if="column.key === 'approval'">
             <a-tag :color="APPROVAL[record.approvalStatus || 'PUBLISHED']?.color">{{ APPROVAL[record.approvalStatus || 'PUBLISHED']?.label || record.approvalStatus }}</a-tag>
             <span class="plan-rev">v{{ record.revision || 1 }}</span>
+            <div v-if="record.approvalStatus === 'REJECTED' && record.rejectReason" class="plan-reject">退回：{{ record.rejectReason }}</div>
           </template>
           <template v-else-if="column.key === 'actions'">
             <div class="row-action-links">
@@ -454,4 +455,5 @@ loadBaseOptions()
 
 <style scoped>
 .plan-rev { margin-left: 4px; color: #8a968f; font-size: 12px; }
+.plan-reject { margin-top: 2px; color: #c9443d; font-size: 12px; }
 </style>

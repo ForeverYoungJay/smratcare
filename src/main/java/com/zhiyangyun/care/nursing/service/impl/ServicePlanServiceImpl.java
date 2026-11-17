@@ -84,11 +84,15 @@ public class ServicePlanServiceImpl implements ServicePlanService {
       revision.setChangedByName(operatorName);
       revisionMapper.insert(revision);
       plan.setRevision(revision.getRevision() + 1);
-      // approved_by/approved_at 保留为上一次发布的审核信息，审核通过后覆盖
-      plan.setApprovalStatus("PENDING");
     }
+    // 任何修改都要重新审核；审核信息只对应当前版本，上一版的审核人见历史版本
+    plan.setApprovalStatus("PENDING");
+    plan.setApprovedBy(null);
+    plan.setApprovedAt(null);
+    plan.setRejectReason(null);
     fillEntity(plan, request);
     servicePlanMapper.updateById(plan);
+    clearReview(plan.getId(), true);
     return buildResponse(plan, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
   }
 
@@ -166,17 +170,20 @@ public class ServicePlanServiceImpl implements ServicePlanService {
     plan.setApprovalStatus("PUBLISHED");
     plan.setApprovedBy(operatorId);
     plan.setApprovedAt(LocalDateTime.now());
+    plan.setRejectReason(null);
     servicePlanMapper.updateById(plan);
+    clearReview(plan.getId(), false);
     return get(id, tenantId);
   }
 
   @Override
-  public ServicePlanResponse reject(Long id, Long tenantId) {
+  public ServicePlanResponse reject(Long id, Long tenantId, String reason) {
     ServicePlan plan = loadPending(id, tenantId);
     if (plan == null) {
       return null;
     }
     plan.setApprovalStatus("REJECTED");
+    plan.setRejectReason(reason);
     servicePlanMapper.updateById(plan);
     return get(id, tenantId);
   }
@@ -188,6 +195,15 @@ public class ServicePlanServiceImpl implements ServicePlanService {
         .eq(ServicePlanRevision::getPlanId, id)
         .orderByDesc(ServicePlanRevision::getRevision)
         .orderByDesc(ServicePlanRevision::getCreateTime));
+  }
+
+  /** updateById 会跳过 null 字段，清空审核信息要单独写 */
+  private void clearReview(Long id, boolean approval) {
+    var wrapper = Wrappers.lambdaUpdate(ServicePlan.class).eq(ServicePlan::getId, id).set(ServicePlan::getRejectReason, null);
+    if (approval) {
+      wrapper.set(ServicePlan::getApprovedBy, null).set(ServicePlan::getApprovedAt, null);
+    }
+    servicePlanMapper.update(null, wrapper);
   }
 
   private ServicePlan loadPending(Long id, Long tenantId) {
@@ -256,6 +272,7 @@ public class ServicePlanServiceImpl implements ServicePlanService {
     response.setApprovalStatus(plan.getApprovalStatus());
     response.setApprovedBy(plan.getApprovedBy());
     response.setApprovedAt(plan.getApprovedAt());
+    response.setRejectReason(plan.getRejectReason());
 
     ElderProfile elder = elderMap.get(plan.getElderId());
     if (elder == null && plan.getElderId() != null) {

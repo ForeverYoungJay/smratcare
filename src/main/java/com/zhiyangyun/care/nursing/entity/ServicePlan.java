@@ -34,6 +34,7 @@ public class ServicePlan {
   private String approvalStatus;
   private Long approvedBy;
   private LocalDateTime approvedAt;
+  private String rejectReason;
   private Long createdBy;
   @TableField(value = "create_time", fill = FieldFill.INSERT)
   private LocalDateTime createTime;

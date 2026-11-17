@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { CareTaskItem } from '../../../types'
-import { SAFETY_TABS, checkRoster, formatRate, hourlyCompletion, incidentActions, progressByStaff, resolveTab, sortTodo } from './nursingModel'
+import { SAFETY_TABS, checkRoster, formatRate, ratioPercent, hourlyCompletion, incidentActions, progressByStaff, resolveTab, sortTodo } from './nursingModel'
 import { buildExecution, type ExecuteForm } from './taskExecution'
-import { assessmentFlowStep, latestAssessmentByElder } from './residentCare'
+import { assessmentFlowStep } from './residentCare'
 
 const task = (over: Partial<CareTaskItem>): CareTaskItem => ({
   taskDailyId: 1, elderId: '7', elderName: '王秀兰', bedId: '1', roomNo: 'A301', taskName: '晨间洗漱', planTime: '2026-11-17 09:00:00', status: 'PENDING', ...over
 })
+
+const base: ExecuteForm = { result: 'DONE', reason: '', bedQrCode: 'QR1', observation: '', incidentType: '', severity: 'MEDIUM', checkedItems: [] }
 
 describe('nursing model', () => {
   it('falls back to the first tab for unknown query values', () => {
@@ -24,6 +26,9 @@ describe('nursing model', () => {
   it('shows no-data instead of a rate when the denominator is zero', () => {
     expect(formatRate({ rate: null, denominator: 0 })).toBe('暂无数据')
     expect(formatRate({ rate: 96.2, denominator: 10 })).toBe('96.2%')
+    expect(ratioPercent(0.9244)).toBe(92.4)
+    expect(ratioPercent('1')).toBe(100)
+    expect(ratioPercent(null)).toBeUndefined()
   })
 
   it('finds double-booked staff and uncovered shifts', () => {
@@ -51,7 +56,6 @@ describe('nursing model', () => {
 })
 
 describe('task execution drawer', () => {
-  const base: ExecuteForm = { result: 'DONE', reason: '', bedQrCode: 'QR1', observation: '', incidentType: '', severity: 'MEDIUM' }
 
   it('requires the bed code to mark a task done and a reason when not fully done', () => {
     expect(buildExecution({ ...base, bedQrCode: '' }, task({})).error).toBeTruthy()
@@ -74,16 +78,23 @@ describe('task execution drawer', () => {
   })
 })
 
-describe('resident care', () => {
-  it('keeps the newest non-draft assessment per elder', () => {
-    const map = latestAssessmentByElder([
-      { id: 1, elderId: '7', elderName: 'a', assessmentType: 'CONTINUOUS', assessmentDate: '2026-10-18', status: 'COMPLETED' },
-      { id: 2, elderId: '7', elderName: 'a', assessmentType: 'CONTINUOUS', assessmentDate: '2026-11-01', status: 'DRAFT' },
-      { id: 3, elderId: '7', elderName: 'a', assessmentType: 'CONTINUOUS', assessmentDate: '2026-09-01', status: 'COMPLETED' }
-    ])
-    expect(map.get('7')?.id).toBe(1)
+describe('service checklist', () => {
+  const items = task({ serviceItems: ['洗脸', '梳头', '口腔清洁'] })
+
+  it('only allows done when every item is ticked, and partial when something is left', () => {
+    expect(buildExecution({ ...base, checkedItems: ['洗脸'] }, items).error).toContain('部分完成')
+    expect(buildExecution({ ...base, result: 'PARTIAL', reason: '拒绝', checkedItems: ['洗脸', '梳头', '口腔清洁'] }, items).error).toContain('已完成')
+    const all = buildExecution({ ...base, checkedItems: ['洗脸', '梳头', '口腔清洁'] }, items)
+    expect(all.execute?.remark).toBe('完成：洗脸、梳头、口腔清洁')
   })
 
+  it('writes what was and was not done into the record', () => {
+    const plan = buildExecution({ ...base, result: 'PARTIAL', reason: '长者拒绝刷牙', checkedItems: ['洗脸', '梳头'], observation: '精神好' }, items)
+    expect(plan.execute?.remark).toBe('【部分完成】长者拒绝刷牙；完成：洗脸、梳头；未完成：口腔清洁；精神好')
+  })
+})
+
+describe('resident care', () => {
   it('tracks how far the assessment-to-plan flow has gone', () => {
     const done = { id: 1, elderName: 'a', assessmentType: 'CONTINUOUS', assessmentDate: '2026-11-01', status: 'COMPLETED' } as const
     expect(assessmentFlowStep(undefined, [])).toBe(0)

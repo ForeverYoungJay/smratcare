@@ -169,6 +169,7 @@ public class CareTaskServiceImpl implements CareTaskService {
       item.setStaffName(staff == null ? null : staff.getRealName());
       CareTaskTemplate template = safeGet(templateMap, task.getTemplateId());
       item.setTaskName(template != null ? template.getTaskName() : null);
+      item.setServiceItems(splitServiceItems(template));
       item.setPlanTime(task.getPlanTime());
       item.setStatus(task.getStatus());
       item.setSuspiciousFlag(suspiciousMap.getOrDefault(task.getId(), false));
@@ -321,6 +322,7 @@ public class CareTaskServiceImpl implements CareTaskService {
       item.setStaffName(staff == null ? null : staff.getRealName());
       CareTaskTemplate template = templateMap.get(task.getTemplateId());
       item.setTaskName(template != null ? template.getTaskName() : null);
+      item.setServiceItems(splitServiceItems(template));
       item.setPlanTime(task.getPlanTime());
       item.setStatus(task.getStatus());
       item.setSuspiciousFlag(suspiciousMap.getOrDefault(task.getId(), false));
@@ -905,5 +907,13 @@ public class CareTaskServiceImpl implements CareTaskService {
         .multiply(BigDecimal.valueOf(score))
         .setScale(0, RoundingMode.HALF_UP)
         .intValue();
+  }
+
+  /** 模板里每行一个服务项目，去掉空行 */
+  public static List<String> splitServiceItems(CareTaskTemplate template) {
+    if (template == null || template.getServiceItems() == null) {
+      return List.of();
+    }
+    return template.getServiceItems().lines().map(String::trim).filter(line -> !line.isEmpty()).toList();
   }
 }

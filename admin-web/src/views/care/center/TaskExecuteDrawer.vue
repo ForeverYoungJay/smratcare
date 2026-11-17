@@ -11,6 +11,11 @@
       </div>
 
       <a-form layout="vertical">
+        <a-form-item v-if="task.serviceItems?.length" label="护理执行项目（按实际情况勾选）">
+          <a-checkbox-group v-model:value="form.checkedItems" class="te-items">
+            <a-checkbox v-for="item in task.serviceItems" :key="item" :value="item">{{ item }}</a-checkbox>
+          </a-checkbox-group>
+        </a-form-item>
         <a-form-item label="执行结果" required>
           <a-radio-group v-model:value="form.result" button-style="solid">
             <a-radio-button value="DONE">已完成</a-radio-button>
@@ -39,7 +44,7 @@
           <a-input :value="`${userStore.staffInfo?.realName || userStore.staffInfo?.username || '当前账号'}（当前登录人）`" disabled />
         </a-form-item>
       </a-form>
-      <a-alert type="warning" show-icon message="必须在实际服务完成后记录；执行时间以服务器时间为准，系统同时记录执行人和修改日志。选了异常或未完成，会自动生成异常事件，到「交接班与安全」跟进。" />
+      <a-alert type="warning" show-icon message="必须在实际服务完成后记录；执行时间以服务器时间为准，系统同时记录执行人和修改日志。选了异常或未完成，会自动生成异常事件并发到护士长待办，在「交接班与安全」跟进。" />
     </template>
     <template #footer>
       <a-space style="float: right">
@@ -69,7 +74,7 @@ const emit = defineEmits<{ 'update:open': [boolean]; done: [] }>()
 const userStore = useUserStore()
 const submitting = ref(false)
 const incidentOptions = [{ value: '', label: '无异常' }, ...Object.entries(INCIDENT_TYPES).map(([value, label]) => ({ value, label }))]
-const blank = (): ExecuteForm => ({ result: 'DONE', reason: '', bedQrCode: '', observation: '', incidentType: '', severity: 'MEDIUM' })
+const blank = (): ExecuteForm => ({ result: 'DONE', reason: '', bedQrCode: '', observation: '', incidentType: '', severity: 'MEDIUM', checkedItems: [] })
 const form = reactive<ExecuteForm>(blank())
 
 // 草稿只存本机浏览器，换设备不会带过去
@@ -126,4 +131,6 @@ async function submit() {
 .te-task { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin: 14px 0; padding-bottom: 12px; border-bottom: 1px solid #edf0ed; }
 .te-task div { display: grid; gap: 4px; }
 .te-task small { color: #7b877e; }
+.te-items { display: grid; gap: 8px; width: 100%; }
+.te-items :deep(.ant-checkbox-wrapper) { margin-inline-start: 0; padding: 8px 10px; border: 1px solid #e3ebe6; border-radius: 8px; }
 </style>

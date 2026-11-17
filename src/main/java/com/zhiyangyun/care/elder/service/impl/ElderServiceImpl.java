@@ -387,6 +387,23 @@ public class ElderServiceImpl implements ElderService {
       String building,
       String sortBy,
       String sortOrder) {
+    return page(tenantId, pageNo, pageSize, keyword, signedOnly, status, lifecycleStatus, fullName, idCardNo, bedNo,
+        roomNo, careLevel, building, sortBy, sortOrder, null);
+  }
+
+  @Override
+  public IPage<ElderResponse> pageWithin(Long tenantId, long pageNo, long pageSize, String keyword, String lifecycleStatus,
+      Set<Long> onlyElderIds) {
+    return page(tenantId, pageNo, pageSize, keyword, false, null, lifecycleStatus, null, null, null, null, null, null,
+        null, null, onlyElderIds);
+  }
+
+  private IPage<ElderResponse> page(Long tenantId, long pageNo, long pageSize, String keyword, Boolean signedOnly,
+      Integer status, String lifecycleStatus, String fullName, String idCardNo, String bedNo, String roomNo,
+      String careLevel, String building, String sortBy, String sortOrder, Set<Long> onlyElderIds) {
+    if (onlyElderIds != null && onlyElderIds.isEmpty()) {
+      return new Page<>(pageNo, pageSize);
+    }
     Set<Long> latestSignedElderIds = null;
     if (Boolean.TRUE.equals(signedOnly)) {
       latestSignedElderIds = resolveLatestSignedElderIds(tenantId);
@@ -402,6 +419,9 @@ public class ElderServiceImpl implements ElderService {
         .eq(lifecycleStatus != null && !lifecycleStatus.isBlank(), "lifecycle_status", ElderLifecycleStatus.normalize(lifecycleStatus));
     if (latestSignedElderIds != null) {
       baseWrapper.in("id", latestSignedElderIds);
+    }
+    if (onlyElderIds != null) {
+      baseWrapper.in("id", onlyElderIds);
     }
     List<ElderProfile> allRows = elderMapper.selectList(baseWrapper.orderByDesc("create_time"));
     Map<Long, Bed> bedMap = resolveCurrentBedMap(allRows);

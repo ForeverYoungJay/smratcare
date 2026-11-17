@@ -39,6 +39,9 @@
         <a-form-item name="frequencyPerDay" label="每日频次" required>
           <a-input-number v-model:value="form.frequencyPerDay" :min="1" style="width: 100%" />
         </a-form-item>
+        <a-form-item name="serviceItems" label="服务项目清单" extra="每行一项；护理员执行时逐项勾选，没做完的要写原因">
+          <a-textarea v-model:value="form.serviceItems" :rows="4" :maxlength="1000" placeholder="协助洗脸、梳头与口腔清洁&#10;协助整理衣物与床单位&#10;安全陪同离床与返回" />
+        </a-form-item>
         <a-form-item name="careLevelRequired" label="护理等级">
           <a-input v-model:value="form.careLevelRequired" placeholder="如 A/B/C" />
         </a-form-item>
@@ -98,7 +101,7 @@ const pagination = {
 }
 
 function openModal(record?: CareTaskTemplate) {
-  Object.assign(form, record || { taskName: '', frequencyPerDay: 1, careLevelRequired: '', enabled: true })
+  Object.assign(form, record || { taskName: '', frequencyPerDay: 1, careLevelRequired: '', enabled: true, serviceItems: '' })
   modalOpen.value = true
 }
 

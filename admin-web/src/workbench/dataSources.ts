@@ -65,7 +65,7 @@ const departmentSources: Record<DepartmentCode, DepartmentSource> = {
           ...(profile.hasManagementView
             ? [{ key: 'unassigned', label: '待分配任务', value: data?.unassignedCount, helper: '需要安排护理人员的任务', path: '/care/today', risk: true }]
             : [{ key: 'exception', label: '异常任务', value: data?.exceptionCount, helper: '需要复核或闭环的护理异常', path: '/care/today', risk: true }]),
-          { key: 'completion', label: '今日完成率', value: data?.completionRate, suffix: '%', helper: '按今日护理任务统计', path: '/care/today' }
+          { key: 'completion', label: '今日完成率', value: data?.completionRate == null ? undefined : Math.round(Number(data.completionRate) * 1000) / 10, suffix: '%', helper: '按今日护理任务统计', path: '/care/today' }
         ],
         nursing: result.detail
       }

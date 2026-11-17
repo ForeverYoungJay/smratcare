@@ -1,4 +1,5 @@
 import type { Id } from './common'
+import type { ElderItem } from './elder'
 
 export interface CaregiverGroupItem {
   id: number
@@ -177,6 +178,7 @@ export interface ServicePlanApproval {
   approvedBy?: number
   approvedAt?: string
   changeReason?: string
+  rejectReason?: string
 }
 
 export interface ServicePlanRevisionItem {
@@ -263,4 +265,11 @@ export interface NursingQualityMetrics {
   dateTo: string
   metrics: { key: string; label: string; numerator: number; denominator: number; rate: number | null }[]
   workloads: { staffId: number; staffName?: string; taskCount: number; doneCount: number; overdueCount: number }[]
+}
+
+export interface NursingResidentItem {
+  elder: ElderItem
+  latestLevelCode?: string
+  latestAssessmentDate?: string
+  nextAssessmentDate?: string
 }

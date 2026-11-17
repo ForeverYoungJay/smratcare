@@ -31,6 +31,10 @@ public interface ElderService {
       String sortBy,
       String sortOrder);
 
+  /** 在给定长者范围内分页（护理档案「待复评」等先算出名单再分页的场景） */
+  IPage<ElderResponse> pageWithin(Long tenantId, long pageNo, long pageSize, String keyword, String lifecycleStatus,
+      java.util.Set<Long> onlyElderIds);
+
   ElderResponse assignBed(Long elderId, AssignBedRequest request);
 
   ElderResponse unbindBed(Long elderId, LocalDate endDate, String reason, Long tenantId, Long createdBy);

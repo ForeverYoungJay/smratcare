@@ -18,4 +18,5 @@ public class CareTaskTodayItem {
   private String careLevel;
   private Boolean suspiciousFlag;
   private Boolean overdueFlag;
+  private java.util.List<String> serviceItems;
 }

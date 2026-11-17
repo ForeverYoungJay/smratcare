@@ -490,7 +490,8 @@ const reviewFormRef = ref()
 const batchFormRef = ref()
 const generateFormRef = ref()
 const createFormRef = ref()
-const templateOptions = ref<{ label: string; value: number }[]>([])
+// 模板 id 是超过 JS 安全整数的雪花 id，全程按字符串处理，不能 Number()
+const templateOptions = ref<{ label: string; value: string }[]>([])
 const actionOpen = ref(false)
 const actionStep = ref(0)
 const actionMode = ref<'generate' | 'create' | 'batch'>('generate')
@@ -582,7 +583,7 @@ const reviewForm = reactive<CareTaskReviewRequest>({
 const generateForm = reactive({ date: dayjs(), force: false })
 const createForm = reactive<any>({
   elderId: '' as Id | '',
-  templateId: 0,
+  templateId: undefined as string | undefined,
   taskName: '',
   custom: false,
   multiDay: false,
@@ -646,7 +647,7 @@ const actionModeLabel = computed(() => {
 })
 
 const templateLabel = computed(() => {
-  const current = templateOptions.value.find((t) => t.value === Number(createForm.templateId))
+  const current = templateOptions.value.find((t) => t.value === String(createForm.templateId))
   return current?.label || '未选择模板'
 })
 
@@ -969,7 +970,7 @@ function openReview(row: CareTaskItem) {
 
 function openCreate() {
   createForm.elderId = ''
-  createForm.templateId = 0
+  createForm.templateId = undefined
   createForm.taskName = ''
   createForm.custom = false
   createForm.multiDay = false
@@ -1092,7 +1093,7 @@ async function submitAction() {
       for (const targetDate of createDates) {
         await createTask({
           elderId: createForm.elderId as Id,
-          templateId: createForm.custom ? undefined : Number(createForm.templateId),
+          templateId: createForm.custom ? undefined : createForm.templateId,
           taskName: createForm.custom ? createForm.taskName : undefined,
           planTime: buildPlanTimeForDate(targetDate),
           staffId: createForm.staffId ? Number(createForm.staffId) : undefined
@@ -1130,7 +1131,7 @@ async function submitAction() {
 async function loadTemplates() {
   try {
     const res = await getTemplatePage({ pageNo: 1, pageSize: 200 })
-    templateOptions.value = res.list.map((t) => ({ label: t.taskName, value: t.id }))
+    templateOptions.value = res.list.map((t) => ({ label: t.taskName, value: String(t.id) }))
   } catch (error) {
     message.error(resolveCareError(error, '加载模板失败'))
     templateOptions.value = []

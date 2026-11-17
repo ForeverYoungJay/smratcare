@@ -30,4 +30,5 @@ public class ServicePlanResponse {
   private String approvalStatus;
   private Long approvedBy;
   private LocalDateTime approvedAt;
+  private String rejectReason;
 }

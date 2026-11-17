@@ -104,7 +104,6 @@ import {
 } from './nursingModel'
 import '../../elder/residentUi.css'
 
-const emit = defineEmits<{ changed: [] }>()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
@@ -173,11 +172,10 @@ async function submitCreate() {
     const elderName = elderOptions.value.find((o) => String(o.value) === String(draft.elderId))?.name
     const created = await createIncident({ ...draft, elderName })
     createOpen.value = false
-    message.success('已上报，可在右侧跟进处置')
+    message.success('已上报，已发到护士长（或责任人）的待办')
     selected.value = null
     await load()
     await select(created.id)
-    emit('changed')
   } catch (error) {
     message.error(resolveCareError(error, '上报失败'))
   } finally {
@@ -204,7 +202,6 @@ async function submitAction() {
     message.success('已记录')
     await select(selected.value!.id)
     await load()
-    emit('changed')
   } catch (error) {
     message.error(resolveCareError(error, '操作失败'))
   } finally {

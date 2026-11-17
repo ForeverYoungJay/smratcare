@@ -101,6 +101,11 @@ export const METRIC_DRILLDOWN: Record<string, string> = {
   rectifyOnTime: '/care/operations?tab=rectify&overdue=true'
 }
 
+/** 任务汇总接口的完成率是 0~1 的小数，换成保留一位的百分数 */
+export function ratioPercent(ratio?: number | string | null) {
+  return ratio == null ? undefined : Math.round(Number(ratio) * 1000) / 10
+}
+
 /** 分母为 0 显示「暂无数据」而不是 0% 或 100% */
 export function formatRate(metric: Pick<QualityMetric, 'rate' | 'denominator'>) {
   return metric.rate == null || !metric.denominator ? '暂无数据' : `${metric.rate}%`

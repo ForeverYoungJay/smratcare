@@ -93,8 +93,8 @@ export function getElderAccountPage(params: any) {
   return fetchPage<ElderAccount>('/api/finance/account/page', params)
 }
 
-export function getElderAccountLogPage(params: any) {
-  return fetchPage<ElderAccountLog>('/api/finance/account/log/page', params)
+export function getElderAccountLogPage(params: any, config?: Record<string, any>) {
+  return fetchPage<ElderAccountLog>('/api/finance/account/log/page', params, config)
 }
 
 export function printElderAccountLogPdf(params: { elderId: Id; accountId?: Id; keyword?: string }) {
@@ -109,8 +109,8 @@ export function updateElderAccount(data: ElderAccountUpdateRequest) {
   return request.post<ElderAccount>('/api/finance/account/update', data)
 }
 
-export function getElderAccountWarnings() {
-  return request.get<ElderAccount[]>('/api/finance/account/warnings')
+export function getElderAccountWarnings(config?: Record<string, any>) {
+  return request.get<ElderAccount[]>('/api/finance/account/warnings', config)
 }
 
 export function getFinanceWorkbenchOverview(config?: Record<string, any>) {
