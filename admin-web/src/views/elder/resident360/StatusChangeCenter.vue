@@ -20,7 +20,7 @@
     />
 
     <StatefulBlock :loading="loading" :error="errorMessage" @retry="fetchRealStats">
-      <a-row :gutter="16" style="margin-bottom: 16px">
+      <a-row class="business-stat-strip" :gutter="16" style="margin-bottom: 16px">
         <a-col v-for="item in visibleStatusItems" :key="item.status" :xs="12" :sm="8" :md="6" :lg="4" style="margin-bottom: 12px">
           <a-card class="card-elevated" :bordered="false" hoverable @click="go(item.path)">
             <a-statistic :title="item.status" :value="item.count" />
@@ -63,14 +63,14 @@
     </a-card>
 
     <a-card title="状态变更动作" class="card-elevated" :bordered="false">
-      <a-space wrap>
+      <ActionToolbar wrap>
         <a-button type="primary" @click="go('/elder/outing')">外出登记</a-button>
         <a-button @click="go('/elder/visit-register')">来访登记</a-button>
         <a-button @click="go('/elder/trial-stay')">试住登记</a-button>
         <a-button @click="go('/elder/medical-outing')">外出就医登记</a-button>
         <a-button danger @click="go('/elder/discharge-apply')">退住申请</a-button>
         <a-button danger @click="go('/elder/death-register')">死亡登记</a-button>
-      </a-space>
+      </ActionToolbar>
 
       <a-divider />
       <a-typography-paragraph>
@@ -146,6 +146,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../../components/ActionToolbar.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'

@@ -4,7 +4,7 @@
       <a-button type="primary" @click="openCreate">新增来访</a-button>
     </template>
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline" class="search-bar">
+      <QueryBar :model="query" layout="inline" class="search-bar" @finish="fetchData">
         <a-form-item label="预约日期">
           <a-range-picker v-model:value="query.dateRange" value-format="YYYY-MM-DD" style="width: 260px" />
         </a-form-item>
@@ -29,23 +29,25 @@
             <a-select-option :value="2">已取消</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" :loading="loading" @click="fetchData">搜索</a-button>
-            <a-button @click="reset">清空</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" :loading="loading" @click="fetchData">搜索</a-button>
+              <a-button @click="reset">清空</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <a-space style="margin-bottom: 12px" wrap>
+      <ActionToolbar style="margin-bottom: 12px" wrap>
         <a-tag color="blue">已选 {{ selectedRowKeys.length }} 条</a-tag>
         <a-button :disabled="selectedRowKeys.length !== 1" @click="checkinSelected">登记到访</a-button>
         <a-button :disabled="selectedRowKeys.length !== 1" @click="printSelectedTicket">打印凭条</a-button>
         <a-button :disabled="selectedRowKeys.length !== 1" @click="openEditSelected">编辑</a-button>
         <a-button danger :disabled="selectedRowKeys.length === 0" @click="deleteSelected">取消预约</a-button>
-      </a-space>
+      </ActionToolbar>
       <StatefulBlock :loading="loading" :error="errorMessage" :empty="!rows.length" empty-text="暂无来访记录" @retry="fetchData">
         <a-table
           :data-source="rows"
@@ -121,6 +123,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'

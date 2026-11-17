@@ -1,74 +1,79 @@
 <template>
-  <PageContainer title="长者档案" subTitle="高频查询、在院状态和服务动作集中处理">
+  <PageContainer
+    class="rm-page"
+    kicker="RESIDENT MANAGEMENT / 02"
+    title="长者列表"
+    subTitle="所有长者统一入口，查档案、办理业务不再反复跳转"
+  >
     <template #extra>
       <a-space wrap>
-        <a-button @click="exportCsvData">导出名单</a-button>
-        <a-button type="primary" @click="goCreate">新建长者</a-button>
+        <a-button @click="exportCsvData"><DownloadOutlined /> 导出名单</a-button>
+        <a-button v-if="canWrite" type="primary" @click="openCreateDrawer"><PlusOutlined /> 新增长者</a-button>
       </a-space>
     </template>
-    <template #meta>
-      <span class="soft-pill">当前列表 {{ total }} 位</span>
-      <span class="soft-pill">已启用筛选 {{ activeFilterTags.length }} 项</span>
-      <span v-for="tag in activeFilterTags.slice(0, 4)" :key="tag" class="selection-pill">{{ tag }}</span>
-    </template>
 
-    <SearchForm
-      :model="query"
-      title="快速查找长者"
-      description="按姓名、床位、房间、护理等级或入住状态筛选，输入后回车即可查询。"
-      @search="runSearch"
-      @reset="reset"
-    >
-      <a-form-item label="姓名">
-        <ElderNameAutocomplete v-model:value="query.fullName" placeholder="姓名(编号)" width="220px" @select="runSearch" />
-      </a-form-item>
-      <a-form-item label="身份证">
-        <a-input v-model:value="query.idCardNo" placeholder="身份证号" allow-clear />
-      </a-form-item>
-      <a-form-item label="床位号">
-        <a-input v-model:value="query.bedNo" placeholder="床位号" allow-clear />
-      </a-form-item>
-      <a-form-item label="房间号">
-        <a-input v-model:value="query.roomNo" placeholder="房间号" allow-clear />
-      </a-form-item>
-      <a-form-item label="护理等级">
-        <a-input v-model:value="query.careLevel" placeholder="护理等级" allow-clear />
-      </a-form-item>
-    </SearchForm>
+    <section class="rm-card">
+      <div class="rm-card__head">
+        <h2 class="rm-card__title">长者统一管理</h2>
+        <span class="rm-card__sub">所有状态统一查询，常用操作无需切换页面</span>
+        <span class="rm-card__extra rm-card__sub">共 {{ total }} 条</span>
+      </div>
 
-    <section class="card-elevated elder-workspace">
-      <div class="list-toolbar">
-        <div class="status-chips" role="tablist" aria-label="按在院状态筛选">
-          <button
-            type="button"
-            class="status-chip"
-            :class="{ 'is-active': !query.lifecycleStatus }"
-            @click="applyStatusChip(undefined)"
-          >全部</button>
-          <button
-            v-for="opt in statusChipOptions"
-            :key="opt.value"
-            type="button"
-            class="status-chip"
-            :class="{ 'is-active': query.lifecycleStatus === opt.value }"
-            @click="applyStatusChip(opt.value)"
-          >{{ opt.label }}</button>
-        </div>
-        <a-tag color="processing">第 {{ query.pageNo }} / {{ totalPageCount }} 页 · 共 {{ total }} 条</a-tag>
+      <div class="status-tabs" role="tablist" aria-label="按在院状态筛选">
+        <button
+          v-for="tab in ELDER_STATUS_TABS"
+          :key="tab.label"
+          type="button"
+          role="tab"
+          class="status-tab"
+          :class="{ 'is-active': query.lifecycleStatus === tab.value }"
+          :aria-selected="query.lifecycleStatus === tab.value"
+          @click="applyStatusChip(tab.value)"
+        >{{ tab.label }}</button>
+      </div>
+
+      <div class="filter-row">
+        <a-input-search
+          v-model:value="query.keyword"
+          class="filter-row__search"
+          placeholder="搜索姓名 / 拼音 / 身份证 / 房间号 / 床位号"
+          allow-clear
+          @search="runSearch"
+        />
+        <a-auto-complete
+          v-model:value="query.careLevel"
+          class="filter-row__select"
+          :options="careLevelOptions"
+          placeholder="护理等级：全部"
+          allow-clear
+          @select="runSearch"
+          @change="onCareLevelChange"
+        />
+        <a-select
+          v-model:value="query.building"
+          class="filter-row__select"
+          :options="buildingOptions"
+          placeholder="全部楼栋"
+          allow-clear
+          @change="runSearch"
+        />
+        <a-button v-if="activeFilterTags.length" @click="reset">清空筛选</a-button>
+      </div>
+      <div v-if="activeFilterTags.length" class="filter-tags">
+        <span v-for="tag in activeFilterTags" :key="tag" class="rm-pill">{{ tag }}</span>
       </div>
 
       <div v-if="selectedCount" class="selection-bar">
         <span class="selection-bar__count">已选 {{ selectedCount }} 位</span>
-        <template v-if="selectedCount === 1">
-          <a-button size="small" @click="openQuickDetailSelected">详情</a-button>
-          <a-button size="small" @click="openQuickEditSelected">编辑</a-button>
+        <a-button size="small" @click="exportSelected">导出所选</a-button>
+        <template v-if="selectedCount === 1 && canWrite">
           <a-button size="small" @click="openChangeBedSelected">换床</a-button>
           <a-button size="small" @click="openCheckoutSelected">退住申请</a-button>
           <a-button size="small" @click="openBindFamilySelected">绑定家属</a-button>
           <a-button size="small" @click="printElderQrSelected">打印二维码</a-button>
           <a-button size="small" danger @click="deleteSelected">删除</a-button>
         </template>
-        <span v-else class="selection-bar__hint">档案操作需要单选一位长者</span>
+        <span v-else-if="canWrite" class="selection-bar__hint">换床、退住、删除等档案操作需单选一位长者</span>
         <a-button size="small" type="text" class="selection-bar__clear" @click="selectedRowKeys = []">取消选择</a-button>
       </div>
 
@@ -83,74 +88,71 @@
         :row-selection="rowSelection"
         :empty-title="emptyStateTitle"
         :empty-description="emptyStateDescription"
-        :scroll="{ x: 1100, y: 560 }"
+        :scroll="{ x: 1260 }"
         @change="onTableChange"
       >
         <template #emptyExtra>
           <a-space wrap>
-            <a-button type="primary" @click="goCreate">新建长者</a-button>
+            <a-button v-if="canWrite" type="primary" @click="openCreateDrawer">新增长者</a-button>
             <a-button v-if="activeFilterTags.length" @click="reset">清空筛选</a-button>
           </a-space>
         </template>
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'fullName'">
-            <a-tooltip :title="record.homeAddress ? `家庭住址：${record.homeAddress}` : '暂无住址，可在详情补充'">
-              <div class="elder-name-cell">
-                <strong>{{ record.fullName }}</strong>
-                <span>{{ record.roomNo || '-' }} / {{ record.bedNo || '未分配床位' }}</span>
+            <div class="elder-cell">
+              <span class="rm-avatar">{{ avatarText(record.fullName) }}</span>
+              <div class="elder-cell__main">
+                <button type="button" class="rm-link elder-cell__name" @click="goDetail(record.id)">{{ record.fullName }}</button>
+                <span v-if="record.riskPrecommit === 'RESCUE_FIRST'" class="rm-pill rm-pill--danger">抢救优先</span>
+                <span v-else-if="record.riskPrecommit === 'NOTIFY_FAMILY_FIRST'" class="rm-pill rm-pill--info">先通知家属</span>
+                <span v-if="record.diseases && record.diseases.length" class="rm-pill rm-pill--warning">慢病 {{ record.diseases.length }}</span>
               </div>
-            </a-tooltip>
-          </template>
-          <template v-else-if="column.key === 'risk'">
-            <div class="risk-tags">
-              <a-tag v-if="record.riskPrecommit === 'RESCUE_FIRST'" color="volcano">抢救优先</a-tag>
-              <a-tag v-else-if="record.riskPrecommit === 'NOTIFY_FAMILY_FIRST'" color="blue">先通知家属</a-tag>
-              <a-tag v-if="record.diseases && record.diseases.length" color="orange">慢病 {{ record.diseases.length }}</a-tag>
-              <span v-if="!record.riskPrecommit && !(record.diseases && record.diseases.length)" class="risk-tags__none">常规</span>
             </div>
           </template>
-          <template v-else-if="column.key === 'idCardNo'">
-            <span class="mono-text">{{ maskIdCard(record.idCardNo) }}</span>
-          </template>
+          <template v-else-if="column.key === 'elderCode'">{{ record.elderCode || '--' }}</template>
           <template v-else-if="column.key === 'birthDate'">
-            <div class="elder-name-cell">
-              <strong class="elder-age" v-if="ageOf(record.birthDate) !== null">{{ ageOf(record.birthDate) }}岁</strong>
-              <span>{{ record.birthDate || '-' }}</span>
-            </div>
+            {{ ageOf(record.birthDate) !== null ? `${ageOf(record.birthDate)}岁` : '--' }} / {{ genderText(record.gender) }}
+          </template>
+          <template v-else-if="column.key === 'bed'">
+            <template v-if="record.bedNo || record.roomNo">
+              {{ buildingOf(record) ? `${buildingOf(record)} ` : '' }}{{ record.bedNo ? bedLabel({ roomNo: record.roomNo, bedNo: record.bedNo } as BedItem) : record.roomNo }}
+            </template>
+            <span v-else class="muted">待分配</span>
+          </template>
+          <template v-else-if="column.key === 'careLevel'">{{ record.careLevel || '--' }}</template>
+          <template v-else-if="column.key === 'responsibleStaff'">
+            {{ record.responsibleStaffName || '--' }}
           </template>
           <template v-else-if="column.key === 'status'">
-            <a-tag :color="statusTag(record)">{{ statusText(record) }}</a-tag>
+            <span class="rm-pill" :class="statusPillClass(record.lifecycleStatus)">{{ statusText(record) }}</span>
           </template>
-          <template v-else-if="column.key === 'lifecycleStage'">
-            <a-tag :color="lifecycleStageColor(resolveLifecycleStage(record))">
-              {{ lifecycleStageLabel(resolveLifecycleStage(record)) }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'sourceType'">
-            <a-tag :color="sourceTypeColor(record.sourceType)">{{ sourceTypeText(record.sourceType) }}</a-tag>
-          </template>
+          <template v-else-if="column.key === 'admissionDate'">{{ record.admissionDate || '--' }}</template>
           <template v-else-if="column.key === 'action'">
-            <div class="row-action-links">
-              <a-button type="link" size="small" @click="goResidentCenter(record)">长者中心</a-button>
+            <div class="row-actions">
+              <button type="button" class="rm-link" @click="goDetail(record.id)">详情</button>
               <a-dropdown trigger="click">
-                <a-button type="link" size="small">更多 <DownOutlined /></a-button>
+                <button type="button" class="rm-link">办理 <DownOutlined /></button>
                 <template #overlay>
                   <a-menu>
-                    <a-menu-item key="quick-detail" @click="openQuickDetail(record)">详情弹窗</a-menu-item>
-                    <a-menu-item key="quick-edit" @click="openQuickEdit(record)">编辑弹窗</a-menu-item>
-                    <a-menu-item key="detail" @click="goDetail(record.id)">完整档案页</a-menu-item>
-                    <a-menu-item key="assessment" @click="goAssessmentArchive(record)">评估档案</a-menu-item>
-                    <a-menu-item key="contracts" @click="goContractsInvoices(record)">合同票据</a-menu-item>
-                    <a-menu-item key="edit" @click="goEdit(record.id)">完整编辑页</a-menu-item>
-                    <a-menu-item key="bed" @click="openChangeBed(record)">换床</a-menu-item>
+                    <a-menu-item key="admission" @click="goWithElder('/elder/admission-processing', record)">入住办理</a-menu-item>
+                    <a-menu-item v-if="canWrite" key="bed" @click="openChangeBed(record)">换床</a-menu-item>
+                    <a-menu-item key="outing" @click="goBedRecord(record, 'OUTING', 'outing')">外出登记</a-menu-item>
+                    <a-menu-item key="medical-outing" @click="goBedRecord(record, 'MEDICAL_OUTING', 'medical')">外出就医登记</a-menu-item>
                     <a-menu-item key="checkout" @click="openCheckout(record)">退住申请</a-menu-item>
-                    <a-menu-item key="family" @click="openBindFamily(record)">绑定家属</a-menu-item>
-                    <a-menu-item key="qr" @click="printElderQr(record)">打印二维码</a-menu-item>
+                    <a-menu-item key="settlement" @click="goSettlement(record)">费用与退住</a-menu-item>
                     <a-menu-divider />
-                    <a-menu-item key="delete" danger @click="confirmDelete(record)">删除档案</a-menu-item>
+                    <a-menu-item key="assessment" @click="goWithElder('/elder/assessment/ability/archive', record)">评估档案</a-menu-item>
+                    <a-menu-item key="contracts" @click="router.push({ path: `/elder/detail/${record.id}`, query: { tab: 'contract' } })">合同票据</a-menu-item>
+                    <a-menu-item v-if="canWrite" key="family" @click="openBindFamily(record)">绑定家属</a-menu-item>
+                    <a-menu-item key="qr" @click="printElderQr(record)">打印二维码</a-menu-item>
+                    <template v-if="canWrite">
+                      <a-menu-divider />
+                      <a-menu-item key="delete" danger @click="confirmDelete(record)">删除档案</a-menu-item>
+                    </template>
                   </a-menu>
                 </template>
               </a-dropdown>
+              <button v-if="canWrite" type="button" class="rm-link" @click="openEditDrawer(record)">编辑</button>
             </div>
           </template>
         </template>
@@ -162,11 +164,35 @@
           :page-size="query.pageSize"
           :total="total"
           show-size-changer
+          :show-total="(n: number) => `共 ${n} 条记录`"
           @change="onPageChange"
           @showSizeChange="onPageSizeChange"
         />
       </div>
     </section>
+
+    <div class="rm-note">
+      <SafetyCertificateOutlined />
+      小提示：新建 / 编辑在右侧抽屉完成；点击“详情”进入长者档案；外出、退住等状态办理可在“办理”菜单直接发起。
+    </div>
+
+    <a-drawer
+      v-model:open="formDrawerOpen"
+      :title="formDrawerElder ? `编辑档案 · ${formDrawerElder.fullName || ''}` : '新增长者'"
+      width="820"
+      destroy-on-close
+      :mask-closable="false"
+    >
+      <ElderEdit
+        v-if="formDrawerElder"
+        :key="String(formDrawerElder.id)"
+        embedded
+        :elder-id="formDrawerElder.id"
+        @saved="onFormSaved"
+        @cancel="formDrawerOpen = false"
+      />
+      <ElderCreate v-else embedded @saved="onFormSaved" @cancel="formDrawerOpen = false" />
+    </a-drawer>
 
     <a-modal :mask-closable="false" v-model:open="changeBedOpen" title="换床" width="420px" @ok="submitChangeBed" @cancel="() => (changeBedOpen = false)">
       <a-form ref="changeBedFormRef" :model="changeBedForm" :rules="changeBedRules" layout="vertical">
@@ -214,178 +240,101 @@
       </div>
     </a-modal>
 
-    <a-drawer v-model:open="quickDetailOpen" width="640" :title="`长者详情 · ${quickDetailRow?.fullName || ''}`">
-      <a-spin :spinning="quickDetailLoading">
-        <a-descriptions bordered :column="2" size="small">
-          <a-descriptions-item label="姓名">{{ quickDetail?.fullName || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="编号">{{ quickDetail?.elderCode || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="性别">{{ genderText(quickDetail?.gender) }}</a-descriptions-item>
-          <a-descriptions-item label="年龄 / 生日">
-            {{ quickDetail?.birthDate ? `${ageOf(quickDetail.birthDate)} 岁 · ${quickDetail.birthDate}` : '-' }}
-          </a-descriptions-item>
-          <a-descriptions-item label="房间 / 床位">
-            {{ (quickDetail?.roomNo || '-') + ' / ' + (quickDetail?.bedNo || '未分配床位') }}
-          </a-descriptions-item>
-          <a-descriptions-item label="在院状态">{{ statusText(quickDetail || {}) }}</a-descriptions-item>
-          <a-descriptions-item label="护理等级">{{ quickDetail?.careLevel || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="入住日期">{{ quickDetail?.admissionDate || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="联系电话">{{ quickDetail?.phone || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="身份证">{{ quickDetail?.idCardNo || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="家庭住址" :span="2">{{ quickDetail?.homeAddress || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="备注" :span="2">{{ quickDetail?.remark || '-' }}</a-descriptions-item>
-        </a-descriptions>
-      </a-spin>
-      <template #footer>
-        <a-space>
-          <a-button @click="quickDetailOpen = false">关闭</a-button>
-          <a-button @click="openQuickEditFromDetail">编辑</a-button>
-          <a-button type="primary" @click="goDetailFromQuick">打开完整档案页</a-button>
-        </a-space>
-      </template>
-    </a-drawer>
-
-    <a-modal :mask-closable="false"
-      v-model:open="quickEditOpen"
-      :title="`编辑档案 · ${quickEditRow?.fullName || ''}`"
-      width="620"
-      :confirm-loading="quickEditSaving"
-      @ok="submitQuickEdit"
-    >
-      <a-spin :spinning="quickEditLoading">
-        <a-form layout="vertical" :model="quickEditForm" :rules="quickEditRules" ref="quickEditFormRef">
-          <a-row :gutter="12">
-            <a-col :span="12">
-              <a-form-item label="姓名" name="fullName">
-                <a-input v-model:value="quickEditForm.fullName" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="12">
-              <a-form-item label="联系电话">
-                <a-input v-model:value="quickEditForm.phone" allow-clear />
-              </a-form-item>
-            </a-col>
-          </a-row>
-          <a-row :gutter="12">
-            <a-col :span="12">
-              <a-form-item label="护理等级">
-                <a-input v-model:value="quickEditForm.careLevel" allow-clear placeholder="如：三级护理" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="12">
-              <a-form-item label="入住日期">
-                <a-date-picker v-model:value="quickEditForm.admissionDate" style="width: 100%" />
-              </a-form-item>
-            </a-col>
-          </a-row>
-          <a-form-item label="家庭住址">
-            <a-input v-model:value="quickEditForm.homeAddress" allow-clear />
-          </a-form-item>
-          <a-form-item label="备注">
-            <a-textarea v-model:value="quickEditForm.remark" :rows="3" allow-clear />
-          </a-form-item>
-        </a-form>
-        <div class="quick-edit-hint">
-          床位、合同、附件等档案项请到
-          <a-button type="link" size="small" style="padding: 0" @click="goEditFromQuick">完整编辑页</a-button>
-          处理。
-        </div>
-      </a-spin>
-    </a-modal>
-
     <ExportConfirmModal
       v-model:open="exportConfirmOpen"
       module="ELDER_LIST"
       module-label="长者名单"
       :scope="exportScope"
-      :estimated-rows="rows.length"
+      :estimated-rows="exportRows.length"
       @confirmed="doExportCsv"
     />
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
-import { DownOutlined } from '@ant-design/icons-vue'
-import dayjs from 'dayjs'
+import { DownOutlined, DownloadOutlined, PlusOutlined, SafetyCertificateOutlined } from '@ant-design/icons-vue'
 import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
-import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import ExportConfirmModal from '../../components/ExportConfirmModal.vue'
-import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
+import { useUserStore } from '../../stores/user'
 import { exportCsv } from '../../utils/export'
-import { lifecycleStageColor, lifecycleStageLabel, normalizeLifecycleStage } from '../../utils/lifecycleStage'
-import {
-  residentStatusText as statusText,
-  residentStatusTag as statusTag,
-  maskIdCard,
-  ageOf
-} from '../../utils/elderStatus'
+import { normalizeLifecycleStage } from '../../utils/lifecycleStage'
+import { residentStatusText as statusText, ageOf } from '../../utils/elderStatus'
 import { completeExport } from '../../api/complianceSecurity'
-import { getElderPage, getElderDetail, updateElder, assignBed, bindFamily, deleteElder } from '../../api/elder'
+import { getElderPage, assignBed, bindFamily, deleteElder } from '../../api/elder'
 import { getBedList } from '../../api/bed'
+import { bedLabel } from './resident360/bedPanoramaModel'
+import { getCareLevelList } from '../../api/nursing'
 import { getFamilyUserPage } from '../../api/family'
 import type { BedItem, ElderItem, FamilyBindRequest, PageResult, FamilyUserItem, Id } from '../../types/api'
+import { avatarText, canWriteElder, ELDER_STATUS_TABS, statusPillClass } from './elderListView'
+import './residentUi.css'
+
+// 抽屉里才用到，按需加载，列表首屏不背表单代码
+const ElderCreate = defineAsyncComponent(() => import('./Create.vue'))
+const ElderEdit = defineAsyncComponent(() => import('./Edit.vue'))
+
+// responsibleStaffName 由后端同期补充到 ElderResponse，类型未落地前用本地交叉类型
+type ElderRow = ElderItem & { responsibleStaffName?: string }
 
 const router = useRouter()
 const route = useRoute()
+const userStore = useUserStore()
+const canWrite = computed(() => canWriteElder(userStore.roles))
 const loading = ref(false)
-const rows = ref<ElderItem[]>([])
+const rows = ref<ElderRow[]>([])
 const total = ref(0)
 const selectedRowKeys = ref<Id[]>([])
 const skipNextRouteWatch = ref(false)
 const routeSignature = ref('')
-const ELDER_LIST_ROUTE_KEYS = ['fullName', 'idCardNo', 'bedNo', 'roomNo', 'careLevel', 'lifecycleStatus', 'status', 'sortBy', 'sortOrder', 'pageNo', 'pageSize'] as const
+const DEFAULT_PAGE_SIZE = 20
+const ELDER_LIST_ROUTE_KEYS = ['keyword', 'fullName', 'idCardNo', 'bedNo', 'roomNo', 'careLevel', 'building', 'lifecycleStatus', 'status', 'sortBy', 'sortOrder', 'pageNo', 'pageSize'] as const
 
 const query = reactive({
+  keyword: undefined as string | undefined,
+  // 以下精确条件只来自其他页面的跳转链接（如 ?fullName=），界面上统一用 keyword 搜索
   fullName: undefined as string | undefined,
   idCardNo: undefined as string | undefined,
   bedNo: undefined as string | undefined,
   roomNo: undefined as string | undefined,
   careLevel: undefined as string | undefined,
+  building: undefined as string | undefined,
   lifecycleStatus: undefined as string | undefined,
   sortBy: undefined as string | undefined,
   sortOrder: undefined as string | undefined,
   pageNo: 1,
-  pageSize: 10
+  pageSize: DEFAULT_PAGE_SIZE
 })
 
 const columns = [
-  { title: '长者 / 床位', dataIndex: 'fullName', key: 'fullName', width: 180, sorter: true },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 100, sorter: true },
+  { title: '长者', dataIndex: 'fullName', key: 'fullName', width: 220, sorter: true, fixed: 'left' },
+  { title: '档案编号', dataIndex: 'elderCode', key: 'elderCode', width: 110 },
+  { title: '年龄 / 性别', dataIndex: 'birthDate', key: 'birthDate', width: 110, sorter: true },
+  { title: '楼栋 / 床位', dataIndex: 'bedNo', key: 'bed', width: 150, sorter: true },
   { title: '护理等级', dataIndex: 'careLevel', key: 'careLevel', width: 110, sorter: true },
-  { title: '年龄 / 生日', dataIndex: 'birthDate', key: 'birthDate', width: 120, sorter: true },
-  { title: '风险 / 关注', key: 'risk', width: 170 },
-  { title: '身份证（脱敏）', dataIndex: 'idCardNo', key: 'idCardNo', width: 150 },
-  { title: '履约阶段', dataIndex: 'lifecycleStage', key: 'lifecycleStage', width: 120 },
-  { title: '操作', key: 'action', width: 150, fixed: 'right' }
-]
-
-const statusChipOptions = [
-  { value: 'IN_HOSPITAL', label: '在住' },
-  { value: 'TRIAL', label: '试住' },
-  { value: 'INTENT', label: '意向' },
-  { value: 'OUTING', label: '外出' },
-  { value: 'MEDICAL_OUTING', label: '外出就医' },
-  { value: 'DISCHARGE_PENDING', label: '待退住' },
-  { value: 'DISCHARGED', label: '已退住' },
-  { value: 'DECEASED', label: '已身故' }
+  { title: '责任护理员', key: 'responsibleStaff', width: 110 },
+  { title: '在院状态', dataIndex: 'status', key: 'status', width: 100, sorter: true },
+  { title: '入住日期', dataIndex: 'admissionDate', key: 'admissionDate', width: 110 },
+  { title: '快捷操作', key: 'action', width: 170, fixed: 'right' }
 ]
 
 const selectedCount = computed(() => selectedRowKeys.value.length)
-const totalPageCount = computed(() => Math.max(1, Math.ceil(total.value / query.pageSize)))
 const selectedRows = computed(() => rows.value.filter((item) => selectedRowKeys.value.some((id) => String(id) === String(item.id))))
 const activeFilterTags = computed(() => {
   const tags: string[] = []
+  if (query.keyword) tags.push(`关键词: ${query.keyword}`)
   if (query.fullName) tags.push(`姓名: ${query.fullName}`)
   if (query.idCardNo) tags.push(`身份证: ${query.idCardNo}`)
   if (query.bedNo) tags.push(`床位: ${query.bedNo}`)
   if (query.roomNo) tags.push(`房间: ${query.roomNo}`)
   if (query.careLevel) tags.push(`护理等级: ${query.careLevel}`)
+  if (query.building) tags.push(`楼栋: ${query.building}`)
   if (query.lifecycleStatus) tags.push(`状态: ${statusText({ lifecycleStatus: query.lifecycleStatus })}`)
   return tags
 })
@@ -411,6 +360,30 @@ const bedOptions = computed(() =>
     .filter((b) => !b.elderId && (b.status === 1 || b.status === undefined))
     .map((b) => ({ label: `${b.roomNo || b.roomId}-${b.bedNo}`, value: b.id }))
 )
+// 分页接口不返回楼栋，借床位列表（换床弹窗本来就要加载）补上
+const buildingByBedId = computed(() => new Map(beds.value.map((b) => [String(b.id), b.building || ''])))
+const buildingOptions = computed(() => Array.from(new Set(beds.value.map((b) => b.building || '').filter(Boolean)))
+  .sort((a, b) => a.localeCompare(b, 'zh-CN', { numeric: true }))
+  .map((value) => ({ label: value, value })))
+function buildingOf(row: ElderRow) {
+  const bedId = row.bedId ?? row.currentBed?.id
+  return bedId == null ? '' : buildingByBedId.value.get(String(bedId)) || ''
+}
+
+const careLevelOptions = ref<Array<{ value: string }>>([])
+async function loadCareLevels() {
+  try {
+    const list: any[] = await getCareLevelList(undefined, { silent403: true })
+    careLevelOptions.value = Array.from(new Set((list || []).map((item) => String(item.levelName || '').trim()).filter(Boolean)))
+      .map((value) => ({ value }))
+  } catch {
+    careLevelOptions.value = []
+  }
+}
+function onCareLevelChange(value?: string) {
+  // allow-clear 清空时立即刷新；手输时等回车/选中
+  if (!value) runSearch()
+}
 
 const changeBedOpen = ref(false)
 const changeBedFormRef = ref<FormInstance>()
@@ -431,153 +404,33 @@ const familyOptions = ref<Array<{ label: string; value: Id }>>([])
 
 const qrOpen = ref(false)
 
-// 详情/编辑弹窗：列表页里做高频轻量查看与改档，重档案项仍走完整页
-const quickDetailOpen = ref(false)
-const quickDetailLoading = ref(false)
-const quickDetailRow = ref<ElderItem | null>(null)
-const quickDetail = ref<any | null>(null)
+// 新建/编辑抽屉：formDrawerElder 为空即新建
+const formDrawerOpen = ref(false)
+const formDrawerElder = ref<ElderRow | null>(null)
 
-const quickEditOpen = ref(false)
-const quickEditLoading = ref(false)
-const quickEditSaving = ref(false)
-const quickEditRow = ref<ElderItem | null>(null)
-const quickEditFormRef = ref<FormInstance>()
-const quickEditForm = reactive({
-  fullName: '',
-  phone: '',
-  careLevel: '',
-  admissionDate: undefined as any,
-  homeAddress: '',
-  remark: ''
-})
-const quickEditRules: FormRules = {
-  fullName: [{ required: true, message: '请输入姓名' }]
+function openCreateDrawer() {
+  formDrawerElder.value = null
+  formDrawerOpen.value = true
+}
+
+function openEditDrawer(row: ElderRow) {
+  formDrawerElder.value = row
+  formDrawerOpen.value = true
+}
+
+function onFormSaved() {
+  formDrawerOpen.value = false
+  fetchData()
 }
 
 function genderText(gender?: number | null) {
   if (gender === 1) return '男'
   if (gender === 2) return '女'
-  return '-'
+  return '--'
 }
 
-async function openQuickDetail(row: ElderItem) {
-  quickDetailRow.value = row
-  quickDetail.value = { ...row }
-  quickDetailOpen.value = true
-  quickDetailLoading.value = true
-  try {
-    const detail = await getElderDetail(row.id)
-    quickDetail.value = {
-      ...detail,
-      bedNo: (detail as any)?.bedNo ?? (detail as any)?.currentBed?.bedNo ?? row.bedNo,
-      roomNo: (detail as any)?.roomNo ?? (detail as any)?.currentBed?.roomNo ?? row.roomNo
-    }
-  } catch {
-    // 拉取失败时保留列表行数据，弹窗仍可用
-  } finally {
-    quickDetailLoading.value = false
-  }
-}
-
-function openQuickDetailSelected() {
-  const row = requireSingleSelection('查看详情')
-  if (!row) return
-  openQuickDetail(row)
-}
-
-async function openQuickEdit(row: ElderItem) {
-  quickEditRow.value = row
-  quickEditOpen.value = true
-  quickEditLoading.value = true
-  quickEditForm.fullName = row.fullName || ''
-  quickEditForm.phone = (row as any).phone || ''
-  quickEditForm.careLevel = row.careLevel || ''
-  quickEditForm.admissionDate = (row as any).admissionDate ? dayjs((row as any).admissionDate) : undefined
-  quickEditForm.homeAddress = (row as any).homeAddress || ''
-  quickEditForm.remark = (row as any).remark || ''
-  try {
-    const detail: any = await getElderDetail(row.id)
-    quickEditForm.fullName = detail?.fullName || quickEditForm.fullName
-    quickEditForm.phone = detail?.phone || ''
-    quickEditForm.careLevel = detail?.careLevel || ''
-    quickEditForm.admissionDate = detail?.admissionDate ? dayjs(detail.admissionDate) : undefined
-    quickEditForm.homeAddress = detail?.homeAddress || ''
-    quickEditForm.remark = detail?.remark || ''
-  } catch {
-    // 拉取失败时用列表行数据兜底
-  } finally {
-    quickEditLoading.value = false
-  }
-}
-
-function openQuickEditSelected() {
-  const row = requireSingleSelection('编辑')
-  if (!row) return
-  openQuickEdit(row)
-}
-
-function openQuickEditFromDetail() {
-  const row = quickDetailRow.value
-  if (!row) return
-  quickDetailOpen.value = false
-  openQuickEdit(row)
-}
-
-function goDetailFromQuick() {
-  const row = quickDetailRow.value
-  if (!row) return
-  quickDetailOpen.value = false
-  goDetail(row.id)
-}
-
-function goEditFromQuick() {
-  const row = quickEditRow.value
-  if (!row) return
-  quickEditOpen.value = false
-  goEdit(row.id)
-}
-
-async function submitQuickEdit() {
-  const row = quickEditRow.value
-  if (!row || quickEditSaving.value) return
-  await quickEditFormRef.value?.validate?.()
-  quickEditSaving.value = true
-  try {
-    await updateElder(row.id, {
-      fullName: quickEditForm.fullName.trim(),
-      phone: quickEditForm.phone.trim() || undefined,
-      careLevel: quickEditForm.careLevel.trim() || undefined,
-      admissionDate: quickEditForm.admissionDate
-        ? dayjs(quickEditForm.admissionDate).format('YYYY-MM-DD')
-        : undefined,
-      homeAddress: quickEditForm.homeAddress.trim() || undefined,
-      remark: quickEditForm.remark.trim() || undefined
-    })
-    message.success('档案已更新')
-    quickEditOpen.value = false
-    await fetchData()
-  } finally {
-    quickEditSaving.value = false
-  }
-}
 const qrDataUrl = ref('')
 const qrText = ref('')
-
-function sourceTypeText(value?: string) {
-  if (value === 'HISTORICAL_IMPORT') return '历史补录'
-  if (value === 'MARKETING_CONTRACT') return '合同流程'
-  return '未标记'
-}
-
-function sourceTypeColor(value?: string) {
-  if (value === 'HISTORICAL_IMPORT') return 'blue'
-  if (value === 'MARKETING_CONTRACT') return 'purple'
-  return 'default'
-}
-
-function resolveLifecycleStage(item: ElderItem) {
-  return normalizeLifecycleStage(item.lifecycleStage, item.lifecycleContractStatus)
-}
 
 function applyStatusChip(value?: string) {
   query.lifecycleStatus = value
@@ -599,14 +452,16 @@ async function fetchData() {
   loading.value = true
   selectedRowKeys.value = []
   try {
-    const res: PageResult<ElderItem> = await getElderPage({
+    const res: PageResult<ElderRow> = await getElderPage({
       pageNo: query.pageNo,
       pageSize: query.pageSize,
+      keyword: query.keyword,
       fullName: query.fullName,
       idCardNo: query.idCardNo,
       bedNo: query.bedNo,
       roomNo: query.roomNo,
       careLevel: query.careLevel,
+      building: query.building,
       lifecycleStatus: query.lifecycleStatus,
       sortBy: query.sortBy,
       sortOrder: query.sortOrder
@@ -628,7 +483,7 @@ async function fetchData() {
 
 async function loadBeds() {
   try {
-    beds.value = await getBedList()
+    beds.value = await getBedList({ silent403: true })
   } catch {
     beds.value = []
   }
@@ -685,11 +540,13 @@ function buildRouteSignature(source: Record<string, unknown>) {
 }
 
 function applyQueryFromRoute() {
+  query.keyword = firstRouteQueryText(route.query.keyword) || undefined
   query.fullName = firstRouteQueryText(route.query.fullName) || undefined
   query.idCardNo = firstRouteQueryText(route.query.idCardNo) || undefined
   query.bedNo = firstRouteQueryText(route.query.bedNo) || undefined
   query.roomNo = firstRouteQueryText(route.query.roomNo) || undefined
   query.careLevel = firstRouteQueryText(route.query.careLevel) || undefined
+  query.building = firstRouteQueryText(route.query.building) || undefined
   const lifecycleStatus = firstRouteQueryText(route.query.lifecycleStatus).toUpperCase()
   if (lifecycleStatus) {
     query.lifecycleStatus = lifecycleStatus
@@ -701,7 +558,7 @@ function applyQueryFromRoute() {
   const order = firstRouteQueryText(route.query.sortOrder).toLowerCase()
   query.sortOrder = order === 'asc' || order === 'desc' ? order : undefined
   query.pageNo = parsePositiveInt(route.query.pageNo, 1)
-  query.pageSize = parsePositiveInt(route.query.pageSize, 10)
+  query.pageSize = parsePositiveInt(route.query.pageSize, DEFAULT_PAGE_SIZE)
 }
 
 function buildQueryRouteQuery() {
@@ -710,16 +567,18 @@ function buildQueryRouteQuery() {
     if ((ELDER_LIST_ROUTE_KEYS as readonly string[]).includes(key)) return
     nextQuery[key] = value
   })
+  if (query.keyword) nextQuery.keyword = query.keyword
   if (query.fullName) nextQuery.fullName = query.fullName
   if (query.idCardNo) nextQuery.idCardNo = query.idCardNo
   if (query.bedNo) nextQuery.bedNo = query.bedNo
   if (query.roomNo) nextQuery.roomNo = query.roomNo
   if (query.careLevel) nextQuery.careLevel = query.careLevel
+  if (query.building) nextQuery.building = query.building
   if (query.lifecycleStatus) nextQuery.lifecycleStatus = query.lifecycleStatus
   if (query.sortBy) nextQuery.sortBy = query.sortBy
   if (query.sortOrder) nextQuery.sortOrder = query.sortOrder
   nextQuery.pageNo = String(parsePositiveInt(query.pageNo, 1))
-  nextQuery.pageSize = String(parsePositiveInt(query.pageSize, 10))
+  nextQuery.pageSize = String(parsePositiveInt(query.pageSize, DEFAULT_PAGE_SIZE))
   return nextQuery
 }
 
@@ -747,12 +606,14 @@ async function runSearch() {
 
 function reset() {
   query.pageNo = 1
-  query.pageSize = 10
+  query.pageSize = DEFAULT_PAGE_SIZE
+  query.keyword = undefined
   query.fullName = undefined
   query.idCardNo = undefined
   query.bedNo = undefined
   query.roomNo = undefined
   query.careLevel = undefined
+  query.building = undefined
   query.lifecycleStatus = undefined
   query.sortBy = undefined
   query.sortOrder = undefined
@@ -790,87 +651,67 @@ function onTableChange(_: any, __: any, sorter: any) {
 
 // 导出二次确认（合规留痕）：先弹窗确认拿一次性 exportTicket，导出后回填行数
 const exportConfirmOpen = ref(false)
-const exportScope = computed(() => {
-  const tags = activeFilterTags.value
-  return tags.length ? `筛选：${tags.join('、')}（当前页 ${rows.value.length} 行）` : `全部（当前页 ${rows.value.length} 行）`
-})
+const exportRows = ref<ElderRow[]>([])
+const exportScope = ref('')
 
-function exportCsvData() {
-  if (!rows.value.length) {
+function openExport(list: ElderRow[], scope: string) {
+  if (!list.length) {
     message.warning('当前列表暂无数据可导出')
     return
   }
+  exportRows.value = list
+  exportScope.value = scope
   exportConfirmOpen.value = true
 }
 
+function exportCsvData() {
+  const tags = activeFilterTags.value
+  openExport(rows.value, tags.length ? `筛选：${tags.join('、')}（当前页 ${rows.value.length} 行）` : `全部（当前页 ${rows.value.length} 行）`)
+}
+
+function exportSelected() {
+  openExport(selectedRows.value, `已勾选 ${selectedRows.value.length} 位长者`)
+}
+
 function doExportCsv(exportTicket: string) {
+  const list = exportRows.value
   exportCsv(
-    rows.value.map((r) => ({
+    list.map((r) => ({
       姓名: r.fullName,
+      档案编号: r.elderCode || '',
       身份证: r.idCardNo || '',
       生日: r.birthDate || '',
       家庭地址: r.homeAddress || '',
+      楼栋: buildingOf(r),
+      房间号: r.roomNo || '',
       床位号: r.bedNo || '',
       护理等级: r.careLevel || '',
-      状态: statusText(r)
+      责任护理员: r.responsibleStaffName || '',
+      状态: statusText(r),
+      入住日期: r.admissionDate || ''
     })),
     'elder-list.csv'
   )
-  completeExport({ exportTicket, rowCount: rows.value.length }).catch(() => {})
-}
-
-function goCreate() {
-  router.push('/elder/create')
-}
-
-function goEdit(id: Id) {
-  router.push(`/elder/edit/${id}`)
+  completeExport({ exportTicket, rowCount: list.length }).catch(() => {})
 }
 
 function goDetail(id: Id) {
   router.push(`/elder/detail/${id}`)
 }
 
-function goResidentCenter(row: ElderItem) {
-  router.push({
-    path: '/elder/resident-360',
-    query: {
-      residentId: String(row.id),
-      elderName: row.fullName || ''
-    }
-  })
+// 办理菜单：目标页都按 elderId（normalizeResidentId 兼容 residentId）预选长者
+function goWithElder(path: string, row: ElderItem) {
+  router.push({ path, query: { elderId: String(row.id), elderName: row.fullName || '' } })
 }
 
-function goAssessmentArchive(row: ElderItem) {
-  router.push({
-    path: '/elder/assessment/ability/archive',
-    query: {
-      elderId: String(row.id),
-      elderName: row.fullName || ''
-    }
-  })
+const FEE_EXIT_PAGE = '/elder/status-change/discharge-settlement'
+
+function goSettlement(row: ElderItem) {
+  router.push({ path: FEE_EXIT_PAGE, query: { tab: 'fee', elderId: String(row.id) } })
 }
 
-function goContractsInvoices(row: ElderItem) {
-  router.push({
-    path: '/elder/contracts-invoices',
-    query: {
-      elderId: String(row.id),
-      elderName: row.fullName || ''
-    }
-  })
-}
-
-function goEditSelected() {
-  const row = requireSingleSelection('编辑')
-  if (!row) return
-  goEdit(row.id)
-}
-
-function goDetailSelected() {
-  const row = requireSingleSelection('查看详情')
-  if (!row) return
-  goDetail(row.id)
+function goBedRecord(row: ElderItem, recordType: 'OUTING' | 'MEDICAL_OUTING', action: 'outing' | 'medical') {
+  router.push({ path: '/elder/bed-panorama', query: { view: 'records', recordType, elderId: String(row.id), action } })
 }
 
 function openChangeBed(row: ElderItem) {
@@ -901,13 +742,7 @@ async function submitChangeBed() {
 }
 
 function openCheckout(row: ElderItem) {
-  router.push({
-    path: '/elder/discharge-apply',
-    query: {
-      elderId: String(row.id),
-      openCreate: '1'
-    }
-  })
+  router.push({ path: FEE_EXIT_PAGE, query: { tab: 'discharge', elderId: String(row.id), create: '1' } })
 }
 
 function openCheckoutSelected() {
@@ -1003,6 +838,7 @@ onMounted(() => {
   routeSignature.value = buildRouteSignature(route.query as Record<string, unknown>)
   fetchData()
   loadBeds()
+  loadCareLevels()
   syncQueryToRoute().catch(() => {})
 })
 
@@ -1025,56 +861,52 @@ watch(
 </script>
 
 <style scoped>
-.elder-workspace {
-  padding: 18px;
-}
-
-.elder-name-cell,
-.row-action-links,
-.pager-row {
-  display: flex;
-  align-items: center;
-}
-
-/* 状态快捷筛选：一次点击切换最常用的在院状态 */
-.list-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.status-tabs {
+  display: inline-flex;
   flex-wrap: wrap;
+  gap: 4px;
   margin-bottom: 14px;
+  padding: 4px;
+  border: 1px solid var(--rm-border);
+  border-radius: 10px;
+  background: #f6f9f8;
 }
 
-.status-chips {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.status-chip {
-  min-height: 32px;
-  padding: 4px 14px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: #ffffff;
-  color: var(--muted);
+.status-tab {
+  padding: 5px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--rm-muted);
+  font: inherit;
   font-size: 13px;
-  font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
 }
 
-.status-chip:hover {
-  border-color: rgba(var(--primary-rgb), 0.4);
-  color: var(--primary);
+.status-tab:hover { color: var(--rm-green); }
+
+.status-tab.is-active {
+  background: #fff;
+  color: var(--rm-green);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(31, 45, 40, 0.1);
 }
 
-.status-chip.is-active {
-  border-color: rgba(var(--primary-rgb), 0.4);
-  background: var(--primary-soft);
-  color: var(--primary-strong);
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.filter-row__search { flex: 1 1 320px; }
+.filter-row__select { width: 200px; }
+
+.filter-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
 }
 
 /* 勾选后才出现的操作条：不占常驻空间，动作跟着选择走 */
@@ -1085,70 +917,59 @@ watch(
   flex-wrap: wrap;
   margin-bottom: 12px;
   padding: 10px 14px;
-  border: 1px solid rgba(var(--primary-rgb), 0.24);
-  border-radius: 12px;
-  background: var(--primary-soft);
+  border: 1px solid #cfe6db;
+  border-radius: 10px;
+  background: var(--rm-green-soft);
 }
 
 .selection-bar__count {
-  color: var(--primary-strong);
-  font-size: 13px;
-  font-weight: 700;
   margin-right: 4px;
+  color: var(--rm-green-dark);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .selection-bar__hint {
-  color: var(--muted);
+  color: var(--rm-muted);
   font-size: 12px;
 }
 
 .selection-bar__clear {
   margin-left: auto;
-  color: var(--muted);
+  color: var(--rm-muted);
 }
 
-.elder-name-cell {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+.elder-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.elder-name-cell strong {
-  color: var(--ink);
-}
-
-.elder-name-cell span {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.elder-age {
-  font-size: 14px;
-}
-
-.risk-tags {
+.elder-cell__main {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
 }
 
-.risk-tags__none {
-  color: var(--muted);
-  font-size: 12px;
+.elder-cell__name {
+  color: var(--rm-text);
+  font-size: 14px;
+  font-weight: 600;
 }
 
-.mono-text {
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
-  color: var(--muted);
-}
+.muted { color: var(--rm-muted); }
 
-.row-action-links {
-  gap: 2px;
-  flex-wrap: nowrap;
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  white-space: nowrap;
 }
 
 .pager-row {
+  display: flex;
   justify-content: flex-end;
   margin-top: 16px;
 }
@@ -1162,17 +983,5 @@ watch(
 .qr-text {
   font-size: 12px;
   color: var(--muted);
-}
-
-@media (max-width: 768px) {
-  .elder-workspace {
-    padding: 12px;
-  }
-}
-
-.quick-edit-hint {
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--text-tertiary, #999);
 }
 </style>

@@ -37,12 +37,12 @@
             <div v-if="careProfile?.riskTags?.length" class="resident-hero__risks"><span>风险标签</span><a-tag v-for="tag in careProfile.riskTags" :key="tag" color="volcano">{{ tag }}</a-tag></div>
           </div>
         </div>
-        <a-space wrap>
+        <ActionToolbar wrap>
           <a-button type="primary" @click="go(`/elder/detail/${residentId}`)">查看档案</a-button>
           <a-button @click="go(`/elder/assessment/ability/archive?elderId=${residentId}`)">评估档案</a-button>
           <a-button @click="go(`/elder/contracts-invoices?elderId=${residentId}`)">合同票据</a-button>
           <a-button @click="go(`/elder/status-change/center?residentId=${residentId}`)">状态变更</a-button>
-        </a-space>
+        </ActionToolbar>
       </div>
     </a-card>
 
@@ -116,7 +116,7 @@
 
             <div v-for="line in card.lines" :key="line" class="line-item">{{ line }}</div>
 
-            <a-space wrap style="margin-top: 12px">
+            <ActionToolbar wrap style="margin-top: 12px">
               <a-button v-for="action in card.actions" :key="action.label" :type="action.primary ? 'primary' : 'default'" @click="go(action.path)">
                 {{ action.label }}
               </a-button>
@@ -133,7 +133,7 @@
               >
                 事故结案
               </a-button>
-            </a-space>
+            </ActionToolbar>
           </a-card>
         </a-col>
       </a-row>
@@ -142,6 +142,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../../components/ActionToolbar.vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'

@@ -4,7 +4,7 @@
       <a-button type="primary" @click="openCreate">新增外出</a-button>
     </template>
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline" class="search-bar">
+      <QueryBar :model="query" layout="inline" class="search-bar" @finish="fetchData">
         <a-form-item label="老人">
           <a-select
             v-model:value="query.elderId"
@@ -34,22 +34,24 @@
             show-time
           />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="fetchData">搜索</a-button>
-            <a-button @click="reset">清空</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="fetchData">搜索</a-button>
+              <a-button @click="reset">清空</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <a-space style="margin-bottom: 12px" wrap>
+      <ActionToolbar style="margin-bottom: 12px" wrap>
         <a-tag color="blue">已选 {{ selectedRowKeys.length }} 条</a-tag>
         <a-button :disabled="selectedRowKeys.length !== 1" @click="approveSelected">批准外出申请</a-button>
         <a-button :disabled="selectedRowKeys.length !== 1" @click="markReturnSelected">返院登记</a-button>
         <a-button danger :disabled="selectedRowKeys.length === 0" @click="deleteSelected">删除</a-button>
-      </a-space>
+      </ActionToolbar>
       <StatefulBlock :loading="loading" :error="errorMessage" :empty="!rows.length" empty-text="暂无外出记录" @retry="fetchData">
         <a-table
           :data-source="rows"
@@ -136,6 +138,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import type { FormInstance, FormRules } from 'ant-design-vue'

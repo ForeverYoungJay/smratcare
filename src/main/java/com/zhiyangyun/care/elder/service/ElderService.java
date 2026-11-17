@@ -27,6 +27,7 @@ public interface ElderService {
       String bedNo,
       String roomNo,
       String careLevel,
+      String building,
       String sortBy,
       String sortOrder);
 

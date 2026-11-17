@@ -23,6 +23,14 @@ vi.mock('../../../api/bed', () => ({
   getBedList: vi.fn().mockResolvedValue([])
 }))
 
+vi.mock('../../../api/nursing', () => ({
+  getCareLevelList: vi.fn().mockResolvedValue([])
+}))
+
+vi.mock('../../../stores/user', () => ({
+  useUserStore: () => ({ roles: ['ADMIN'] })
+}))
+
 vi.mock('qrcode', () => ({
   default: { toDataURL: vi.fn().mockResolvedValue('data:image/png;base64,') },
   toDataURL: vi.fn().mockResolvedValue('data:image/png;base64,')

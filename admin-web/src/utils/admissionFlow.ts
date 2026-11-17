@@ -28,3 +28,16 @@ export function resolveAdmissionFlowSteps(flowStage?: string, admitted = false):
     state: index < currentIndex || admitted ? 'done' : index === currentIndex ? 'current' : 'pending'
   }))
 }
+
+export interface AdmissionContext { elderId?: string | number; contractNo?: string; leadId?: string | number; bedId?: string | number }
+
+export function withAdmissionContext(path: string, context: AdmissionContext): string {
+  const [pathname, search] = path.split('?')
+  const params = new URLSearchParams(search || '')
+  for (const [key, value] of Object.entries(context)) {
+    if (value !== undefined && String(value).trim()) params.set(key, String(value).trim())
+  }
+  const residentId = String(context.elderId ?? '').trim()
+  if (residentId) params.set('residentId', residentId)
+  return `${pathname}${params.size ? `?${params}` : ''}`
+}

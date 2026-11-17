@@ -40,8 +40,10 @@ export interface BedItem {
   lastReleasedAt?: string
   elderName?: string
   elderGender?: number
+  elderBirthDate?: string
   elderLifecycleStatus?: string
   careLevel?: string
+  responsibleStaffName?: string
   roomNo?: string
   building?: string
   buildingRemark?: string

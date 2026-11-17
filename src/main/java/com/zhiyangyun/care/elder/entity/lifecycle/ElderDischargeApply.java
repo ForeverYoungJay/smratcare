@@ -30,6 +30,12 @@ public class ElderDischargeApply {
   private Long reviewedBy;
   private String reviewedByName;
   private LocalDateTime reviewedTime;
+  private LocalDateTime careHandoverTime;
+  private String careHandoverByName;
+  private LocalDateTime itemHandoverTime;
+  private String itemHandoverByName;
+  private LocalDateTime archiveTime;
+  private String archiveByName;
   private Long createdBy;
   @TableField(value = "create_time", fill = FieldFill.INSERT)
   private LocalDateTime createTime;

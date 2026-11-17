@@ -1,5 +1,8 @@
 <template>
-  <PageContainer title="新建老人" subTitle="补录平台启用前已入住长者，保留历史合同与资料，不走营销流程">
+  <component
+    :is="embedded ? 'div' : PageContainer"
+    v-bind="embedded ? {} : { title: '新建老人', subTitle: '补录平台启用前已入住长者，保留历史合同与资料，不走营销流程' }"
+  >
     <a-card class="card-elevated" :bordered="false">
       <a-alert
         type="info"
@@ -104,6 +107,19 @@
         </a-form-item>
         <a-form-item label="护理等级" name="careLevel">
           <a-input v-model:value="form.careLevel" placeholder="如：一级护理/二级护理" />
+        </a-form-item>
+        <a-form-item label="责任护理员" name="responsibleStaffId">
+          <a-select
+            v-model:value="form.responsibleStaffId"
+            allow-clear
+            show-search
+            :filter-option="false"
+            :options="staffOptions"
+            :loading="staffLoading"
+            placeholder="输入姓名/工号搜索"
+            @search="searchStaff"
+            @focus="() => searchStaff('')"
+          />
         </a-form-item>
         <a-form-item label="风险预担" name="riskPrecommit">
           <a-select v-model:value="form.riskPrecommit" placeholder="请选择突发风险处置优先策略" allow-clear>
@@ -228,7 +244,7 @@
         <a-button type="primary" :loading="saving" @click="submit">保存</a-button>
       </a-space>
     </a-card>
-  </PageContainer>
+  </component>
 </template>
 
 <script setup lang="ts">
@@ -238,6 +254,7 @@ import dayjs from 'dayjs'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
+import { useStaffOptions } from '../../composables/useStaffOptions'
 import { bindFamily, createElder, getElderPage, updateElderDiseases, uploadElderFile } from '../../api/elder'
 import { admitElder } from '../../api/elderLifecycle'
 import { upsertFamilyUser } from '../../api/family'
@@ -245,8 +262,12 @@ import { getBedList, getBuildingList, getFloorList, getRoomList } from '../../ap
 import { getDiseaseList } from '../../api/store'
 import type { AdmissionRequest, BedItem, BuildingItem, ElderCreateRequest, ElderItem, FloorItem, Id, RoomItem } from '../../types'
 
+// embedded：在长者列表的右侧抽屉里使用，保存/取消改为通知父组件，不跳路由也不读路由预填
+const props = defineProps<{ embedded?: boolean }>()
+const emit = defineEmits<{ saved: []; cancel: [] }>()
 const router = useRouter()
 const route = useRoute()
+const { staffOptions, staffLoading, searchStaff } = useStaffOptions()
 const formRef = ref<FormInstance>()
 const saving = ref(false)
 /** 提交成功后跳走时不要再拦一次 */
@@ -254,7 +275,8 @@ const submitted = ref(false)
 const formDerivedBirthDate = ref('')
 const syncingAssetSelection = ref(false)
 
-const form = reactive<ElderCreateRequest & { contractNo?: string; depositAmount?: number }>({
+// responsibleStaffId 由后端同期补充到 ElderCreateRequest，类型未落地前用本地交叉类型
+const form = reactive<ElderCreateRequest & { contractNo?: string; depositAmount?: number; responsibleStaffId?: Id }>({
   fullName: '',
   idCardNo: '',
   phone: '',
@@ -270,6 +292,7 @@ const form = reactive<ElderCreateRequest & { contractNo?: string; depositAmount?
   contractNo: '',
   depositAmount: undefined,
   careLevel: '',
+  responsibleStaffId: undefined,
   riskPrecommit: undefined,
   status: 1,
   remark: '',
@@ -488,7 +511,8 @@ const rules: FormRules = {
 }
 
 function back() {
-  router.push('/elder/list')
+  if (props.embedded) emit('cancel')
+  else router.push('/elder/list')
 }
 
 /** 表单里是否已经填了东西（用于判断离开时要不要拦一下） */
@@ -532,7 +556,7 @@ async function submit() {
       throw new Error('整租入住必须选择主床位')
     }
     let successMessage = '保存成功'
-    const payload: ElderCreateRequest = {
+    const payload: ElderCreateRequest & { responsibleStaffId?: Id } = {
       fullName: trimText(form.fullName),
       idCardNo: trimText(form.idCardNo) || undefined,
       phone: trimText(form.phone) || undefined,
@@ -546,6 +570,7 @@ async function submit() {
       birthDate: form.birthDate,
       admissionDate: form.admissionDate,
       careLevel: form.careLevel,
+      responsibleStaffId: form.responsibleStaffId,
       riskPrecommit: form.riskPrecommit,
       status: form.status,
       remark: trimText(form.remark) || undefined,
@@ -619,7 +644,8 @@ async function submit() {
       message.success(successMessage)
     }
     submitted.value = true
-    router.push('/elder/list')
+    if (props.embedded) emit('saved')
+    else router.push('/elder/list')
   } catch (error: any) {
     // 表单校验失败时 antd 抛出的是 { errorFields } 对象（无 message），需从中取出首个字段错误提示，
     // 否则会被吞成通用“保存失败”，用户无法定位是哪个字段有问题。
@@ -904,7 +930,8 @@ onMounted(async () => {
   if (!familyDraftRows.value.length) {
     addFamilyDraftRow()
   }
-  const fullNameFromRoute = trimText(String(route.query.fullName || ''))
+  // 抽屉里挂在列表路由下，列表的 fullName 是筛选条件而不是预填
+  const fullNameFromRoute = props.embedded ? '' : trimText(String(route.query.fullName || ''))
   if (!form.fullName && fullNameFromRoute) {
     form.fullName = fullNameFromRoute
   }
@@ -912,7 +939,7 @@ onMounted(async () => {
     form.admissionDate = dayjs().format('YYYY-MM-DD')
   }
   await loadAssets()
-  await applyBedRoutePrefill()
+  if (!props.embedded) await applyBedRoutePrefill()
   loadDiseaseOptions()
 })
 </script>

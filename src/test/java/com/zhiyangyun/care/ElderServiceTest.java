@@ -299,7 +299,7 @@ class ElderServiceTest {
 
   @Test
   void page_query() {
-    var page = elderService.page(null, 1, 10, "Elder", false, null, null, null, null, null, null, null, null, null);
+    var page = elderService.page(null, 1, 10, "Elder", false, null, null, null, null, null, null, null, null, null, null);
     assertNotNull(page);
     assertEquals(1, page.getCurrent());
   }
@@ -313,6 +313,7 @@ class ElderServiceTest {
     room.setTenantId(orgId);
     room.setOrgId(orgId);
     room.setRoomNo("RM-FILTER-901");
+    room.setBuilding("筛选测试楼");
     room.setCapacity(2);
     room.setStatus(1);
     roomMapper.insert(room);
@@ -330,6 +331,7 @@ class ElderServiceTest {
     elder.setTenantId(orgId);
     elder.setOrgId(orgId);
     elder.setFullName("房间筛选测试");
+    elder.setElderCode("RMCODE-901");
     elder.setStatus(1);
     elder.setBedId(bed.getId());
     elderMapper.insert(elder);
@@ -347,12 +349,45 @@ class ElderServiceTest {
     relationMapper.insert(relation);
 
     var matched = elderService.page(
-        orgId, 1, 10, null, false, null, null, null, null, null, "RM-FILTER-901", null, null, null);
+        orgId, 1, 10, null, false, null, null, null, null, null, "RM-FILTER-901", null, null, null, null);
     assertEquals(1, matched.getRecords().size());
     assertEquals(elder.getId(), matched.getRecords().get(0).getId());
 
     var unmatched = elderService.page(
-        orgId, 1, 10, null, false, null, null, null, null, null, "RM-FILTER-NOPE", null, null, null);
+        orgId, 1, 10, null, false, null, null, null, null, null, "RM-FILTER-NOPE", null, null, null, null);
     assertEquals(0, unmatched.getRecords().size());
+
+    assertEquals(1, elderService.page(
+        orgId, 1, 10, null, false, null, null, null, null, null, null, null, "筛选测试楼", null, null).getRecords().size());
+    assertEquals(0, elderService.page(
+        orgId, 1, 10, null, false, null, null, null, null, null, null, null, "别的楼", null, null).getRecords().size());
+    assertEquals(1, elderService.page(
+        orgId, 1, 10, "RMCODE-901", false, null, null, null, null, null, null, null, null, null, null).getRecords().size());
+  }
+
+  @Test
+  void responsible_staff_is_persisted_resolved_and_org_checked() {
+    com.zhiyangyun.care.elder.model.ElderCreateRequest create = new com.zhiyangyun.care.elder.model.ElderCreateRequest();
+    create.setTenantId(1L);
+    create.setOrgId(1L);
+    create.setFullName("责任护理员测试长者");
+    create.setElderCode("RS-STAFF-01");
+    create.setResponsibleStaffId(502L);
+    var created = elderService.create(create);
+    assertEquals(502L, created.getResponsibleStaffId());
+
+    var detail = elderService.get(created.getId(), 1L);
+    assertEquals("值班护理员甲", detail.getResponsibleStaffName());
+
+    com.zhiyangyun.care.elder.model.ElderUpdateRequest update = new com.zhiyangyun.care.elder.model.ElderUpdateRequest();
+    update.setTenantId(1L);
+    update.setResponsibleStaffId(503L);
+    elderService.update(created.getId(), update);
+    assertEquals("护理部长乙", elderService.get(created.getId(), 1L).getResponsibleStaffName());
+
+    com.zhiyangyun.care.elder.model.ElderUpdateRequest foreign = new com.zhiyangyun.care.elder.model.ElderUpdateRequest();
+    foreign.setTenantId(1L);
+    foreign.setResponsibleStaffId(987654321L);
+    assertThrows(IllegalArgumentException.class, () -> elderService.update(created.getId(), foreign));
   }
 }
