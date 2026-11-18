@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.zhiyangyun.care.bill.entity.BillMonthly;
+import com.zhiyangyun.care.bill.mapper.BillMonthlyMapper;
 import com.zhiyangyun.care.elder.entity.Bed;
 import com.zhiyangyun.care.elder.entity.ElderBedRelation;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
@@ -69,6 +71,35 @@ class FeeManagementServiceTest {
 
   @Autowired
   private FinanceRefundVoucherMapper financeRefundVoucherMapper;
+
+  @Autowired
+  private BillMonthlyMapper billMonthlyMapper;
+
+  @Test
+  void confirm_settlement_refund_blocked_while_monthly_bill_unpaid() {
+    Long elderId = createElder("结算测试欠费");
+    deposit(elderId, BigDecimal.valueOf(3000));
+    BillMonthly bill = new BillMonthly();
+    bill.setOrgId(1L);
+    bill.setElderId(elderId);
+    bill.setBillMonth("2026-11");
+    bill.setTotalAmount(BigDecimal.valueOf(1300));
+    bill.setPaidAmount(BigDecimal.ZERO);
+    bill.setOutstandingAmount(BigDecimal.valueOf(1300));
+    bill.setStatus(0);
+    billMonthlyMapper.insert(bill);
+
+    DischargeSettlementCreateRequest req = new DischargeSettlementCreateRequest();
+    req.setElderId(elderId);
+    req.setPayableAmount(BigDecimal.valueOf(100));
+    DischargeSettlement settlement = feeManagementService.createDischargeSettlement(1L, 500L, req);
+    approveSettlement(settlement.getId());
+
+    IllegalStateException error = assertThrows(IllegalStateException.class,
+        () -> feeManagementService.confirmDischargeSettlement(1L, 500L, settlement.getId(), financeRefundRequest("财务A")));
+    assertEquals("存在未结清账单，请先收款后再办理退住退款", error.getMessage());
+    assertEquals(0, BigDecimal.valueOf(3000).compareTo(elderAccountService.getOrCreate(1L, elderId, 500L).getBalance()));
+  }
 
   @Test
   void confirm_settlement_rejects_when_balance_insufficient() {

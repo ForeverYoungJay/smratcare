@@ -36,7 +36,7 @@
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
           <a-tag :color="record.status === 'SETTLED' ? 'green' : 'orange'">
-            {{ record.status }}
+            {{ statusOptions.find((o) => o.value === record.status)?.label || record.status }}
           </a-tag>
         </template>
         <template v-else-if="column.key === 'reconcileStatus'">
@@ -154,6 +154,7 @@ const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChange
 
 const statusOptions = [
   { label: '待确认', value: 'PENDING_CONFIRM' },
+  { label: '签字中/待退款', value: 'PROCESSING' },
   { label: '已结算', value: 'SETTLED' },
   { label: '已取消', value: 'CANCELLED' }
 ]
