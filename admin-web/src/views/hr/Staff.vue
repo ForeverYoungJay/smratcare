@@ -92,7 +92,10 @@
       @change="handleTableChange"
     >
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'status'">
+        <template v-if="column.key === 'realName'">
+          <a @click="profile360 = { staffId: record.staffId, name: record.realName }">{{ record.realName }}</a>
+        </template>
+        <template v-else-if="column.key === 'status'">
           <a-tag :color="record.status === 1 ? 'green' : 'default'">
             {{ record.status === 1 ? '在职' : '离职' }}
           </a-tag>
@@ -158,7 +161,10 @@
             <div class="form-rule-tip">选择岗位/角色后会按角色管理里的所属部门自动带出，也可手动调整。</div>
           </a-form-item>
           <a-form-item label="手机号">
-            <a-input v-model:value="accountForm.phone" />
+            <a-input v-model:value="accountForm.phone" @blur="checkDuplicate" />
+            <a-alert v-for="dup in duplicates" :key="dup.staffId" style="margin-top: 8px" show-icon :type="dup.onJob ? 'error' : 'warning'"
+              :message="`${dup.samePhone ? '手机号' : '姓名'}与已有档案「${dup.realName}${dup.staffNo ? ` / ${dup.staffNo}` : ''}」相同（${dup.onJob ? '在职' : '已离职'}）`"
+              :description="dup.onJob ? '请勿重复建档，人员有变更请在原档案上更正。' : '如为返聘，请在原档案上恢复在职，保留前次任职历史，不要新建档案。'" />
           </a-form-item>
           <a-form-item label="账号状态">
             <a-select v-model:value="accountForm.status" :options="statusOptions" />
@@ -295,6 +301,13 @@
         <a-form-item label="员工ID" required>
           <a-input v-model:value="terminateForm.staffId" disabled />
         </a-form-item>
+        <a-form-item label="离职交接清单">
+          <div v-for="item in offboarding" :key="item.key" class="offboard-row">
+            <a-tag :color="item.done ? 'green' : 'orange'">{{ item.done ? '已完成' : '待处理' }}</a-tag>
+            <b>{{ item.label }}</b><span>{{ item.detail }}</span>
+          </div>
+          <div v-if="offboarding.some((item) => !item.done && item.key !== 'account')" class="form-rule-tip">仍有待处理事项；可以先办理离职，但请在离职日前完成交接。</div>
+        </a-form-item>
         <a-form-item label="离职日期">
           <a-date-picker v-model:value="terminateForm.leaveDate" style="width: 100%" />
         </a-form-item>
@@ -359,6 +372,7 @@
         </a-space>
       </a-spin>
     </a-modal>
+    <StaffProfile360 :open="!!profile360.staffId" :staff-id="profile360.staffId" :name="profile360.name" @close="profile360 = {}" />
   </PageContainer>
 </template>
 
@@ -372,6 +386,8 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { getHrSocialSecuritySummary, getHrStaffPage, getHrProfile, upsertHrProfile, terminateStaff, reinstateStaff } from '../../api/hr'
+import { checkStaffDuplicate, getOffboardingChecklist, type ChecklistItem } from '../../api/hrOps'
+import StaffProfile360 from './StaffProfile360.vue'
 import { appendStaffRole, getRolePage, getStaffRoleAssignments } from '../../api/rbac'
 import { createStaff as createStaffAccount } from '../../api/staff'
 import { openPrintTableReport } from '../../utils/print'
@@ -885,6 +901,17 @@ function maybeAutoOpenProfile() {
   openDrawer({ staffId } as HrStaffProfile).catch(() => {})
 }
 
+const offboarding = ref<ChecklistItem[]>([])
+const profile360 = ref<{ staffId?: string | number; name?: string }>({})
+const duplicates = ref<Awaited<ReturnType<typeof checkStaffDuplicate>>>([])
+
+/** 新建人员前查重：同手机号或同名的已有档案（含已离职，返聘应恢复原档案） */
+async function checkDuplicate() {
+  const phone = String(accountForm.phone || '').trim()
+  const name = String(accountForm.realName || '').trim()
+  duplicates.value = phone || name ? await checkStaffDuplicate({ phone: phone || undefined, name: name || undefined }).catch(() => []) : []
+}
+
 const terminateOpen = ref(false)
 const terminating = ref(false)
 const terminateForm = reactive<{ staffId?: string | number; leaveDate?: any; leaveReason?: string }>({})
@@ -894,6 +921,8 @@ function openTerminate(record: HrStaffProfile) {
   terminateForm.leaveDate = record.leaveDate ? dayjs(record.leaveDate) : undefined
   terminateForm.leaveReason = record.leaveReason || ''
   terminateOpen.value = true
+  offboarding.value = []
+  getOffboardingChecklist(String(record.staffId)).then((items) => { offboarding.value = items }).catch(() => {})
 }
 
 async function submitTerminate() {
@@ -1057,6 +1086,8 @@ maybeAutoOpenProfile()
 </script>
 
 <style scoped>
+.offboard-row { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; font-size: 13px; }
+.offboard-row span { color: #6b7a74; }
 .secondary-actions { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; max-width:420px; }
 .selection-tip {
   color: var(--muted);

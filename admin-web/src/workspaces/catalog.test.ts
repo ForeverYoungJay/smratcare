@@ -46,9 +46,9 @@ describe('one page per function', () => {
   it('keeps old feature names searchable without exposing unauthorized tabs', () => {
     const menu = getMenuTree(['HR_EMPLOYEE'], ['/hr/profile/social-security-reminders'])
     const flatten = (items: MenuItem[]): MenuItem[] => items.flatMap(item => [item, ...flatten(item.children || [])])
-    const profile = flatten(menu).find(item => item.path === '/hr/profile/basic')!
-    expect(profile.aliases).toContain('社保办理')
-    expect(profile.aliases).not.toContain('劳动合同')
+    const compensation = flatten(menu).find(item => item.path === '/hr/expense/records')!
+    expect(compensation.aliases).toContain('社保公积金')
+    expect(compensation.aliases).not.toContain('报销记录')
     const finance = flatten(getMenuTree(['FINANCE_MINISTER'], ['/finance']))
     expect(finance.find(item => item.path === '/finance/bills/detail-query')?.aliases).toContain('押金')
   })
@@ -118,10 +118,10 @@ describe('one page per function', () => {
     const roles = ['HR_EMPLOYEE']
     const pages = ['/hr/profile/social-security-reminders']
     const allowed = workspaceLocation('/hr/profile/social-security-reminders')!
-    const forbidden = workspaceLocation('/hr/profile/contracts')!
+    const forbidden = workspaceLocation('/hr/expense/approval-flow')!
     expect(resolveRouteAccess(router, roles, router.resolve(allowed).fullPath, pages).canAccess).toBe(true)
     expect(resolveRouteAccess(router, roles, router.resolve(forbidden).fullPath, pages).canAccess).toBe(false)
-    const workspace = functionWorkspaces.find((w) => w.id === 'hr-profile')!
+    const workspace = functionWorkspaces.find((w) => w.id === 'hr-compensation')!
     expect(workspace.tabs.filter((t) => canUseWorkspaceTab(t, roles, pages, [])).map((t) => t.path)).toEqual(pages)
   })
 
@@ -153,10 +153,10 @@ describe('one page per function', () => {
     setPagePermissions(['/hr/profile/social-security-reminders'])
     setupPermission(router)
     await router.push(workspaceLocation('/hr/profile/social-security-reminders')!)
-    expect(router.currentRoute.value.path).toBe('/hr/profile/basic')
+    expect(router.currentRoute.value.path).toBe('/hr/expense/records')
     await router.push(workspaceLocation('/hr/profile/account-access')!)
     expect(router.currentRoute.value.path).toBe('/403')
-    expect(resolveRouteAccess(router, ['HR_EMPLOYEE'], '/hr/profile/basic?view=unknown', ['/hr/profile/social-security-reminders']).canAccess).toBe(false)
+    expect(resolveRouteAccess(router, ['HR_EMPLOYEE'], '/hr/expense/records?view=unknown', ['/hr/profile/social-security-reminders']).canAccess).toBe(false)
   })
 
   it('keeps report route identity and scene props for genuinely different views', () => {

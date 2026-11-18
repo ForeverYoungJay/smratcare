@@ -320,6 +320,13 @@ export const financeRoutes: RouteRecordRaw[] = [
                 name: 'FinanceReconcileMonthClose',
                 component: () => import('../views/finance/FinanceMonthClose.vue'),
                 meta: { title: '月结进度' }
+              },
+              {
+                // 人事审核通过的工资批次，由财务复核、提交银行并凭回执登记付款
+                path: '/finance/payroll',
+                name: 'FinancePayroll',
+                component: () => import('../views/hr/HrPayroll.vue'),
+                meta: { title: '工资付款', roles: ['FINANCE_EMPLOYEE', 'FINANCE_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
               }
             ]
           },

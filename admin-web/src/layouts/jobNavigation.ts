@@ -169,7 +169,7 @@ function buildConsolidatedDepartmentMenu(department: string, availablePaths: Set
   const links = (pairs: string[][]): JobLink[] => pairs.map(([label, path]) => ({ label, path }))
   const office: JobEntry = { label: '我的办公', path: '', icon: 'UserOutlined', children: links([
     ['我的待办', '/workbench/todo'], ['审批办理', '/oa/approval'], ['考勤与请假', '/workbench/attendance'],
-    ['我的日程', '/workbench/schedule'], ['工作总结', '/workbench/reports'], ['我的信息', '/workbench/my-info']
+    ['我的日程', '/workbench/schedule'], ['工作总结', '/workbench/reports'], ['我的工资与积分', '/workbench/payslips'], ['我的信息', '/workbench/my-info']
   ]) }
   let entries: JobEntry[]
   if (department === 'FINANCE') entries = [
@@ -193,9 +193,10 @@ function buildConsolidatedDepartmentMenu(department: string, availablePaths: Set
     // 行政人事部：行政事务 6 个主页面在一级菜单，人事业务收进「人事管理」组
     ...links([['行政工作台', '/oa/workbench'], ['家属服务', '/oa/family'], ['协同办公', '/oa/collaboration'],
       ['生活服务', '/oa/services'], ['活动与满意度', '/oa/culture'], ['制度知识与公告', '/oa/library']]),
-    { label: '人事管理', path: '', icon: 'TeamOutlined', children: links([['人事工作台', '/hr/overview'], ['员工档案与合同', '/hr/profile/basic'],
-      ['招聘与入职', '/hr/recruitment/needs'], ['考勤与排班', '/hr/attendance/records'], ['员工费用与报销', '/hr/expense/records'],
-      ['员工宿舍', '/hr/expense/dormitory'], ['培训与证书', '/hr/development/records'], ['绩效与积分', '/hr/performance/reports']]) },
+    // 人事 7 个主菜单（员工宿舍在「薪酬与员工服务」内）
+    { label: '人事管理', path: '', icon: 'TeamOutlined', children: links([['人事工作台', '/hr/overview'], ['招聘与入职', '/hr/recruitment/needs'],
+      ['员工档案与合同', '/hr/profile/basic'], ['考勤与排班', '/hr/attendance/records'], ['薪酬与员工服务', '/hr/expense/records'],
+      ['培训与证书', '/hr/development/records'], ['绩效与积分', '/hr/performance/reports']]) },
     office
   ]
   return uniqueEntries(entries.map((item, index) => entry(item, availablePaths, index + 1)).filter(Boolean) as MenuItem[])

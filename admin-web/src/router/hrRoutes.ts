@@ -189,6 +189,12 @@ export const hrRoutes: RouteRecordRaw[] = [
                 meta: { title: '加班申请（兼容）', roles: ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'], hidden: true }
               },
               {
+                path: 'control',
+                name: 'HrAttendanceControl',
+                component: () => import('../views/hr/HrAttendanceControl.vue'),
+                meta: { title: '考勤核定与调整', roles: ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
+              },
+              {
                 path: 'records',
                 name: 'HrAttendanceRecords',
                 component: () => import('../views/hr/HrAttendanceRecords.vue'),
@@ -247,6 +253,7 @@ export const hrRoutes: RouteRecordRaw[] = [
             redirect: '/hr/expense/records?scene=training-reimburse',
             children: [
               { path: 'records', name: 'HrExpenseRecords', component: () => import('../views/hr/HrExpenseScenePage.vue'), meta: { title: '费用报销台', roles: ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] } },
+              { path: 'payroll', name: 'HrExpensePayroll', component: () => import('../views/hr/HrPayroll.vue'), meta: { title: '工资批次', roles: ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] } },
               { path: 'training-reimburse', name: 'HrExpenseTrainingReimburse', redirect: '/hr/expense/records?scene=training-reimburse', meta: { title: '外出培训费用报销（兼容）', roles: ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'], hidden: true } },
               { path: 'subsidy', name: 'HrExpenseSubsidy', redirect: '/hr/expense/records?scene=subsidy', meta: { title: '补贴申请（兼容）', roles: ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'], hidden: true } },
               { path: 'dormitory', name: 'HrExpenseDormitory', component: () => import('../views/hr/HrDormitoryManagement.vue'), meta: { title: '员工宿舍', roles: ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] } },
@@ -282,6 +289,7 @@ export const hrRoutes: RouteRecordRaw[] = [
               { path: 'admin', name: 'HrPerformanceAdmin', redirect: '/hr/performance/reports?scene=admin', meta: { title: '行政绩效（兼容）', roles: ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'], hidden: true } },
               { path: 'scoring-rules', name: 'HrPerformanceScoringRules', component: () => import('../views/hr/PointsRule.vue'), meta: { title: '评分规则配置', roles: ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] } },
               { path: 'generation', name: 'HrPerformanceGeneration', redirect: '/hr/performance/reports?scene=generation', meta: { title: '绩效生成（兼容）', roles: ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'], hidden: true } },
+              { path: 'appeals', name: 'HrPerformanceAppeals', component: () => import('../views/hr/HrAppeals.vue'), meta: { title: '申诉复核', roles: ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] } },
               { path: 'reports', name: 'HrPerformanceReports', component: () => import('../views/hr/Performance.vue'), meta: { title: '绩效报表', roles: ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] } },
               { path: 'reward-punishment', name: 'HrPerformanceRewardPunishment', component: () => import('../views/oa/RewardPunishment.vue'), meta: { title: '奖惩记录', roles: ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] } }
             ]

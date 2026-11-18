@@ -41,6 +41,12 @@ export const sharedRoutes: RouteRecordRaw[] = [
             meta: { title: '我的信息' }
           },
           {
+            path: 'payslips',
+            name: 'WorkbenchPayslips',
+            component: () => import('../views/hr/MyHrSelf.vue'),
+            meta: { title: '我的工资与积分' }
+          },
+          {
             path: 'attendance',
             name: 'WorkbenchAttendance',
             component: () => import('../views/oa/AttendanceLeave.vue'),

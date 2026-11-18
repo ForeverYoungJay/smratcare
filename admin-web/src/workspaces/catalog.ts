@@ -29,10 +29,11 @@ export const workspaceDefinitions: WorkspaceDefinition[] = [
   ] },
   { id: 'finance-settlement', title: '结算与月结', entries: [
     ['/finance/discharge/settlement', '退住结算', ['/finance/discharge/print-sign', '/finance/discharge/review', '/finance/discharge/status-sync']],
-    ['/finance/reconcile/center', '日对账'], ['/finance/reconcile/month-close', '月结关账']
+    ['/finance/reconcile/center', '日对账'], ['/finance/reconcile/month-close', '月结关账'], ['/finance/payroll', '工资付款']
   ], groups: [
     ['退住与费用审核', ['/finance/discharge/settlement']],
-    ['对账与月结', ['/finance/reconcile/center', '/finance/reconcile/month-close']]
+    ['对账与月结', ['/finance/reconcile/center', '/finance/reconcile/month-close']],
+    ['工资付款', ['/finance/payroll']]
   ] },
   { id: 'finance-reports', title: '财务经营分析', entries: [
     ['/finance/reports/overall', '总收支'], ['/finance/reports/revenue-structure', '营收结构'],
@@ -69,27 +70,30 @@ export const workspaceDefinitions: WorkspaceDefinition[] = [
     ['/hr/profile/basic', '员工档案'], ['/hr/profile/account-access', '账号与领导'],
     ['/hr/profile/contracts', '劳动合同'], ['/hr/profile/contract-reminders', '合同临期'],
     ['/hr/profile/contract-print', '合同打印'], ['/hr/profile/contract-templates', '合同模板'],
-    ['/hr/profile/attachments', '档案附件'], ['/hr/profile/social-security-reminders', '社保办理']
+    ['/hr/profile/attachments', '档案附件']
   ] },
   { id: 'hr-attendance', title: '考勤与排班', entries: [
     ['/hr/attendance/records', '考勤记录'], ['/hr/attendance/abnormal', '异常核验'],
     ['/hr/attendance/calendar', '排班日历'], ['/hr/attendance/schemes', '值班方案'],
     ['/hr/attendance/groups', '护理班组'], ['/hr/attendance/leave-approval', '请假与换班审批'],
-    ['/hr/attendance/access-control', '门禁记录']
+    ['/hr/attendance/access-control', '门禁记录'], ['/hr/attendance/control', '核定与调整']
   ] },
-  { id: 'hr-expenses', title: '员工费用与报销', entries: [
-    ['/hr/expense/records', '报销记录'], ['/hr/expense/approval-flow', '费用申请与审批'],
-    ['/hr/expense/meal-fee', '员工餐费'], ['/hr/expense/electricity-fee', '员工电费']
-  ] },
-  { id: 'hr-dormitory', title: '员工宿舍', entries: [
+  // 人事 7 个主菜单：员工宿舍并入「薪酬与员工服务」作为一组标签，不再单独占一级菜单
+  { id: 'hr-compensation', title: '薪酬与员工服务', entries: [
+    ['/hr/expense/records', '报销记录'], ['/hr/expense/payroll', '工资批次'], ['/hr/expense/approval-flow', '费用申请与审批'],
+    ['/hr/expense/meal-fee', '员工餐费'], ['/hr/expense/electricity-fee', '员工电费'],
+    ['/hr/profile/social-security-reminders', '社保公积金'],
     ['/hr/expense/dormitory', '住宿台账与配置'], ['/hr/expense/dormitory-map', '宿舍房态图']
+  ], groups: [
+    ['薪酬与报销', ['/hr/expense/records', '/hr/expense/payroll', '/hr/expense/approval-flow', '/hr/expense/meal-fee', '/hr/expense/electricity-fee', '/hr/profile/social-security-reminders']],
+    ['员工宿舍', ['/hr/expense/dormitory', '/hr/expense/dormitory-map']]
   ] },
   { id: 'hr-training', title: '培训与证书', entries: [
     ['/hr/development/records', '培训记录'], ['/hr/development/certificates', '证书档案', ['/hr/profile/certificates']],
     ['/hr/development/certificate-reminders', '证书临期']
   ] },
   { id: 'hr-performance', title: '绩效与积分', entries: [
-    ['/hr/performance/reports', '绩效与兑换'], ['/hr/performance/reward-punishment', '奖惩'],
+    ['/hr/performance/reports', '绩效与兑换'], ['/hr/performance/reward-punishment', '奖惩'], ['/hr/performance/appeals', '申诉复核'],
     ['/hr/incentive/ledger', '积分台账'], ['/hr/incentive/rules', '评分与积分规则', ['/hr/performance/scoring-rules']]
   ] },
   { id: 'organization', title: '组织与权限', entries: [
@@ -136,7 +140,20 @@ export const workspaceNotes: Record<string, { message: string; type: 'info' | 'w
   '/finance/discharge/settlement': { type: 'warning', message: '试算金额不是可直接支付的退款指令；押金用途、抵扣与退款渠道须符合合同及预收费监管规定。' },
   '/finance/reconcile/month-close': { type: 'warning', message: '未匹配流水、待处理异常及未审核调整项完成后才允许月结；月结后修改走调整期和审批，不直接改历史数据。' },
   '/finance/config/master-data': { type: 'error', message: '规则变化不得追溯覆盖已审核或已归档账单；须有版本号、生效日期与审批链。' },
-  '/finance/config/approval-flow': { type: 'info', message: '申请人不得自动成为最终审核人；技术管理员不默认具有账务修改权限。' }
+  '/finance/config/approval-flow': { type: 'info', message: '申请人不得自动成为最终审核人；技术管理员不默认具有账务修改权限。' },
+  // 人力资源模块设计中的约束
+  '/hr/recruitment/needs': { type: 'info', message: '候选人与员工是不同状态：录用审批与身份核验完成后才建立或关联正式员工档案；返聘先查重，保留历史劳动关系。' },
+  '/hr/profile/basic': { type: 'warning', message: '一人一档：身份证、银行卡等默认脱敏；不得删除正式员工来“修改身份”，通过更正并保留记录。' },
+  '/hr/profile/contracts': { type: 'info', message: '合同到期预警不等于自动结束劳动关系；已签署合同不覆写，续签和变更保留历史版本。' },
+  '/hr/attendance/records': { type: 'info', message: '夜班跨日按实际时间戳匹配打卡；已核定的考勤期修改须走有审批的调整单。' },
+  '/hr/attendance/calendar': { type: 'warning', message: '护理部、医务部的专业排班是实际值班来源，人事只引用和核定，不另建冲突的第二张值班表。' },
+  '/hr/attendance/leave-approval': { type: 'info', message: '请假、加班、补卡未经审批不改变考勤结果；加班不因排班超时自动计薪。' },
+  '/hr/expense/records': { type: 'warning', message: '一笔费用一个业务来源：报销须有票据和审批，由财务复核并付款；同一报销单不得重复支付。' },
+  '/hr/profile/social-security-reminders': { type: 'info', message: '社保公积金按真实制度和申报结果登记，不以写死比例代替实际申报。' },
+  '/hr/expense/dormitory': { type: 'warning', message: '同一床位任何时点只能有一个有效入住；宿舍维修由后勤办理；宿舍费用未经依据和审批不得自动从工资扣除。' },
+  '/hr/development/certificates': { type: 'warning', message: '证书有效状态以人工复核为准，员工不能自行改为“有效”；到期提醒天数是机构配置，不等同于法定期限。' },
+  '/hr/performance/reports': { type: 'warning', message: '绩效和积分不自动生成工资扣减；护理、医务指标应来自真实任务与质控记录。' },
+  '/hr/incentive/ledger': { type: 'info', message: '积分更正用冲正记录，不覆盖历史流水；加减分须写明依据。' }
 }
 
 export interface WorkspaceSource {

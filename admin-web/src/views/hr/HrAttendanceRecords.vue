@@ -36,12 +36,28 @@
         <template v-else-if="column.key === 'reviewed'">
           {{ Number(record.reviewed) === 1 ? '已核验' : '待核验' }}
         </template>
+        <template v-else-if="column.key === 'adjust'">
+          <a @click="openAdjust(record)">申请调整</a>
+        </template>
       </template>
     </DataTable>
+    <a-modal v-model:open="adjustOpen" :title="`考勤调整单 · ${adjustTarget?.staffName || ''}`" ok-text="提交审批" @ok="submitAdjust">
+      <a-alert type="info" show-icon style="margin-bottom: 12px" message="调整单经人事主管审批后才写回考勤；已核定锁定的月份只能通过调整单修改。" />
+      <a-form layout="vertical">
+        <a-form-item label="更正签到时间"><a-date-picker v-model:value="adjustForm.newCheckIn" show-time value-format="YYYY-MM-DDTHH:mm:ss" style="width: 100%" /></a-form-item>
+        <a-form-item label="更正签退时间（夜班可选次日）"><a-date-picker v-model:value="adjustForm.newCheckOut" show-time value-format="YYYY-MM-DDTHH:mm:ss" style="width: 100%" /></a-form-item>
+        <a-form-item label="更正状态">
+          <a-select v-model:value="adjustForm.newStatus" allow-clear :options="[{ value: 'NORMAL', label: '正常' }, { value: 'LATE', label: '迟到' }, { value: 'EARLY_LEAVE', label: '早退' }, { value: 'ABSENT', label: '缺勤' }]" />
+        </a-form-item>
+        <a-form-item label="调整原因" required><a-textarea v-model:value="adjustForm.reason" :rows="2" placeholder="如：打卡设备故障，班组长确认实际到岗时间" /></a-form-item>
+      </a-form>
+    </a-modal>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
+import { message } from 'ant-design-vue'
+import { requestAttendanceAdjustment } from '../../api/hrOps'
 import { onMounted, reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
@@ -66,8 +82,24 @@ const columns = [
   { title: '签退时间', dataIndex: 'checkOutTime', key: 'checkOutTime', width: 180 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 120 },
   { title: '异常', dataIndex: 'abnormal', key: 'abnormal', width: 100 },
-  { title: '核验', dataIndex: 'reviewed', key: 'reviewed', width: 100 }
+  { title: '核验', dataIndex: 'reviewed', key: 'reviewed', width: 100 },
+  { title: '', key: 'adjust', width: 90 }
 ]
+const adjustOpen = ref(false)
+const adjustTarget = ref<HrAttendanceRecordItem>()
+const adjustForm = reactive({ newCheckIn: undefined as string | undefined, newCheckOut: undefined as string | undefined, newStatus: undefined as string | undefined, reason: '' })
+
+function openAdjust(record: HrAttendanceRecordItem) {
+  adjustTarget.value = record
+  Object.assign(adjustForm, { newCheckIn: undefined, newCheckOut: undefined, newStatus: undefined, reason: '' })
+  adjustOpen.value = true
+}
+async function submitAdjust() {
+  if (!adjustForm.reason.trim()) return message.warning('请填写调整原因')
+  await requestAttendanceAdjustment({ recordId: String(adjustTarget.value!.id), ...adjustForm })
+  message.success('已提交调整单，待人事主管审批后生效')
+  adjustOpen.value = false
+}
 
 const dateRange = ref<string[]>()
 const rows = ref<HrAttendanceRecordItem[]>([])

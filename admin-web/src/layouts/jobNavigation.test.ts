@@ -92,7 +92,13 @@ describe('two-level job navigation', () => {
   it('gives administration six main pages and keeps HR work in one group', () => {
     const menu = jobMenu('HR_EMPLOYEE')
     expect(menu.slice(0, 6).map((item) => item.path)).toEqual(['/oa/workbench', '/oa/family', '/oa/collaboration', '/oa/services', '/oa/culture', '/oa/library'])
-    expect(menu.find((item) => item.label === '人事管理')?.children?.map((c) => c.path)).toContain('/hr/profile/basic')
+    // 人事员工只有社保办理权限：落在「薪酬与员工服务」
+    expect(menu.find((item) => item.label === '人事管理')?.children?.map((c) => c.path)).toContain('/hr/expense/records')
+  })
+
+  it('gives the HR minister the seven HR main menus with dormitory inside compensation', () => {
+    const hr = jobMenu('HR_MINISTER').find((item) => item.label === '人事管理')
+    expect(hr?.children?.map((c) => c.label)).toEqual(['人事工作台', '招聘与入职', '员工档案与合同', '考勤与排班', '薪酬与员工服务', '培训与证书', '绩效与积分'])
   })
 
   it('gives the logistics minister the five fire safety pages inside management', () => {

@@ -12,6 +12,9 @@ import com.zhiyangyun.care.oa.entity.OaTask;
 import com.zhiyangyun.care.oa.mapper.OaApprovalMapper;
 import com.zhiyangyun.care.oa.mapper.OaTaskMapper;
 import com.zhiyangyun.care.schedule.entity.AttendanceRecord;
+import com.zhiyangyun.care.hr.entity.HrAttendancePeriod;
+import com.zhiyangyun.care.hr.mapper.HrAttendancePeriodMapper;
+import com.zhiyangyun.care.hr.service.HrRules;
 import com.zhiyangyun.care.schedule.entity.AttendanceSeasonRule;
 import com.zhiyangyun.care.schedule.mapper.AttendanceRecordMapper;
 import com.zhiyangyun.care.schedule.mapper.AttendanceSeasonRuleMapper;
@@ -55,6 +58,7 @@ public class AttendanceServiceImpl implements AttendanceService {
   private final OaApprovalMapper approvalMapper;
   private final OaTaskMapper taskMapper;
   private final ObjectMapper objectMapper;
+  private final HrAttendancePeriodMapper periodMapper;
 
   public AttendanceServiceImpl(
       AttendanceRecordMapper attendanceMapper,
@@ -62,13 +66,15 @@ public class AttendanceServiceImpl implements AttendanceService {
       StaffMapper staffMapper,
       OaApprovalMapper approvalMapper,
       OaTaskMapper taskMapper,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      HrAttendancePeriodMapper periodMapper) {
     this.attendanceMapper = attendanceMapper;
     this.seasonRuleMapper = seasonRuleMapper;
     this.staffMapper = staffMapper;
     this.approvalMapper = approvalMapper;
     this.taskMapper = taskMapper;
     this.objectMapper = objectMapper;
+    this.periodMapper = periodMapper;
   }
 
   @Override
@@ -276,6 +282,20 @@ public class AttendanceServiceImpl implements AttendanceService {
         .eq(AttendanceRecord::getWorkDate, today)
         .orderByDesc(AttendanceRecord::getUpdateTime)
         .last("LIMIT 1"));
+    // 跨日夜班（如 23:00–07:00）：凌晨的下班、午休、外出打卡归到前一天还没下班的记录
+    if (!"IN".equals(normalizedAction) && (record == null || record.getCheckInTime() == null)) {
+      AttendanceRecord overnight = attendanceMapper.selectOne(Wrappers.lambdaQuery(AttendanceRecord.class)
+          .eq(AttendanceRecord::getIsDeleted, 0)
+          .eq(orgId != null, AttendanceRecord::getOrgId, orgId)
+          .eq(AttendanceRecord::getStaffId, currentStaffId)
+          .eq(AttendanceRecord::getWorkDate, today.minusDays(1))
+          .isNotNull(AttendanceRecord::getCheckInTime)
+          .isNull(AttendanceRecord::getCheckOutTime)
+          .last("LIMIT 1"));
+      if (HrRules.isOpenOvernight(overnight, now)) {
+        record = overnight;
+      }
+    }
 
     if ("IN".equals(normalizedAction)) {
       if (record == null) {
@@ -472,6 +492,11 @@ public class AttendanceServiceImpl implements AttendanceService {
         .last("LIMIT 1"));
     if (record == null) {
       throw new IllegalArgumentException("考勤记录不存在");
+    }
+    if (record.getWorkDate() != null && periodMapper.selectCount(Wrappers.lambdaQuery(HrAttendancePeriod.class)
+        .eq(HrAttendancePeriod::getOrgId, record.getOrgId())
+        .eq(HrAttendancePeriod::getPeriod, YearMonth.from(record.getWorkDate()).toString())) > 0) {
+      throw new IllegalArgumentException("该月考勤已核定锁定，请提交考勤调整单");
     }
     record.setReviewed(normalizeEnabledFlag(reviewed));
     record.setReviewedBy(currentStaffId);
