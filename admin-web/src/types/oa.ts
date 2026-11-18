@@ -322,8 +322,12 @@ export interface OaWorkReport {
   riskIssue?: string
   nextPlan?: string
   status?: string
-  reporterId?: number
+  reporterId?: number | string
   reporterName?: string
+  reviewerName?: string
+  reviewComment?: string
+  reviewScore?: number
+  reviewedAt?: string
 }
 
 export interface OaWorkReportSummary {

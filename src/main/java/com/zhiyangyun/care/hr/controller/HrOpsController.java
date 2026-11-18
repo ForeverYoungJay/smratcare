@@ -254,6 +254,7 @@ public class HrOpsController {
       result.add(row);
     }
     result.sort((a, b) -> String.valueOf(b.get("period")).compareTo(String.valueOf(a.get("period"))));
+    audit("VIEW_PAYSLIP", staffId, "员工查看本人工资单 " + result.size() + " 期");
     return Result.ok(result);
   }
 

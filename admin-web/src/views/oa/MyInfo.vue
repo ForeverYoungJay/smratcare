@@ -1,5 +1,6 @@
 <template>
-  <PageContainer title="我的信息" subTitle="个人在岗节奏、费用状态与绩效画像">
+  <PageContainer title="我的信息" subTitle="个人档案、账号安全，以及在岗节奏、费用状态与绩效画像">
+    <MyAccountPanel />
     <div class="my-info-shell">
       <section class="hero-panel">
         <div class="hero-copy">
@@ -176,6 +177,7 @@
 </template>
 
 <script setup lang="ts">
+import MyAccountPanel from './MyAccountPanel.vue'
 import { computed, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { getMyInfoSummary } from '../../api/oa'

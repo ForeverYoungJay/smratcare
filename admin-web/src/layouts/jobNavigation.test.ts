@@ -32,6 +32,7 @@ describe('two-level job navigation', () => {
       const office = menu.filter((item) => item.navSection === 'entry')
       expect(office.map((item) => item.label)).toEqual(['我的办公'])
       expect(menu[menu.length - 1].label).toBe('我的办公')
+      expect(office[0].children?.map((c) => c.label)).toEqual(['我的工作台', '我的待办', '考勤与请假', '我的日程', '工作总结', '我的工资与积分', '我的信息'])
       for (const personal of ['/workbench/todo', '/workbench/my-info']) {
         expect(paths(menu).filter((p) => p === personal)).toHaveLength(1)
         expect(paths(office)).toContain(personal)

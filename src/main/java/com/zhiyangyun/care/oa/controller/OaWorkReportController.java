@@ -6,11 +6,20 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.oa.entity.OaWorkReport;
+import com.zhiyangyun.care.auth.entity.StaffAccount;
+import com.zhiyangyun.care.auth.mapper.StaffMapper;
+import com.zhiyangyun.care.oa.entity.OaTask;
+import com.zhiyangyun.care.oa.entity.OaTodo;
+import com.zhiyangyun.care.oa.mapper.OaTaskMapper;
+import com.zhiyangyun.care.oa.mapper.OaTodoMapper;
+import com.zhiyangyun.care.schedule.entity.AttendanceRecord;
+import com.zhiyangyun.care.schedule.mapper.AttendanceRecordMapper;
 import com.zhiyangyun.care.oa.mapper.OaWorkReportMapper;
 import com.zhiyangyun.care.oa.model.OaWorkReportRequest;
 import com.zhiyangyun.care.oa.model.OaWorkReportSummaryResponse;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
+import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,9 +35,85 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/oa/report")
 public class OaWorkReportController {
   private final OaWorkReportMapper reportMapper;
+  private final StaffMapper staffMapper;
+  private final OaTaskMapper taskMapper;
+  private final OaTodoMapper todoMapper;
+  private final AttendanceRecordMapper attendanceMapper;
 
-  public OaWorkReportController(OaWorkReportMapper reportMapper) {
+  public OaWorkReportController(OaWorkReportMapper reportMapper, StaffMapper staffMapper, OaTaskMapper taskMapper,
+      OaTodoMapper todoMapper, AttendanceRecordMapper attendanceMapper) {
     this.reportMapper = reportMapper;
+    this.staffMapper = staffMapper;
+    this.taskMapper = taskMapper;
+    this.todoMapper = todoMapper;
+    this.attendanceMapper = attendanceMapper;
+  }
+
+  public record ReviewRequest(String comment, Integer score) {}
+
+  /** 主管点评：只能点评本部门已提交的总结（院长、管理员不限部门），不能点评自己的 */
+  @PutMapping("/{id}/review")
+  public Result<OaWorkReport> review(@PathVariable Long id, @RequestBody ReviewRequest request) {
+    if (!AuthContext.isMinisterOrHigher()) {
+      throw new org.springframework.security.access.AccessDeniedException("仅部门负责人及以上可点评");
+    }
+    Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    OaWorkReport report = reportMapper.selectOne(applyReportScope(Wrappers.lambdaQuery(OaWorkReport.class)
+        .eq(OaWorkReport::getId, id)
+        .eq(OaWorkReport::getIsDeleted, 0)
+        .eq(orgId != null, OaWorkReport::getOrgId, orgId)
+        .last("LIMIT 1"), staffId, false));
+    if (report == null) {
+      throw new IllegalArgumentException("总结不存在或不在您的点评范围内");
+    }
+    if (java.util.Objects.equals(report.getReporterId(), staffId)) {
+      throw new IllegalArgumentException("不能点评自己的总结");
+    }
+    if (!"SUBMITTED".equals(report.getStatus())) {
+      throw new IllegalArgumentException("只能点评已提交的总结");
+    }
+    if (request.comment() == null || request.comment().isBlank()) {
+      throw new IllegalArgumentException("请填写点评意见");
+    }
+    if (request.score() != null && (request.score() < 1 || request.score() > 5)) {
+      throw new IllegalArgumentException("评分为 1-5 分");
+    }
+    report.setReviewerId(staffId);
+    report.setReviewerName(AuthContext.getUsername());
+    report.setReviewComment(request.comment().trim());
+    report.setReviewScore(request.score());
+    report.setReviewedAt(java.time.LocalDateTime.now());
+    reportMapper.updateById(report);
+    return Result.ok(report);
+  }
+
+  /** 撰写草稿用的本人工作数据（只统计本人；只填入草稿，不会自动提交） */
+  @GetMapping("/draft-stats")
+  public Result<java.util.Map<String, Object>> draftStats(
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @RequestParam LocalDate startDate,
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @RequestParam LocalDate endDate) {
+    if (startDate.isAfter(endDate)) {
+      throw new IllegalArgumentException("开始日期不能晚于结束日期");
+    }
+    Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    java.time.LocalDateTime from = startDate.atStartOfDay();
+    java.time.LocalDateTime to = endDate.plusDays(1).atStartOfDay();
+    java.util.Map<String, Object> stats = new java.util.LinkedHashMap<>();
+    stats.put("tasksDone", taskMapper.selectCount(Wrappers.lambdaQuery(OaTask.class)
+        .eq(OaTask::getIsDeleted, 0).eq(orgId != null, OaTask::getOrgId, orgId)
+        .eq(OaTask::getAssigneeId, staffId).eq(OaTask::getStatus, "DONE")
+        .ge(OaTask::getUpdateTime, from).lt(OaTask::getUpdateTime, to)));
+    stats.put("todosDone", todoMapper.selectCount(Wrappers.lambdaQuery(OaTodo.class)
+        .eq(OaTodo::getIsDeleted, 0).eq(orgId != null, OaTodo::getOrgId, orgId)
+        .eq(OaTodo::getAssigneeId, staffId).eq(OaTodo::getStatus, "DONE")
+        .ge(OaTodo::getUpdateTime, from).lt(OaTodo::getUpdateTime, to)));
+    stats.put("attendanceDays", attendanceMapper.selectCount(Wrappers.lambdaQuery(AttendanceRecord.class)
+        .eq(AttendanceRecord::getIsDeleted, 0).eq(orgId != null, AttendanceRecord::getOrgId, orgId)
+        .eq(AttendanceRecord::getStaffId, staffId).isNotNull(AttendanceRecord::getCheckInTime)
+        .ge(AttendanceRecord::getWorkDate, startDate).le(AttendanceRecord::getWorkDate, endDate)));
+    return Result.ok(stats);
   }
 
   @GetMapping("/page")
@@ -225,6 +310,7 @@ public class OaWorkReportController {
     if (report == null) {
       return Result.ok(null);
     }
+    requireNotReviewed(report);
     report.setTitle(request.getTitle());
     report.setReportType(normalizeReportType(request.getReportType()));
     report.setReportDate(request.getReportDate() == null ? report.getReportDate() : request.getReportDate());
@@ -257,6 +343,7 @@ public class OaWorkReportController {
   public Result<Void> delete(@PathVariable Long id) {
     OaWorkReport report = findAccessibleReport(id);
     if (report != null) {
+      requireNotReviewed(report);
       report.setIsDeleted(1);
       reportMapper.updateById(report);
     }
@@ -316,12 +403,31 @@ public class OaWorkReportController {
         .le(endDate != null, OaWorkReport::getReportDate, endDate), staffId, mineOnly);
   }
 
+  private void requireNotReviewed(OaWorkReport report) {
+    if (report.getReviewedAt() != null) {
+      throw new IllegalArgumentException("总结已被点评，不能再修改或删除");
+    }
+  }
+
+  /**
+   * 数据范围由服务端身份决定：普通员工无论 mineOnly 传什么都只看本人；
+   * 部门负责人可看本部门；院长与管理员可看全院。
+   */
   private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaWorkReport> applyReportScope(
       com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaWorkReport> wrapper,
       Long staffId,
       boolean mineOnly) {
-    if (!mineOnly) {
-      return wrapper;
+    if (!mineOnly && AuthContext.isMinisterOrHigher()) {
+      if (AuthContext.isAdmin() || AuthContext.hasRole("DIRECTOR")) {
+        return wrapper;
+      }
+      StaffAccount me = staffId == null ? null : staffMapper.selectById(staffId);
+      if (me != null && me.getDepartmentId() != null) {
+        List<Long> team = staffMapper.selectList(Wrappers.lambdaQuery(StaffAccount.class)
+                .eq(StaffAccount::getIsDeleted, 0).eq(StaffAccount::getDepartmentId, me.getDepartmentId()))
+            .stream().map(StaffAccount::getId).toList();
+        return wrapper.in(OaWorkReport::getReporterId, team);
+      }
     }
     if (staffId == null) {
       return wrapper.eq(OaWorkReport::getId, -1L);

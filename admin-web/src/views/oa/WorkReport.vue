@@ -9,6 +9,10 @@
       <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
       <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
     </template>
+    <a-radio-group v-if="isManager" v-model:value="viewScope" style="margin-bottom: 12px" @change="onScopeChange">
+      <a-radio-button value="mine">我的总结</a-radio-button>
+      <a-radio-button value="team">团队总结（点评）</a-radio-button>
+    </a-radio-group>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="类型">
         <a-select v-model:value="query.reportType" :options="reportTypeOptions" allow-clear style="width: 160px" />
@@ -38,9 +42,17 @@
           <a-tag color="blue">{{ reportTypeLabel(record.reportType) }}</a-tag>
         </template>
         <template v-else-if="column.key === 'status'">
-          <a-tag :color="record.status === 'SUBMITTED' ? 'green' : 'orange'">
-            {{ record.status === 'SUBMITTED' ? '已提交' : '草稿' }}
+          <a-tag :color="record.reviewedAt ? 'purple' : record.status === 'SUBMITTED' ? 'green' : 'orange'">
+            {{ record.reviewedAt ? '已点评' : record.status === 'SUBMITTED' ? '已提交' : '草稿' }}
           </a-tag>
+        </template>
+        <template v-else-if="column.key === 'review'">
+          <template v-if="record.reviewedAt">
+            <a-rate v-if="record.reviewScore" :value="record.reviewScore" disabled style="font-size: 12px" />
+            <div class="review-text">{{ record.reviewerName }}：{{ record.reviewComment }}</div>
+          </template>
+          <a v-else-if="canReview(record)" @click="openReview(record)">点评</a>
+          <span v-else class="review-text">-</span>
         </template>
       </template>
     </DataTable>
@@ -75,7 +87,11 @@
           <a-textarea v-model:value="form.contentSummary" :rows="2" />
         </a-form-item>
         <a-form-item label="已完成工作">
-          <a-textarea v-model:value="form.completedWork" :rows="3" />
+          <template #extra>
+            <a-button size="small" :loading="drafting" @click="fillDraft">用本期工作数据生成草稿</a-button>
+            <span class="review-text">只统计本人数据，填入后可修改，不会自动提交</span>
+          </template>
+          <a-textarea v-model:value="form.completedWork" :rows="4" />
         </a-form-item>
         <a-form-item label="问题与风险">
           <a-textarea v-model:value="form.riskIssue" :rows="3" />
@@ -97,6 +113,14 @@
         </a-row>
       </a-form>
     </a-modal>
+
+    <a-modal v-model:open="reviewOpen" :title="`点评 · ${reviewTarget?.title || ''}`" :confirm-loading="saving" @ok="submitReview">
+      <p class="review-text">{{ reviewTarget?.reporterName }} · {{ reviewTarget?.completedWork || reviewTarget?.contentSummary || '' }}</p>
+      <a-form layout="vertical">
+        <a-form-item label="评分"><a-rate v-model:value="reviewForm.score" /></a-form-item>
+        <a-form-item label="点评意见" required><a-textarea v-model:value="reviewForm.comment" :rows="3" /></a-form-item>
+      </a-form>
+    </a-modal>
   </PageContainer>
 </template>
 
@@ -107,7 +131,10 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
-import { getOaWorkReportPage, createOaWorkReport, updateOaWorkReport, submitOaWorkReport, deleteOaWorkReport } from '../../api/oa'
+import { getOaWorkReportPage, createOaWorkReport, updateOaWorkReport, submitOaWorkReport, deleteOaWorkReport, getOaWorkReportDraftStats, reviewOaWorkReport } from '../../api/oa'
+import { useUserStore } from '../../stores/user'
+import { hasMinisterOrHigher } from '../../utils/roleAccess'
+import { defaultReportPeriod, draftFromStats } from './myOffice'
 import type { OaWorkReport, PageResult } from '../../types'
 
 const loading = ref(false)
@@ -127,8 +154,61 @@ const columns = [
   { title: '类型', dataIndex: 'reportType', key: 'reportType', width: 100 },
   { title: '总结日期', dataIndex: 'reportDate', key: 'reportDate', width: 120 },
   { title: '总结人', dataIndex: 'reporterName', key: 'reporterName', width: 120 },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 100 }
+  { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
+  { title: '主管点评', key: 'review', width: 240 }
 ]
+const userStore = useUserStore()
+const myStaffId = String(userStore.staffInfo?.id || '')
+const isManager = hasMinisterOrHigher(userStore.roles || [])
+const viewScope = ref<'mine' | 'team'>('mine')
+const drafting = ref(false)
+const reviewOpen = ref(false)
+const reviewTarget = ref<OaWorkReport>()
+const reviewForm = reactive({ comment: '', score: 4 })
+
+const canReview = (record: OaWorkReport) => viewScope.value === 'team' && record.status === 'SUBMITTED' && String(record.reporterId) !== myStaffId
+
+function onScopeChange() {
+  query.pageNo = 1
+  pagination.current = 1
+  fetchData()
+}
+
+function openReview(record: OaWorkReport) {
+  reviewTarget.value = record
+  reviewForm.comment = ''
+  reviewForm.score = 4
+  reviewOpen.value = true
+}
+
+async function submitReview() {
+  if (!reviewForm.comment.trim()) return message.warning('请填写点评意见')
+  saving.value = true
+  try {
+    await reviewOaWorkReport(reviewTarget.value!.id, { comment: reviewForm.comment.trim(), score: reviewForm.score || undefined })
+    message.success('已点评')
+    reviewOpen.value = false
+    fetchData()
+  } finally {
+    saving.value = false
+  }
+}
+
+/** 用本人本期数据生成草稿：只追加到「已完成工作」，由员工核对后自己提交 */
+async function fillDraft() {
+  const [start, end] = form.periodRange?.[0] && form.periodRange?.[1]
+    ? [dayjs(form.periodRange[0]).format('YYYY-MM-DD'), dayjs(form.periodRange[1]).format('YYYY-MM-DD')]
+    : defaultReportPeriod(form.reportType)
+  drafting.value = true
+  try {
+    const stats = await getOaWorkReportDraftStats({ startDate: start, endDate: end })
+    const draft = draftFromStats(stats, start, end)
+    form.completedWork = form.completedWork ? `${form.completedWork}\n${draft}` : draft
+    if (!form.periodRange) form.periodRange = [dayjs(start), dayjs(end)]
+  } finally {
+    drafting.value = false
+  }
+}
 
 const reportTypeOptions = [
   { label: '日总结', value: 'DAY' },
@@ -182,7 +262,7 @@ async function fetchData() {
       pageSize: query.pageSize,
       reportType: query.reportType,
       status: query.status,
-      mineOnly: true,
+      mineOnly: viewScope.value === 'mine',
       startDate: dateRange.value?.[0] ? dayjs(dateRange.value[0]).format('YYYY-MM-DD') : undefined,
       endDate: dateRange.value?.[1] ? dayjs(dateRange.value[1]).format('YYYY-MM-DD') : undefined
     })
@@ -338,6 +418,7 @@ fetchData()
 </script>
 
 <style scoped>
+.review-text { color: #6b7a74; font-size: 12px; }
 .selection-tip {
   color: var(--muted);
   font-size: 12px;

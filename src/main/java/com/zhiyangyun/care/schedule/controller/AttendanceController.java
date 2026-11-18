@@ -52,7 +52,10 @@ public class AttendanceController {
       @RequestParam(required = false) Long staffId,
       @RequestParam(required = false) String month) {
     YearMonth targetMonth = month == null || month.isBlank() ? YearMonth.now() : YearMonth.parse(month);
-    return Result.ok(attendanceService.overview(AuthContext.getOrgId(), AuthContext.getStaffId(), staffId, targetMonth));
+    // 只有人事部长、院长、管理员可以查看他人考勤；其他人传什么 staffId 都只看本人
+    boolean canViewOthers = AuthContext.isAdmin() || AuthContext.hasRole("HR_MINISTER") || AuthContext.hasRole("DIRECTOR");
+    Long target = canViewOthers ? staffId : null;
+    return Result.ok(attendanceService.overview(AuthContext.getOrgId(), AuthContext.getStaffId(), target, targetMonth));
   }
 
   @PostMapping("/punch")

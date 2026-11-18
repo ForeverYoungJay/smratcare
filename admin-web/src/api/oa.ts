@@ -563,6 +563,16 @@ export function getOaWorkReportPage(params: any) {
   return fetchPage<OaWorkReport>('/api/oa/report/page', params)
 }
 
+/** 主管点评（只能点评本部门已提交的、非本人的总结） */
+export function reviewOaWorkReport(id: string | number, data: { comment: string; score?: number }) {
+  return request.put<OaWorkReport>(`/api/oa/report/${id}/review`, data)
+}
+
+/** 本人在某周期的工作数据，用于生成可编辑草稿 */
+export function getOaWorkReportDraftStats(params: { startDate: string; endDate: string }) {
+  return request.get<{ tasksDone: number | string; todosDone: number | string; attendanceDays: number | string }>('/api/oa/report/draft-stats', { params })
+}
+
 export function getOaWorkReportSummary(params: any) {
   return request.get<OaWorkReportSummary>('/api/oa/report/summary', { params })
 }

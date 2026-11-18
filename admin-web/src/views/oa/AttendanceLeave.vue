@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="考勤与行政日程一览" subTitle="我的考勤、请假联动日程、院长查看员工打卡明细">
+  <PageContainer title="考勤与请假" subTitle="我的打卡、考勤月报与请假/加班/调班申请；院长可切换员工查看">
     <a-card class="attendance-hero" :bordered="false">
       <div class="hero-head">
         <div>
@@ -55,6 +55,8 @@
         请假审批通过后会自动写入本页日程；午休中显示蓝色状态；院长可切换员工查看上下班/外出时长并打印。
       </div>
     </a-card>
+
+    <MyApprovalStrip :apply-types="[{ type: 'LEAVE', label: '请假申请' }, { type: 'OVERTIME', label: '加班申请' }, { type: 'SHIFT_CHANGE', label: '调班申请' }]" />
 
     <a-row :gutter="16" class="metrics-row business-stat-strip">
       <a-col :xs="24" :sm="12" :lg="6">
@@ -202,6 +204,7 @@
 </template>
 
 <script setup lang="ts">
+import MyApprovalStrip from './MyApprovalStrip.vue'
 import ActionToolbar from "../../components/ActionToolbar.vue"
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'

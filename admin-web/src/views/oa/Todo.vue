@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="待办事项" subTitle="个人待办管理">
+  <PageContainer title="我的待办" subTitle="个人待办、待我审批与我发起的申请；超时事项优先处理">
     <template #meta>
       <span class="soft-pill">总待办 {{ summary.totalCount || 0 }}</span>
       <span class="selection-pill">已勾选 {{ selectedRowKeys.length }} 条</span>
@@ -7,6 +7,7 @@
       <span v-for="tag in activeFilterTags" :key="tag" class="selection-pill">{{ tag }}</span>
     </template>
 
+    <MyApprovalStrip />
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="标题/内容/负责人" allow-clear style="width: 240px" />
@@ -293,6 +294,7 @@
 </template>
 
 <script setup lang="ts">
+import MyApprovalStrip from './MyApprovalStrip.vue'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

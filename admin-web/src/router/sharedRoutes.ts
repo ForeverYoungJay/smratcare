@@ -50,7 +50,7 @@ export const sharedRoutes: RouteRecordRaw[] = [
             path: 'attendance',
             name: 'WorkbenchAttendance',
             component: () => import('../views/oa/AttendanceLeave.vue'),
-            meta: { title: '我的考勤与请假' }
+            meta: { title: '考勤与请假' }
           },
           {
             path: 'schedule',
@@ -62,7 +62,7 @@ export const sharedRoutes: RouteRecordRaw[] = [
             path: 'reports',
             name: 'WorkbenchReports',
             component: () => import('../views/oa/WorkReport.vue'),
-            meta: { title: '我的总结' }
+            meta: { title: '工作总结' }
           },
           {
             path: 'approvals',
