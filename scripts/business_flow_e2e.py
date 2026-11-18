@@ -9,6 +9,7 @@
 import json
 import sys
 import time
+import urllib.parse
 import urllib.request
 from datetime import date, datetime, timedelta
 
@@ -19,11 +20,11 @@ TAG = '流程测试' + datetime.now().strftime('%H%M%S')
 _tokens = {}
 
 
-def call(user, method, path, body=None):
+def call(user, method, path, body=None, allow=()):
     if user not in _tokens:
         _tokens[user] = None
         _tokens[user] = call(user, 'POST', '/api/auth/login', {'username': user, 'password': '123456'})['token']
-    req = urllib.request.Request(BASE + path, method=method, data=None if body is None else json.dumps(body).encode(),
+    req = urllib.request.Request(BASE + urllib.parse.quote(path, safe='/?=&:%-_.~'), method=method, data=None if body is None else json.dumps(body).encode(),
                                  headers={'Content-Type': 'application/json'})
     if _tokens[user]:
         req.add_header('Authorization', 'Bearer ' + _tokens[user])
@@ -35,6 +36,8 @@ def call(user, method, path, body=None):
     data = json.loads(raw)
     if isinstance(data, dict) and 'code' in data and 'data' in data:
         if data['code'] != 0:
+            if any(a in str(data.get('message')) for a in allow):
+                return {'_skipped': data.get('message')}
             raise SystemExit(f'✗ {user} {method} {path}\n  {data.get("message")}')
         return data['data']
     return data
@@ -166,6 +169,10 @@ def main():
     bed_after = next(b for b in call('marketing_emp', 'GET', '/api/bed/list') if str(b['id']) == str(bed['id']))
     step('结果：长者状态（3=已退住）', final.get('status'))
     step('结果：床位是否释放', not bed_after.get('elderId'))
+    ended = call('marketing_minister', 'GET', f'/api/crm/contracts/{contract_id}')
+    step('结果：合同状态', (ended.get('status'), ended.get('contractStatus')))
+    if ended.get('status') != 'TERMINATED':
+        raise SystemExit('✗ 退住后合同没有失效')
     print(f'\n全流程通过。测试数据标记：{TAG}，elderId={elder_id} leadId={lead_id} contractId={contract_id}')
 
 
