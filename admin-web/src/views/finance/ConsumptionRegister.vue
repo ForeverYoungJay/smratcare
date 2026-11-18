@@ -13,6 +13,9 @@
       <a-form-item label="结束日期">
         <a-date-picker v-model:value="query.to" />
       </a-form-item>
+      <a-form-item label="来源 / 核查">
+        <a-select v-model:value="query.moduleKey" :options="moduleOptions" style="width: 160px" allow-clear placeholder="全部来源" />
+      </a-form-item>
       <a-form-item label="类别">
         <a-select v-model:value="query.category" :options="categoryOptions" style="width: 180px" allow-clear />
       </a-form-item>
@@ -98,6 +101,8 @@ const query = reactive({
   from: undefined as any,
   to: undefined as any,
   category: '',
+  // 原「医护费用 / 餐饮扣费 / 后勤收费 / 医护费用异常」页面合并为这里的来源筛选，后端按 moduleKey 过滤
+  moduleKey: (typeof route.query.moduleKey === 'string' ? route.query.moduleKey : undefined) as string | undefined,
   riskLevel: undefined as 'HIGH' | 'MEDIUM' | 'LOW' | undefined,
   keyword: '',
   elderId: normalizeResidentId(route.query as Record<string, unknown>) as Id | undefined
@@ -128,6 +133,12 @@ const sourceTypeOptions = [
   { label: '商城', value: 'STORE' },
   { label: '医护', value: 'MEDICAL' },
   { label: '账单收款', value: 'BILL_PAYMENT' }
+]
+const moduleOptions = [
+  { label: '医护费用', value: 'MEDICAL_FLOW' },
+  { label: '餐饮扣费', value: 'DINING_FLOW' },
+  { label: '物资/后勤收费', value: 'LOGISTICS_FLOW' },
+  { label: '医护费用异常（重复/缺来源）', value: 'MEDICAL_ERRORS' }
 ]
 const categoryOptions = [
   { label: '餐饮消费', value: 'DINING' },
@@ -161,7 +172,8 @@ async function fetchData() {
       from: query.from ? dayjs(query.from).format('YYYY-MM-DD') : undefined,
       to: query.to ? dayjs(query.to).format('YYYY-MM-DD') : undefined,
       category: query.category || undefined,
-      keyword: query.keyword || undefined
+      keyword: query.keyword || undefined,
+      moduleKey: query.moduleKey || undefined
     })
     rows.value = res.list
     pagination.total = res.total || res.list.length
@@ -175,6 +187,7 @@ function onReset() {
   query.from = undefined
   query.to = undefined
   query.category = ''
+  query.moduleKey = undefined
   query.riskLevel = undefined
   query.keyword = ''
   query.elderId = undefined

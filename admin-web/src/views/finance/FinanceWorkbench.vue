@@ -38,6 +38,56 @@
       </section>
 
       <section class="rm-card">
+        <div class="rm-card__head"><span class="rm-card__title">近 6 个月收款与应收趋势</span><a class="rm-link" @click="go('/finance/reports/overall')">经营分析 →</a></div>
+        <TrendChart v-if="trend.length" :labels="trend.map((p) => p.label)" :series="[
+          { name: '实收金额', color: '#1f9d74', values: trend.map((p) => p.received) },
+          { name: '账单应收', color: '#7aa7c7', values: trend.map((p) => p.billed) }]" />
+        <div v-else class="fw-empty">暂无趋势数据</div>
+        <p class="fw-muted">实收按收款时间、应收按账单月汇总，两者口径不同，不能直接相减作为欠费。</p>
+      </section>
+    </div>
+
+    <div class="rm-split fw-grid">
+      <section class="rm-card">
+        <div class="rm-card__head"><span class="rm-card__title">最近收款记录</span><a class="rm-link" @click="go('/finance/payments/records')">前往收款流水 →</a></div>
+        <a-table size="small" :data-source="payments" :columns="columns" :pagination="false" :loading="paymentLoading" row-key="id">
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'paidAt'">{{ record.paidAt ? dayjs(record.paidAt).format('MM-DD HH:mm') : '--' }}</template>
+            <template v-else-if="column.key === 'elder'">{{ record.elderName || '--' }}<small v-if="record.billMonth" class="fw-sub"> {{ record.billMonth }}</small></template>
+            <template v-else-if="column.key === 'amount'">{{ money(record.amount) }}</template>
+            <template v-else-if="column.key === 'payMethod'">{{ METHOD[record.payMethod] || record.payMethod }}</template>
+            <template v-else-if="column.key === 'bill'"><a class="rm-link" @click="go(`/finance/bill/${record.billMonthlyId}`)">查看账单</a></template>
+          </template>
+        </a-table>
+      </section>
+
+      <section class="rm-card">
+        <div class="rm-card__head"><span class="rm-card__title">欠费账龄分布</span><a class="rm-link" @click="go('/finance/bills/follow-up')">欠费与催缴 →</a></div>
+        <div v-if="!aging.length" class="fw-empty">暂无欠费数据</div>
+        <div v-else class="fw-bars">
+          <div v-for="row in aging" :key="row.key" class="fw-bar fw-bar--aging">
+            <span>{{ row.label }}</span>
+            <a-progress :percent="row.percent" :show-info="false" :stroke-color="AGING_COLOR[row.key]" size="small" />
+            <em>{{ money(row.amount) }}</em>
+          </div>
+        </div>
+        <p class="fw-muted">统计口径：未结清账单以账单月最后一天为应缴日计算逾期天数；当月账单计为未到期。</p>
+      </section>
+    </div>
+
+    <div class="rm-split fw-grid">
+      <section class="rm-card">
+        <div class="rm-card__head"><span class="rm-card__title">快捷办理</span></div>
+        <div class="fw-quick">
+          <button v-for="item in QUICK" :key="item.label" type="button" @click="go(item.path)"><component :is="item.icon" /><span>{{ item.label }}</span></button>
+        </div>
+        <div class="fw-terms">
+          <div><b>应收账单</b><span>已确认收费义务，不等于实际收款</span></div>
+          <div><b>预收服务费</b><span>尚未提供服务的预收款，单独跟踪</span></div>
+          <div><b>押金</b><span>受用途与存管约束，不作为通用余额</span></div>
+        </div>
+      </section>
+      <section class="rm-card">
         <div class="rm-card__head"><span class="rm-card__title">本月收入结构</span><a class="rm-link" @click="go('/finance/reports/revenue-structure')">经营分析 →</a></div>
         <div v-if="!revenue.length" class="fw-empty">本月暂无收入数据</div>
         <div v-else class="fw-bars">
@@ -50,32 +100,6 @@
         <p class="fw-muted">本月收入合计 {{ money(overview?.revenueStructure?.monthRevenueTotal) }}；收入确认不等于现金到账。</p>
       </section>
     </div>
-
-    <div class="rm-split fw-grid">
-      <section class="rm-card">
-        <div class="rm-card__head"><span class="rm-card__title">最近收款记录</span><a class="rm-link" @click="go('/finance/payments/records')">前往收款流水 →</a></div>
-        <a-table size="small" :data-source="payments" :columns="columns" :pagination="false" :loading="paymentLoading" row-key="id">
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'paidAt'">{{ record.paidAt ? dayjs(record.paidAt).format('MM-DD HH:mm') : '--' }}</template>
-            <template v-else-if="column.key === 'amount'">{{ money(record.amount) }}</template>
-            <template v-else-if="column.key === 'payMethod'">{{ METHOD[record.payMethod] || record.payMethod }}</template>
-            <template v-else-if="column.key === 'bill'"><a class="rm-link" @click="go(`/finance/bill/${record.billMonthlyId}`)">查看账单</a></template>
-          </template>
-        </a-table>
-      </section>
-
-      <section class="rm-card">
-        <div class="rm-card__head"><span class="rm-card__title">快捷办理</span></div>
-        <div class="fw-quick">
-          <button v-for="item in QUICK" :key="item.label" type="button" @click="go(item.path)"><component :is="item.icon" /><span>{{ item.label }}</span></button>
-        </div>
-        <div class="fw-terms">
-          <div><b>应收账单</b><span>已确认收费义务，不等于实际收款</span></div>
-          <div><b>预收服务费</b><span>尚未提供服务的预收款，单独跟踪</span></div>
-          <div><b>押金</b><span>受用途与存管约束，不作为通用余额</span></div>
-        </div>
-      </section>
-    </div>
   </PageContainer>
 </template>
 
@@ -85,13 +109,15 @@ import dayjs from 'dayjs'
 import { useRouter } from 'vue-router'
 import { AlertOutlined, AuditOutlined, FileTextOutlined, LogoutOutlined, SafetyCertificateOutlined, TeamOutlined, WalletOutlined } from '@ant-design/icons-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { getFinanceWorkbenchOverview, getPaymentRecordPage } from '../../api/finance'
+import { getFinanceArrearsAging, getFinanceMonthlyRevenue, getFinanceWorkbenchOverview, getPaymentRecordPage } from '../../api/finance'
+import TrendChart from '../marketing/center/TrendChart.vue'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
-import type { FinanceWorkbenchOverview, PaymentRecordItem } from '../../types'
-import { financeTodos } from './workbenchTodos'
+import type { FinanceArrearsAgingItem, FinanceReportMonthlyItem, FinanceWorkbenchOverview, PaymentRecordItem } from '../../types'
+import { agingRows, financeTodos } from './workbenchTodos'
 import '../elder/residentUi.css'
 
 const METHOD: Record<string, string> = { CASH: '现金', CARD: '刷卡', BANK: '银行转账', WECHAT_OFFLINE: '微信（线下）', ALIPAY: '支付宝', WECHAT: '微信', QR_CODE: '扫码' }
+const AGING_COLOR: Record<string, string> = { CURRENT: '#1f9d74', D30: '#e3b55c', D60: '#e09a3e', D90: '#e07a6a', D90_PLUS: '#d9534f' }
 const QUICK = [
   { label: '收银开单', icon: WalletOutlined, path: '/finance/payments/cashier-desk' },
   { label: '票据管理', icon: FileTextOutlined, path: '/finance/fees/payment-and-invoice' },
@@ -100,6 +126,7 @@ const QUICK = [
 ]
 const columns = [
   { title: '时间', key: 'paidAt', width: 110 },
+  { title: '长者', key: 'elder' },
   { title: '金额', key: 'amount' },
   { title: '渠道', key: 'payMethod' },
   { title: '登记人', dataIndex: 'operatorStaffName' },
@@ -109,6 +136,8 @@ const columns = [
 const router = useRouter()
 const overview = ref<FinanceWorkbenchOverview | null>(null)
 const payments = ref<PaymentRecordItem[]>([])
+const monthly = ref<FinanceReportMonthlyItem[]>([])
+const agingRaw = ref<FinanceArrearsAgingItem[]>([])
 const loading = ref(false)
 const paymentLoading = ref(false)
 const errorMessage = ref('')
@@ -132,6 +161,9 @@ const todos = computed(() => financeTodos(overview.value))
 const revenue = computed(() => (overview.value?.revenueStructure?.categories || []).map((c) => ({
   ...c, percent: Math.round(n(c.ratio) <= 1 ? n(c.ratio) * 100 : n(c.ratio))
 })))
+
+const trend = computed(() => monthly.value.map((m) => ({ label: dayjs(`${m.month}-01`).format('M月'), received: n(m.receivedAmount), billed: n(m.billedAmount) })))
+const aging = computed(() => agingRows(agingRaw.value))
 
 function go(path: string) { router.push(path) }
 
@@ -157,6 +189,10 @@ async function load() {
     errorMessage.value = error?.message || '财务工作台加载失败，请重试'
   } finally { loading.value = false }
   loadPayments()
+  const quiet = { silent403: true }
+  const [m, a] = await Promise.allSettled([getFinanceMonthlyRevenue({ months: 6 }), getFinanceArrearsAging(quiet)])
+  monthly.value = m.status === 'fulfilled' ? m.value || [] : []
+  agingRaw.value = a.status === 'fulfilled' ? a.value || [] : []
 }
 onMounted(load)
 useLiveSyncRefresh({ topics: ['finance'], refresh: load, debounceMs: 900 })
@@ -173,6 +209,8 @@ useLiveSyncRefresh({ topics: ['finance'], refresh: load, debounceMs: 900 })
 .fw-dot--danger { background: #d9534f; }
 .fw-bars { display: grid; gap: 10px; }
 .fw-bar { display: grid; grid-template-columns: 80px 1fr 100px; align-items: center; gap: 8px; font-size: 13px; }
+.fw-bar--aging { grid-template-columns: 96px 1fr 100px; }
+.fw-sub { color: #8a968f; }
 .fw-bar em { color: #6b7a74; font-style: normal; text-align: right; }
 .fw-quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .fw-quick button { display: grid; justify-items: center; gap: 8px; padding: 18px 4px; border: 1px solid #e3ebe6; border-radius: 10px; background: #fff; color: #1f6f55; font-size: 22px; cursor: pointer; }

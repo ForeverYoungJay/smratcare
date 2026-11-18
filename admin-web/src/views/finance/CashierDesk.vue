@@ -46,6 +46,7 @@
             <a-button type="primary" @click="go('/finance/payments/register?from=cashier_desk')">收费登记</a-button>
             <a-button @click="go('/finance/fees/payment-and-invoice?from=cashier_desk')">票据处理</a-button>
             <a-button @click="go('/finance/payments/refund-reversal?from=cashier_desk')">退款/冲正</a-button>
+            <a-button @click="go('/finance/payments/shift-close')">日结交班</a-button>
             <a-button @click="printShiftSummary">打印交班单</a-button>
           </div>
         </div>
@@ -212,6 +213,12 @@
         </section>
       </StatefulBlock>
     </div>
+    <a-drawer :open="panel === 'records'" title="全部收款流水" width="min(1100px, 96vw)" destroy-on-close @close="close('date', 'method')">
+      <PaymentRecords />
+    </a-drawer>
+    <a-drawer :open="panel === 'shift'" title="日结与交班" width="min(1100px, 96vw)" destroy-on-close @close="close('date')">
+      <ShiftClose />
+    </a-drawer>
   </PageContainer>
 </template>
 
@@ -228,8 +235,12 @@ import StatefulBlock from '../../components/StatefulBlock.vue'
 import { exportFinanceInvoiceReceiptCsv, getFinanceInvoiceReceiptPage, getFinancePaymentAdjustmentPage, getPaymentRecordPage } from '../../api/finance'
 import type { FinanceInvoiceReceiptItem, FinancePaymentAdjustmentItem, PageResult, PaymentRecordItem } from '../../types'
 import { printTableReport } from '../../utils/print'
+import PaymentRecords from './PaymentRecords.vue'
+import ShiftClose from './ShiftClose.vue'
+import { usePanelQuery } from './usePanelQuery'
 
 const router = useRouter()
+const { panel, close } = usePanelQuery()
 const loading = ref(false)
 const errorMessage = ref('')
 const payments = ref<PaymentRecordItem[]>([])

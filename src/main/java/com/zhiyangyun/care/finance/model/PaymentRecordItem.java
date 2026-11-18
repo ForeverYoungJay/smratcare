@@ -8,6 +8,9 @@ import lombok.Data;
 public class PaymentRecordItem {
   private Long id;
   private Long billMonthlyId;
+  private Long elderId;
+  private String elderName;
+  private String billMonth;
   private BigDecimal amount;
   private BigDecimal payableAmount;
   private BigDecimal ltciDeductAmount;

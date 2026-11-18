@@ -86,9 +86,18 @@ public class FireSafetyRecordController {
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
       @RequestParam(required = false) LocalDateTime checkTimeStart,
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-      @RequestParam(required = false) LocalDateTime checkTimeEnd) {
+      @RequestParam(required = false) LocalDateTime checkTimeEnd,
+      @RequestParam(required = false) Boolean issueOnly) {
     Long orgId = requireOrgId();
-    var wrapper = buildQueryWrapper(orgId, keyword, recordType, inspectorName, status, checkTimeStart, checkTimeEnd);
+    // status=ACTIVE 表示未关闭（OPEN/RUNNING）；issueOnly 只看登记了问题的记录，供隐患整改清单跨类型查询
+    boolean activeOnly = status != null && "ACTIVE".equalsIgnoreCase(status.trim());
+    var wrapper = buildQueryWrapper(orgId, keyword, recordType, inspectorName, activeOnly ? null : status, checkTimeStart, checkTimeEnd);
+    if (activeOnly) {
+      wrapper.in(FireSafetyRecord::getStatus, ACTIVE_STATUSES);
+    }
+    if (Boolean.TRUE.equals(issueOnly)) {
+      wrapper.isNotNull(FireSafetyRecord::getIssueDescription).ne(FireSafetyRecord::getIssueDescription, "");
+    }
     wrapper.orderByDesc(FireSafetyRecord::getCheckTime);
     IPage<FireSafetyRecord> page = recordMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
     hydrateRecords(page.getRecords());
@@ -102,6 +111,7 @@ public class FireSafetyRecordController {
     record.setTenantId(orgId);
     record.setOrgId(orgId);
     applyRequest(record, request);
+    if ("CLOSED".equals(record.getStatus())) requireCloseAllowed(record, AuthContext.isMinisterOrHigher());
     record.setCreatedBy(AuthContext.getStaffId());
     recordMapper.insert(record);
     hydrateRecord(record);
@@ -111,15 +121,21 @@ public class FireSafetyRecordController {
   @PutMapping("/{id}")
   public Result<FireSafetyRecord> update(@PathVariable Long id, @Valid @RequestBody FireSafetyRecordRequest request) {
     FireSafetyRecord existing = findRequiredRecord(id);
+    boolean wasClosed = "CLOSED".equals(existing.getStatus());
     applyRequest(existing, request);
+    // 通过普通保存把状态改成「已关闭」也要走同样的关闭规则
+    if (!wasClosed && "CLOSED".equals(existing.getStatus())) requireCloseAllowed(existing, AuthContext.isMinisterOrHigher());
     recordMapper.updateById(existing);
     hydrateRecord(existing);
     return Result.ok(existing);
   }
 
+  /** 关闭（复核通过）只给消防主管与管理层；一线人员登记和处置，不自行关闭 */
   @PutMapping("/{id}/close")
+  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<FireSafetyRecord> close(@PathVariable Long id) {
     FireSafetyRecord existing = findRequiredRecord(id);
+    requireHandledBeforeClose(existing);
     existing.setStatus("CLOSED");
     existing.setUpdateTime(LocalDateTime.now());
     recordMapper.updateById(existing);
@@ -704,6 +720,24 @@ public class FireSafetyRecordController {
       throw new IllegalArgumentException("recordType 不能为空");
     }
     return normalized;
+  }
+
+  /** 登记了问题（隐患/故障）的记录必须先写明处置措施，不能直接点「关闭」 */
+  static void requireHandledBeforeClose(FireSafetyRecord record) {
+    boolean hasIssue = record.getIssueDescription() != null && !record.getIssueDescription().isBlank();
+    boolean handled = record.getActionTaken() != null && !record.getActionTaken().isBlank();
+    if (hasIssue && !handled) {
+      throw new IllegalArgumentException("该记录登记了问题，请先填写处置措施和整改结果，再关闭");
+    }
+  }
+
+  /** 登记了问题的记录：须先写处置措施，且只能由主管/管理层关闭；没有问题的例行记录不受限 */
+  static void requireCloseAllowed(FireSafetyRecord record, boolean manager) {
+    requireHandledBeforeClose(record);
+    boolean hasIssue = record.getIssueDescription() != null && !record.getIssueDescription().isBlank();
+    if (hasIssue && !manager) {
+      throw new IllegalArgumentException("登记了问题的记录需由消防主管复核后关闭");
+    }
   }
 
   private String normalizeStatus(String status) {

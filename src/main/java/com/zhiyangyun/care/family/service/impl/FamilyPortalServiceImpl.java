@@ -21,6 +21,7 @@ import com.zhiyangyun.care.elder.entity.lifecycle.ElderMedicalOutingRecord;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderOutingRecord;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.ElderFamilyMapper;
+import com.zhiyangyun.care.elder.support.FamilyAuthorization;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.FamilyUserMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
@@ -466,6 +467,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
             .eq(OaNotice::getIsDeleted, 0)
             .eq(OaNotice::getOrgId, orgId)
             .eq(OaNotice::getStatus, "PUBLISHED")
+            .ne(OaNotice::getAudience, "STAFF")
             .orderByDesc(OaNotice::getPublishTime)
             .orderByDesc(OaNotice::getCreateTime));
 
@@ -580,6 +582,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
             .eq(OaNotice::getIsDeleted, 0)
             .eq(OaNotice::getOrgId, orgId)
             .eq(OaNotice::getStatus, "PUBLISHED")
+            .ne(OaNotice::getAudience, "STAFF")
             .orderByDesc(OaNotice::getPublishTime)
             .orderByDesc(OaNotice::getCreateTime)
             .last("LIMIT 200"));
@@ -879,7 +882,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
   public List<FamilyPortalModels.ActivityAlbumItem> listActivityAlbums(Long orgId, Long familyUserId, int pageNo, int pageSize,
       String scope) {
     Set<Long> liked = loadLongSetState(orgId, familyUserId, STATE_ALBUM_LIKE);
-    List<Long> boundElderIds = ensureBoundElderIds(extractElderIds(listBoundRelations(orgId, familyUserId)));
+    List<Long> boundElderIds = photoElderIds(orgId, familyUserId);
     Map<Long, ElderProfile> elderMap = loadElderMap(orgId, boundElderIds);
     String normalizedScope = normalizeAlbumScope(scope);
 
@@ -1213,7 +1216,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
 
   @Override
   public FamilyPortalModels.PaymentSummaryResponse getPaymentSummary(Long orgId, Long familyUserId, Long elderId, String month) {
-    List<Long> elderIds = extractElderIds(listBoundRelations(orgId, familyUserId));
+    List<Long> elderIds = scopedElderIds(orgId, familyUserId, FamilyAuthorization.BILLING, "费用明细");
     Long targetElderId = resolveTargetElderId(elderIds, elderId);
     String billMonth = (month == null || month.isBlank()) ? currentBillMonth() : month;
 
@@ -1307,7 +1310,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
 
   @Override
   public List<FamilyPortalModels.PaymentHistoryItem> listPaymentHistory(Long orgId, Long familyUserId, Long elderId) {
-    List<Long> elderIds = extractElderIds(listBoundRelations(orgId, familyUserId));
+    List<Long> elderIds = scopedElderIds(orgId, familyUserId, FamilyAuthorization.BILLING, "费用明细");
     Long targetElderId = resolveTargetElderId(elderIds, elderId);
     List<BillMonthly> bills = billMonthlyMapper.selectList(
         Wrappers.lambdaQuery(BillMonthly.class)
@@ -1569,7 +1572,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
   @Override
   public List<FamilyPortalModels.RechargeOrderItem> listRechargeOrders(Long orgId, Long familyUserId, Long elderId,
       int pageNo, int pageSize) {
-    List<Long> elderIds = ensureBoundElderIds(extractElderIds(listBoundRelations(orgId, familyUserId)));
+    List<Long> elderIds = ensureBoundElderIds(scopedElderIds(orgId, familyUserId, FamilyAuthorization.BILLING, "费用明细"));
     Long targetElderId = elderId == null ? null : resolveTargetElderId(elderIds, elderId);
 
     Page<FamilyRechargeOrder> page = familyRechargeOrderMapper.selectPage(new Page<>(Math.max(pageNo, 1), Math.max(pageSize, 1)),
@@ -4021,13 +4024,29 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
   }
 
   private List<ElderFamily> listBoundRelations(Long orgId, Long familyUserId) {
+    LocalDate today = LocalDate.now();
     return elderFamilyMapper.selectList(
         Wrappers.lambdaQuery(ElderFamily.class)
             .eq(ElderFamily::getIsDeleted, 0)
             .eq(ElderFamily::getOrgId, orgId)
             .eq(ElderFamily::getFamilyUserId, familyUserId)
             .orderByDesc(ElderFamily::getIsPrimary)
-            .orderByDesc(ElderFamily::getUpdateTime));
+            .orderByDesc(ElderFamily::getUpdateTime))
+        .stream()
+        .filter(relation -> FamilyAuthorization.active(relation, today))
+        .toList();
+  }
+
+  /** 只返回该家属被授权查看某类信息（费用、照片）的长者 */
+  private List<Long> scopedElderIds(Long orgId, Long familyUserId, String scope, String label) {
+    List<ElderFamily> relations = listBoundRelations(orgId, familyUserId);
+    List<Long> allowed = extractElderIds(relations.stream()
+        .filter(relation -> FamilyAuthorization.allows(relation, scope))
+        .toList());
+    if (allowed.isEmpty() && !relations.isEmpty()) {
+      throw new IllegalArgumentException("当前账号未获授权查看" + label + "，请联系机构行政办理授权");
+    }
+    return allowed;
   }
 
   private List<Long> extractElderIds(List<ElderFamily> relations) {
@@ -4767,11 +4786,21 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     return "photo";
   }
 
+  /** 个人相册只对授权“照片分享”的长者可见；集体活动相册不受影响。-1 占位避免 IN () */
+  private List<Long> photoElderIds(Long orgId, Long familyUserId) {
+    List<ElderFamily> relations = listBoundRelations(orgId, familyUserId);
+    ensureBoundElderIds(extractElderIds(relations));
+    List<Long> allowed = extractElderIds(relations.stream()
+        .filter(relation -> FamilyAuthorization.allows(relation, FamilyAuthorization.PHOTO))
+        .toList());
+    return allowed.isEmpty() ? List.of(-1L) : allowed;
+  }
+
   private void ensureFamilyAlbumVisible(Long orgId, Long familyUserId, Long albumId) {
     if (albumId == null || albumId <= 0) {
       throw new IllegalArgumentException("活动相册不存在");
     }
-    List<Long> boundElderIds = ensureBoundElderIds(extractElderIds(listBoundRelations(orgId, familyUserId)));
+    List<Long> boundElderIds = photoElderIds(orgId, familyUserId);
     Long count = oaAlbumMapper.selectCount(Wrappers.lambdaQuery(OaAlbum.class)
         .eq(OaAlbum::getIsDeleted, 0)
         .eq(OaAlbum::getOrgId, orgId)
@@ -4889,11 +4918,6 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     if (orgId == null || familyUserId == null || elderId == null) {
       return true;
     }
-    Map<String, Object> map = readStateMap(orgId, familyUserId, STATE_SECURITY, "default");
-    String scope = defaultText(readText(map, "visibleScope"), "仅子女可查看完整健康数据");
-    if (scope.contains("全部授权")) {
-      return true;
-    }
     ElderFamily relation = elderFamilyMapper.selectOne(
         Wrappers.lambdaQuery(ElderFamily.class)
             .eq(ElderFamily::getIsDeleted, 0)
@@ -4901,6 +4925,16 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
             .eq(ElderFamily::getFamilyUserId, familyUserId)
             .eq(ElderFamily::getElderId, elderId)
             .last("LIMIT 1"));
+    // 机构核验的授权优先于家属端自己的可见范围设置
+    if (relation != null && (!FamilyAuthorization.active(relation, LocalDate.now())
+        || !FamilyAuthorization.allows(relation, FamilyAuthorization.HEALTH))) {
+      return false;
+    }
+    Map<String, Object> map = readStateMap(orgId, familyUserId, STATE_SECURITY, "default");
+    String scope = defaultText(readText(map, "visibleScope"), "仅子女可查看完整健康数据");
+    if (scope.contains("全部授权")) {
+      return true;
+    }
     // 主绑定家属是老人的第一联系人，不受“仅子女/直系家属”关系关键词限制，
     // 否则关系登记为“家属”等泛称时，唯一绑定人反而看不到完整健康数据。
     if (relation != null && Integer.valueOf(1).equals(relation.getIsPrimary())) {

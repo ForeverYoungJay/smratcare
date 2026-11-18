@@ -26,6 +26,12 @@ public class OaNotice {
   private LocalDateTime publishTime;
 
   private String status;
+  /** STAFF 员工 / FAMILY 家属 / ALL 全部 */
+  private String audience;
+  @TableField(exist = false)
+  private Long readCount;
+  @TableField(exist = false)
+  private Boolean readByMe;
 
   private Long createdBy;
 

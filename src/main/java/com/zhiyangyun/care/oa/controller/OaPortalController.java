@@ -143,6 +143,7 @@ public class OaPortalController {
         .eq(OaNotice::getIsDeleted, 0)
         .eq(orgId != null, OaNotice::getOrgId, orgId)
         .eq(OaNotice::getStatus, "PUBLISHED")
+        .ne(OaNotice::getAudience, "FAMILY")
         .orderByDesc(OaNotice::getPublishTime)
         .last("LIMIT 5"));
     List<OaTodo> todos = listScopedTodos(orgId, personalScope, staffId, username, 8);

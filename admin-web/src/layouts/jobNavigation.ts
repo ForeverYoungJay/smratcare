@@ -98,7 +98,11 @@ const departmentNavigation: DepartmentNavigation[] = [
     management: [
       { label: '设备档案', path: '/logistics/maintenance/assets' },
       { label: '仓库设置', path: '/logistics/storage/warehouse' },
-      { label: '床位管理', path: '/logistics/assets/bed-management' }
+      { label: '床位管理', path: '/logistics/assets/bed-management' },
+      // 消防安全由后勤部长负责（后勤员工没有消防页面权限），放在管理组里，不再单独占一级菜单
+      { label: '消防安全工作台', path: '/fire/overview' }, { label: '防火巡查与检查', path: '/fire/inspection' },
+      { label: '消防设施与维保', path: '/fire/facilities' }, { label: '监控与控制室', path: '/fire/control-center' },
+      { label: '隐患处置与分析', path: '/fire/safety' }, { label: '消防系统配置', path: '/fire/settings' }
     ],
     assignmentLabel: '后勤任务分配', assignmentPath: '/logistics/task-center',
     reportLabel: '后勤报表', reportPath: '/logistics/reports/maintenance-todo-log'
@@ -186,10 +190,13 @@ function buildConsolidatedDepartmentMenu(department: string, availablePaths: Set
       ['合同与转入住', '/marketing/contracts'], ['市场运营', '/marketing/operations'], ['入住办理中心', '/elder/admission-processing']]), office
   ]
   else entries = [
-    ...links([['人事工作台', '/hr/overview'], ['员工档案与合同', '/hr/profile/basic'], ['招聘与入职', '/hr/recruitment/needs'],
-      ['考勤与排班', '/hr/attendance/records'], ['员工费用与报销', '/hr/expense/records'], ['员工宿舍', '/hr/expense/dormitory'],
-      ['培训与证书', '/hr/development/records'], ['绩效与积分', '/hr/performance/reports']]),
-    { ...office, children: [...(office.children || []), ...links([['制度与文档', '/oa/document'], ['通知公告', '/oa/notice']])] }
+    // 行政人事部：行政事务 6 个主页面在一级菜单，人事业务收进「人事管理」组
+    ...links([['行政工作台', '/oa/workbench'], ['家属服务', '/oa/family'], ['协同办公', '/oa/collaboration'],
+      ['生活服务', '/oa/services'], ['活动与满意度', '/oa/culture'], ['制度知识与公告', '/oa/library']]),
+    { label: '人事管理', path: '', icon: 'TeamOutlined', children: links([['人事工作台', '/hr/overview'], ['员工档案与合同', '/hr/profile/basic'],
+      ['招聘与入职', '/hr/recruitment/needs'], ['考勤与排班', '/hr/attendance/records'], ['员工费用与报销', '/hr/expense/records'],
+      ['员工宿舍', '/hr/expense/dormitory'], ['培训与证书', '/hr/development/records'], ['绩效与积分', '/hr/performance/reports']]) },
+    office
   ]
   return uniqueEntries(entries.map((item, index) => entry(item, availablePaths, index + 1)).filter(Boolean) as MenuItem[])
 }

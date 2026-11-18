@@ -74,7 +74,8 @@ describe('route security foundation', () => {
 
   it('shows camera recordings only under fire safety and redirects old bookmarks', async () => {
     const paths = flattenMenu(getMenuTree(['LOGISTICS_MINISTER'], getRecommendedPagePermissions('LOGISTICS_MINISTER')))
-    expect(paths).toContain('/fire/video')
+    // 录像在「监控与控制室」主页面的标签里，旧页面路由仍可直达
+    expect(paths).toContain('/fire/control-center')
     expect(paths).not.toContain('/logistics/video')
     await router.push('/logistics/video?cameraId=42#recordings')
     expect(router.currentRoute.value.path).toBe('/fire/video')

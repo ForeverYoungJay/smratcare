@@ -3,6 +3,9 @@ import type { Id } from './common'
 export interface PaymentRecordItem {
   id: Id
   billMonthlyId: Id
+  elderId?: Id
+  elderName?: string
+  billMonth?: string
   /** 实收现金 */
   amount: number
   payableAmount?: number
@@ -79,6 +82,13 @@ export interface FinanceReportMonthlyItem {
   receivedAmount?: number
   refundAmount?: number
   netAmount?: number
+}
+
+export interface FinanceArrearsAgingItem {
+  key: 'CURRENT' | 'D30' | 'D60' | 'D90' | 'D90_PLUS'
+  label: string
+  amount: number
+  billCount: number
 }
 
 export interface FinanceArrearsItem {

@@ -1,5 +1,15 @@
 import type { RouteRecordRaw } from 'vue-router'
 import { redirectPreservingLocation } from './routeAliases'
+import { ADMIN_CENTERS } from '../views/oa/center/adminTabs'
+
+/**
+ * 行政管理：菜单只保留 6 个主页面（工作台 + 5 个标签页），原有功能页保留路由（菜单隐藏），
+ * 作为主页面的标签嵌入，权限仍以各自路由 meta.roles 为准。人事管理不在此模块。
+ */
+function adminCenter(key: string, name: string): RouteRecordRaw {
+  const config = ADMIN_CENTERS[key]
+  return { path: key, name, component: () => import('../views/medical/center/TabbedCenter.vue'), props: config, meta: { title: config.title } }
+}
 
 export const administrationRoutes: RouteRecordRaw[] = [
   {
@@ -22,25 +32,37 @@ export const administrationRoutes: RouteRecordRaw[] = [
             'DIRECTOR', 'SYS_ADMIN', 'ADMIN'
           ]
         },
-        redirect: '/oa/overview',
+        redirect: '/oa/workbench',
+        // 审批中心、通知公告、文档中心同时是各部门「我的办公」入口，保持可见；其余原功能页菜单隐藏
         children: [
+          {
+            path: 'workbench',
+            name: 'OaWorkbench',
+            component: () => import('../views/oa/center/AdminWorkbench.vue'),
+            meta: { title: '行政工作台' }
+          },
+          adminCenter('family', 'OaFamily'),
+          adminCenter('collaboration', 'OaCollaboration'),
+          adminCenter('services', 'OaServices'),
+          adminCenter('culture', 'OaCulture'),
+          adminCenter('library', 'OaLibrary'),
           {
             path: 'overview',
             name: 'OaOverview',
-            component: () => import('../views/oa/AdminCenter.vue'),
-            meta: { title: '行政中心' }
+            redirect: '/oa/workbench',
+            meta: { title: '行政中心（已并入行政工作台）', hidden: true }
           },
           {
             path: 'family-service',
             name: 'OaFamilyService',
             component: () => import('../views/operations/FamilyServiceCenter.vue'),
-            meta: { title: '家属服务中心' }
+            meta: { title: '家属服务中心', hidden: true }
           },
           {
             path: 'family-users',
             name: 'OaFamilyUsers',
             component: () => import('../views/elder/Family.vue'),
-            meta: { title: '家属账号与绑定' }
+            meta: { title: '家属账号与绑定', hidden: true }
           },
           {
             path: 'family-service-health',
@@ -57,20 +79,20 @@ export const administrationRoutes: RouteRecordRaw[] = [
           {
             path: 'work-execution',
             name: 'OaWorkExecution',
-            meta: { title: '协同办公' },
+            meta: { title: '协同办公', hidden: true },
             redirect: '/oa/work-execution/task',
             children: [
               {
                 path: 'task',
                 name: 'OaTask',
                 component: () => import('../views/oa/Task.vue'),
-                meta: { title: '任务管理' }
+                meta: { title: '任务管理', hidden: true }
               },
               {
                 path: 'family-communication',
                 name: 'OaFamilyCommunication',
                 component: () => import('../views/oa/FamilyCommunication.vue'),
-                meta: { title: '家属反馈与沟通' }
+                meta: { title: '家属反馈与沟通', hidden: true }
               },
               {
                 path: 'calendar',
@@ -82,25 +104,25 @@ export const administrationRoutes: RouteRecordRaw[] = [
                 path: 'daily-report',
                 name: 'OaDailyReport',
                 component: () => import('../views/oa/DailyReport.vue'),
-                meta: { title: '日总结' }
+                meta: { title: '日总结', hidden: true }
               },
               {
                 path: 'weekly-report',
                 name: 'OaWeeklyReport',
                 component: () => import('../views/oa/WeeklyReport.vue'),
-                meta: { title: '周总结' }
+                meta: { title: '周总结', hidden: true }
               },
               {
                 path: 'monthly-report',
                 name: 'OaMonthlyReport',
                 component: () => import('../views/oa/MonthlyReport.vue'),
-                meta: { title: '月总结' }
+                meta: { title: '月总结', hidden: true }
               },
               {
                 path: 'yearly-report',
                 name: 'OaYearlyReport',
                 component: () => import('../views/oa/YearlyReport.vue'),
-                meta: { title: '年总结' }
+                meta: { title: '年总结', hidden: true }
               },
               {
                 path: 'attendance-leave',
@@ -113,26 +135,26 @@ export const administrationRoutes: RouteRecordRaw[] = [
           {
             path: 'life',
             name: 'OaLife',
-            meta: { title: '生活服务' },
+            meta: { title: '生活服务', hidden: true },
             redirect: '/oa/life/birthday',
             children: [
               {
                 path: 'birthday',
                 name: 'OaLifeBirthday',
                 component: () => import('../views/life/Birthday.vue'),
-                meta: { title: '会员生日' }
+                meta: { title: '会员生日', hidden: true }
               },
               {
                 path: 'room-cleaning',
                 name: 'OaLifeRoomCleaning',
                 component: () => import('../views/life/RoomCleaning.vue'),
-                meta: { title: '房间打扫' }
+                meta: { title: '房间打扫', hidden: true }
               },
               {
                 path: 'maintenance',
                 name: 'OaLifeMaintenance',
                 component: () => import('../views/life/Maintenance.vue'),
-                meta: { title: '维修管理' }
+                meta: { title: '维修管理', hidden: true }
               }
             ]
           },
@@ -145,26 +167,26 @@ export const administrationRoutes: RouteRecordRaw[] = [
           {
             path: 'card',
             name: 'OaCard',
-            meta: { title: '一卡通' },
+            meta: { title: '一卡通', hidden: true },
             redirect: '/oa/card/account',
             children: [
               {
                 path: 'account',
                 name: 'OaCardAccount',
                 component: () => import('../views/card/Account.vue'),
-                meta: { title: '卡务管理' }
+                meta: { title: '卡务管理', hidden: true }
               },
               {
                 path: 'recharge',
                 name: 'OaCardRecharge',
                 component: () => import('../views/card/Recharge.vue'),
-                meta: { title: '充值记录' }
+                meta: { title: '充值记录', hidden: true }
               },
               {
                 path: 'consume',
                 name: 'OaCardConsume',
                 component: () => import('../views/card/Consume.vue'),
-                meta: { title: '消费记录' }
+                meta: { title: '消费记录', hidden: true }
               }
             ]
           },
@@ -192,7 +214,7 @@ export const administrationRoutes: RouteRecordRaw[] = [
             path: 'knowledge',
             name: 'OaKnowledge',
             component: () => import('../views/oa/Knowledge.vue'),
-            meta: { title: '知识库' }
+            meta: { title: '知识库', hidden: true }
           },
           {
             path: 'group-settings',
@@ -209,32 +231,32 @@ export const administrationRoutes: RouteRecordRaw[] = [
           {
             path: 'activity-center',
             name: 'OaActivityCenter',
-            meta: { title: '活动与文化' },
+            meta: { title: '活动与文化', hidden: true },
             redirect: '/oa/activity-center/plan',
             children: [
               {
                 path: 'plan',
                 name: 'OaActivityCenterPlan',
                 component: () => import('../views/oa/ActivityPlan.vue'),
-                meta: { title: '活动中心' }
+                meta: { title: '活动中心', hidden: true }
               },
               {
                 path: 'records',
                 name: 'OaActivityCenterRecords',
                 component: () => import('../views/life/Activity.vue'),
-                meta: { title: '活动记录' }
+                meta: { title: '活动记录', hidden: true }
               },
               {
                 path: 'survey-manage',
                 name: 'OaActivityCenterSurveyManage',
                 component: () => import('../views/survey/Template.vue'),
-                meta: { title: '满意度调查' }
+                meta: { title: '满意度调查', hidden: true }
               },
               {
                 path: 'survey-stats',
                 name: 'OaActivityCenterSurveyStats',
                 component: () => import('../views/survey/Stats.vue'),
-                meta: { title: '调查统计' }
+                meta: { title: '调查统计', hidden: true }
               }
             ]
           },
@@ -290,7 +312,7 @@ export const administrationRoutes: RouteRecordRaw[] = [
             path: 'staff-collaboration',
             name: 'OaStaffCollaboration',
             component: () => import('../views/oa/StaffCollaborationCenter.vue'),
-            meta: { title: '跨部门协同流程' }
+            meta: { title: '跨部门协同流程', hidden: true }
           },
           {
             path: 'employee-suggestions',

@@ -12,6 +12,9 @@ export interface CardAccount {
   openTime?: string
   lastRechargeTime?: string
   remark?: string
+  prevCardId?: Id
+  statusReason?: string
+  statusChangedAt?: string
 }
 
 export interface CardTradeLog {

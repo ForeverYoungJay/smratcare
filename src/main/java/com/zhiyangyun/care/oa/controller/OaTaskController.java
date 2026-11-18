@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Objects;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpHeaders;
@@ -351,6 +352,43 @@ public class OaTaskController {
     return Result.ok(task);
   }
 
+  /** 执行人提交完成，进入待验收 */
+  @PutMapping("/{id}/submit")
+  @PreAuthorize("@perm.hasAny('oa.calendar.manage','oa.calendar.view')")
+  public Result<OaTask> submit(@PathVariable Long id) {
+    OaTask task = requireTask(id);
+    if (!"OPEN".equals(task.getStatus()) || task.getAssigneeId() == null) {
+      throw new IllegalArgumentException("仅已分派且执行中的任务可提交验收");
+    }
+    task.setStatus("SUBMITTED");
+    taskMapper.updateById(task);
+    return Result.ok(task);
+  }
+
+  /** 发起人或日程管理员验收：通过则完成，退回则回到执行中 */
+  @PutMapping("/{id}/accept")
+  @PreAuthorize("@perm.hasAny('oa.calendar.manage','oa.calendar.view')")
+  public Result<OaTask> accept(@PathVariable Long id, @RequestParam(defaultValue = "true") boolean pass) {
+    OaTask task = requireTask(id);
+    if (!"SUBMITTED".equals(task.getStatus())) {
+      throw new IllegalArgumentException("仅待验收任务可验收");
+    }
+    if (!hasCalendarManagePermission() && !Objects.equals(task.getCreatedBy(), AuthContext.getStaffId())) {
+      throw new IllegalArgumentException("仅任务发起人可验收");
+    }
+    task.setStatus(pass ? "DONE" : "OPEN");
+    taskMapper.updateById(task);
+    return Result.ok(task);
+  }
+
+  private OaTask requireTask(Long id) {
+    OaTask task = findAccessibleTask(id);
+    if (task == null) {
+      throw new IllegalArgumentException("任务不存在或无权限");
+    }
+    return task;
+  }
+
   @PutMapping("/batch/done")
   @PreAuthorize("@perm.hasAny('oa.calendar.manage','oa.calendar.view')")
   public Result<Integer> batchDone(@RequestBody OaBatchIdsRequest request) {
@@ -476,8 +514,8 @@ public class OaTaskController {
       return null;
     }
     String normalized = status.trim().toUpperCase();
-    if (!"OPEN".equals(normalized) && !"DONE".equals(normalized)) {
-      throw new IllegalArgumentException("status 仅支持 OPEN/DONE");
+    if (!"OPEN".equals(normalized) && !"SUBMITTED".equals(normalized) && !"DONE".equals(normalized)) {
+      throw new IllegalArgumentException("status 仅支持 OPEN/SUBMITTED/DONE");
     }
     return normalized;
   }

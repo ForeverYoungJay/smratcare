@@ -114,7 +114,7 @@
         <template v-else-if="column.key === 'action'">
           <div class="row-action-links">
             <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
-            <a-button type="link" size="small" :disabled="record.status === 'CLOSED'" @click="closeRecord(record)">关闭</a-button>
+            <a-button v-if="canCloseRecords" type="link" size="small" :disabled="record.status === 'CLOSED'" @click="closeRecord(record)">关闭</a-button>
             <a-dropdown v-if="viewConfig.supportsQr || viewConfig.supportsRecheck" trigger="click">
               <a-button type="link" size="small">更多 <DownOutlined /></a-button>
               <template #overlay>
@@ -217,6 +217,10 @@
           </a-col>
         </a-row>
 
+        <a-form-item v-if="!form.id && templateItems.length" :label="`检查项（${activeTemplate?.templateName} v${activeTemplate?.version}）`">
+          <a-checkbox-group v-model:value="templatePassed" style="display: grid; gap: 4px" :options="templateItems" />
+          <div style="margin-top: 4px; color: #8a968f; font-size: 12px">勾选表示该项正常；未勾选的项会写入问题描述，进入隐患整改。</div>
+        </a-form-item>
         <a-form-item label="问题描述">
           <a-textarea v-model:value="form.issueDescription" :rows="3" />
         </a-form-item>
@@ -396,6 +400,9 @@ import {
   updateFireSafetyRecord
 } from '../../../api/fire'
 import { printTableReport } from '../../../utils/print'
+import { useUserStore } from '../../../stores/user'
+import { canCloseHazard, splitTemplateItems, templateIssueLine } from '../center/fireModel'
+import { getFireTemplates, type FireCheckTemplate } from '../../../api/fireOps'
 import type { FireSafetyRecord, FireSafetyRecordType, FireSafetyReportSummary, FireSafetyStatus } from '../../../types'
 
 type FireBoardViewConfig = {
@@ -413,6 +420,11 @@ type FireBoardViewConfig = {
   showDailyReminder: boolean
 }
 
+// 关闭（复核）只给消防主管与管理层，与后端一致
+const canCloseRecords = canCloseHazard(useUserStore().roles || [])
+const activeTemplate = ref<FireCheckTemplate | null>(null)
+const templatePassed = ref<string[]>([])
+const templateItems = computed(() => splitTemplateItems(activeTemplate.value?.items))
 const props = defineProps<{
   title: string
   subTitle: string
@@ -834,9 +846,17 @@ function resetForm() {
   form.purchaseDocumentUrls = []
 }
 
-function openCreate() {
+async function openCreate() {
   resetForm()
+  activeTemplate.value = null
+  templatePassed.value = []
   editOpen.value = true
+  // 日巡、夜巡、月检按管理员配置的启用模板逐项检查
+  if (['DAY_PATROL', 'NIGHT_PATROL', 'MONTHLY_CHECK'].includes(props.recordType)) {
+    const templates = await getFireTemplates({ recordType: props.recordType, enabledOnly: true }).catch(() => [])
+    activeTemplate.value = templates[0] || null
+    templatePassed.value = [...templateItems.value]
+  }
 }
 
 function openEdit(record: FireSafetyRecord) {
@@ -909,6 +929,10 @@ async function submit() {
     return
   }
 
+  const templateLine = !form.id && templateItems.value.length ? templateIssueLine(templateItems.value, templatePassed.value) : ''
+  if (templateLine && !String(form.issueDescription || '').includes(templateLine)) {
+    form.issueDescription = [templateLine, form.issueDescription].filter((text) => String(text || '').trim()).join('；')
+  }
   const payload = {
     recordType: props.recordType,
     title: normalizeText(form.title),

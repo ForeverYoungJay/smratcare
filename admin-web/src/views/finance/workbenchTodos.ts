@@ -1,4 +1,4 @@
-import type { FinanceWorkbenchOverview } from '../../types'
+import type { FinanceArrearsAgingItem, FinanceWorkbenchOverview } from '../../types'
 
 export interface FinanceTodo {
   label: string
@@ -24,4 +24,11 @@ export function financeTodos(o: FinanceWorkbenchOverview | null | undefined): Fi
     { label: '票据未关联收款', count: n(o.reconcile?.invoiceUnlinkedCount), unit: '张', hint: '收据、发票须与实际收款对应', path: '/finance/fees/payment-and-invoice', tone: 'info' }
   ]
   return items.filter((item) => item.count > 0)
+}
+
+/** 账龄条：按最大金额折算长度；全部为 0 时不显示 */
+export function agingRows(items: FinanceArrearsAgingItem[]) {
+  const rows = items.map((item) => ({ ...item, amount: Number(item.amount ?? 0) }))
+  const max = Math.max(0, ...rows.map((r) => r.amount))
+  return max > 0 ? rows.map((r) => ({ ...r, percent: Math.round((r.amount / max) * 100) })) : []
 }

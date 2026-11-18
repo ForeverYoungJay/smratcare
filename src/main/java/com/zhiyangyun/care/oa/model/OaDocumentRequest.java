@@ -22,4 +22,6 @@ public class OaDocumentRequest {
   private LocalDateTime uploadedAt;
 
   private String remark;
+
+  private java.time.LocalDate reviewDueDate;
 }

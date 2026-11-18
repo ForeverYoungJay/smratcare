@@ -31,6 +31,13 @@ public class CardAccount {
 
   private String remark;
 
+  /** 补卡前的旧卡 */
+  private Long prevCardId;
+
+  private String statusReason;
+
+  private LocalDateTime statusChangedAt;
+
   private Long createdBy;
 
   @TableField("create_time")

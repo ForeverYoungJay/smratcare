@@ -43,6 +43,7 @@
         <div class="value">{{ Number(summary.averageScore || 0).toFixed(2) }}</div>
       </a-card>
     </div>
+    <a-alert type="info" show-icon style="margin-bottom: 16px" :message="surveyCaliber(summary, query.dateRange)" />
 
     <a-card class="card-elevated" :bordered="false">
       <a-table
@@ -78,6 +79,7 @@ import QueryBar from '../../components/QueryBar.vue'
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import { surveyCaliber } from '../oa/center/adminTabs'
 import { getSurveyTemplatePage, getSurveyStatsSummary, getSurveySubmissionPage } from '../../api/survey'
 import type { SurveyTemplate, SurveyStatsSummary, SurveySubmissionItem, PageResult } from '../../types'
 

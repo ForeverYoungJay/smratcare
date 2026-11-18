@@ -8,6 +8,10 @@ import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.audit.service.AuditLogService;
+import com.zhiyangyun.care.bill.entity.BillMonthly;
+import com.zhiyangyun.care.bill.mapper.BillMonthlyMapper;
+import com.zhiyangyun.care.elder.entity.ElderProfile;
+import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.finance.entity.PaymentRecord;
 import com.zhiyangyun.care.finance.mapper.PaymentRecordMapper;
 import com.zhiyangyun.care.finance.model.PaymentRecordItem;
@@ -19,6 +23,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -39,13 +44,18 @@ public class PaymentRecordController {
   private final FinanceService financeService;
   private final StaffMapper staffMapper;
   private final AuditLogService auditLogService;
+  private final BillMonthlyMapper billMonthlyMapper;
+  private final ElderMapper elderMapper;
 
   public PaymentRecordController(PaymentRecordMapper paymentRecordMapper, FinanceService financeService,
-      StaffMapper staffMapper, AuditLogService auditLogService) {
+      StaffMapper staffMapper, AuditLogService auditLogService, BillMonthlyMapper billMonthlyMapper,
+      ElderMapper elderMapper) {
     this.paymentRecordMapper = paymentRecordMapper;
     this.financeService = financeService;
     this.staffMapper = staffMapper;
     this.auditLogService = auditLogService;
+    this.billMonthlyMapper = billMonthlyMapper;
+    this.elderMapper = elderMapper;
   }
 
   @GetMapping("/page")
@@ -83,11 +93,24 @@ public class PaymentRecordController {
                 .eq(StaffAccount::getIsDeleted, 0)
                 .in(StaffAccount::getId, ids)).stream()
                 .collect(Collectors.toMap(StaffAccount::getId, item -> item, (a, b) -> a))));
+    List<Long> billIds = page.getRecords().stream().map(PaymentRecord::getBillMonthlyId).filter(Objects::nonNull).distinct().toList();
+    Map<Long, BillMonthly> billMap = billIds.isEmpty() ? Collections.emptyMap()
+        : billMonthlyMapper.selectBatchIds(billIds).stream().collect(Collectors.toMap(BillMonthly::getId, b -> b, (a, b) -> a));
+    List<Long> elderIds = billMap.values().stream().map(BillMonthly::getElderId).filter(Objects::nonNull).distinct().toList();
+    Map<Long, String> elderNames = elderIds.isEmpty() ? Collections.emptyMap()
+        : elderMapper.selectBatchIds(elderIds).stream().filter(e -> e.getFullName() != null)
+            .collect(Collectors.toMap(ElderProfile::getId, ElderProfile::getFullName, (a, b) -> a));
     IPage<PaymentRecordItem> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
     resp.setRecords(page.getRecords().stream().map(item -> {
       PaymentRecordItem row = new PaymentRecordItem();
       row.setId(item.getId());
       row.setBillMonthlyId(item.getBillMonthlyId());
+      BillMonthly bill = item.getBillMonthlyId() == null ? null : billMap.get(item.getBillMonthlyId());
+      if (bill != null) {
+        row.setElderId(bill.getElderId());
+        row.setElderName(elderNames.get(bill.getElderId()));
+        row.setBillMonth(bill.getBillMonth());
+      }
       row.setAmount(item.getAmount());
       row.setPayableAmount(item.getPayableAmount());
       row.setLtciDeductAmount(item.getLtciDeductAmount());

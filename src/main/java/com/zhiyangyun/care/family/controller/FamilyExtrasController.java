@@ -8,6 +8,7 @@ import com.zhiyangyun.care.bill.entity.BillMonthly;
 import com.zhiyangyun.care.bill.mapper.BillItemMapper;
 import com.zhiyangyun.care.bill.mapper.BillMonthlyMapper;
 import com.zhiyangyun.care.elder.entity.ElderFamily;
+import com.zhiyangyun.care.elder.support.FamilyAuthorization;
 import com.zhiyangyun.care.elder.mapper.ElderFamilyMapper;
 import com.zhiyangyun.care.survey.entity.SurveyQuestion;
 import com.zhiyangyun.care.survey.entity.SurveySubmission;
@@ -215,7 +216,10 @@ public class FamilyExtrasController {
                 .eq(ElderFamily::getIsDeleted, 0)
                 .eq(ElderFamily::getOrgId, orgId)
                 .eq(ElderFamily::getFamilyUserId, familyUserId))
-        .stream().map(ElderFamily::getElderId).filter(Objects::nonNull).distinct().toList();
+        .stream()
+        .filter(relation -> FamilyAuthorization.active(relation, LocalDate.now())
+            && FamilyAuthorization.allows(relation, FamilyAuthorization.BILLING))
+        .map(ElderFamily::getElderId).filter(Objects::nonNull).distinct().toList();
 
     Map<String, Object> response = new HashMap<>();
     response.put("month", month == null || month.isBlank()

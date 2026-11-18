@@ -5,7 +5,11 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.auth.entity.StaffAccount;
+import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.oa.entity.OaNotice;
+import com.zhiyangyun.care.oa.entity.OaNoticeRead;
+import com.zhiyangyun.care.oa.mapper.OaNoticeReadMapper;
 import com.zhiyangyun.care.oa.mapper.OaNoticeMapper;
 import com.zhiyangyun.care.oa.model.OaBatchIdsRequest;
 import com.zhiyangyun.care.oa.model.OaNoticeRequest;
@@ -14,8 +18,11 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -32,10 +39,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/oa/notice")
 public class OaNoticeController {
+  private static final List<String> AUDIENCES = List.of("STAFF", "FAMILY", "ALL");
   private final OaNoticeMapper noticeMapper;
+  private final OaNoticeReadMapper readMapper;
+  private final StaffMapper staffMapper;
 
-  public OaNoticeController(OaNoticeMapper noticeMapper) {
+  public OaNoticeController(OaNoticeMapper noticeMapper, OaNoticeReadMapper readMapper, StaffMapper staffMapper) {
     this.noticeMapper = noticeMapper;
+    this.readMapper = readMapper;
+    this.staffMapper = staffMapper;
   }
 
   @GetMapping("/page")
@@ -43,19 +55,96 @@ public class OaNoticeController {
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) String keyword,
-      @RequestParam(required = false) String status) {
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String audience) {
     Long orgId = AuthContext.getOrgId();
     String normalizedStatus = normalizeStatus(status);
     var wrapper = Wrappers.lambdaQuery(OaNotice.class)
         .eq(OaNotice::getIsDeleted, 0)
         .eq(orgId != null, OaNotice::getOrgId, orgId)
-        .eq(normalizedStatus != null, OaNotice::getStatus, normalizedStatus);
+        .eq(normalizedStatus != null, OaNotice::getStatus, normalizedStatus)
+        .eq(audience != null && !audience.isBlank(), OaNotice::getAudience, audience);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(OaNotice::getTitle, keyword)
           .or().like(OaNotice::getContent, keyword));
     }
     wrapper.orderByDesc(OaNotice::getPublishTime);
-    return Result.ok(noticeMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
+    IPage<OaNotice> page = noticeMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+    fillReadStats(page.getRecords());
+    return Result.ok(page);
+  }
+
+  /** 员工阅读确认：同一人重复打开只记一次 */
+  @PostMapping("/{id}/read")
+  public Result<Void> markRead(@PathVariable Long id) {
+    OaNotice notice = findAccessibleNotice(id);
+    Long staffId = AuthContext.getStaffId();
+    if (notice == null || staffId == null || !"PUBLISHED".equals(notice.getStatus())) {
+      return Result.ok(null);
+    }
+    Long exists = readMapper.selectCount(Wrappers.lambdaQuery(OaNoticeRead.class)
+        .eq(OaNoticeRead::getNoticeId, id).eq(OaNoticeRead::getStaffId, staffId));
+    if (exists == null || exists == 0) {
+      OaNoticeRead read = new OaNoticeRead();
+      read.setOrgId(notice.getOrgId());
+      read.setNoticeId(id);
+      read.setStaffId(staffId);
+      read.setStaffName(AuthContext.getUsername());
+      read.setReadAt(LocalDateTime.now());
+      try {
+        readMapper.insert(read);
+      } catch (DuplicateKeyException ignored) {
+        // 并发打开时由唯一索引去重
+      }
+    }
+    return Result.ok(null);
+  }
+
+  /** 阅读回执：已读人数 / 应读人数（在职员工）及已读名单；家属公告的阅读在家属端统计 */
+  @GetMapping("/{id}/reads")
+  public Result<Map<String, Object>> reads(@PathVariable Long id) {
+    OaNotice notice = findAccessibleNotice(id);
+    if (notice == null) {
+      return Result.ok(Map.of());
+    }
+    List<OaNoticeRead> reads = readMapper.selectList(Wrappers.lambdaQuery(OaNoticeRead.class)
+        .eq(OaNoticeRead::getNoticeId, id).orderByAsc(OaNoticeRead::getReadAt));
+    Map<String, Object> result = new HashMap<>();
+    result.put("readCount", reads.size());
+    result.put("targetCount", "FAMILY".equals(notice.getAudience()) ? null : staffMapper.selectCount(
+        Wrappers.lambdaQuery(StaffAccount.class)
+            .eq(StaffAccount::getIsDeleted, 0)
+            .eq(StaffAccount::getStatus, 1)
+            .eq(notice.getOrgId() != null, StaffAccount::getOrgId, notice.getOrgId())));
+    result.put("readers", reads.stream()
+        .map(r -> Map.of("staffName", safe(r.getStaffName()), "readAt", formatDateTime(r.getReadAt())))
+        .toList());
+    return Result.ok(result);
+  }
+
+  private void fillReadStats(List<OaNotice> notices) {
+    if (notices.isEmpty()) {
+      return;
+    }
+    Long staffId = AuthContext.getStaffId();
+    List<OaNoticeRead> reads = readMapper.selectList(Wrappers.lambdaQuery(OaNoticeRead.class)
+        .in(OaNoticeRead::getNoticeId, notices.stream().map(OaNotice::getId).toList()));
+    Map<Long, Long> counts = reads.stream().collect(Collectors.groupingBy(OaNoticeRead::getNoticeId, Collectors.counting()));
+    for (OaNotice notice : notices) {
+      notice.setReadCount(counts.getOrDefault(notice.getId(), 0L));
+      notice.setReadByMe(reads.stream().anyMatch(r -> r.getNoticeId().equals(notice.getId()) && r.getStaffId().equals(staffId)));
+    }
+  }
+
+  private String normalizeAudience(String audience, String fallback) {
+    if (audience == null || audience.isBlank()) {
+      return fallback;
+    }
+    String normalized = audience.trim().toUpperCase();
+    if (!AUDIENCES.contains(normalized)) {
+      throw new IllegalArgumentException("接收对象仅支持 STAFF/FAMILY/ALL");
+    }
+    return normalized;
   }
 
   @GetMapping("/{id}")
@@ -71,6 +160,7 @@ public class OaNoticeController {
     notice.setOrgId(orgId);
     notice.setTitle(request.getTitle());
     notice.setContent(request.getContent());
+    notice.setAudience(normalizeAudience(request.getAudience(), "STAFF"));
     notice.setPublisherName(AuthContext.getUsername());
     String normalizedStatus = normalizeStatus(request.getStatus());
     notice.setStatus(normalizedStatus == null ? "DRAFT" : normalizedStatus);
@@ -97,6 +187,7 @@ public class OaNoticeController {
     }
     notice.setTitle(request.getTitle());
     notice.setContent(request.getContent());
+    notice.setAudience(normalizeAudience(request.getAudience(), notice.getAudience()));
     String normalizedStatus = normalizeStatus(request.getStatus());
     if (normalizedStatus != null && !"DRAFT".equals(normalizedStatus)) {
       throw new IllegalArgumentException("编辑公告仅支持保持 DRAFT 状态");

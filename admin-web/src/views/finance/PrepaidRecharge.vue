@@ -151,7 +151,7 @@ async function submit() {
 }
 
 function goLogs() {
-  router.push({ name: 'FinanceAccountLog', query: { elderId: form.elderId } })
+  router.push({ path: '/finance/accounts/ledger', query: { elderId: String(form.elderId) } })
 }
 
 function goLowBalance() {

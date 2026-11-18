@@ -4,6 +4,7 @@ import type { Id } from '../types'
 import type {
   FinanceBillDetail,
   FinanceReportMonthlyItem,
+  FinanceArrearsAgingItem,
   FinanceArrearsItem,
   FinanceStoreSalesItem,
   ElderAccount,
@@ -79,6 +80,10 @@ export function getFinanceBillDetail(billId: Id, config?: Record<string, any>) {
 
 export function getFinanceMonthlyRevenue(params?: { from?: string; to?: string; months?: number }) {
   return request.get<FinanceReportMonthlyItem[]>('/api/finance/report/monthly-revenue', { params })
+}
+
+export function getFinanceArrearsAging(config?: Record<string, any>) {
+  return request.get<FinanceArrearsAgingItem[]>('/api/finance/report/arrears-aging', config)
 }
 
 export function getFinanceArrearsTop(params?: { limit?: number }) {

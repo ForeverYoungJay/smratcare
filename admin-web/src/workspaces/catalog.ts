@@ -4,31 +4,35 @@ import { hasRouteAccess, moduleRolesByPath } from '../utils/roleAccess'
 import { toCanonicalRoutePath } from '../router/routeAliases'
 
 type Entry = [path: string, label: string, aliases?: string[]]
-export interface WorkspaceDefinition { id: string; title: string; entries: Entry[] }
+/** groups：标签较多时分两级展示，[一级标签, 该组包含的原页面路径] */
+export interface WorkspaceDefinition { id: string; title: string; entries: Entry[]; groups?: Array<[label: string, paths: string[]]> }
 export const workspaceDefinitions: WorkspaceDefinition[] = [
-  // 财务 5 个主页面 + 主管可见的规则配置；标签超过 7 个时页头改为「办理内容」下拉
+  // 财务 5 个主页面 + 主管可见的规则配置；同一页面的不同视角用筛选/抽屉，不再单独占标签
   { id: 'finance-collections', title: '收费与账户', entries: [
-    ['/finance/bills/detail-query', '账单与收银'], ['/finance/bills/in-resident', '在住账单缴费', ['/finance/payments/register']],
-    ['/finance/bills/in-admission', '入住首期账单'], ['/finance/payments/cashier-desk', '今日收银'],
-    ['/finance/payments/records', '收款流水'], ['/finance/accounts/list', '长者资金账户'],
-    ['/finance/accounts/ledger', '资金流水'], ['/finance/deposit-management', '押金'],
-    ['/finance/prepaid-recharge', '预存充值'], ['/finance/consumer-voucher', '消费券'],
-    ['/finance/fees/payment-and-invoice', '票据管理', ['/finance/reconcile/invoice']], ['/finance/payments/refund-reversal', '退款与冲正']
+    ['/finance/bills/detail-query', '账单', ['/finance/payments/register', '/finance/bills/in-resident', '/finance/bills/in-admission']], ['/finance/admission-fee-audit', '入住费用审核'],
+    ['/finance/payments/cashier-desk', '收银台', ['/finance/payments/records', '/finance/payments/shift-close']], ['/finance/payments/refund-reversal', '退款与冲正'],
+    ['/finance/accounts/list', '长者账户', ['/finance/accounts/ledger', '/finance/prepaid-recharge']], ['/finance/deposit-management', '押金'], ['/finance/consumer-voucher', '消费券'],
+    ['/finance/fees/payment-and-invoice', '票据管理', ['/finance/reconcile/invoice']]
+  ], groups: [
+    ['账单与收银', ['/finance/bills/detail-query', '/finance/admission-fee-audit', '/finance/payments/cashier-desk', '/finance/payments/refund-reversal']],
+    ['长者资金账户', ['/finance/accounts/list', '/finance/deposit-management', '/finance/consumer-voucher']],
+    ['票据管理', ['/finance/fees/payment-and-invoice']]
   ] },
   { id: 'finance-consumption', title: '消费与风险', entries: [
-    ['/finance/flows/consumption', '消费与分摊'], ['/finance/flows/medical', '医护费用'],
-    ['/finance/flows/dining', '餐饮扣费'], ['/finance/flows/logistics', '后勤收费'],
-    ['/finance/allocation/public-cost', '公共费用分摊', ['/finance/allocation/tasks']], ['/finance/electricity-fee', '长者电费'],
-    ['/finance/bills/follow-up', '欠费与催缴'], ['/finance/bills/auto-deduct', '自动扣费异常', ['/finance/bills/auto-deduct-errors']],
-    ['/finance/reconcile/issue-center', '财务异常工单'], ['/finance/flows/medical-errors', '医护费用异常'],
+    ['/finance/flows/consumption', '消费流水', ['/finance/flows/medical', '/finance/flows/dining', '/finance/flows/logistics', '/finance/flows/medical-errors']], ['/finance/allocation/public-cost', '公共费用分摊', ['/finance/allocation/tasks']],
+    ['/finance/electricity-fee', '长者电费'], ['/finance/bills/follow-up', '欠费与催缴'],
+    ['/finance/bills/auto-deduct', '自动扣费'], ['/finance/reconcile/issue-center', '异常工单', ['/finance/reconcile/exception', '/finance/reconcile/ledger-health', '/finance/bills/auto-deduct-errors']],
     ['/finance/flows/adjustments', '费用调整']
+  ], groups: [
+    ['消费与分摊', ['/finance/flows/consumption', '/finance/allocation/public-cost', '/finance/electricity-fee']],
+    ['欠费与异常', ['/finance/bills/follow-up', '/finance/bills/auto-deduct', '/finance/reconcile/issue-center', '/finance/flows/adjustments']]
   ] },
   { id: 'finance-settlement', title: '结算与月结', entries: [
-    ['/finance/discharge/settlement', '退住结算', ['/finance/discharge/print-sign']],
-    ['/finance/discharge/review', '退住费用审核'], ['/finance/admission-fee-audit', '入住费用审核'],
-    ['/finance/discharge/status-sync', '结算状态核对'], ['/finance/reconcile/center', '日对账'],
-    ['/finance/reconcile/exception', '对账异常'], ['/finance/payments/shift-close', '日结交班'],
-    ['/finance/reconcile/ledger-health', '一致性巡检'], ['/finance/reconcile/month-close', '月结关账']
+    ['/finance/discharge/settlement', '退住结算', ['/finance/discharge/print-sign', '/finance/discharge/review', '/finance/discharge/status-sync']],
+    ['/finance/reconcile/center', '日对账'], ['/finance/reconcile/month-close', '月结关账']
+  ], groups: [
+    ['退住与费用审核', ['/finance/discharge/settlement']],
+    ['对账与月结', ['/finance/reconcile/center', '/finance/reconcile/month-close']]
   ] },
   { id: 'finance-reports', title: '财务经营分析', entries: [
     ['/finance/reports/overall', '总收支'], ['/finance/reports/revenue-structure', '营收结构'],
@@ -40,6 +44,9 @@ export const workspaceDefinitions: WorkspaceDefinition[] = [
     ['/finance/bills/rules', '计费规则'], ['/finance/allocation/rules', '分摊规则'],
     ['/finance/config/payment-channels', '支付渠道'], ['/finance/config/approval-flow', '审批规则'],
     ['/finance/accounts/warning-rules', '余额预警'], ['/finance/config/change-log', '变更记录']
+  ], groups: [
+    ['收费与计费规则', ['/finance/config/master-data', '/finance/allocation/subjects', '/finance/bills/rules', '/finance/allocation/rules', '/finance/accounts/warning-rules']],
+    ['渠道与审批', ['/finance/config/payment-channels', '/finance/config/approval-flow', '/finance/config/change-log']]
   ] },
   // 客户/跟进/参观预订已收敛为 /marketing/customers、/marketing/visits 两个主页面（标签切换），不再走工作区
   { id: 'marketing-contracts', title: '合同台账', entries: [
@@ -115,6 +122,23 @@ export const workspaceDefinitions: WorkspaceDefinition[] = [
   ] }
 ]
 
+/** 标签页顶部的合规提示（按原页面路径），来自财务模块设计中的风险约束 */
+export const workspaceNotes: Record<string, { message: string; type: 'info' | 'warning' | 'error' }> = {
+  '/finance/payments/cashier-desk': { type: 'info', message: '实际收款须与银行到账核实；未确认到账不得标记为已确认。收据与税务发票是不同凭证，不得互相替代。' },
+  '/finance/accounts/list': { type: 'warning', message: '预收服务费、押金等不同性质资金分账管理，不得在界面合并为一个“可提现余额”；实际账务以银行对账及原始凭据为准。' },
+  '/finance/deposit-management': { type: 'warning', message: '押金按存管账户、可用用途与退款规则管理，不等同于可用消费资金。' },
+  '/finance/fees/payment-and-invoice': { type: 'warning', message: '开票信息须与实际交易一致；金额更正、服务中止等走红字流程，不直接删除原开票记录。' },
+  '/finance/flows/consumption': { type: 'warning', message: '不得因录入两次或多部门重复提交而重复扣费；审核前不自动进入应收或扣款。' },
+  '/finance/allocation/public-cost': { type: 'info', message: '公共费用分摊须明示依据、对象和计算方法，审核后再入账。' },
+  '/finance/bills/follow-up': { type: 'info', message: '催缴沟通应保留联系人、方式、时间、约定与跟进责任人。' },
+  '/finance/bills/auto-deduct': { type: 'error', message: '自动扣费不得绕开授权、合同条款和资金用途限制。' },
+  '/finance/reconcile/issue-center': { type: 'warning', message: '账单减免、核销、冲销、退款均通过受控流程并保留原始记录，不直接修改余额。' },
+  '/finance/discharge/settlement': { type: 'warning', message: '试算金额不是可直接支付的退款指令；押金用途、抵扣与退款渠道须符合合同及预收费监管规定。' },
+  '/finance/reconcile/month-close': { type: 'warning', message: '未匹配流水、待处理异常及未审核调整项完成后才允许月结；月结后修改走调整期和审批，不直接改历史数据。' },
+  '/finance/config/master-data': { type: 'error', message: '规则变化不得追溯覆盖已审核或已归档账单；须有版本号、生效日期与审批链。' },
+  '/finance/config/approval-flow': { type: 'info', message: '申请人不得自动成为最终审核人；技术管理员不默认具有账务修改权限。' }
+}
+
 export interface WorkspaceSource {
   title?: string
   path: string
@@ -129,7 +153,7 @@ export interface WorkspaceTab {
   props: RouteRecordRaw['props']
   sources: WorkspaceSource[]
 }
-export interface FunctionWorkspace { id: string; title: string; path: string; tabs: WorkspaceTab[] }
+export interface FunctionWorkspace { id: string; title: string; path: string; tabs: WorkspaceTab[]; groups?: WorkspaceDefinition['groups'] }
 export const functionWorkspaces: FunctionWorkspace[] = []
 export const retainedWorkspacePermissionPaths = new Set<string>()
 const legacyLocations = new Map<string, { path: string; query: Record<string, any> }>()
@@ -149,6 +173,13 @@ export function canUseWorkspaceTab(tab: WorkspaceTab, roles: string[], pages: st
     return pageAllowed && roleAllowed &&
       source.permissionGroups.every((group) => group.some((p) => permissions.includes(p)))
   })
+}
+
+/** 两级标签：只保留当前账号可用的标签，空组不显示；没有配置 groups 时返回空数组 */
+export function workspaceTabGroups(workspace: FunctionWorkspace | undefined, tabs: WorkspaceTab[]) {
+  return (workspace?.groups || [])
+    .map(([label, paths]) => ({ label, tabs: tabs.filter((tab) => paths.includes(tab.path)) }))
+    .filter((group) => group.tabs.length > 0)
 }
 
 export function getFunctionWorkspace(id: unknown) {
@@ -194,7 +225,7 @@ export function consolidateFunctionRoutes(routes: RouteRecordRaw[]): RouteRecord
         })
       }
     })
-    functionWorkspaces.push({ id: definition.id, title: definition.title, path: tabs[0].path, tabs })
+    functionWorkspaces.push({ id: definition.id, title: definition.title, path: tabs[0].path, tabs, groups: definition.groups })
   }
   function rewrite(list: RouteRecordRaw[], parent = ''): RouteRecordRaw[] {
     return list.map((route) => {
@@ -205,9 +236,12 @@ export function consolidateFunctionRoutes(routes: RouteRecordRaw[]): RouteRecord
         meta: { ...route.meta, title: workspace.title, workspaceId: workspace.id }
       } as RouteRecordRaw
       const location = workspaceLocation(path)
+      // 合并进主页面的旧入口保留自己的预设筛选（如 ?billScene=、?panel=），再叠加调用方的 query
+      const preset: Record<string, string> = {}
+      if (typeof route.redirect === 'string') new URL(route.redirect, 'http://workspace.local').searchParams.forEach((value, key) => { preset[key] = value })
       if (location) return {
         ...route, component: undefined, props: undefined,
-        redirect: (to) => workspaceLocation(path, to.query, to.hash)!,
+        redirect: (to) => workspaceLocation(path, { ...preset, ...to.query }, to.hash)!,
         meta: { ...route.meta, hidden: true, legacy: true, searchable: false }
       } as RouteRecordRaw
       const result = { ...route, children: route.children ? rewrite(route.children, path) : undefined } as RouteRecordRaw

@@ -17,6 +17,9 @@ import com.zhiyangyun.care.elder.model.FamilyRelationItem;
 import com.zhiyangyun.care.elder.model.FamilyUserPageItem;
 import com.zhiyangyun.care.elder.model.AdminFamilyUserUpsertRequest;
 import com.zhiyangyun.care.elder.service.FamilyService;
+import com.zhiyangyun.care.elder.support.FamilyAuthorization;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,6 +31,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -164,9 +168,44 @@ public class AdminFamilyController {
       item.setIdCardNo(user == null ? null : user.getIdCardNo());
       item.setRelation(relation.getRelation());
       item.setIsPrimary(relation.getIsPrimary());
+      item.setAuthScopes(relation.getAuthScopes());
+      item.setValidUntil(relation.getValidUntil());
+      item.setAuthorizedByName(relation.getAuthorizedByName());
+      item.setAuthorizedAt(relation.getAuthorizedAt());
       items.add(item);
     }
     return Result.ok(items);
+  }
+
+  public record AuthorizationRequest(List<String> scopes, LocalDate validUntil) {}
+
+  /** 逐项核验后授权：健康信息、费用明细、照片分享、代理办理、紧急联系人 */
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PutMapping("/relations/{relationId}/authorization")
+  public Result<Void> authorize(@PathVariable Long relationId, @RequestBody AuthorizationRequest request) {
+    ElderFamily relation = requireRelation(relationId);
+    if (request.validUntil() != null && request.validUntil().isBefore(LocalDate.now())) {
+      throw new IllegalArgumentException("授权有效期不能早于今天");
+    }
+    relation.setAuthScopes(FamilyAuthorization.normalize(request.scopes()));
+    relation.setValidUntil(request.validUntil());
+    relation.setAuthorizedByName(AuthContext.getUsername());
+    relation.setAuthorizedAt(LocalDateTime.now());
+    // validUntil 为空时也要写回 null（MyBatis-Plus 默认忽略 null 字段）
+    elderFamilyMapper.update(relation, Wrappers.lambdaUpdate(ElderFamily.class)
+        .set(ElderFamily::getValidUntil, request.validUntil())
+        .eq(ElderFamily::getId, relation.getId()));
+    return Result.ok(null);
+  }
+
+  private ElderFamily requireRelation(Long relationId) {
+    Long orgId = AuthContext.getOrgId();
+    ElderFamily relation = elderFamilyMapper.selectById(relationId);
+    if (relation == null || !Integer.valueOf(0).equals(relation.getIsDeleted())
+        || (orgId != null && !orgId.equals(relation.getOrgId()))) {
+      throw new IllegalArgumentException("绑定关系不存在或已撤销");
+    }
+    return relation;
   }
 
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
@@ -247,6 +286,9 @@ public class AdminFamilyController {
       ElderProfile elder = elderMap.get(relation.getElderId());
       FamilyElderItem item = new FamilyElderItem();
       item.setElderId(relation.getElderId());
+      item.setRelationId(relation.getId());
+      item.setAuthScopes(relation.getAuthScopes());
+      item.setValidUntil(relation.getValidUntil());
       item.setElderName(elder == null ? null : elder.getFullName());
       item.setRelation(relation.getRelation());
       item.setIsPrimary(relation.getIsPrimary());
@@ -289,14 +331,19 @@ public class AdminFamilyController {
 
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @DeleteMapping("/relations/{relationId}")
-  public Result<Void> removeRelation(@PathVariable Long relationId) {
+  public Result<Void> removeRelation(@PathVariable Long relationId,
+      @RequestParam(required = false) String reason) {
     Long orgId = AuthContext.getOrgId();
     ElderFamily relation = elderFamilyMapper.selectById(relationId);
     if (relation != null
         && relation.getIsDeleted() != null
         && relation.getIsDeleted() == 0
         && (orgId == null || orgId.equals(relation.getOrgId()))) {
+      // 撤销即刻生效：家属端所有查询都按 is_deleted=0 过滤；保留撤销人和原因备查
       relation.setIsDeleted(1);
+      relation.setRevokedByName(AuthContext.getUsername());
+      relation.setRevokedAt(LocalDateTime.now());
+      relation.setRevokeReason(reason == null || reason.isBlank() ? "解除绑定" : reason.trim());
       elderFamilyMapper.updateById(relation);
     }
     return Result.ok(null);

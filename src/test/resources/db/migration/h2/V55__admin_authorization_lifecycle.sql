@@ -1,0 +1,50 @@
+-- H2 版本：与 MySQL V294 一致；测试库原本没有 one_card_account，这里补建（不含一人一卡唯一约束）
+
+ALTER TABLE elder_family ADD COLUMN IF NOT EXISTS auth_scopes VARCHAR(128);
+ALTER TABLE elder_family ADD COLUMN IF NOT EXISTS valid_until DATE;
+ALTER TABLE elder_family ADD COLUMN IF NOT EXISTS authorized_by_name VARCHAR(64);
+ALTER TABLE elder_family ADD COLUMN IF NOT EXISTS authorized_at DATETIME;
+ALTER TABLE elder_family ADD COLUMN IF NOT EXISTS revoked_by_name VARCHAR(64);
+ALTER TABLE elder_family ADD COLUMN IF NOT EXISTS revoked_at DATETIME;
+ALTER TABLE elder_family ADD COLUMN IF NOT EXISTS revoke_reason VARCHAR(255);
+
+CREATE TABLE IF NOT EXISTS one_card_account (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NULL,
+  org_id BIGINT NULL,
+  elder_id BIGINT NOT NULL,
+  card_no VARCHAR(64) NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
+  loss_flag TINYINT NOT NULL DEFAULT 0,
+  open_time DATETIME NULL,
+  last_recharge_time DATETIME NULL,
+  remark VARCHAR(255) NULL,
+  created_by BIGINT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0
+);
+ALTER TABLE one_card_account ADD COLUMN IF NOT EXISTS prev_card_id BIGINT;
+ALTER TABLE one_card_account ADD COLUMN IF NOT EXISTS status_reason VARCHAR(255);
+ALTER TABLE one_card_account ADD COLUMN IF NOT EXISTS status_changed_at DATETIME;
+
+ALTER TABLE oa_notice ADD COLUMN IF NOT EXISTS audience VARCHAR(16) NOT NULL DEFAULT 'ALL';
+
+CREATE TABLE IF NOT EXISTS oa_notice_read (
+  id BIGINT NOT NULL PRIMARY KEY,
+  org_id BIGINT NULL,
+  notice_id BIGINT NOT NULL,
+  staff_id BIGINT NOT NULL,
+  staff_name VARCHAR(64) NULL,
+  read_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uk_oa_notice_read UNIQUE (notice_id, staff_id)
+);
+
+ALTER TABLE oa_document ADD COLUMN IF NOT EXISTS version_no INT NOT NULL DEFAULT 1;
+ALTER TABLE oa_document ADD COLUMN IF NOT EXISTS prev_version_id BIGINT;
+ALTER TABLE oa_document ADD COLUMN IF NOT EXISTS is_current TINYINT NOT NULL DEFAULT 1;
+ALTER TABLE oa_document ADD COLUMN IF NOT EXISTS review_status VARCHAR(16) NOT NULL DEFAULT 'APPROVED';
+ALTER TABLE oa_document ADD COLUMN IF NOT EXISTS reviewer_name VARCHAR(64);
+ALTER TABLE oa_document ADD COLUMN IF NOT EXISTS reviewed_at DATETIME;
+ALTER TABLE oa_document ADD COLUMN IF NOT EXISTS review_note VARCHAR(255);
+ALTER TABLE oa_document ADD COLUMN IF NOT EXISTS review_due_date DATE;

@@ -20,7 +20,7 @@ import PageContainer from '../../../components/PageContainer.vue'
 import EmbeddedPage from '../../marketing/center/EmbeddedPage.vue'
 import { useUserStore } from '../../../stores/user'
 import { resolveRouteAccess } from '../../../utils/routeAccess'
-import { pickTab, type CenterTab } from './centerTabs'
+import { pickTab, tabPagePermissions, type CenterTab } from './centerTabs'
 import '../../elder/residentUi.css'
 
 /**
@@ -32,8 +32,9 @@ const route = useRoute()
 const router = useRouter()
 const user = useUserStore()
 
+const pages = computed(() => tabPagePermissions(user.pagePermissions, props.tabs))
 const visibleTabs = computed(() => props.tabs.filter((tab) =>
-  resolveRouteAccess(router, user.roles, tab.path, user.pagePermissions, user.permissions).canAccess))
+  resolveRouteAccess(router, user.roles, tab.path, pages.value, user.permissions).canAccess))
 const active = computed(() => pickTab(visibleTabs.value, route.query.tab))
 
 const resolved = computed(() => {

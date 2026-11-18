@@ -4,7 +4,7 @@ import { financeRoutes } from '../router/financeRoutes'
 import { marketingRoutes } from '../router/marketingRoutes'
 import { hrRoutes } from '../router/hrRoutes'
 import { routes } from '../router/routes'
-import { canUseWorkspaceTab, functionWorkspaces, workspaceLocation } from './catalog'
+import { canUseWorkspaceTab, functionWorkspaces, workspaceLocation, workspaceNotes, workspaceTabGroups } from './catalog'
 import { normalizePagePermissions, getPagePermissionOptions, getRecommendedPagePermissions } from '../utils/pageAccess'
 import { resolveRouteAccess } from '../utils/routeAccess'
 import { resolveDefaultHome } from '../access/policy'
@@ -63,6 +63,33 @@ describe('one page per function', () => {
     expect(router.currentRoute.value.path).toBe('/workbench/overview')
   })
 
+  it.each([
+    ['/finance/bills/in-admission', '/finance/bills/detail-query', { billScene: 'ADMISSION' }],
+    ['/finance/accounts/ledger?elderId=7', '/finance/bills/detail-query', { panel: 'ledger', elderId: '7' }],
+    ['/finance/reconcile/exception', '/finance/flows/consumption', { sourceModule: 'RECONCILE' }],
+    ['/finance/discharge/review', '/finance/discharge/settlement', { step: 'review' }]
+  ])('opens merged page %s on its host page with the old preset filter', async (from, path, query) => {
+    const router = makeRouter()
+    await router.push(from)
+    expect(router.currentRoute.value.path).toBe(path)
+    expect(router.currentRoute.value.query).toMatchObject(query)
+  })
+
+  it('puts every tab of a grouped workspace into exactly one group', () => {
+    for (const workspace of functionWorkspaces.filter((w) => w.groups)) {
+      const grouped = workspace.groups!.flatMap(([, paths]) => paths)
+      expect(grouped.slice().sort(), workspace.id).toEqual(workspace.tabs.map((t) => t.path).sort())
+    }
+    const collections = functionWorkspaces.find((w) => w.id === 'finance-collections')!
+    const visible = collections.tabs.filter((t) => t.path !== '/finance/fees/payment-and-invoice')
+    expect(workspaceTabGroups(collections, visible).map((g) => g.label)).toEqual(['账单与收银', '长者资金账户'])
+  })
+
+  it('only attaches compliance notes to real workspace tabs', () => {
+    const tabPaths = new Set(functionWorkspaces.flatMap((w) => w.tabs.map((t) => t.path)))
+    for (const path of Object.keys(workspaceNotes)) expect(tabPaths.has(path), path).toBe(true)
+  })
+
   it('registers every source exactly once and preserves source permissions', () => {
     const paths = functionWorkspaces.flatMap((w) => w.tabs.flatMap((t) => t.sources.map((s) => s.path)))
     expect(new Set(paths).size).toBe(paths.length)
@@ -81,7 +108,8 @@ describe('one page per function', () => {
     expect(location).toEqual({ path: target, query: { ...query, view: key }, hash: '#record' })
     await router.push({ path, query: { ...query, view: key }, hash: '#record' })
     expect(router.currentRoute.value.path).toBe(target)
-    expect(router.currentRoute.value.query).toEqual({ ...query, view: key })
+    // 合并进来的旧入口会带上自己的预设筛选（billScene / panel / step 等），调用方的参数必须原样保留
+    expect(router.currentRoute.value.query).toMatchObject({ ...query, view: key })
     expect(router.currentRoute.value.hash).toBe('#record')
   })
 
@@ -112,8 +140,10 @@ describe('one page per function', () => {
     const location = workspaceLocation('/finance/payments/register')!
     const router = makeRouter()
     expect(resolveRouteAccess(router, ['FINANCE_EMPLOYEE'], router.resolve(location).fullPath, pages).canAccess).toBe(true)
-    const admission = workspaceLocation('/finance/bills/in-admission')!
-    expect(resolveRouteAccess(router, ['FINANCE_EMPLOYEE'], router.resolve(admission).fullPath, pages).canAccess).toBe(false)
+    // 在住 / 入住首期账单已合并为同一账单页的场景筛选，授权跟随账单页；其他标签仍不放宽
+    expect(router.resolve(workspaceLocation('/finance/bills/in-admission')!).query).toMatchObject({ view: location.query.view })
+    const audit = workspaceLocation('/finance/admission-fee-audit')!
+    expect(resolveRouteAccess(router, ['FINANCE_EMPLOYEE'], router.resolve(audit).fullPath, pages).canAccess).toBe(false)
   })
 
   it('rejects forged view names and unauthorized query-only tab navigation in the real guard', async () => {

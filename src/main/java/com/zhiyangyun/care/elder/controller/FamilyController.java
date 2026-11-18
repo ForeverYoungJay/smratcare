@@ -84,7 +84,8 @@ public class FamilyController {
         Wrappers.lambdaQuery(ElderFamily.class)
             .eq(ElderFamily::getOrgId, orgId)
             .eq(ElderFamily::getFamilyUserId, familyUserId)
-            .eq(ElderFamily::getIsDeleted, 0));
+            .eq(ElderFamily::getIsDeleted, 0)
+            .and(w -> w.isNull(ElderFamily::getValidUntil).or().ge(ElderFamily::getValidUntil, java.time.LocalDate.now())));
     List<FamilyElderItem> items = new ArrayList<>();
     for (ElderFamily relation : relations) {
       ElderProfile elder = elderMapper.selectById(relation.getElderId());

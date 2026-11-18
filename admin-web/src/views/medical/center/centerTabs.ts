@@ -12,6 +12,15 @@ export function pickTab<T extends { key: string }>(tabs: T[], requested: unknown
   return tabs.find((tab) => tab.key === requested) || tabs[0]
 }
 
+/**
+ * 能进入主页面就等于获得其标签页的页面授权；不限页面（空列表）时保持不限。
+ * 各标签自身的角色限制仍由路由 meta.roles 判断。
+ */
+export function tabPagePermissions(pagePermissions: string[] | undefined, tabs: Pick<CenterTab, 'path'>[]) {
+  const pages = pagePermissions || []
+  return pages.length ? [...pages, ...tabs.map((tab) => tab.path)] : pages
+}
+
 const P = '/medical-care/'
 
 /** 7 个主菜单里的「标签 + 原有页面」型页面（工作台、健康档案是独立页面） */

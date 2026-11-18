@@ -40,8 +40,8 @@ describe('two-level job navigation', () => {
   it.each([
     ['MARKETING_EMPLOYEE', '市场工作台', '/marketing/customers'],
     ['MARKETING_MINISTER', '市场工作台', '/marketing/operations'],
-    ['HR_EMPLOYEE', '人事工作台', '/hr/overview'],
-    ['HR_MINISTER', '人事工作台', '/hr/profile/basic']
+    ['HR_EMPLOYEE', '行政工作台', '/hr/overview'],
+    ['HR_MINISTER', '行政工作台', '/hr/profile/basic']
   ])('%s starts with its department and uses consolidated function entries', (role, title, path) => {
     const menu = jobMenu(role)
     expect(menu[0].label).toBe(title)
@@ -87,6 +87,17 @@ describe('two-level job navigation', () => {
     expect(paths(jobMenu('FINANCE_MINISTER'))).toEqual(expect.arrayContaining([...main, '/finance/config/master-data']))
     expect(paths(jobMenu('FINANCE_EMPLOYEE'))).toEqual(expect.arrayContaining(main))
     expect(paths(jobMenu('FINANCE_EMPLOYEE'))).not.toContain('/finance/config/master-data')
+  })
+
+  it('gives administration six main pages and keeps HR work in one group', () => {
+    const menu = jobMenu('HR_EMPLOYEE')
+    expect(menu.slice(0, 6).map((item) => item.path)).toEqual(['/oa/workbench', '/oa/family', '/oa/collaboration', '/oa/services', '/oa/culture', '/oa/library'])
+    expect(menu.find((item) => item.label === '人事管理')?.children?.map((c) => c.path)).toContain('/hr/profile/basic')
+  })
+
+  it('gives the logistics minister the five fire safety pages inside management', () => {
+    const management = jobMenu('LOGISTICS_MINISTER').find((item) => item.label === '后勤部管理')
+    expect(management?.children?.map((c) => c.path)).toEqual(expect.arrayContaining(['/fire/overview', '/fire/inspection', '/fire/facilities', '/fire/control-center', '/fire/safety']))
   })
 
   it('links employee navigation to medical and logistics department workbenches', () => {

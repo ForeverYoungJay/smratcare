@@ -110,8 +110,8 @@
           >
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'status'">
-                <a-tag :color="record.status === 'DONE' ? 'green' : 'orange'">
-                  {{ record.status === 'DONE' ? '已完成' : '进行中' }}
+                <a-tag :color="record.status === 'DONE' ? 'green' : record.status === 'SUBMITTED' ? 'blue' : 'orange'">
+                  {{ record.status === 'DONE' ? '已完成' : record.status === 'SUBMITTED' ? '待验收' : '进行中' }}
                 </a-tag>
               </template>
               <template v-else-if="column.key === 'priority'">
@@ -133,6 +133,9 @@
             </template>
           </DataTable>
         </StatefulBlock>
+      </a-tab-pane>
+      <a-tab-pane key="kanban" tab="任务看板">
+        <TaskKanban v-if="activeKey === 'kanban'" @edit="openEdit" @changed="fetchData" />
       </a-tab-pane>
       <a-tab-pane key="calendar" tab="日历视图">
         <a-card class="card-elevated" :bordered="false">
@@ -264,6 +267,7 @@
 </template>
 
 <script setup lang="ts">
+import TaskKanban from './TaskKanban.vue'
 import { reactive, ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
@@ -357,6 +361,7 @@ const form = reactive({
 
 const statusOptions = [
   { label: '进行中', value: 'OPEN' },
+  { label: '待验收', value: 'SUBMITTED' },
   { label: '已完成', value: 'DONE' }
 ]
 const editableStatusOptions = [{ label: '进行中', value: 'OPEN' }]
@@ -593,7 +598,7 @@ function resolveRouteQuickFilter(routeQuick: string, routeCategory: string) {
 
 function applyRoutePreset() {
   const status = firstRouteQueryText(route.query.status).toUpperCase()
-  query.status = status === 'OPEN' || status === 'DONE' ? status : undefined
+  query.status = status === 'OPEN' || status === 'SUBMITTED' || status === 'DONE' ? status : undefined
   query.keyword = firstRouteQueryText(route.query.keyword)
   const auto = firstRouteQueryText(route.query.auto).toLowerCase()
   if (auto === '0' || auto === 'false') autoRefresh.value = false

@@ -2,6 +2,7 @@
   <PageContainer title="老人账户" subTitle="余额、预警阈值与账户流水">
     <template #extra>
       <a-space>
+        <a-button @click="router.push('/finance/prepaid-recharge')">预存充值</a-button>
         <a-button @click="openWarnings">余额预警</a-button>
         <a-button type="primary" @click="openAdjust">余额调整</a-button>
       </a-space>
@@ -127,6 +128,12 @@
         </a-form-item>
       </a-form>
     </a-modal>
+    <a-drawer :open="panel === 'ledger'" title="账户流水" width="min(1100px, 96vw)" destroy-on-close @close="close('elderId')">
+      <AccountLog />
+    </a-drawer>
+    <a-drawer :open="panel === 'recharge'" title="预存充值" width="min(1100px, 96vw)" destroy-on-close @close="close()">
+      <PrepaidRecharge />
+    </a-drawer>
   </PageContainer>
 </template>
 
@@ -143,8 +150,12 @@ import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getElderAccountPage, adjustElderAccount, getElderAccountWarnings, getFinanceModuleEntrySummary, updateElderAccount } from '../../api/finance'
 import type { ElderAccount, FinanceModuleEntrySummary, Id, PageResult } from '../../types'
 import router from '../../router'
+import AccountLog from './AccountLog.vue'
+import PrepaidRecharge from './PrepaidRecharge.vue'
+import { usePanelQuery } from './usePanelQuery'
 
 const route = useRoute()
+const { panel, close } = usePanelQuery()
 const loading = ref(false)
 const rows = ref<ElderAccount[]>([])
 const warnings = ref<ElderAccount[]>([])
@@ -332,7 +343,7 @@ async function submitAdjust() {
 }
 
 function openLogs(record: ElderAccount) {
-  router.push({ name: 'FinanceAccountLog', query: { elderId: record.elderId } })
+  router.push({ path: '/finance/accounts/ledger', query: { elderId: String(record.elderId) } })
 }
 
 function openConfig(record: ElderAccount) {
@@ -388,12 +399,12 @@ applyRouteFilters()
 fetchData()
 
 watch(
-  () => route.query,
+  // 打开/关闭流水、充值抽屉只改 panel/elderId，不重新查账户列表
+  () => { const { panel: _panel, elderId: _elderId, ...rest } = route.query; return JSON.stringify(rest) },
   () => {
     applyRouteFilters()
     fetchData().catch(() => {})
-  },
-  { deep: true }
+  }
 )
 
 useLiveSyncRefresh({

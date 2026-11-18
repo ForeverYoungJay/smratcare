@@ -42,14 +42,14 @@ export const financeRoutes: RouteRecordRaw[] = [
               {
                 path: 'register',
                 name: 'FinancePaymentsRegister',
-                component: () => import('../views/finance/ResidentBillPayment.vue'),
-                meta: { title: '收费登记' }
+                redirect: '/finance/bills/detail-query?billScene=RESIDENT',
+                meta: { title: '收费登记（已合并）' }
               },
               {
                 path: 'records',
                 name: 'FinancePaymentsRecords',
-                component: () => import('../views/finance/PaymentRecords.vue'),
-                meta: { title: '收款流水' }
+                redirect: '/finance/payments/cashier-desk?panel=records',
+                meta: { title: '收款流水（已合并）' }
               },
               {
                 path: '/finance/fees/payment-and-invoice',
@@ -66,8 +66,8 @@ export const financeRoutes: RouteRecordRaw[] = [
               {
                 path: '/finance/payments/shift-close',
                 name: 'FinancePaymentsShiftClose',
-                component: () => import('../views/finance/ShiftClose.vue'),
-                meta: { title: '日结与交班' }
+                redirect: '/finance/payments/cashier-desk?panel=shift',
+                meta: { title: '日结与交班（已合并）' }
               }
             ]
           },
@@ -80,14 +80,14 @@ export const financeRoutes: RouteRecordRaw[] = [
               {
                 path: '/finance/bills/in-admission',
                 name: 'FinanceBillsInAdmission',
-                component: () => import('../views/finance/AdmissionBillPayment.vue'),
-                meta: { title: '入住账单' }
+                redirect: '/finance/bills/detail-query?billScene=ADMISSION',
+                meta: { title: '入住账单（已合并）' }
               },
               {
                 path: '/finance/bills/in-resident',
                 name: 'FinanceBillsInResident',
-                component: () => import('../views/finance/ResidentBillPayment.vue'),
-                meta: { title: '在住周期账单' }
+                redirect: '/finance/bills/detail-query?billScene=RESIDENT',
+                meta: { title: '在住周期账单（已合并）' }
               },
               {
                 path: '/finance/bills/detail-query',
@@ -109,14 +109,14 @@ export const financeRoutes: RouteRecordRaw[] = [
               {
                 path: '/finance/accounts/ledger',
                 name: 'FinanceAccountsLedger',
-                component: () => import('../views/finance/AccountLog.vue'),
-                meta: { title: '账户流水' }
+                redirect: '/finance/accounts/list?panel=ledger',
+                meta: { title: '账户流水（已合并）' }
               },
               {
                 path: '/finance/prepaid-recharge',
                 name: 'FinancePrepaidRecharge',
-                component: () => import('../views/finance/PrepaidRecharge.vue'),
-                meta: { title: '预存充值' }
+                redirect: '/finance/accounts/list?panel=recharge',
+                meta: { title: '预存充值（已合并）' }
               },
               {
                 path: '/finance/consumer-voucher',
@@ -179,66 +179,26 @@ export const financeRoutes: RouteRecordRaw[] = [
               {
                 path: '/finance/flows/medical',
                 name: 'FinanceFlowsMedical',
-                component: () => import('../views/finance/FlowCenter.vue'),
-                meta: { title: '医护费用流水' },
-                props: {
-                  moduleKey: 'MEDICAL_FLOW',
-                  moduleName: '医护费用流水',
-                  description: '按医嘱、用药、治疗与检查动作汇总收费流水',
-                  category: 'MEDICINE',
-                  links: [
-                    { label: '查看医护费用异常', to: '/finance/flows/medical-errors' },
-                    { label: '查看费用调整单', to: '/finance/flows/adjustments' }
-                  ]
-                }
+                redirect: '/finance/flows/consumption?moduleKey=MEDICAL_FLOW',
+                meta: { title: '医护费用流水（已合并）' }
               },
               {
                 path: '/finance/flows/medical-errors',
                 name: 'FinanceFlowsMedicalErrors',
-                component: () => import('../views/finance/FlowCenter.vue'),
-                meta: { title: '医护费用异常' },
-                props: {
-                  moduleKey: 'MEDICAL_ERRORS',
-                  moduleName: '医护费用异常',
-                  description: '重复计费、缺少医嘱关联、异常修正与重算',
-                  category: 'MEDICINE',
-                  links: [
-                    { label: '查看医护费用流水', to: '/finance/flows/medical' },
-                    { label: '查看费用调整单', to: '/finance/flows/adjustments' }
-                  ]
-                }
+                redirect: '/finance/flows/consumption?moduleKey=MEDICAL_ERRORS',
+                meta: { title: '医护费用异常（已合并）' }
               },
               {
                 path: '/finance/flows/dining',
                 name: 'FinanceFlowsDining',
-                component: () => import('../views/finance/FlowCenter.vue'),
-                meta: { title: '餐饮扣费流水' },
-                props: {
-                  moduleKey: 'DINING_FLOW',
-                  moduleName: '餐饮扣费流水',
-                  description: '积分点餐扣费、餐饮补扣与异常追踪',
-                  category: 'DINING',
-                  links: [
-                    { label: '查看消费流水', to: '/finance/flows/consumption' },
-                    { label: '查看在住账单', to: '/finance/bills/in-resident' }
-                  ]
-                }
+                redirect: '/finance/flows/consumption?moduleKey=DINING_FLOW',
+                meta: { title: '餐饮扣费流水（已合并）' }
               },
               {
                 path: '/finance/flows/logistics',
                 name: 'FinanceFlowsLogistics',
-                component: () => import('../views/finance/FlowCenter.vue'),
-                meta: { title: '物资/后勤收费流水' },
-                props: {
-                  moduleKey: 'LOGISTICS_FLOW',
-                  moduleName: '物资/后勤收费流水',
-                  description: '物资与后勤额外收费项目的自动入账视图',
-                  category: 'OTHER',
-                  links: [
-                    { label: '查看消费流水', to: '/finance/flows/consumption' },
-                    { label: '查看经营报表', to: '/finance/reports/overall' }
-                  ]
-                }
+                redirect: '/finance/flows/consumption?moduleKey=LOGISTICS_FLOW',
+                meta: { title: '物资/后勤收费流水（已合并）' }
               },
               {
                 path: '/finance/flows/adjustments',
@@ -290,20 +250,20 @@ export const financeRoutes: RouteRecordRaw[] = [
               {
                 path: '/finance/bills/auto-deduct-errors',
                 name: 'FinanceBillsAutoDeductErrors',
-                component: () => import('../views/finance/AutoDebitManagement.vue'),
-                meta: { title: '自动扣费异常' }
+                redirect: '/finance/reconcile/issue-center?sourceModule=AUTO_DEBIT',
+                meta: { title: '自动扣费异常（已合并）' }
               },
               {
                 path: '/finance/reconcile/exception',
                 name: 'FinanceReconcileException',
-                component: () => import('../views/finance/ReconcileException.vue'),
-                meta: { title: '对账异常处理' }
+                redirect: '/finance/reconcile/issue-center?sourceModule=RECONCILE',
+                meta: { title: '对账异常处理（已合并）' }
               },
               {
                 path: '/finance/reconcile/ledger-health',
                 name: 'FinanceReconcileLedgerHealth',
-                component: () => import('../views/finance/LedgerHealth.vue'),
-                meta: { title: '财务一致性巡检' }
+                redirect: '/finance/reconcile/issue-center?sourceModule=LEDGER',
+                meta: { title: '财务一致性巡检（已合并）' }
               },
               {
                 path: '/finance/reconcile/issue-center',
@@ -322,13 +282,13 @@ export const financeRoutes: RouteRecordRaw[] = [
               {
                 path: 'review',
                 name: 'FinanceDischargeReview',
-                component: () => import('../views/finance/DischargeFeeAudit.vue'),
-                meta: { title: '退住审核' }
+                redirect: '/finance/discharge/settlement?step=review',
+                meta: { title: '退住审核（已合并）' }
               },
               {
                 path: 'settlement',
                 name: 'FinanceDischargeSettlementCenter',
-                component: () => import('../views/finance/DischargeSettlement.vue'),
+                component: () => import('../views/finance/DischargeFlow.vue'),
                 meta: { title: '退住结算' }
               },
               {
@@ -340,8 +300,8 @@ export const financeRoutes: RouteRecordRaw[] = [
               {
                 path: 'status-sync',
                 name: 'FinanceDischargeStatusSync',
-                component: () => import('../views/finance/DischargeStatusSync.vue'),
-                meta: { title: '结算状态回写' }
+                redirect: '/finance/discharge/settlement?step=sync',
+                meta: { title: '结算状态回写（已合并）' }
               },
               {
                 path: '/finance/reconcile/center',

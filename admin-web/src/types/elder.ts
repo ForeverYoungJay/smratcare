@@ -152,6 +152,10 @@ export interface FamilyRelationItem {
 
 export interface FamilyElderItem {
   elderId: Id
+  relationId?: Id
+  /** HEALTH,BILLING,PHOTO,PROXY,EMERGENCY；空 = 历史绑定（全部可见） */
+  authScopes?: string | null
+  validUntil?: string | null
   elderName?: string
   relation?: string
   isPrimary?: boolean | number

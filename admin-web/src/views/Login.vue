@@ -186,7 +186,8 @@ const demoAccounts = [
     items: [
       { label: '员工 logistics_emp', username: 'logistics_emp' },
       { label: '部长 logistics_minister', username: 'logistics_minister' },
-      { label: '管理层 logistics_director', username: 'logistics_director' }
+      { label: '管理层 logistics_director', username: 'logistics_director' },
+      { label: '保卫 guard_demo', username: 'guard_demo' }
     ]
   },
   {

@@ -22,6 +22,10 @@ export function getFamilyLinkedElders(familyUserId: Id) {
   return request.get<FamilyElderItem[]>(`/api/admin/family/users/${familyUserId}/elders`)
 }
 
-export function removeFamilyRelation(relationId: Id) {
-  return request.delete<void>(`/api/admin/family/relations/${relationId}`)
+export function removeFamilyRelation(relationId: Id, reason?: string) {
+  return request.delete<void>(`/api/admin/family/relations/${relationId}`, { params: { reason } })
+}
+
+export function authorizeFamilyRelation(relationId: Id, data: { scopes: string[]; validUntil?: string | null }) {
+  return request.put<void>(`/api/admin/family/relations/${relationId}/authorization`, data)
 }

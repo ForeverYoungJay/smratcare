@@ -40,7 +40,7 @@ function joinPath(base: string, path: string): string {
 }
 
 function shouldIncludeRoute(route: RouteRecordRaw, fullPath: string) {
-  if ((route.meta?.hidden && !retainedWorkspacePermissionPaths.has(fullPath)) || !route.meta?.title) {
+  if ((route.meta?.hidden && !retainedWorkspacePermissionPaths.has(fullPath) && !route.meta?.workspaceId) || !route.meta?.title) {
     return false
   }
   if (fullPath.includes('/:')) {
@@ -53,11 +53,12 @@ function buildTree(routeList: RouteRecordRaw[], basePath = ''): PagePermissionNo
   return (routeList || [])
     .map((route) => {
       const fullPath = joinPath(basePath, String(route.path || ''))
-      if ((route.meta?.hidden || route.meta?.legacy) && !retainedWorkspacePermissionPaths.has(fullPath)) return null
       const workspace = getFunctionWorkspace(route.meta?.workspaceId)
       const children = workspace
         ? workspace.tabs.flatMap((tab) => tab.sources.filter((source) => source.path !== fullPath).map((source) => ({ title: tab.label, key: source.path })))
         : Array.isArray(route.children) ? buildTree(route.children, fullPath) : []
+      // 工作区页面即使在菜单里隐藏（被主页面标签收纳），也要能在角色权限里授权；隐藏的分组只在含有这类页面时保留
+      if ((route.meta?.hidden || route.meta?.legacy) && !retainedWorkspacePermissionPaths.has(fullPath) && !workspace && children.length === 0) return null
       const includeSelf = shouldIncludeRoute(route, fullPath)
       if (!includeSelf && children.length === 0) {
         return null
@@ -86,6 +87,18 @@ const pagePermissionFlat: Array<{ path: string; title: string }> = []
 flattenTree(pagePermissionTree, pagePermissionFlat)
 const pageTitleMap = new Map(pagePermissionFlat.map((item) => [item.path, item.title]))
 const knownPagePaths = new Set(pagePermissionFlat.map((item) => item.path))
+// 被主页面标签收纳、菜单里隐藏的原功能页仍是真实页面：已保存的单页授权不能因为隐藏而被丢弃
+function collectHiddenPages(routeList: RouteRecordRaw[], basePath = '') {
+  for (const route of routeList || []) {
+    const fullPath = joinPath(basePath, String(route.path || ''))
+    if (route.component && route.meta?.title && route.meta?.hidden && !route.meta?.legacy && !fullPath.includes('/:') && !HIDDEN_PATHS.has(fullPath)) {
+      knownPagePaths.add(fullPath)
+      if (!pageTitleMap.has(fullPath)) pageTitleMap.set(fullPath, String(route.meta.title))
+    }
+    if (route.children) collectHiddenPages(route.children, fullPath)
+  }
+}
+collectHiddenPages((layout?.children || []) as RouteRecordRaw[])
 // A hidden legacy entry can still be an existing account's exact grant.
 functionWorkspaces.forEach((workspace) => workspace.tabs.forEach((tab) => tab.sources.forEach((source) => {
   const path = toCanonicalPermissionPath(source.path)
