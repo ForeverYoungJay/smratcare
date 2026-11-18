@@ -1,98 +1,122 @@
 <template>
   <div class="login-page">
-    <div class="login-shell">
-      <aside class="login-hero">
-        <div class="login-hero__brand">
-          <img :src="brandLogoUrl" alt="龟峰颐养中心" class="login-hero__logo" />
+    <header class="login-top">
+      <div class="login-top__brand">
+        <img :src="brandLogoUrl" alt="弋阳龟峰颐养中心" class="login-top__logo" />
+        <div>
+          <div class="login-top__org">弋阳龟峰颐养中心</div>
+          <div class="login-top__en">Yiyang Guifeng Elderly Care Center</div>
+        </div>
+        <span class="login-top__divider" aria-hidden="true" />
+        <span class="login-top__motto">安心颐养 · 贴心照护 · 健康相伴</span>
+      </div>
+      <button type="button" class="login-top__home" @click="goEnterpriseHome"><HomeOutlined /> 返回官网</button>
+    </header>
+
+    <main class="login-main">
+      <section class="login-hero">
+        <h1 class="login-hero__title">员工管理服务平台</h1>
+        <p class="login-hero__values">协同高效<i>|</i>规范管理<i>|</i>服务长者<i>|</i>共同成长</p>
+      </section>
+
+      <section class="login-card" aria-labelledby="login-card-title">
+        <div class="login-card__head">
+          <TeamOutlined class="login-card__icon" />
           <div>
-            <div class="login-hero__org">龟峰颐养中心</div>
-            <div class="login-hero__platform">智养云 · 运营管理平台</div>
+            <h2 id="login-card-title">员工登录</h2>
+            <p>颐养中心管理平台 · 内部专用</p>
           </div>
         </div>
-        <h1 class="login-hero__slogan">照护、健康、安全、经营，一体化管理</h1>
-        <p class="login-hero__desc">围绕长者全生命周期，把入住、护理、医疗、安全、家属服务与经营数据收拢在同一平台。</p>
-        <ul class="login-hero__features">
-          <li><span>护</span>长者全生命周期与护理执行闭环</li>
-          <li><span>安</span>生命体征与安全事件实时预警</li>
-          <li><span>亲</span>家属服务、探访与关怀协同</li>
-          <li><span>营</span>床位、收费与经营一屏掌握</li>
-        </ul>
-      </aside>
-      <div class="login-card">
-      <div class="brand">
-        <div class="logo">
-          <img :src="brandLogoUrl" alt="龟峰颐养中心logo" class="logo-image" />
-        </div>
-        <div>
-          <div class="title">智养云运营中台</div>
-          <div class="subtitle">智慧养老管理平台</div>
-        </div>
-      </div>
-      <a-form v-if="!twoFactor.active" :model="form" @finish="onSubmit" layout="vertical">
-        <a-form-item label="用户名" name="username" :rules="[{ required: true, message: '请输入用户名' }]">
-          <a-input v-model:value="form.username" placeholder="admin" />
-        </a-form-item>
-        <a-form-item label="密码" name="password" :rules="[{ required: true, message: '请输入密码' }]">
-          <a-input-password v-model:value="form.password" placeholder="******" />
-        </a-form-item>
-        <a-button type="primary" html-type="submit" block :loading="loading">登录</a-button>
-        <a-button block style="margin-top: 8px" @click="goEnterpriseHome">返回企业首页</a-button>
-      </a-form>
-      <a-form v-else layout="vertical" @finish="onVerifyTwoFactor">
-        <a-alert
-          type="info"
-          show-icon
-          style="margin-bottom: 16px"
-          message="安全验证（双因子登录）"
-          :description="`本机构已开启双因子登录，验证码已发送至 ${twoFactor.phone || '预留手机号'}`"
-        />
-        <a-form-item label="短信验证码">
-          <a-input
-            v-model:value="twoFactor.code"
-            placeholder="请输入短信验证码"
-            :maxlength="8"
-            autocomplete="one-time-code"
+
+        <a-form v-if="!twoFactor.active" :model="form" @finish="onSubmit">
+          <a-form-item name="username" :rules="[{ required: true, message: '请输入员工账号或工号' }]">
+            <a-input v-model:value="form.username" size="large" placeholder="请输入员工账号 / 工号" autocomplete="username">
+              <template #prefix><UserOutlined /></template>
+            </a-input>
+          </a-form-item>
+          <a-form-item name="password" :rules="[{ required: true, message: '请输入密码' }]">
+            <a-input-password v-model:value="form.password" size="large" placeholder="请输入密码" autocomplete="current-password">
+              <template #prefix><LockOutlined /></template>
+            </a-input-password>
+          </a-form-item>
+          <div class="login-card__row">
+            <a-checkbox v-model:checked="rememberAccount">记住账号</a-checkbox>
+            <a class="login-card__link" @click="onForgotPassword">忘记密码？</a>
+          </div>
+          <a-button type="primary" html-type="submit" block size="large" class="login-card__submit" :loading="loading">登 录</a-button>
+        </a-form>
+        <a-form v-else layout="vertical" @finish="onVerifyTwoFactor">
+          <a-alert
+            type="info"
+            show-icon
+            style="margin-bottom: 16px"
+            message="安全验证（双因子登录）"
+            :description="`本机构已开启双因子登录，验证码已发送至 ${twoFactor.phone || '预留手机号'}`"
           />
-        </a-form-item>
-        <a-button type="primary" html-type="submit" block :loading="twoFactor.submitting">验证并登录</a-button>
-        <div class="twofa-actions">
-          <a-button type="link" size="small" :disabled="twoFactor.countdown > 0" @click="onResendTwoFactor">
-            {{ twoFactor.countdown > 0 ? `重新发送(${twoFactor.countdown}s)` : '重新发送验证码' }}
-          </a-button>
-          <a-button type="link" size="small" @click="backToPasswordStep">返回重新登录</a-button>
+          <a-form-item label="短信验证码">
+            <a-input
+              v-model:value="twoFactor.code"
+              size="large"
+              placeholder="请输入短信验证码"
+              :maxlength="8"
+              autocomplete="one-time-code"
+            />
+          </a-form-item>
+          <a-button type="primary" html-type="submit" block size="large" class="login-card__submit" :loading="twoFactor.submitting">验证并登录</a-button>
+          <div class="twofa-actions">
+            <a-button type="link" size="small" :disabled="twoFactor.countdown > 0" @click="onResendTwoFactor">
+              {{ twoFactor.countdown > 0 ? `重新发送(${twoFactor.countdown}s)` : '重新发送验证码' }}
+            </a-button>
+            <a-button type="link" size="small" @click="backToPasswordStep">返回重新登录</a-button>
+          </div>
+        </a-form>
+
+        <div class="login-card__other"><span>其他登录方式</span></div>
+        <div class="login-card__alt">
+          <!-- 扫码、工卡登录尚未接入后端，按钮如实标注，不模拟登录 -->
+          <button type="button" @click="onUnavailable('扫码登录')"><QrcodeOutlined /> 扫码登录 <small>暂未开通</small></button>
+          <button type="button" @click="onUnavailable('工卡登录')"><IdcardOutlined /> 工卡登录 <small>暂未开通</small></button>
         </div>
-      </a-form>
-      <div class="tips">
-        推荐使用现代浏览器访问以获得最佳体验
-      </div>
-      <details v-if="showDemoPanel" class="demo-panel">
-        <summary>演示账号快捷填充（开发调试）</summary>
-        <p class="demo-help">点击账号会自动填入用户名与默认密码（123456）</p>
-        <div class="demo-groups">
-          <div v-for="group in demoAccounts" :key="group.name" class="demo-group">
-            <div class="demo-group-title">{{ group.name }}</div>
-            <div class="demo-users">
-              <button
-                v-for="item in group.items"
-                :key="item.username"
-                type="button"
-                class="demo-user"
-                @click="fillDemo(item.username)"
-              >
-                {{ item.label }}
-              </button>
+
+        <details v-if="showDemoPanel" class="demo-panel">
+          <summary>演示账号快捷填充（开发调试）</summary>
+          <p class="demo-help">点击账号会自动填入用户名与默认密码（123456）</p>
+          <div class="demo-groups">
+            <div v-for="group in demoAccounts" :key="group.name" class="demo-group">
+              <div class="demo-group-title">{{ group.name }}</div>
+              <div class="demo-users">
+                <button
+                  v-for="item in group.items"
+                  :key="item.username"
+                  type="button"
+                  class="demo-user"
+                  @click="fillDemo(item.username)"
+                >
+                  {{ item.label }}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </details>
-      </div>
-    </div>
+        </details>
+      </section>
+    </main>
+
+    <footer class="login-foot">
+      <ul class="login-features">
+        <li><AppstoreOutlined /><div><b>一体化管理</b><span>业务协同 · 数据共享</span></div></li>
+        <li><SafetyCertificateOutlined /><div><b>安全可靠</b><span>权限分级 · 数据加密</span></div></li>
+        <li><TeamOutlined /><div><b>高效便捷</b><span>任务清晰 · 移动可用</span></div></li>
+        <li><HeartOutlined /><div><b>以人为本</b><span>服务长者 · 关爱员工</span></div></li>
+      </ul>
+      <div class="login-copyright">© 弋阳龟峰颐养中心 ｜ 管理平台 v1.0</div>
+    </footer>
   </div>
 </template>
 
 <script setup lang="ts">
 import { message } from 'ant-design-vue'
-import { onUnmounted, reactive, ref } from 'vue'
+import { onUnmounted, reactive, ref, watch } from 'vue'
+import { AppstoreOutlined, HeartOutlined, HomeOutlined, IdcardOutlined, LockOutlined, QrcodeOutlined, SafetyCertificateOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import brandLogoUrl from '../assets/guifeng-logo.png'
 import { login } from '../api/auth'
@@ -105,10 +129,24 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
+// 记住账号只保存账号，不保存密码；浏览器禁用存储时静默忽略
+const REMEMBER_KEY = 'login.rememberedUsername'
+function readRemembered() {
+  try { return localStorage.getItem(REMEMBER_KEY) || '' } catch { return '' }
+}
+function writeRemembered(username: string) {
+  try {
+    if (username) localStorage.setItem(REMEMBER_KEY, username)
+    else localStorage.removeItem(REMEMBER_KEY)
+  } catch { /* 存储不可用时不影响登录 */ }
+}
+
 const form = reactive({
-  username: '',
+  username: readRemembered(),
   password: ''
 })
+const rememberAccount = ref(Boolean(form.username))
+watch(rememberAccount, (on) => { if (!on) writeRemembered('') })
 
 const loading = ref(false)
 
@@ -238,6 +276,7 @@ async function onSubmit() {
       startTwoFactorCountdown()
       return
     }
+    writeRemembered(rememberAccount.value ? form.username.trim() : '')
     await finishLogin(res)
   } catch (error: any) {
     const status = Number(error?.response?.status || 0)
@@ -317,243 +356,135 @@ async function onResendTwoFactor() {
   }
 }
 
+// 官网是独立页面 home.html：生产 nginx 会把它 301 到 /；开发服务器上 / 是后台，直接去 / 会被送回登录页
 function goEnterpriseHome() {
-  window.location.assign('/')
+  window.location.assign('/home.html')
+}
+
+function onForgotPassword() {
+  message.info('员工账号的密码由行政人事部重置，请联系行政人事部或部门负责人。')
+}
+
+function onUnavailable(name: string) {
+  message.info(`${name}暂未开通，请使用账号密码登录。`)
 }
 </script>
 
 <style scoped>
 .login-page {
-  min-height: 100vh;
+  --login-green: #17734f;
+  --login-green-dark: #0f5c3f;
+  --login-ink: #1f3a2e;
+  position: relative;
   display: grid;
-  place-items: center;
-  padding: 24px;
+  grid-template-rows: auto 1fr auto;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 100vh;
+  padding: 28px 56px 24px;
+  overflow: hidden;
+  color: var(--login-ink);
+  background-color: #eef5ef;
   background-image:
-    linear-gradient(135deg, rgba(24, 92, 78, 0.82) 0%, rgba(33, 112, 95, 0.66) 46%, rgba(46, 138, 114, 0.5) 100%),
+    linear-gradient(90deg, rgba(246, 251, 247, 0.94) 0%, rgba(246, 251, 247, 0.78) 38%, rgba(246, 251, 247, 0.28) 70%, rgba(246, 251, 247, 0.12) 100%),
+    linear-gradient(180deg, rgba(232, 244, 236, 0.35) 0%, rgba(232, 244, 236, 0) 40%, rgba(214, 236, 222, 0.75) 100%),
     url('../assets/home-login.jpg');
   background-size: cover;
   background-position: center;
-  background-repeat: no-repeat;
 }
 
-.login-shell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 56px;
-  width: 100%;
-  max-width: 960px;
+.login-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.login-top__brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.login-top__logo { width: 58px; height: 58px; object-fit: contain; }
+.login-top__org { font-size: 26px; font-weight: 800; letter-spacing: 0.04em; color: var(--login-green-dark); line-height: 1.2; }
+.login-top__en { font-size: 12px; font-weight: 600; color: #3d5a4b; }
+.login-top__divider { width: 1px; height: 40px; margin: 0 10px; background: rgba(31, 58, 46, 0.35); }
+.login-top__motto { font-size: 18px; letter-spacing: 0.12em; color: var(--login-ink); white-space: nowrap; }
+.login-top__home {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px;
+  border: 1px solid rgba(23, 115, 79, 0.45); border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72); color: var(--login-green-dark); font-weight: 600; cursor: pointer;
 }
+.login-top__home:hover { background: #fff; }
 
-.login-hero {
-  flex: 1 1 0;
-  max-width: 460px;
-  color: #ffffff;
+.login-main { display: flex; align-items: center; justify-content: space-between; gap: 48px; padding: 24px 0; }
+.login-hero { padding-left: clamp(0px, 6vw, 110px); }
+.login-hero__title {
+  position: relative; display: inline-block; margin: 0 0 22px; padding-bottom: 14px;
+  font-family: 'STKaiti', 'KaiTi', 'Kaiti SC', 'BiauKai', serif;
+  font-size: clamp(40px, 4.6vw, 68px); font-weight: 700; letter-spacing: 0.06em; color: #12402d;
 }
-
-.login-hero__brand {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 30px;
+.login-hero__title::after {
+  content: ''; position: absolute; left: 22%; right: 12%; bottom: 0; height: 4px; border-radius: 4px;
+  background: linear-gradient(90deg, rgba(222, 170, 70, 0), #dfa84a 30%, #dfa84a 70%, rgba(222, 170, 70, 0));
 }
-
-.login-hero__logo {
-  width: 54px;
-  height: 54px;
-  padding: 10px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.18);
-  object-fit: contain;
-}
-
-.login-hero__org {
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-}
-
-.login-hero__platform {
-  margin-top: 2px;
-  font-size: 13px;
-  opacity: 0.85;
-}
-
-.login-hero__slogan {
-  margin: 0 0 14px;
-  font-size: 30px;
-  line-height: 1.3;
-  font-weight: 800;
-  color: #ffffff;
-}
-
-.login-hero__desc {
-  margin: 0 0 28px;
-  max-width: 420px;
-  font-size: 14px;
-  line-height: 1.85;
-  opacity: 0.9;
-}
-
-.login-hero__features {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 14px;
-}
-
-.login-hero__features li {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 14px;
-}
-
-.login-hero__features li span {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.2);
-  font-size: 13px;
-  font-weight: 700;
-}
+.login-hero__values { margin: 0; font-size: 20px; letter-spacing: 0.22em; color: var(--login-ink); }
+.login-hero__values i { margin: 0 14px; font-style: normal; opacity: 0.55; }
 
 .login-card {
-  flex: none;
-  width: 380px;
-  max-width: 100%;
-  background: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  border-radius: 16px;
-  padding: 32px;
-  box-shadow: 0 10px 32px rgba(16, 46, 39, 0.28);
+  position: relative; flex: none; width: 460px; max-width: 100%; padding: 40px 44px 30px;
+  border-radius: 28px; background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 24px 60px rgba(18, 64, 45, 0.18); overflow: hidden;
 }
-
-@media (max-width: 880px) {
-  .login-shell {
-    gap: 0;
-  }
-
-  .login-hero {
-    display: none;
-  }
+.login-card::before {
+  content: ''; position: absolute; top: -60px; right: -60px; width: 200px; height: 160px; border-radius: 50%;
+  background: radial-gradient(circle at 30% 70%, #cfe9d6, #e9f5ec 60%, transparent 70%); pointer-events: none;
 }
-
-.login-card :deep(.ant-btn) {
-  height: 40px;
+.login-card__head { position: relative; display: flex; align-items: center; gap: 16px; margin-bottom: 28px; }
+.login-card__icon { font-size: 48px; color: var(--login-green); }
+.login-card__head h2 { margin: 0; font-size: 30px; font-weight: 800; color: #12402d; }
+.login-card__head p { margin: 2px 0 0; color: #4d6458; font-size: 15px; }
+.login-card :deep(.ant-input-affix-wrapper) { height: 52px; border-radius: 12px; }
+.login-card :deep(.ant-input-prefix) { margin-right: 10px; color: #4d6458; font-size: 18px; }
+.login-card__row { display: flex; justify-content: space-between; align-items: center; margin: -4px 0 18px; }
+.login-card__link { color: var(--login-green); }
+.login-card__submit.ant-btn { height: 52px; border-radius: 12px; font-size: 18px; letter-spacing: 0.4em; }
+.login-card__other { display: flex; align-items: center; gap: 14px; margin: 26px 0 16px; color: #4d6458; }
+.login-card__other::before, .login-card__other::after { content: ''; flex: 1; height: 1px; background: #e2ebe5; }
+.login-card__alt { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.login-card__alt button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 50px;
+  border: 0; border-radius: 12px; background: #f0f7f2; color: var(--login-ink); font-size: 15px; cursor: pointer;
 }
+.login-card__alt button small { color: #8a9a91; font-size: 11px; }
 
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 6px;
-  padding-bottom: 18px;
-  border-bottom: 1px solid var(--border-soft, #edefe9);
+.twofa-actions { margin-top: 8px; display: flex; justify-content: space-between; }
+
+.login-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+.login-features {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 0; padding: 18px 10px;
+  list-style: none; border-radius: 22px; background: rgba(255, 255, 255, 0.86); max-width: 960px; flex: 1;
 }
+.login-features li { display: flex; align-items: center; gap: 12px; padding: 0 18px; border-left: 1px solid #e2ebe5; }
+.login-features li:first-child { border-left: 0; }
+.login-features li > :first-child { font-size: 30px; color: var(--login-green); }
+.login-features b { display: block; font-size: 16px; color: var(--login-ink); }
+.login-features span { font-size: 12px; color: #5c6f65; }
+.login-copyright { flex: none; font-size: 13px; color: #3d5a4b; }
 
-.brand + .ant-form,
-.brand + form {
-  margin-top: 18px;
+.demo-panel { margin-top: 16px; padding: 10px 12px; border-radius: 10px; background: #f7f8f4; border: 1px solid #e4e7e0; }
+.demo-panel summary { cursor: pointer; font-size: 12px; color: #3c4f48; font-weight: 600; }
+.demo-help { margin: 8px 0 10px; font-size: 12px; color: #5c6f69; }
+.demo-groups { display: grid; gap: 8px; max-height: 240px; overflow: auto; padding-right: 2px; }
+.demo-group-title { font-size: 12px; color: #22332e; margin-bottom: 6px; }
+.demo-users { display: flex; flex-wrap: wrap; gap: 6px; }
+.demo-user { border: 1px solid rgba(33, 112, 95, 0.28); border-radius: 999px; background: #e8f3ef; color: #185c4e; padding: 3px 9px; font-size: 12px; cursor: pointer; }
+.demo-user:hover { background: #dcede6; }
+
+@media (max-width: 1200px) {
+  .login-top__divider, .login-top__motto { display: none; }
+  .login-features { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 12px; }
+  .login-features li:nth-child(3) { border-left: 0; }
 }
-
-.logo {
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  background: var(--primary-soft, #e8f3ef);
-  border: 1px solid rgba(33, 112, 95, 0.18);
-}
-
-.logo-image {
-  width: 28px;
-  height: 28px;
-  object-fit: contain;
-}
-
-.title {
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--ink, #22332e);
-}
-
-.subtitle {
-  font-size: 12px;
-  color: var(--muted, #5c6f69);
-}
-
-.twofa-actions {
-  margin-top: 8px;
-  display: flex;
-  justify-content: space-between;
-}
-
-.tips {
-  margin-top: 16px;
-  font-size: 12px;
-  color: var(--muted);
-  text-align: center;
-}
-
-.demo-panel {
-  margin-top: 14px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: #f7f8f4;
-  border: 1px solid var(--border, #e4e7e0);
-}
-
-.demo-panel summary {
-  cursor: pointer;
-  font-size: 12px;
-  color: var(--ink-soft, #3c4f48);
-  font-weight: 600;
-}
-
-.demo-help {
-  margin: 8px 0 10px;
-  font-size: 12px;
-  color: var(--muted, #5c6f69);
-}
-
-.demo-groups {
-  display: grid;
-  gap: 8px;
-  max-height: 240px;
-  overflow: auto;
-  padding-right: 2px;
-}
-
-.demo-group-title {
-  font-size: 12px;
-  color: var(--ink, #22332e);
-  margin-bottom: 6px;
-}
-
-.demo-users {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.demo-user {
-  border: 1px solid rgba(33, 112, 95, 0.28);
-  border-radius: 999px;
-  background: #e8f3ef;
-  color: #185c4e;
-  padding: 3px 9px;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.demo-user:hover {
-  background: #dcede6;
+@media (max-width: 900px) {
+  .login-page { padding: 16px; }
+  .login-main { justify-content: center; padding: 20px 0; }
+  .login-hero, .login-features { display: none; }
+  .login-foot { justify-content: center; }
+  .login-top__org { font-size: 18px; }
+  .login-top__logo { width: 40px; height: 40px; }
+  .login-top__en { display: none; }
+  .login-card { padding: 28px 22px 22px; border-radius: 20px; }
+  .login-card__head h2 { font-size: 24px; }
+  .login-card__alt button { flex-direction: column; gap: 0; height: 58px; }
 }
 </style>

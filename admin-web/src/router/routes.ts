@@ -21,7 +21,7 @@ export const routes: RouteRecordRaw[] = [
     path: '/enterprise',
     component: () => import('../views/EnterpriseHome.vue'),
     beforeEnter() {
-      window.location.replace('/')
+      window.location.replace('/home.html')
       return false
     },
     meta: { title: '企业首页', hidden: true }
@@ -30,7 +30,7 @@ export const routes: RouteRecordRaw[] = [
     path: '/home',
     component: () => import('../views/EnterpriseHome.vue'),
     beforeEnter() {
-      window.location.replace('/')
+      window.location.replace('/home.html')
       return false
     },
     meta: { title: '弋阳龟峰颐养中心', hidden: true }

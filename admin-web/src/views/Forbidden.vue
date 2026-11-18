@@ -27,7 +27,7 @@ function goHome() {
 }
 
 function goEnterpriseHome() {
-  window.location.assign('/')
+  window.location.assign('/home.html')
 }
 
 function contactAdmin() {
