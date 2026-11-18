@@ -66,7 +66,7 @@ function buildMenu(
         if (!selfAccessible && children.length === 0) {
           return null
         }
-        if (r.children?.length && children.length === 1 && !r.component && /^\/(finance|marketing|hr|base-config|system)\/.+/.test(routePath)) return children[0]
+        if (r.children?.length && children.length === 1 && !r.component && (/^\/(finance|marketing|hr|base-config|system)\/.+/.test(routePath) || routePath === '/base-config')) return children[0]
         const fullPath = r.children && children.length > 0 ? undefined : joinPath(basePath, r.path || '')
         const routeName = r.name ? String(r.name) : ''
         const node: MenuItem = {

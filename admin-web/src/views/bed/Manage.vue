@@ -1,5 +1,8 @@
 <template>
   <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
+    <template v-if="canEditTypes" #extra>
+      <a-button @click="router.push('/logistics/assets/bed-type-config')">床位/房间类型与区域设置</a-button>
+    </template>
     <div class="bed-management-page">
       <a-row :gutter="20" class="workspace-grid">
         <a-col :xs="24" :xl="6">
@@ -977,6 +980,7 @@
 </template>
 
 <script setup lang="ts">
+import { useUserStore } from '../../stores/user'
 import ActionToolbar from '../../components/ActionToolbar.vue'
 import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
@@ -1041,6 +1045,8 @@ type DrawerMode = 'create' | 'edit' | 'view'
 type WorkspaceMode = 'manage' | 'map' | 'panorama'
 
 const router = useRouter()
+// 类型与区域字典只有管理员维护（在「基础数据 → 长者与床位」）
+const canEditTypes = (useUserStore().roles || []).includes('ADMIN')
 const rooms = ref<RoomItem[]>([])
 const beds = ref<BedItem[]>([])
 const roomList = ref<RoomItem[]>([])

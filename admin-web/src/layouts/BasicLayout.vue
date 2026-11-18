@@ -98,9 +98,8 @@
 
         <template #todo-overlay>
           <a-menu>
-            <a-menu-item @click="handleHeaderQuickTodoClick">进入我的待办</a-menu-item>
-            <a-menu-item @click="router.push('/workbench/approvals')">处理我的审批</a-menu-item>
-            <a-menu-item @click="openQuickChatTodoDrawer">查看聊天任务</a-menu-item>
+            <a-menu-item @click="handleHeaderQuickTodoClick">我的待办</a-menu-item>
+            <a-menu-item @click="router.push('/oa/approval?scope=PENDING_REVIEW')">待我审批</a-menu-item>
           </a-menu>
         </template>
 
@@ -1036,15 +1035,10 @@ const themeColorOptions = [
 ]
 const quickNotifyItems = computed(() => {
   if (!headerSettings.quickNotifyEnabled) return []
+  // 铃铛只放通知（未读消息、逾期任务）；页面入口在侧栏「我的办公」和待办按钮里，不在这里重复
   return [
-    { title: '发起快捷聊天', action: 'openQuickChat' },
-    { title: `聊天任务（${quickChatTodoPendingCount.value}${quickChatTodoOverdueCount.value ? `/逾期${quickChatTodoOverdueCount.value}` : ''}）`, action: 'openQuickChatTodo' },
-    { title: `待办完成率（${quickChatTodoCompletionRate.value}%）`, action: 'openQuickChatTodo' },
-    { title: `执行总览（${quickChatExecutionOverview.value.totalPressure}）`, action: 'openQuickChatTodo' },
-    { title: '我的待办', route: '/workbench/todo' },
-    { title: '待我审批', route: '/oa/approval?scope=PENDING_REVIEW' },
-    { title: '我的日程', route: '/workbench/schedule' },
-    { title: '会员生日', route: '/oa/life/birthday' }
+    { title: `未读聊天消息（${quickChatUnreadCount.value}）`, action: 'openQuickChat' },
+    { title: `聊天任务（${quickChatTodoPendingCount.value}${quickChatTodoOverdueCount.value ? `，逾期 ${quickChatTodoOverdueCount.value}` : ''}）`, action: 'openQuickChatTodo' }
   ]
 })
 const { departmentOptions, searchDepartments, ensureSelectedDepartment } = useDepartmentOptions({ pageSize: 200, preloadSize: 600 })

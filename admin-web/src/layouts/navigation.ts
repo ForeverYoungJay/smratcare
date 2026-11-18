@@ -23,13 +23,14 @@ import type { MenuItem } from './menu'
 
 export type NavSectionKey = 'entry' | 'care' | 'operations' | 'compliance' | 'support' | 'system'
 
+/** 分区顺序即侧栏顺序：业务在前，个人办公（我的工作台、待办、审批、考勤等）统一放最后 */
 export const NAV_SECTION_LABELS: Record<NavSectionKey, string> = {
-  entry: '工作入口',
   care: '长者服务',
   operations: '经营运营',
-  compliance: '安全与监管',
   support: '行政后勤',
-  system: '系统配置'
+  compliance: '安全与监管',
+  system: '系统配置',
+  entry: '个人办公'
 }
 
 const iconRegistry = {

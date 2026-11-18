@@ -2,149 +2,6 @@ import type { RouteRecordRaw } from 'vue-router'
 
 export const systemRoutes: RouteRecordRaw[] = [
   {
-        path: 'base-config',
-        name: 'BaseConfig',
-        meta: { title: '基础数据配置', icon: 'DatabaseOutlined', navSection: 'system', navOrder: 120, navPinned: true, roles: ['SYS_ADMIN', 'ADMIN'] },
-        children: [
-          {
-            path: '',
-            name: 'BaseConfigHub',
-            component: () => import('../views/ModuleHub.vue'),
-            meta: { title: '基础数据导航', hidden: true }
-          },
-          {
-            path: 'elder-type',
-            name: 'BaseConfigElderType',
-            component: () => import('../views/base-config/Index.vue'),
-            props: { title: '老人类别', groupCode: 'ELDER_CATEGORY' },
-            meta: { title: '老人类别', roles: ['ADMIN'] }
-          },
-          {
-            path: 'marketing',
-            name: 'BaseConfigMarketing',
-            meta: { title: '营销', roles: ['ADMIN'] },
-            redirect: '/base-config/marketing/customer-tag',
-            children: [
-              {
-                path: 'customer-tag',
-                name: 'BaseConfigMarketingCustomerTag',
-                component: () => import('../views/base-config/Index.vue'),
-                props: { title: '客户标签', groupCode: 'MARKETING_CUSTOMER_TAG' },
-                meta: { title: '客户标签', roles: ['ADMIN'] }
-              },
-              {
-                path: 'source-channel',
-                name: 'BaseConfigMarketingSourceChannel',
-                component: () => import('../views/base-config/Index.vue'),
-                props: { title: '来源渠道', groupCode: 'MARKETING_SOURCE_CHANNEL' },
-                meta: { title: '来源渠道', roles: ['ADMIN'] }
-              }
-            ]
-          },
-          {
-            path: 'assessment',
-            name: 'BaseConfigAssessment',
-            component: () => import('../views/base-config/Index.vue'),
-            props: { title: '评估', groupCode: 'ASSESSMENT_TYPE' },
-            meta: { title: '评估', roles: ['ADMIN'] }
-          },
-          {
-            path: 'residence',
-            name: 'BaseConfigResidence',
-            meta: { title: '入住', roles: ['ADMIN'] },
-            redirect: '/base-config/residence/bed-type',
-            children: [
-              {
-                path: 'bed-type',
-                name: 'BaseConfigResidenceBedType',
-                redirect: '/logistics/assets/bed-type-config',
-                meta: { title: '床位类型', roles: ['ADMIN'] }
-              },
-              {
-                path: 'room-type',
-                name: 'BaseConfigResidenceRoomType',
-                redirect: '/logistics/assets/room-type-config',
-                meta: { title: '房间类型', roles: ['ADMIN'] }
-              },
-              {
-                path: 'area-settings',
-                name: 'BaseConfigResidenceAreaSettings',
-                redirect: '/logistics/assets/area-config',
-                meta: { title: '区域设置', roles: ['ADMIN'] }
-              },
-              {
-                path: 'building-management',
-                name: 'BaseConfigResidenceBuildingManagement',
-                redirect: '/logistics/assets/bed-management',
-                meta: { title: '楼栋管理', roles: ['ADMIN'], hidden: true }
-              }
-            ]
-          },
-          {
-            path: 'activity',
-            name: 'BaseConfigActivity',
-            component: () => import('../views/base-config/Index.vue'),
-            props: { title: '活动', groupCode: 'ACTIVITY_TYPE' },
-            meta: { title: '活动', roles: ['ADMIN'] }
-          },
-          {
-            path: 'community',
-            name: 'BaseConfigCommunity',
-            meta: { title: '社区', roles: ['ADMIN'] },
-            redirect: '/base-config/community/maintenance-category',
-            children: [
-              {
-                path: 'maintenance-category',
-                name: 'BaseConfigCommunityMaintenanceCategory',
-                component: () => import('../views/base-config/Index.vue'),
-                props: { title: '维修分类', groupCode: 'COMMUNITY_REPAIR_CATEGORY' },
-                meta: { title: '维修分类', roles: ['ADMIN'] }
-              },
-              {
-                path: 'task-type-settings',
-                name: 'BaseConfigCommunityTaskTypeSettings',
-                component: () => import('../views/base-config/Index.vue'),
-                props: { title: '任务类型设置', groupCode: 'COMMUNITY_TASK_TYPE' },
-                meta: { title: '任务类型设置', roles: ['ADMIN'] }
-              }
-            ]
-          },
-          {
-            path: 'discharge-fee-settings',
-            name: 'BaseConfigDischargeFeeSettings',
-            component: () => import('../views/base-config/Index.vue'),
-            props: { title: '退住费用设置', groupCode: 'DISCHARGE_FEE_CONFIG' },
-            meta: { title: '退住费用设置', roles: ['ADMIN'] }
-          },
-          {
-            path: 'fee',
-            name: 'BaseConfigFee',
-            component: () => import('../views/base-config/Index.vue'),
-            props: { title: '费用', groupCode: 'FEE_TYPE' },
-            meta: { title: '费用', roles: ['ADMIN'] }
-          },
-          {
-            path: 'refund-reason',
-            name: 'BaseConfigRefundReason',
-            component: () => import('../views/base-config/Index.vue'),
-            props: { title: '退款原因', groupCode: 'REFUND_REASON' },
-            meta: { title: '退款原因', roles: ['ADMIN'] }
-          },
-          {
-            path: 'trial-package',
-            name: 'BaseConfigTrialPackage',
-            component: () => import('../views/base-config/Index.vue'),
-            props: { title: '试住套餐', groupCode: 'TRIAL_STAY_PACKAGE' },
-            meta: { title: '试住套餐', roles: ['ADMIN'] }
-          },
-          {
-            path: 'index',
-            redirect: '/base-config/elder-type',
-            meta: { hidden: true }
-          }
-        ]
-      },
-  {
         path: 'system',
         name: 'System',
         meta: { title: '系统管理', icon: 'SettingOutlined', navSection: 'system', navOrder: 130, navPinned: true, roles: ['DIRECTOR', 'SYS_ADMIN', 'ADMIN', 'HR_MINISTER'] },
@@ -155,11 +12,157 @@ export const systemRoutes: RouteRecordRaw[] = [
             component: () => import('../views/System/SystemAdminHome.vue'),
             meta: { title: '系统管理首页', hidden: true }
           },
+        {
+              path: '/base-config',
+              name: 'BaseConfig',
+              // 业务字典挂在「系统管理」下（地址仍是 /base-config/...），菜单里不再单独占一个一级模块
+              meta: { title: '基础数据配置', icon: 'DatabaseOutlined', roles: ['SYS_ADMIN', 'ADMIN'] },
+              children: [
+                {
+                  path: '',
+                  name: 'BaseConfigHub',
+                  component: () => import('../views/ModuleHub.vue'),
+                  meta: { title: '基础数据导航', hidden: true }
+                },
+                {
+                  path: 'elder-type',
+                  name: 'BaseConfigElderType',
+                  component: () => import('../views/base-config/Index.vue'),
+                  props: { title: '老人类别', groupCode: 'ELDER_CATEGORY' },
+                  meta: { title: '老人类别', roles: ['ADMIN'] }
+                },
+                {
+                  path: 'marketing',
+                  name: 'BaseConfigMarketing',
+                  meta: { title: '营销', roles: ['ADMIN'] },
+                  redirect: '/base-config/marketing/customer-tag',
+                  children: [
+                    {
+                      path: 'customer-tag',
+                      name: 'BaseConfigMarketingCustomerTag',
+                      component: () => import('../views/base-config/Index.vue'),
+                      props: { title: '客户标签', groupCode: 'MARKETING_CUSTOMER_TAG' },
+                      meta: { title: '客户标签', roles: ['ADMIN'] }
+                    },
+                    {
+                      path: 'source-channel',
+                      name: 'BaseConfigMarketingSourceChannel',
+                      component: () => import('../views/base-config/Index.vue'),
+                      props: { title: '来源渠道', groupCode: 'MARKETING_SOURCE_CHANNEL' },
+                      meta: { title: '来源渠道', roles: ['ADMIN'] }
+                    }
+                  ]
+                },
+                {
+                  path: 'assessment',
+                  name: 'BaseConfigAssessment',
+                  component: () => import('../views/base-config/Index.vue'),
+                  props: { title: '评估', groupCode: 'ASSESSMENT_TYPE' },
+                  meta: { title: '评估', roles: ['ADMIN'] }
+                },
+                {
+                  path: 'residence',
+                  name: 'BaseConfigResidence',
+                  // 床位类型/房间类型/区域设置已并入「基础数据」的「长者与床位」标签，旧地址保留跳转
+                  meta: { title: '入住', roles: ['ADMIN'], hidden: true },
+                  redirect: '/base-config/residence/bed-type',
+                  children: [
+                    {
+                      path: 'bed-type',
+                      name: 'BaseConfigResidenceBedType',
+                      redirect: '/logistics/assets/bed-type-config',
+                      meta: { title: '床位类型', roles: ['ADMIN'] }
+                    },
+                    {
+                      path: 'room-type',
+                      name: 'BaseConfigResidenceRoomType',
+                      redirect: '/logistics/assets/room-type-config',
+                      meta: { title: '房间类型', roles: ['ADMIN'] }
+                    },
+                    {
+                      path: 'area-settings',
+                      name: 'BaseConfigResidenceAreaSettings',
+                      redirect: '/logistics/assets/area-config',
+                      meta: { title: '区域设置', roles: ['ADMIN'] }
+                    },
+                    {
+                      path: 'building-management',
+                      name: 'BaseConfigResidenceBuildingManagement',
+                      redirect: '/logistics/assets/bed-management',
+                      meta: { title: '楼栋管理', roles: ['ADMIN'], hidden: true }
+                    }
+                  ]
+                },
+                {
+                  path: 'activity',
+                  name: 'BaseConfigActivity',
+                  component: () => import('../views/base-config/Index.vue'),
+                  props: { title: '活动', groupCode: 'ACTIVITY_TYPE' },
+                  meta: { title: '活动', roles: ['ADMIN'] }
+                },
+                {
+                  path: 'community',
+                  name: 'BaseConfigCommunity',
+                  meta: { title: '社区', roles: ['ADMIN'] },
+                  redirect: '/base-config/community/maintenance-category',
+                  children: [
+                    {
+                      path: 'maintenance-category',
+                      name: 'BaseConfigCommunityMaintenanceCategory',
+                      component: () => import('../views/base-config/Index.vue'),
+                      props: { title: '维修分类', groupCode: 'COMMUNITY_REPAIR_CATEGORY' },
+                      meta: { title: '维修分类', roles: ['ADMIN'] }
+                    },
+                    {
+                      path: 'task-type-settings',
+                      name: 'BaseConfigCommunityTaskTypeSettings',
+                      component: () => import('../views/base-config/Index.vue'),
+                      props: { title: '任务类型设置', groupCode: 'COMMUNITY_TASK_TYPE' },
+                      meta: { title: '任务类型设置', roles: ['ADMIN'] }
+                    }
+                  ]
+                },
+                {
+                  path: 'discharge-fee-settings',
+                  name: 'BaseConfigDischargeFeeSettings',
+                  component: () => import('../views/base-config/Index.vue'),
+                  props: { title: '退住费用设置', groupCode: 'DISCHARGE_FEE_CONFIG' },
+                  meta: { title: '退住费用设置', roles: ['ADMIN'] }
+                },
+                {
+                  path: 'fee',
+                  name: 'BaseConfigFee',
+                  component: () => import('../views/base-config/Index.vue'),
+                  props: { title: '费用', groupCode: 'FEE_TYPE' },
+                  meta: { title: '费用', roles: ['ADMIN'] }
+                },
+                {
+                  path: 'refund-reason',
+                  name: 'BaseConfigRefundReason',
+                  component: () => import('../views/base-config/Index.vue'),
+                  props: { title: '退款原因', groupCode: 'REFUND_REASON' },
+                  meta: { title: '退款原因', roles: ['ADMIN'] }
+                },
+                {
+                  path: 'trial-package',
+                  name: 'BaseConfigTrialPackage',
+                  component: () => import('../views/base-config/Index.vue'),
+                  props: { title: '试住套餐', groupCode: 'TRIAL_STAY_PACKAGE' },
+                  meta: { title: '试住套餐', roles: ['ADMIN'] }
+                },
+                {
+                  path: 'index',
+                  redirect: '/base-config/elder-type',
+                  meta: { hidden: true }
+                }
+              ]
+            },
           {
             path: 'site-config',
             name: 'SystemSiteConfigCenter',
             component: () => import('../views/System/SiteConfigCenter.vue'),
-            meta: { title: '官网配置中心', roles: ['ADMIN', 'HR_MINISTER'] }
+            // 对外发布内容归行政「制度知识与公告」的标签，系统管理菜单不再单列
+            meta: { title: '官网配置中心', roles: ['ADMIN', 'HR_MINISTER'], hidden: true }
           },
           {
             path: 'org-info',

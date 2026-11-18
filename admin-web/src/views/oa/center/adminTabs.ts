@@ -45,11 +45,12 @@ export const ADMIN_CENTERS: Record<string, { title: string; subTitle: string; ta
   },
   library: {
     title: '制度知识与公告',
-    subTitle: '制度文档、知识库与通知公告；版本、审核与阅读确认可追溯',
+    subTitle: '制度文档、知识库、通知公告与对外官网内容；版本、审核与阅读确认可追溯',
     tabs: [
       { key: 'notices', label: '通知公告', path: `${P}notice`, note: '员工公告与家属通知须区分接收对象；不在公告中公开长者健康状况、身份证、手机号及财务信息。', noteType: 'warning' },
       { key: 'documents', label: '制度与文档', path: `${P}document`, note: '正式制度不可在原版本上静默覆盖，保留历史版本和审核信息。' },
-      { key: 'knowledge', label: '知识库', path: `${P}knowledge` }
+      { key: 'knowledge', label: '知识库', path: `${P}knowledge` },
+      { key: 'site', label: '官网与小程序内容', path: '/system/site-config', note: '对外发布的机构介绍、动态与预约留言：发布前核对内容，不公开长者照片、健康与身份信息；预约留言请及时转市场部跟进。', noteType: 'warning' }
     ]
   }
 }

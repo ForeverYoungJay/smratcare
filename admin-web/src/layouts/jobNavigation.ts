@@ -3,147 +3,92 @@ import type { MenuItem } from './menu'
 import { functionWorkspaces, workspaceLocation } from '../workspaces/catalog'
 
 type JobLink = { label: string; path: string; desc?: string }
-type JobEntry = JobLink & { children?: JobLink[]; icon?: string; section?: MenuItem['navSection'] }
-type DepartmentNavigation = {
-  department: DepartmentCode
-  employeeRole: RoleCode
-  ministerRole: RoleCode
-  section: MenuItem['navSection']
-  businessLabel: string
-  objectLabel: string
-  objectPath: string
-  business: JobLink[]
-  managementLabel: string
-  management: JobLink[]
-  assignmentLabel: string
-  assignmentPath: string
-  reportLabel: string
-  reportPath: string
+type Section = NonNullable<MenuItem['navSection']>
+type JobEntry = JobLink & { children?: JobLink[]; icon?: string; section: Section; ministerOnly?: boolean }
+
+const links = (pairs: string[][]): JobLink[] => pairs.map(([label, path]) => ({ label, path }))
+const pages = (pairs: string[][], section: Section): JobEntry[] => links(pairs).map((link) => ({ ...link, section }))
+
+/** 个人办公只在这一个分组里出现（所有岗位一致），不再在各部门菜单里零散重复 */
+const OFFICE: JobEntry = {
+  label: '我的办公', path: '', icon: 'UserOutlined', section: 'entry', children: links([
+    ['我的工作台', '/workbench/overview'], ['我的待办', '/workbench/todo'], ['审批办理', '/oa/approval'],
+    ['考勤与请假', '/workbench/attendance'], ['我的日程', '/workbench/schedule'], ['工作总结', '/workbench/reports'],
+    ['我的工资与积分', '/workbench/payslips'], ['我的信息', '/workbench/my-info']
+  ])
 }
 
-const personalEntries = {
-  home: { label: '我的工作台', path: '/workbench/overview', desc: '查看今天的任务、提醒和最近处理记录' },
-  todo: { label: '我的待办', path: '/workbench/todo', desc: '集中处理待办和超时任务' },
-  info: { label: '我的信息', path: '/workbench/my-info', desc: '查看个人资料和账号信息' },
-  approvals: { label: '待我审批', path: '/workbench/approvals', desc: '处理需要本人审批的事项' }
-} satisfies Record<string, JobLink>
-
-const departmentNavigation: DepartmentNavigation[] = [
-  {
-    department: 'NURSING', employeeRole: ROLE_CODES.NURSING_EMPLOYEE, ministerRole: ROLE_CODES.NURSING_MINISTER, section: 'care',
-    businessLabel: '护理部业务', objectLabel: '长者查询', objectPath: '/elder/list',
-    business: [
-      { label: '护理工作台', path: '/care/workbench' },
-      { label: '护理任务中心', path: '/care/tasks' },
-      { label: '护理档案与评估', path: '/care/residents' },
-      { label: '交接班与安全', path: '/care/safety' }
-    ],
-    managementLabel: '护理部管理',
-    management: [
-      { label: '排班与质控', path: '/care/operations' }
-    ],
-    assignmentLabel: '护理排班', assignmentPath: '/care/operations?tab=roster',
-    reportLabel: '护理报表', reportPath: '/care/operations?tab=quality'
-  },
-  {
-    department: 'MEDICAL', employeeRole: ROLE_CODES.MEDICAL_EMPLOYEE, ministerRole: ROLE_CODES.MEDICAL_MINISTER, section: 'care',
-    businessLabel: '医务部业务', objectLabel: '长者查询', objectPath: '/medical-care/residents',
-    business: [
-      { label: '医务工作台', path: '/medical-care/workbench' },
-      { label: '长者健康档案', path: '/medical-care/residents' },
-      { label: '诊疗与医嘱', path: '/medical-care/clinical' },
-      { label: '用药与医嘱执行', path: '/medical-care/medication' },
-      { label: '健康监测与随访', path: '/medical-care/monitoring' },
-      { label: '医护协同与质控', path: '/medical-care/coordination' },
-      { label: '告警与应急', path: '/medical-care/alerts' }
-    ],
-    managementLabel: '医务部管理',
-    management: [
-      { label: '医护系统配置', path: '/medical-care/settings' }
-    ],
-    assignmentLabel: '医护任务分配', assignmentPath: '/medical-care/alerts?tab=dispatch',
-    reportLabel: '医务报表', reportPath: '/medical-care/coordination?tab=quality'
-  },
-  {
-    department: 'FINANCE', employeeRole: ROLE_CODES.FINANCE_EMPLOYEE, ministerRole: ROLE_CODES.FINANCE_MINISTER, section: 'operations',
-    businessLabel: '财务部业务', objectLabel: '财务查询', objectPath: '/finance/bills/detail-query',
-    business: [
-      { label: '财务工作台', path: '/finance/workbench' },
-      { label: '收费与账户', path: '/finance/bills/detail-query' },
-      { label: '消费与风险', path: '/finance/flows/consumption' },
-      { label: '结算与月结', path: '/finance/discharge/settlement' }
-    ],
-    managementLabel: '财务部管理',
-    management: [
-      { label: '财务规则配置', path: '/finance/config/master-data' }
-    ],
-    assignmentLabel: '财务任务分配', assignmentPath: '/finance/allocation/tasks',
-    reportLabel: '财务报表', reportPath: '/finance/reports/overall'
-  },
-  {
-    department: 'LOGISTICS', employeeRole: ROLE_CODES.LOGISTICS_EMPLOYEE, ministerRole: ROLE_CODES.LOGISTICS_MINISTER, section: 'support',
-    businessLabel: '后勤部业务', objectLabel: '房态查询', objectPath: '/logistics/assets/room-state-map',
-    business: [
-      { label: '后勤部首页', path: '/logistics/workbench' },
-      { label: '报修与维修', path: '/logistics/assets/maintenance-record' },
-      { label: '库存预警', path: '/logistics/storage/alerts' },
-      { label: '采购管理', path: '/logistics/storage/purchase' },
-      { label: '入库管理', path: '/logistics/storage/inbound' },
-      { label: '出库管理', path: '/logistics/storage/outbound' },
-      { label: '送餐计划', path: '/logistics/dining/delivery-plan' },
-      { label: '床位与状态', path: '/elder/bed-panorama' },
-      { label: '来访登记', path: '/elder/status-change/visit-register' }
-    ],
-    managementLabel: '后勤部管理',
-    management: [
-      { label: '设备档案', path: '/logistics/maintenance/assets' },
-      { label: '仓库设置', path: '/logistics/storage/warehouse' },
-      { label: '床位管理', path: '/logistics/assets/bed-management' },
-      // 消防安全由后勤部长负责（后勤员工没有消防页面权限），放在管理组里，不再单独占一级菜单
-      { label: '消防安全工作台', path: '/fire/overview' }, { label: '防火巡查与检查', path: '/fire/inspection' },
-      { label: '消防设施与维保', path: '/fire/facilities' }, { label: '监控与控制室', path: '/fire/control-center' },
-      { label: '隐患处置与分析', path: '/fire/safety' }, { label: '消防系统配置', path: '/fire/settings' }
-    ],
-    assignmentLabel: '后勤任务分配', assignmentPath: '/logistics/task-center',
-    reportLabel: '后勤报表', reportPath: '/logistics/reports/maintenance-todo-log'
-  },
-  {
-    department: 'HR', employeeRole: ROLE_CODES.HR_EMPLOYEE, ministerRole: ROLE_CODES.HR_MINISTER, section: 'support',
-    businessLabel: '行政人事业务', objectLabel: '部门工作台', objectPath: '/hr/overview',
-    business: [
-      { label: '通知公告', path: '/oa/notice' },
-      { label: '制度与文档', path: '/oa/document' },
-      { label: '我的考勤与请假', path: '/workbench/attendance' },
-      { label: '合同和社保提醒', path: '/hr/profile/social-security-reminders' }
-    ],
-    managementLabel: '行政人事管理',
-    management: [
-      { label: '员工档案', path: '/hr/profile/basic' },
-      { label: '招聘办理', path: '/hr/recruitment/needs' },
-      { label: '培训与证书', path: '/hr/development/records' },
-      { label: '制度管理', path: '/hr/compliance/policies' }
-    ],
-    assignmentLabel: '排班与任务分配', assignmentPath: '/hr/attendance/calendar',
-    reportLabel: '人事报表', reportPath: '/hr/performance/reports'
-  },
-  {
-    department: 'MARKETING', employeeRole: ROLE_CODES.MARKETING_EMPLOYEE, ministerRole: ROLE_CODES.MARKETING_MINISTER, section: 'operations',
-    businessLabel: '市场部业务', objectLabel: '客户查询', objectPath: '/marketing/customers',
-    business: [
-      { label: '市场工作台', path: '/marketing/workbench' },
-      { label: '客户与跟进', path: '/marketing/customers' },
-      { label: '参观与预订', path: '/marketing/visits' },
-      { label: '合同与转入住', path: '/marketing/contracts' }
-    ],
-    managementLabel: '市场部管理',
-    management: [
-      { label: '市场运营', path: '/marketing/operations' }
-    ],
-    assignmentLabel: '客户任务分配', assignmentPath: '/marketing/customers',
-    reportLabel: '市场报表', reportPath: '/marketing/operations'
-  }
+/** 各部门的主页面（部门员工与部长共用；没有权限的页面由 availablePaths 自动过滤） */
+const DEPARTMENTS: Array<{ department: DepartmentCode; roles: RoleCode[]; minister: RoleCode; entries: JobEntry[] }> = [
+  { department: 'NURSING', roles: [ROLE_CODES.NURSING_EMPLOYEE, ROLE_CODES.NURSING_MINISTER], minister: ROLE_CODES.NURSING_MINISTER, entries: pages([
+    ['护理工作台', '/care/workbench'], ['护理任务中心', '/care/tasks'], ['护理档案与评估', '/care/residents'],
+    ['交接班与安全', '/care/safety'], ['排班与质控', '/care/operations'], ['医嘱执行', '/medical-care/order-executions']], 'care') },
+  { department: 'MEDICAL', roles: [ROLE_CODES.MEDICAL_EMPLOYEE, ROLE_CODES.MEDICAL_MINISTER], minister: ROLE_CODES.MEDICAL_MINISTER, entries: pages([
+    ['医务工作台', '/medical-care/workbench'], ['长者健康档案', '/medical-care/residents'], ['诊疗与医嘱', '/medical-care/clinical'],
+    ['用药与医嘱执行', '/medical-care/medication'], ['健康监测与随访', '/medical-care/monitoring'], ['医护协同与质控', '/medical-care/coordination'],
+    ['告警与应急', '/medical-care/alerts'], ['医护系统配置', '/medical-care/settings']], 'care') },
+  { department: 'FINANCE', roles: [ROLE_CODES.FINANCE_EMPLOYEE, ROLE_CODES.FINANCE_MINISTER], minister: ROLE_CODES.FINANCE_MINISTER, entries: pages([
+    ['财务工作台', '/finance/workbench'], ['收费与账户', '/finance/bills/detail-query'], ['消费与风险', '/finance/flows/consumption'],
+    ['结算与月结', '/finance/discharge/settlement'], ['财务经营分析', '/finance/reports/overall'], ['财务规则配置', '/finance/config/master-data']], 'operations') },
+  { department: 'MARKETING', roles: [ROLE_CODES.MARKETING_EMPLOYEE, ROLE_CODES.MARKETING_MINISTER], minister: ROLE_CODES.MARKETING_MINISTER, entries: pages([
+    ['市场工作台', '/marketing/workbench'], ['客户与跟进', '/marketing/customers'], ['参观与预订', '/marketing/visits'],
+    ['合同与转入住', '/marketing/contracts'], ['市场运营', '/marketing/operations'], ['入住办理中心', '/elder/admission-processing']], 'operations') },
+  { department: 'LOGISTICS', roles: [ROLE_CODES.LOGISTICS_EMPLOYEE, ROLE_CODES.LOGISTICS_MINISTER], minister: ROLE_CODES.LOGISTICS_MINISTER, entries: [
+    { label: '后勤部业务', path: '', icon: 'AppstoreOutlined', section: 'support', children: links([
+      ['后勤部首页', '/logistics/workbench'], ['报修与维修', '/logistics/assets/maintenance-record'], ['房态查询', '/logistics/assets/room-state-map'],
+      ['床位与状态', '/elder/bed-panorama'], ['库存预警', '/logistics/storage/alerts'], ['采购管理', '/logistics/storage/purchase'],
+      ['入库管理', '/logistics/storage/inbound'], ['出库管理', '/logistics/storage/outbound'], ['送餐计划', '/logistics/dining/delivery-plan'],
+      ['来访登记', '/elder/status-change/visit-register']]) },
+    // 管理组（设备、仓库、床位、消防、任务分配、报表）只在部长菜单里出现
+    { label: '后勤部管理', path: '', icon: 'ApartmentOutlined', section: 'support', ministerOnly: true, children: links([
+      ['后勤任务分配', '/logistics/task-center'], ['后勤报表', '/logistics/reports/maintenance-todo-log'],
+      ['设备档案', '/logistics/maintenance/assets'], ['仓库设置', '/logistics/storage/warehouse'], ['床位管理', '/logistics/assets/bed-management'],
+      ['消防安全工作台', '/fire/overview'], ['防火巡查与检查', '/fire/inspection'], ['消防设施与维保', '/fire/facilities'],
+      ['监控与控制室', '/fire/control-center'], ['隐患处置与分析', '/fire/safety'], ['消防系统配置', '/fire/settings']]) }
+  ] },
+  { department: 'HR', roles: [ROLE_CODES.HR_EMPLOYEE, ROLE_CODES.HR_MINISTER], minister: ROLE_CODES.HR_MINISTER, entries: [
+    // 行政事务 6 个主页面在一级菜单，人事 7 个主菜单收进「人事管理」组（员工宿舍在「薪酬与员工服务」内）
+    ...pages([['行政工作台', '/oa/workbench'], ['家属服务', '/oa/family'], ['协同办公', '/oa/collaboration'],
+      ['生活服务', '/oa/services'], ['活动与满意度', '/oa/culture'], ['制度知识与公告', '/oa/library']], 'support'),
+    { label: '人事管理', path: '', icon: 'TeamOutlined', section: 'support', children: links([
+      ['人事工作台', '/hr/overview'], ['招聘与入职', '/hr/recruitment/needs'], ['员工档案与合同', '/hr/profile/basic'],
+      ['考勤与排班', '/hr/attendance/records'], ['薪酬与员工服务', '/hr/expense/records'], ['培训与证书', '/hr/development/records'],
+      ['绩效与积分', '/hr/performance/reports']]) }
+  ] }
 ]
 
+const DIRECTOR_ENTRIES: JobEntry[] = [
+  { label: '经营总览', path: '/portal', icon: 'HomeOutlined', section: 'operations' },
+  { label: '部门运行', path: '', icon: 'ApartmentOutlined', section: 'operations', children: links([
+    ['护理运行', '/care/workbench'], ['医务运行', '/medical-care/workbench'], ['财务运行', '/finance/workbench'],
+    ['后勤运行', '/logistics/workbench'], ['行政人事', '/hr/overview'], ['市场运行', '/marketing/workbench']]) },
+  { label: '经营报表', path: '/stats/org/monthly-operation', icon: 'BarChartOutlined', section: 'operations' },
+  { label: '长者查询', path: '/elder/list', icon: 'TeamOutlined', section: 'care' },
+  { label: '风险与异常', path: '', icon: 'AlertOutlined', section: 'compliance', children: links([
+    ['敏感数据审计', '/stats/sensitive-access-audit'], ['导出审计', '/stats/export-audit'], ['经营驾驶舱', '/stats/executive-cockpit']]) }
+]
+
+const ADMIN_ENTRIES: JobEntry[] = [
+  { label: '业务总览', path: '/portal', icon: 'HomeOutlined', section: 'operations' },
+  { label: '部门业务', path: '', icon: 'ApartmentOutlined', section: 'operations', children: links([
+    ['护理业务', '/care/workbench'], ['医务业务', '/medical-care/workbench'], ['财务业务', '/finance/workbench'],
+    ['后勤业务', '/logistics/workbench'], ['行政人事', '/hr/overview'], ['市场业务', '/marketing/workbench']]) },
+  { label: '长者管理', path: '', icon: 'TeamOutlined', section: 'care', children: links([
+    ['长者工作台', '/elder/in-hospital-overview'], ['长者列表', '/elder/list'], ['入住办理中心', '/elder/admission-processing'],
+    ['床位与状态管理', '/elder/bed-panorama'], ['费用与退住', '/elder/status-change/discharge-settlement']]) },
+  { label: '业务基础配置', path: '/base-config/elder-type', icon: 'DatabaseOutlined', section: 'system' },
+  { label: '制度知识与公告', path: '/oa/library', icon: 'SettingOutlined', section: 'system' }
+]
+
+const SYSTEM_ENTRIES: JobEntry[] = [
+  { label: '系统管理首页', path: '/system', icon: 'SettingOutlined', section: 'system' },
+  { label: '角色与权限', path: '/system/role', icon: 'SafetyCertificateOutlined', section: 'system' },
+  { label: '组织与账号', path: '', icon: 'ApartmentOutlined', section: 'system', children: links([
+    ['机构信息', '/system/org-info'], ['部门管理', '/system/department']]) },
+  { label: '基础配置', path: '/base-config/elder-type', icon: 'DatabaseOutlined', section: 'system' },
+  { label: '安全与审计', path: '', icon: 'SafetyCertificateOutlined', section: 'compliance', children: links([
+    ['安全策略', '/stats/security-policy'], ['敏感数据审计', '/stats/sensitive-access-audit'], ['导出审计', '/stats/export-audit']]) }
+]
 
 function uniqueEntries(items: MenuItem[]) {
   const seen = new Set<string>()
@@ -163,43 +108,6 @@ function uniqueEntriesWithSeen(items: MenuItem[], seen: Set<string>) {
     if (!item.path || seen.has(item.path)) return false
     seen.add(item.path); return true
   })
-}
-
-function buildConsolidatedDepartmentMenu(department: string, availablePaths: Set<string>) {
-  const links = (pairs: string[][]): JobLink[] => pairs.map(([label, path]) => ({ label, path }))
-  const office: JobEntry = { label: '我的办公', path: '', icon: 'UserOutlined', children: links([
-    ['我的待办', '/workbench/todo'], ['审批办理', '/oa/approval'], ['考勤与请假', '/workbench/attendance'],
-    ['我的日程', '/workbench/schedule'], ['工作总结', '/workbench/reports'], ['我的工资与积分', '/workbench/payslips'], ['我的信息', '/workbench/my-info']
-  ]) }
-  let entries: JobEntry[]
-  if (department === 'FINANCE') entries = [
-    ...links([['财务工作台', '/finance/workbench'], ['收费与账户', '/finance/bills/detail-query'], ['消费与风险', '/finance/flows/consumption'],
-      ['结算与月结', '/finance/discharge/settlement'], ['财务经营分析', '/finance/reports/overall'], ['财务规则配置', '/finance/config/master-data']]), office
-  ]
-  else if (department === 'MEDICAL') entries = [
-    ...links([['医务工作台', '/medical-care/workbench'], ['长者健康档案', '/medical-care/residents'], ['诊疗与医嘱', '/medical-care/clinical'],
-      ['用药与医嘱执行', '/medical-care/medication'], ['健康监测与随访', '/medical-care/monitoring'], ['医护协同与质控', '/medical-care/coordination'],
-      ['告警与应急', '/medical-care/alerts'], ['医护系统配置', '/medical-care/settings']]), office
-  ]
-  else if (department === 'NURSING') entries = [
-    ...links([['护理工作台', '/care/workbench'], ['护理任务中心', '/care/tasks'], ['护理档案与评估', '/care/residents'],
-      ['交接班与安全', '/care/safety'], ['排班与质控', '/care/operations'], ['医嘱执行', '/medical-care/order-executions']]), office
-  ]
-  else if (department === 'MARKETING') entries = [
-    ...links([['市场工作台', '/marketing/workbench'], ['客户与跟进', '/marketing/customers'], ['参观与预订', '/marketing/visits'],
-      ['合同与转入住', '/marketing/contracts'], ['市场运营', '/marketing/operations'], ['入住办理中心', '/elder/admission-processing']]), office
-  ]
-  else entries = [
-    // 行政人事部：行政事务 6 个主页面在一级菜单，人事业务收进「人事管理」组
-    ...links([['行政工作台', '/oa/workbench'], ['家属服务', '/oa/family'], ['协同办公', '/oa/collaboration'],
-      ['生活服务', '/oa/services'], ['活动与满意度', '/oa/culture'], ['制度知识与公告', '/oa/library']]),
-    // 人事 7 个主菜单（员工宿舍在「薪酬与员工服务」内）
-    { label: '人事管理', path: '', icon: 'TeamOutlined', children: links([['人事工作台', '/hr/overview'], ['招聘与入职', '/hr/recruitment/needs'],
-      ['员工档案与合同', '/hr/profile/basic'], ['考勤与排班', '/hr/attendance/records'], ['薪酬与员工服务', '/hr/expense/records'],
-      ['培训与证书', '/hr/development/records'], ['绩效与积分', '/hr/performance/reports']]) },
-    office
-  ]
-  return uniqueEntries(entries.map((item, index) => entry(item, availablePaths, index + 1)).filter(Boolean) as MenuItem[])
 }
 
 function normalizeRoles(roles: string[]) {
@@ -232,123 +140,29 @@ function entry(raw: JobEntry, availablePaths: Set<string>, order: number): MenuI
     path: children ? undefined : item.path,
     desc: item.desc,
     icon: item.icon,
-    navSection: item.section || 'entry',
+    navSection: item.section,
     navOrder: order,
     children
   }
 }
 
-function buildDepartmentMenu(config: DepartmentNavigation, minister: boolean, availablePaths: Set<string>) {
-  const entries: JobEntry[] = [
-    { ...personalEntries.home, icon: 'HomeOutlined', section: 'entry' },
-    { label: config.businessLabel, path: '', children: config.business, icon: 'AppstoreOutlined', section: config.section },
-    { label: config.objectLabel, path: config.objectPath, icon: 'TeamOutlined', section: config.section },
-    { ...personalEntries.todo, icon: 'CheckSquareOutlined', section: 'entry' }
-  ]
-  if (minister) {
-    entries.push(
-      { label: config.managementLabel, path: '', children: config.management, icon: 'ApartmentOutlined', section: 'support' },
-      { ...personalEntries.approvals, icon: 'AuditOutlined', section: 'support' },
-      { label: config.assignmentLabel, path: config.assignmentPath, icon: 'ScheduleOutlined', section: 'support' },
-      { label: config.reportLabel, path: config.reportPath, icon: 'BarChartOutlined', section: 'operations' }
-    )
-  }
-  entries.push({ ...personalEntries.info, icon: 'UserOutlined', section: 'entry' })
-  return uniqueEntries(entries.map((item, index) => entry(item, availablePaths, index + 1)).filter(Boolean) as MenuItem[])
-}
-
-function buildDirectorMenu(availablePaths: Set<string>) {
-  const entries: JobEntry[] = [
-    { label: '经营总览', path: '/portal', icon: 'HomeOutlined' },
-    {
-      label: '部门运行', path: '', icon: 'ApartmentOutlined', section: 'operations', children: [
-        { label: '护理运行', path: '/care/workbench' }, { label: '医务运行', path: '/medical-care/workbench' },
-        { label: '财务运行', path: '/finance/workbench' }, { label: '后勤运行', path: '/logistics/workbench' },
-        { label: '行政人事', path: '/hr/overview' }, { label: '市场运行', path: '/marketing/workbench' }
-      ]
-    },
-    {
-      label: '风险与异常', path: '', icon: 'AlertOutlined', section: 'compliance', children: [
-        { label: '敏感数据审计', path: '/stats/sensitive-access-audit' },
-        { label: '导出审计', path: '/stats/export-audit' },
-        { label: '经营驾驶舱', path: '/stats/executive-cockpit' }
-      ]
-    },
-    { label: '长者查询', path: '/elder/list', icon: 'TeamOutlined', section: 'care' },
-    { ...personalEntries.approvals, icon: 'AuditOutlined', section: 'entry' },
-    { label: '经营报表', path: '/stats/org/monthly-operation', icon: 'BarChartOutlined', section: 'operations' },
-    { ...personalEntries.info, icon: 'UserOutlined', section: 'entry' }
-  ]
-  return uniqueEntries(entries.map((item, index) => entry(item, availablePaths, index + 1)).filter(Boolean) as MenuItem[])
-}
-
-function buildSystemMenu(availablePaths: Set<string>) {
-  const entries: JobEntry[] = [
-    { label: '系统管理首页', path: '/system', icon: 'SettingOutlined', section: 'system' },
-    { ...personalEntries.home, icon: 'HomeOutlined', section: 'entry' },
-    { ...personalEntries.todo, icon: 'CheckSquareOutlined', section: 'entry' },
-    { label: '角色与权限', path: '/system/role', icon: 'SafetyCertificateOutlined', section: 'system' },
-    {
-      label: '组织与账号', path: '', icon: 'ApartmentOutlined', section: 'system', children: [
-        { label: '机构信息', path: '/system/org-info' },
-        { label: '部门管理', path: '/system/department' }
-      ]
-    },
-    { label: '基础配置', path: '/base-config', icon: 'DatabaseOutlined', section: 'system' },
-    {
-      label: '安全与审计', path: '', icon: 'SafetyCertificateOutlined', section: 'compliance', children: [
-        { label: '安全策略', path: '/stats/security-policy' },
-        { label: '敏感数据审计', path: '/stats/sensitive-access-audit' },
-        { label: '导出审计', path: '/stats/export-audit' }
-      ]
-    },
-    { ...personalEntries.info, icon: 'UserOutlined', section: 'entry' }
-  ]
-  return uniqueEntries(entries.map((item, index) => entry(item, availablePaths, index + 1)).filter(Boolean) as MenuItem[])
-}
-
-function buildAdminMenu(availablePaths: Set<string>) {
-  const entries: JobEntry[] = [
-    { label: '业务总览', path: '/portal', icon: 'HomeOutlined' },
-    { ...personalEntries.home, icon: 'AppstoreOutlined', section: 'entry' },
-    { ...personalEntries.todo, icon: 'CheckSquareOutlined', section: 'entry' },
-    {
-      label: '部门业务', path: '', icon: 'ApartmentOutlined', section: 'operations', children: [
-        { label: '护理业务', path: '/care/workbench' }, { label: '医务业务', path: '/medical-care/workbench' },
-        { label: '财务业务', path: '/finance/workbench' }, { label: '后勤业务', path: '/logistics/workbench' },
-        { label: '行政人事', path: '/hr/overview' }, { label: '市场业务', path: '/marketing/workbench' }
-      ]
-    },
-    {
-      label: '长者管理', path: '', icon: 'TeamOutlined', section: 'care', children: [
-        { label: '长者工作台', path: '/elder/in-hospital-overview' },
-        { label: '长者列表', path: '/elder/list' },
-        { label: '入住办理中心', path: '/elder/admission-processing' },
-        { label: '床位与状态管理', path: '/elder/bed-panorama' },
-        { label: '费用与退住', path: '/elder/status-change/discharge-settlement' }
-      ]
-    },
-    { ...personalEntries.approvals, icon: 'AuditOutlined' },
-    { label: '业务基础配置', path: '/base-config', icon: 'DatabaseOutlined', section: 'system' },
-    { label: '官网内容配置', path: '/system/site-config', icon: 'SettingOutlined', section: 'system' },
-    { ...personalEntries.info, icon: 'UserOutlined' }
-  ]
-  return uniqueEntries(entries.map((item, index) => entry(item, availablePaths, index + 1)).filter(Boolean) as MenuItem[])
+function buildMenu(entries: JobEntry[], availablePaths: Set<string>) {
+  return uniqueEntries([...entries, OFFICE].map((item, index) => entry(item, availablePaths, index + 1)).filter(Boolean) as MenuItem[])
 }
 
 export function supportsJobNavigation(roles: string[]) {
   const normalized = normalizeRoles(roles)
   return normalized.has(ROLE_CODES.ADMIN) || normalized.has(ROLE_CODES.SYS_ADMIN) || normalized.has(ROLE_CODES.DIRECTOR) ||
-    departmentNavigation.some((item) => normalized.has(item.employeeRole) || normalized.has(item.ministerRole))
+    DEPARTMENTS.some((item) => item.roles.some((role) => normalized.has(role)))
 }
 
 export function buildJobNavigation(roles: string[], availablePaths: Set<string>): MenuItem[] {
   const normalized = normalizeRoles(roles)
-  if (normalized.has(ROLE_CODES.SYS_ADMIN)) return buildSystemMenu(availablePaths)
-  if (normalized.has(ROLE_CODES.DIRECTOR)) return buildDirectorMenu(availablePaths)
-  if (normalized.has(ROLE_CODES.ADMIN)) return buildAdminMenu(availablePaths)
-  const department = departmentNavigation.find((item) => normalized.has(item.ministerRole) || normalized.has(item.employeeRole))
+  if (normalized.has(ROLE_CODES.SYS_ADMIN)) return buildMenu(SYSTEM_ENTRIES, availablePaths)
+  if (normalized.has(ROLE_CODES.DIRECTOR)) return buildMenu(DIRECTOR_ENTRIES, availablePaths)
+  if (normalized.has(ROLE_CODES.ADMIN)) return buildMenu(ADMIN_ENTRIES, availablePaths)
+  const department = DEPARTMENTS.find((item) => item.roles.some((role) => normalized.has(role)))
   if (!department) return []
-  if (['FINANCE', 'MARKETING', 'HR', 'NURSING', 'MEDICAL'].includes(department.department)) return buildConsolidatedDepartmentMenu(department.department, availablePaths)
-  return buildDepartmentMenu(department, normalized.has(department.ministerRole), availablePaths)
+  const minister = normalized.has(department.minister)
+  return buildMenu(department.entries.filter((item) => minister || !item.ministerOnly), availablePaths)
 }

@@ -102,12 +102,21 @@ export const workspaceDefinitions: WorkspaceDefinition[] = [
   { id: 'security', title: '安全与审计', entries: [
     ['/stats/sensitive-access-audit', '敏感访问审计'], ['/stats/export-audit', '导出审计'], ['/stats/security-policy', '安全策略']
   ] },
+  // 业务字典：原「入住」下的床位类型/房间类型/区域设置（实为后勤页面的跳转）并入这里，按业务分组
   { id: 'dictionary', title: '基础数据', entries: [
-    ['/base-config/elder-type', '长者类别'], ['/base-config/marketing/customer-tag', '客户标签'],
-    ['/base-config/marketing/source-channel', '来源渠道'], ['/base-config/assessment', '评估类型'],
-    ['/base-config/activity', '活动类型'], ['/base-config/community/maintenance-category', '维修分类'],
-    ['/base-config/community/task-type-settings', '任务类型'], ['/base-config/discharge-fee-settings', '退住费用'],
-    ['/base-config/fee', '费用类型'], ['/base-config/refund-reason', '退款原因'], ['/base-config/trial-package', '试住套餐']
+    ['/base-config/elder-type', '长者类别'], ['/logistics/assets/bed-type-config', '床位类型'],
+    ['/logistics/assets/room-type-config', '房间类型'], ['/logistics/assets/area-config', '区域设置'],
+    ['/base-config/trial-package', '试住套餐'],
+    ['/base-config/marketing/customer-tag', '客户标签'], ['/base-config/marketing/source-channel', '来源渠道'],
+    ['/base-config/assessment', '评估类型'], ['/base-config/activity', '活动类型'],
+    ['/base-config/community/maintenance-category', '维修分类'], ['/base-config/community/task-type-settings', '任务类型'],
+    ['/base-config/fee', '费用类型'], ['/base-config/refund-reason', '退款原因'], ['/base-config/discharge-fee-settings', '退住费用']
+  ], groups: [
+    ['长者与床位', ['/base-config/elder-type', '/logistics/assets/bed-type-config', '/logistics/assets/room-type-config', '/logistics/assets/area-config', '/base-config/trial-package']],
+    ['营销', ['/base-config/marketing/customer-tag', '/base-config/marketing/source-channel']],
+    ['评估与活动', ['/base-config/assessment', '/base-config/activity']],
+    ['后勤服务', ['/base-config/community/maintenance-category', '/base-config/community/task-type-settings']],
+    ['费用', ['/base-config/fee', '/base-config/refund-reason', '/base-config/discharge-fee-settings']]
   ] },
   { id: 'documents', title: '制度与文档', entries: [
     ['/oa/document', '文档档案夹'], ['/hr/compliance/policies', '规章制度'], ['/hr/compliance/policy-alerts', '制度更新提醒']
@@ -141,6 +150,10 @@ export const workspaceNotes: Record<string, { message: string; type: 'info' | 'w
   '/finance/reconcile/month-close': { type: 'warning', message: '未匹配流水、待处理异常及未审核调整项完成后才允许月结；月结后修改走调整期和审批，不直接改历史数据。' },
   '/finance/config/master-data': { type: 'error', message: '规则变化不得追溯覆盖已审核或已归档账单；须有版本号、生效日期与审批链。' },
   '/finance/config/approval-flow': { type: 'info', message: '申请人不得自动成为最终审核人；技术管理员不默认具有账务修改权限。' },
+  // 业务字典：选项被历史记录引用，删除会让旧记录显示不出含义
+  '/base-config/elder-type': { type: 'info', message: '字典选项已被长者、账单等记录引用：不再使用时请停用，不要删除或改成别的含义。' },
+  '/logistics/assets/bed-type-config': { type: 'info', message: '床位类型、房间类型、区域会用于床位管理和床态图；修改名称会影响所有已使用的床位，停用不影响历史记录。' },
+  '/base-config/fee': { type: 'warning', message: '费用类型调整不追溯已生成的账单；新增收费项目须与收费标准和合同一致。' },
   // 人力资源模块设计中的约束
   '/hr/recruitment/needs': { type: 'info', message: '候选人与员工是不同状态：录用审批与身份核验完成后才建立或关联正式员工档案；返聘先查重，保留历史劳动关系。' },
   '/hr/profile/basic': { type: 'warning', message: '一人一档：身份证、银行卡等默认脱敏；不得删除正式员工来“修改身份”，通过更正并保留记录。' },

@@ -45,8 +45,13 @@ describe('route security foundation', () => {
       'elder/death-register',
       'logistics', 'care', 'finance', 'health', 'medical-care', 'fire',
       'ltci', 'stats', 'ai', 'card', 'life', 'dining', 'assessment',
-      'survey', 'oa', 'hr', 'base-config', 'system', 'demo'
+      'survey', 'oa', 'hr', 'system', 'demo'
     ])
+  })
+
+  it('nests base data under system management without changing its URLs', () => {
+    const system = routes.find((route) => route.path === '/')?.children?.find((route) => route.path === 'system')
+    expect(system?.children?.find((route) => route.path === '/base-config')?.meta?.title).toBe('基础数据配置')
   })
 
   it('preserves query and hash when redirecting a legacy URL', () => {

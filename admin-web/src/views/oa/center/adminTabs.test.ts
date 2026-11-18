@@ -4,6 +4,7 @@ import { routes } from '../../../router/routes'
 import { resolveRouteAccess } from '../../../utils/routeAccess'
 import { normalizePagePermissions } from '../../../utils/pageAccess'
 import { tabPagePermissions } from '../../medical/center/centerTabs'
+import { functionWorkspaces, workspaceLocation } from '../../../workspaces/catalog'
 import { ADMIN_CENTERS, cardActions, cardStatus, familyScopeSummary, surveyCaliber, taskColumn, upcomingBirthdays } from './adminTabs'
 
 const router = createRouter({ history: createMemoryHistory(), routes })
@@ -57,5 +58,14 @@ describe('administration centers', () => {
       .toEqual(['unassigned', 'doing', 'submitted', 'done'])
     expect(surveyCaliber({ scoredSubmissions: 12, unscoredSubmissions: 3 }, ['2026-11-01', '2026-11-18']))
       .toContain('已评分提交 12 份，未评分/未答复 3 份不计入')
+  })
+
+  it('keeps bed/room/area types inside base data and website content inside the admin library', () => {
+    expect(workspaceLocation('/logistics/assets/bed-type-config')?.path).toBe('/base-config/elder-type')
+    const dictionary = functionWorkspaces.find((w) => w.id === 'dictionary')!
+    expect(dictionary.groups?.map(([label]) => label)).toEqual(['长者与床位', '营销', '评估与活动', '后勤服务', '费用'])
+    expect(ADMIN_CENTERS.library.tabs.find((t) => t.key === 'site')?.path).toBe('/system/site-config')
+    // 官网内容只给管理员和行政人事部长
+    expect(resolveRouteAccess(router, ['HR_EMPLOYEE'], '/system/site-config', [], []).canAccess).toBe(false)
   })
 })
