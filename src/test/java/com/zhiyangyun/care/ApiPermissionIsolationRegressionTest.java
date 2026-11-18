@@ -153,6 +153,36 @@ class ApiPermissionIsolationRegressionTest {
   }
 
   @Test
+  void maintenance_reporter_cannot_complete_but_logistics_can() throws Exception {
+    String nurseUsername = "nursing_emp_" + ID_SEQ.incrementAndGet();
+    createStaffWithRole(nurseUsername, "NURSING_EMPLOYEE");
+    String logisticsUsername = "logistics_emp_" + ID_SEQ.incrementAndGet();
+    createStaffWithRole(logisticsUsername, "LOGISTICS_EMPLOYEE");
+    String nurseToken = loginAndGetToken(nurseUsername, "123456");
+
+    Map<String, Object> body = new HashMap<>();
+    body.put("reporterName", "护理员");
+    body.put("issueType", "水电");
+    body.put("description", "回归测试-漏水");
+    String createResp = mockMvc.perform(post("/api/life/maintenance")
+            .header("Authorization", "Bearer " + nurseToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(body)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code", is(0)))
+        .andReturn().getResponse().getContentAsString();
+    String id = objectMapper.readTree(createResp).path("data").path("id").asText();
+
+    mockMvc.perform(put("/api/life/maintenance/" + id + "/complete")
+            .header("Authorization", "Bearer " + nurseToken))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(put("/api/life/maintenance/" + id + "/complete")
+            .header("Authorization", "Bearer " + loginAndGetToken(logisticsUsername, "123456")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status", is("COMPLETED")));
+  }
+
+  @Test
   void crm_lead_page_should_isolate_records_for_employee() throws Exception {
     String ownerA = "marketing_emp_" + ID_SEQ.incrementAndGet();
     String ownerB = "marketing_emp_" + ID_SEQ.incrementAndGet();

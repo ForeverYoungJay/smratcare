@@ -2,6 +2,7 @@ package com.zhiyangyun.care;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,6 +33,19 @@ class VitalSignServiceTest {
     var response = vitalSignService.record(request);
     assertTrue(response.isAbnormalFlag());
     assertNotNull(response.getAbnormalReason());
+  }
+
+  @Test
+  void unconfigured_type_uses_default_thresholds() throws Exception {
+    VitalRecordRequest request = new VitalRecordRequest();
+    request.setElderId(200L);
+    request.setType("SPO2");
+    request.setValueJson(objectMapper.readTree("{\"spo2\":88}"));
+    request.setMeasuredAt(LocalDateTime.now());
+    assertTrue(vitalSignService.record(request).isAbnormalFlag());
+
+    request.setValueJson(objectMapper.readTree("{\"spo2\":97}"));
+    assertFalse(vitalSignService.record(request).isAbnormalFlag());
   }
 
   @Test

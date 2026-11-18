@@ -212,6 +212,7 @@ function statusText(status?: CrmContractItem['status']) {
   if (status === 'SIGNED') return '已签署'
   if (status === 'EFFECTIVE') return '已生效'
   if (status === 'VOID') return '已作废'
+  if (status === 'TERMINATED') return '已无效（已退住）'
   return status || '-'
 }
 

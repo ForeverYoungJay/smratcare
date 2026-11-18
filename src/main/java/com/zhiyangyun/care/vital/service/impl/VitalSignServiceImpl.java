@@ -280,7 +280,31 @@ public class VitalSignServiceImpl implements VitalSignService {
       String key = config.getMetricCode() == null ? "DEFAULT" : config.getMetricCode().toUpperCase();
       map.put(key, config);
     }
+    return map.isEmpty() ? defaultThresholds(type) : map;
+  }
+
+  /** 机构未配置阈值时的通用老年人参考范围，避免明显异常（如血压 180/110）不被标记 */
+  private static Map<String, VitalThresholdConfig> defaultThresholds(String type) {
+    Map<String, VitalThresholdConfig> map = new HashMap<>();
+    switch (type == null ? "" : type.toUpperCase()) {
+      case "BP" -> {
+        map.put("SBP", threshold("90", "140"));
+        map.put("DBP", threshold("60", "90"));
+      }
+      case "TEMP" -> map.put("TEMP", threshold("36.0", "37.3"));
+      case "BS" -> map.put("BS", threshold("3.9", "11.1"));
+      case "SPO2" -> map.put("SPO2", threshold("93", null));
+      case "HR" -> map.put("HR", threshold("50", "100"));
+      default -> { }
+    }
     return map;
+  }
+
+  private static VitalThresholdConfig threshold(String min, String max) {
+    VitalThresholdConfig config = new VitalThresholdConfig();
+    config.setMinValue(min == null ? null : new BigDecimal(min));
+    config.setMaxValue(max == null ? null : new BigDecimal(max));
+    return config;
   }
 
   private String metricForType(String type) {

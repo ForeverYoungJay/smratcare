@@ -14,6 +14,8 @@ import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeApplyMapper;
 import com.zhiyangyun.care.elder.model.lifecycle.DischargeApplyCreateRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.DischargeApplyReviewRequest;
+import com.zhiyangyun.care.elder.model.lifecycle.DischargeRequest;
+import com.zhiyangyun.care.elder.service.lifecycle.ElderLifecycleService;
 import com.zhiyangyun.care.elder.model.lifecycle.ResidenceLifecycleConstants;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -44,13 +46,16 @@ class ElderResidenceFlowTest {
   @Autowired
   private BillMonthlyMapper billMonthlyMapper;
 
+  @Autowired
+  private ElderLifecycleService lifecycleService;
+
   @AfterEach
   void cleanupAuth() {
     SecurityContextHolder.clearContext();
   }
 
   @Test
-  void approve_apply_auto_discharge_success() {
+  void approve_apply_waits_for_settlement() {
     mockAdminAuth();
     ElderProfile elder = createElder("AutoSuccess");
 
@@ -66,33 +71,25 @@ class ElderResidenceFlowTest {
     review.setReviewRemark("同意");
     ElderDischargeApply reviewed = residenceController.reviewDischargeApply(created.getId(), review).getData();
 
+    // 审批通过后不直接离院：等交接与退住结算完成后才释放床位
     assertEquals(ResidenceLifecycleConstants.DISCHARGE_APPLY_APPROVED, reviewed.getStatus());
-    assertEquals(ResidenceLifecycleConstants.AUTO_DISCHARGE_SUCCESS, reviewed.getAutoDischargeStatus());
-    assertNotNull(reviewed.getLinkedDischargeId());
+    assertEquals(ResidenceLifecycleConstants.AUTO_DISCHARGE_PENDING_SETTLEMENT, reviewed.getAutoDischargeStatus());
   }
 
   @Test
-  void approve_apply_with_unpaid_bill_stays_pending_and_records_reason() {
+  void direct_discharge_with_unpaid_bill_is_refused() {
     mockAdminAuth();
     ElderProfile elder = createElder("AutoFail");
     createUnpaidBill(elder.getId());
 
-    DischargeApplyCreateRequest createRequest = new DischargeApplyCreateRequest();
-    createRequest.setElderId(elder.getId());
-    createRequest.setPlannedDischargeDate(LocalDate.now());
-    createRequest.setReason("账单测试");
-    ElderDischargeApply created = residenceController.createDischargeApply(createRequest).getData();
-    assertNotNull(created);
-
-    DischargeApplyReviewRequest review = new DischargeApplyReviewRequest();
-    review.setStatus(ResidenceLifecycleConstants.DISCHARGE_APPLY_APPROVED);
-    review.setReviewRemark("尝试自动退住");
-    assertThrows(Exception.class, () -> residenceController.reviewDischargeApply(created.getId(), review));
-
-    ElderDischargeApply latest = applyMapper.selectById(created.getId());
-    assertEquals(ResidenceLifecycleConstants.DISCHARGE_APPLY_PENDING, latest.getStatus());
-    assertEquals(ResidenceLifecycleConstants.AUTO_DISCHARGE_FAILED, latest.getAutoDischargeStatus());
-    assertTrue(latest.getAutoDischargeMessage() != null && !latest.getAutoDischargeMessage().isBlank());
+    DischargeRequest request = new DischargeRequest();
+    request.setTenantId(elder.getTenantId());
+    request.setOrgId(elder.getOrgId());
+    request.setElderId(elder.getId());
+    request.setDischargeDate(LocalDate.now());
+    request.setReason("账单测试");
+    IllegalStateException ex = assertThrows(IllegalStateException.class, () -> lifecycleService.discharge(request));
+    assertEquals("存在未结清账单，无法办理出院", ex.getMessage());
   }
 
   @Test

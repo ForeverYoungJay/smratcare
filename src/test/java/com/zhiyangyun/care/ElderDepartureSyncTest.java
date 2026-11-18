@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.zhiyangyun.care.crm.entity.CrmContract;
+import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.model.ElderDepartureType;
@@ -55,24 +57,32 @@ class ElderDepartureSyncTest {
   private HealthMedicationSettingMapper healthMedicationSettingMapper;
   @Autowired
   private HealthMedicationTaskMapper healthMedicationTaskMapper;
+  @Autowired
+  private CrmContractMapper crmContractMapper;
 
   @Test
   void discharge_sync_cancels_pending_cross_module_records() {
+    // 用独立长者，避免把共享种子长者 4003 置为离院、影响其他测试
     ElderProfile elder = elderMapper.selectById(4003L);
+    elder.setId(null);
+    elder.setElderCode("ELD-DEPART-" + System.nanoTime());
+    elder.setElderQrCode("QR-DEPART-" + System.nanoTime());
+    elder.setBedId(null);
     elder.setLifecycleStatus(ElderLifecycleStatus.IN_HOSPITAL);
-    elderMapper.updateById(elder);
+    elderMapper.insert(elder);
+    Long elderId = elder.getId();
 
     StoreOrder order = new StoreOrder();
     order.setOrgId(1L);
     order.setOrderNo("TEST-DISCHARGE-ORDER");
-    order.setElderId(4003L);
+    order.setElderId(elderId);
     order.setOrderStatus(1);
     order.setPayStatus(0);
     storeOrderMapper.insert(order);
 
     VisitBooking visitBooking = new VisitBooking();
     visitBooking.setOrgId(1L);
-    visitBooking.setElderId(4003L);
+    visitBooking.setElderId(elderId);
     visitBooking.setFamilyUserId(1L);
     visitBooking.setVisitorName("家属");
     visitBooking.setVisitorPhone("13000000000");
@@ -89,7 +99,7 @@ class ElderDepartureSyncTest {
     ServicePlan plan = new ServicePlan();
     plan.setTenantId(1L);
     plan.setOrgId(1L);
-    plan.setElderId(4003L);
+    plan.setElderId(elderId);
     plan.setServiceItemId(1L);
     plan.setPlanName("离院联动测试计划");
     plan.setCycleType("DAILY");
@@ -101,7 +111,7 @@ class ElderDepartureSyncTest {
     ServiceBooking serviceBooking = new ServiceBooking();
     serviceBooking.setTenantId(1L);
     serviceBooking.setOrgId(1L);
-    serviceBooking.setElderId(4003L);
+    serviceBooking.setElderId(elderId);
     serviceBooking.setPlanId(plan.getId());
     serviceBooking.setServiceItemId(1L);
     serviceBooking.setBookingTime(LocalDateTime.now().plusDays(1));
@@ -111,7 +121,7 @@ class ElderDepartureSyncTest {
     ElderPackage elderPackage = new ElderPackage();
     elderPackage.setTenantId(1L);
     elderPackage.setOrgId(1L);
-    elderPackage.setElderId(4003L);
+    elderPackage.setElderId(elderId);
     elderPackage.setPackageId(1L);
     elderPackage.setStartDate(LocalDate.now());
     elderPackage.setStatus(1);
@@ -120,7 +130,7 @@ class ElderDepartureSyncTest {
     HealthMedicationSetting setting = new HealthMedicationSetting();
     setting.setTenantId(1L);
     setting.setOrgId(1L);
-    setting.setElderId(4003L);
+    setting.setElderId(elderId);
     setting.setElderName("正常老人");
     setting.setDrugName("维生素");
     setting.setFrequency("QD");
@@ -130,7 +140,8 @@ class ElderDepartureSyncTest {
     HealthMedicationTask medicationTask = new HealthMedicationTask();
     medicationTask.setTenantId(1L);
     medicationTask.setOrgId(1L);
-    medicationTask.setElderId(4003L);
+    medicationTask.setElderId(elderId);
+    medicationTask.setSettingId(setting.getId());
     medicationTask.setElderName("正常老人");
     medicationTask.setDrugName("维生素");
     medicationTask.setTaskDate(LocalDate.now().plusDays(1));
@@ -141,12 +152,22 @@ class ElderDepartureSyncTest {
     CareTaskDaily careTask = new CareTaskDaily();
     careTask.setTenantId(1L);
     careTask.setOrgId(1L);
-    careTask.setElderId(4003L);
+    careTask.setElderId(elderId);
     careTask.setTemplateId(300L);
     careTask.setTaskDate(LocalDate.now());
     careTask.setPlanTime(LocalDateTime.now().plusHours(1));
     careTask.setStatus("PENDING");
     careTaskDailyMapper.insert(careTask);
+
+    CrmContract contract = new CrmContract();
+    contract.setTenantId(1L);
+    contract.setOrgId(1L);
+    contract.setElderId(elderId);
+    contract.setContractNo("TEST-DISCHARGE-CONTRACT");
+    contract.setStatus("SIGNED");
+    contract.setFlowStage("SIGNED");
+    contract.setEffectiveTo(LocalDate.now().plusYears(1));
+    crmContractMapper.insert(contract);
 
     elderLifecycleStateService.transition(
         elder,
@@ -170,7 +191,10 @@ class ElderDepartureSyncTest {
     assertEquals(LocalDate.now(), healthMedicationSettingMapper.selectById(setting.getId()).getEndDate());
     assertEquals(1L, careTaskDailyMapper.selectCount(
         Wrappers.lambdaQuery(CareTaskDaily.class)
-            .eq(CareTaskDaily::getElderId, 4003L)
+            .eq(CareTaskDaily::getElderId, elderId)
             .eq(CareTaskDaily::getStatus, "CANCELLED")));
+    CrmContract ended = crmContractMapper.selectById(contract.getId());
+    assertEquals("TERMINATED", ended.getStatus());
+    assertEquals(LocalDate.now(), ended.getEffectiveTo());
   }
 }

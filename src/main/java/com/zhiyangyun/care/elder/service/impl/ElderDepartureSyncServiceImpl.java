@@ -1,6 +1,8 @@
 package com.zhiyangyun.care.elder.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.zhiyangyun.care.crm.entity.CrmContract;
+import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.model.ElderLifecycleStatus;
 import com.zhiyangyun.care.elder.service.ElderDepartureSyncService;
@@ -29,6 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ElderDepartureSyncServiceImpl implements ElderDepartureSyncService {
   private static final String TASK_CANCELLED = "CANCELLED";
+  private static final List<String> CONTRACT_ACTIVE = List.of("SIGNED", "EFFECTIVE");
+  private static final String CONTRACT_TERMINATED = "TERMINATED";
   private static final String MEDICATION_CANCELLED = "CANCELLED";
   private static final String PLAN_INACTIVE = "INACTIVE";
   private static final String BOOKING_CANCELLED = "CANCELLED";
@@ -47,6 +51,7 @@ public class ElderDepartureSyncServiceImpl implements ElderDepartureSyncService 
   private final CareTaskDailyMapper careTaskDailyMapper;
   private final HealthMedicationTaskMapper healthMedicationTaskMapper;
   private final HealthMedicationSettingMapper healthMedicationSettingMapper;
+  private final CrmContractMapper crmContractMapper;
 
   public ElderDepartureSyncServiceImpl(
       StoreOrderMapper storeOrderMapper,
@@ -56,7 +61,8 @@ public class ElderDepartureSyncServiceImpl implements ElderDepartureSyncService 
       ElderPackageMapper elderPackageMapper,
       CareTaskDailyMapper careTaskDailyMapper,
       HealthMedicationTaskMapper healthMedicationTaskMapper,
-      HealthMedicationSettingMapper healthMedicationSettingMapper) {
+      HealthMedicationSettingMapper healthMedicationSettingMapper,
+      CrmContractMapper crmContractMapper) {
     this.storeOrderMapper = storeOrderMapper;
     this.visitBookingMapper = visitBookingMapper;
     this.servicePlanMapper = servicePlanMapper;
@@ -65,6 +71,7 @@ public class ElderDepartureSyncServiceImpl implements ElderDepartureSyncService 
     this.careTaskDailyMapper = careTaskDailyMapper;
     this.healthMedicationTaskMapper = healthMedicationTaskMapper;
     this.healthMedicationSettingMapper = healthMedicationSettingMapper;
+    this.crmContractMapper = crmContractMapper;
   }
 
   @Override
@@ -89,6 +96,25 @@ public class ElderDepartureSyncServiceImpl implements ElderDepartureSyncService 
     cancelPendingCareTasks(elder);
     deactivateMedicationSettings(elder, today);
     cancelPendingMedicationTasks(elder, today);
+    terminateSignedContracts(elder, today);
+  }
+
+  /** 离院后入住合同不再有效：停止续签提醒和后续月账单 */
+  private void terminateSignedContracts(ElderProfile elder, LocalDate today) {
+    List<CrmContract> contracts = crmContractMapper.selectList(Wrappers.lambdaQuery(CrmContract.class)
+        .eq(CrmContract::getIsDeleted, 0)
+        .eq(CrmContract::getOrgId, elder.getOrgId())
+        .eq(CrmContract::getElderId, elder.getId())
+        .in(CrmContract::getStatus, CONTRACT_ACTIVE));
+    for (CrmContract contract : contracts) {
+      contract.setStatus(CONTRACT_TERMINATED);
+      contract.setContractStatus("已无效（已退住）");
+      if (contract.getEffectiveTo() == null || contract.getEffectiveTo().isAfter(today)) {
+        contract.setEffectiveTo(today);
+      }
+      contract.setRemark(appendRemark(contract.getRemark(), "老人已离院，合同自动失效"));
+      crmContractMapper.updateById(contract);
+    }
   }
 
   private void cancelPendingStoreOrders(ElderProfile elder, LocalDateTime now) {

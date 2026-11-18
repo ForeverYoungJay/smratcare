@@ -15,6 +15,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,6 +29,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/life/maintenance")
 public class MaintenanceController {
+  // 任何员工都能报修；接单、改单、完工、删除只归后勤和管理层，避免报修人自行关单
+  private static final String HANDLE_ACCESS =
+      "hasAnyRole('LOGISTICS_EMPLOYEE','LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')";
   private final MaintenanceRequestMapper requestMapper;
   private final RoomMapper roomMapper;
 
@@ -98,6 +102,7 @@ public class MaintenanceController {
     return Result.ok(entity);
   }
 
+  @PreAuthorize(HANDLE_ACCESS)
   @PutMapping("/{id}")
   public Result<MaintenanceRequest> update(@PathVariable Long id, @Valid @RequestBody MaintenanceRequestCreateRequest request) {
     Long orgId = AuthContext.getOrgId();
@@ -122,6 +127,7 @@ public class MaintenanceController {
     return Result.ok(entity);
   }
 
+  @PreAuthorize(HANDLE_ACCESS)
   @PutMapping("/{id}/complete")
   public Result<MaintenanceRequest> complete(@PathVariable Long id) {
     MaintenanceRequest entity = getRequestInOrg(id, AuthContext.getOrgId());
@@ -134,6 +140,7 @@ public class MaintenanceController {
     return Result.ok(entity);
   }
 
+  @PreAuthorize(HANDLE_ACCESS)
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     MaintenanceRequest entity = getRequestInOrg(id, AuthContext.getOrgId());

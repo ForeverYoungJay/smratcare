@@ -31,21 +31,21 @@ class DashboardControllerTest {
   @Test
   @Sql(statements = {
       "INSERT INTO bill_monthly (id, org_id, elder_id, bill_month, total_amount, paid_amount, outstanding_amount, status, is_deleted) "
-          + "VALUES (8301, 1, 200, '2026-01', 100.00, 100.00, 0.00, 2, 0)",
+          + "VALUES (8301, 1, 200, '2019-01', 100.00, 100.00, 0.00, 2, 0)",
       "INSERT INTO bill_monthly (id, org_id, elder_id, bill_month, total_amount, paid_amount, outstanding_amount, status, is_deleted) "
-          + "VALUES (8302, 1, 200, '2026-02', 240.00, 240.00, 0.00, 2, 0)"
+          + "VALUES (8302, 1, 200, '2019-02', 240.00, 240.00, 0.00, 2, 0)"
   })
   void summary_respects_requested_window() throws Exception {
     String token = loginAndGetToken("admin", "123456");
 
     mockMvc.perform(get("/api/dashboard/summary")
-            .param("from", "2026-01")
-            .param("to", "2026-01")
+            .param("from", "2019-01")
+            .param("to", "2019-01")
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code", is(0)))
-        .andExpect(jsonPath("$.data.statsFromMonth", is("2026-01")))
-        .andExpect(jsonPath("$.data.statsToMonth", is("2026-01")))
+        .andExpect(jsonPath("$.data.statsFromMonth", is("2019-01")))
+        .andExpect(jsonPath("$.data.statsToMonth", is("2019-01")))
         .andExpect(jsonPath("$.data.totalRevenue", is(100.00)))
         .andExpect(jsonPath("$.data.averageMonthlyRevenue", is(100.00)));
   }

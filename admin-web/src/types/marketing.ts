@@ -495,7 +495,7 @@ export interface CrmContractItem {
   flowStage?: ContractFlowStage
   currentOwnerDept?: 'MARKETING' | 'ASSESSMENT'
   orgName?: string
-  status?: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'SIGNED' | 'EFFECTIVE' | 'VOID'
+  status?: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'SIGNED' | 'EFFECTIVE' | 'VOID' | 'TERMINATED'
   changeWorkflowStatus?: ContractChangeStatus
   changeWorkflowRemark?: string
   smsSendCount?: number

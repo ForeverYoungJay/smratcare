@@ -1909,7 +1909,7 @@ async function finalizeSelected() {
 }
 
 function nextStepLabel(record: CrmContractItem) {
-  if (record.status === 'VOID') return '查看'
+  if (record.status === 'VOID' || record.status === 'TERMINATED') return '查看'
   const stage = normalizedFlowStage(record)
   if (stage === 'SIGNED') return '进入系统'
   if (stage === 'PENDING_ASSESSMENT') {
@@ -1923,7 +1923,7 @@ function nextStepLabel(record: CrmContractItem) {
 }
 
 async function handleNextStep(record: CrmContractItem) {
-  if (record.status === 'VOID') {
+  if (record.status === 'VOID' || record.status === 'TERMINATED') {
     view(record)
     return
   }
@@ -2334,7 +2334,8 @@ function contractStatusLabel(status: string) {
     REJECTED: '已驳回',
     SIGNED: '已签署',
     EFFECTIVE: '已生效',
-    VOID: '作废'
+    VOID: '作废',
+    TERMINATED: '已无效（已退住）'
   }
   return map[status] || status
 }

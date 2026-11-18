@@ -11,6 +11,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhiyangyun.care.visit.model.VisitBookRequest;
 import com.zhiyangyun.care.visit.service.VisitService;
+import com.zhiyangyun.care.visit.entity.VisitBooking;
+import com.zhiyangyun.care.visit.mapper.VisitBookingMapper;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +37,17 @@ class VisitModuleTest {
 
   @Autowired
   private ObjectMapper objectMapper;
+
+  @Autowired
+  private VisitBookingMapper visitBookingMapper;
+
+  /** 预约须晚于当前 30 分钟、登记只认当天：晚间跑测试时预约会落到次日，这里把预约挪回今天 */
+  private void moveToToday(Long bookingId) {
+    VisitBooking booking = visitBookingMapper.selectById(bookingId);
+    booking.setVisitDate(LocalDate.now());
+    booking.setVisitTime(LocalDateTime.now());
+    visitBookingMapper.updateById(booking);
+  }
 
   private VisitBookRequest bookingRequest(LocalDateTime visitTime, String timeSlot) {
     VisitBookRequest request = new VisitBookRequest();
@@ -69,6 +83,7 @@ class VisitModuleTest {
   void status_flow_on_checkin() {
     VisitBookRequest r1 = bookingRequest(LocalDateTime.now().plusHours(1), "AM");
     var booking = visitService.book(r1);
+    moveToToday(booking.getId());
 
     var checkin = visitService.checkIn(new com.zhiyangyun.care.visit.model.VisitCheckInRequest() {{
       setOrgId(1L);
@@ -92,6 +107,7 @@ class VisitModuleTest {
   void checkin_requires_valid_visit_code_when_provided() {
     VisitBookRequest request = bookingRequest(LocalDateTime.now().plusHours(4), "PM");
     var booking = visitService.book(request);
+    moveToToday(booking.getId());
 
     assertThrows(IllegalArgumentException.class, () -> visitService.checkIn(new com.zhiyangyun.care.visit.model.VisitCheckInRequest() {{
       setOrgId(1L);
