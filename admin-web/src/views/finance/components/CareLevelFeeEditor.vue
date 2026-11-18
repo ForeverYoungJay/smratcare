@@ -1,6 +1,7 @@
 <template>
   <a-modal :open="true" title="护理等级收费" :footer="null" width="820px" :mask-closable="false" @cancel="emit('close')">
-    <a-alert type="info" show-icon message="按护理等级与生效月份设置月费；等级须与长者档案一致。护理费在账单中按实际计费天数折算。" />
+    <a-alert type="info" show-icon message="按护理等级与生效月份设置月费；护理等级取自护理部「护理等级」字典，与长者档案一致。护理费在账单中按实际计费天数折算。" />
+    <a-alert v-if="!loading && !careLevelOptions.length" type="warning" show-icon style="margin-top: 8px" message="护理部尚未维护护理等级，请先在「护理等级」中添加，再回来设置月费。" />
     <StatefulBlock :loading="loading" :error="error" @retry="load">
       <a-table :columns="columns" :data-source="fees" row-key="id" :scroll="{ x: 620 }" :pagination="{ pageSize: 5 }" size="small">
         <template #bodyCell="{ column, record }">
@@ -12,7 +13,7 @@
     <a-divider>维护护理月费</a-divider>
     <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" @finish="save">
       <a-row :gutter="16">
-        <a-col :xs="24" :sm="12"><a-form-item label="护理等级" name="careLevel"><a-input v-model:value="form.careLevel" :disabled="editing" placeholder="与长者档案中的护理等级一致" /></a-form-item></a-col>
+        <a-col :xs="24" :sm="12"><a-form-item label="护理等级" name="careLevel"><a-select v-model:value="form.careLevel" :options="careLevelOptions" :disabled="editing" placeholder="选择护理部维护的护理等级" /></a-form-item></a-col>
         <a-col :xs="24" :sm="12"><a-form-item label="生效月份" name="effectiveMonth"><a-date-picker v-model:value="form.effectiveMonth" :allow-clear="false" picker="month" style="width:100%" /></a-form-item></a-col>
         <a-col :xs="24" :sm="12"><a-form-item label="护理月费（元/月）" name="feeMonthly"><a-input-number v-model:value="form.feeMonthly" :min="0" :precision="2" style="width:100%" /></a-form-item></a-col>
         <a-col :xs="24" :sm="12"><a-form-item label="状态"><a-switch v-model:checked="form.status" :checked-value="1" :un-checked-value="0" checked-children="启用" un-checked-children="停用" /></a-form-item></a-col>
@@ -43,6 +44,7 @@ import type { FormInstance } from 'ant-design-vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { getBillingCareLevelFees, getBillingFeeHistory, getFinanceConfigImpactPreview, upsertBillingCareLevelFee } from '../../../api/finance'
+import { getCareLevelNameOptions } from '../../../api/nursing'
 import type { BillingCareLevelFee, FinanceBillingConfigEntry } from '../../../types'
 import { useUserStore } from '../../../stores/user'
 import { confirmAction } from '../../../utils/actionConfirm'
@@ -54,6 +56,7 @@ const emit = defineEmits<{ close: [] }>()
 const user = useUserStore()
 const formRef = ref<FormInstance>()
 const loading = ref(false), saving = ref(false), editing = ref(false)
+const careLevelOptions = ref<Array<{ value: string; label: string }>>([])
 const error = ref('')
 const fees = ref<BillingCareLevelFee[]>([])
 const baseFees = ref<FinanceBillingConfigEntry[]>([])
@@ -86,7 +89,8 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [careFees, history] = await Promise.all([getBillingCareLevelFees(orgId), getBillingFeeHistory(orgId)])
+    const [careFees, history, levels] = await Promise.all([getBillingCareLevelFees(orgId), getBillingFeeHistory(orgId), getCareLevelNameOptions()])
+    careLevelOptions.value = levels
     fees.value = careFees.sort((a, b) => b.effectiveMonth.localeCompare(a.effectiveMonth) || a.careLevel.localeCompare(b.careLevel, 'zh-CN'))
     baseFees.value = history
   } catch (err: any) {

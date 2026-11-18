@@ -353,7 +353,7 @@
         </a-table-column>
       </a-table>
       <a-button style="margin-top: 10px;" @click="appendSheetItem">+ 增加物品</a-button>
-      <a-alert style="margin-top: 10px;" type="info" show-icon message="保存后生成领用单；可先发起 OA 出库审批，审批完成后再执行确认出库并打印领取单。" />
+      <a-alert style="margin-top: 10px;" type="info" show-icon message="保存后生成领用单，须发起 OA 出库审批；审批通过后系统自动出库。若当时库存不足未能出库，补足库存后再点「确认出库」。" />
     </a-modal>
 
   </PageContainer>
@@ -809,10 +809,11 @@ function buildSheetApprovalPayload(sheet: InventoryOutboundSheet) {
     approvalType: 'MATERIAL_APPLY',
     title: `出库审批：${sheet.outboundNo || `领用单#${sheet.id}`}`,
     formData: JSON.stringify({
-      outboundSheetId: Number(sheet.id),
+      // id 为 19 位长整数，转 Number 会丢精度导致审批找不到领用单
+      outboundSheetId: String(sheet.id),
       outboundNo: sheet.outboundNo,
       receiverName: sheet.receiverName,
-      elderId: sheet.elderId ? Number(sheet.elderId) : undefined,
+      elderId: sheet.elderId ? String(sheet.elderId) : undefined,
       applyDept: sheet.applyDept,
       itemCount: sheet.items?.length || 0
     }),
@@ -828,7 +829,7 @@ async function submitSelectedSheetsApproval() {
   }
   Modal.confirm({
     title: `发起出库审批（${draftRecords.length}）？`,
-    content: '提交后会进入 OA 审批流，审批通过后再执行确认出库更稳妥。',
+    content: '提交后进入 OA 审批流，审批通过后系统自动出库。',
     onOk: async () => {
       for (const sheet of draftRecords) {
         await createApproval(buildSheetApprovalPayload(sheet))
@@ -1188,7 +1189,7 @@ async function submitOutboundSheet() {
       }))
     }
     const created = await createOutboundSheet(payload)
-    message.success(`领用单已创建：${created.outboundNo}，请领取完成后确认出库`)
+    message.success(`领用单已创建：${created.outboundNo}，请发起出库审批`)
     outboundOpen.value = false
     await fetchSheetData()
   } finally {

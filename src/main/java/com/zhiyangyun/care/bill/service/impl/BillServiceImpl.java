@@ -99,6 +99,7 @@ public class BillServiceImpl implements BillService {
       }
     }
 
+    response.setWarnings(missingStandardWarnings(elders, billMonth));
     response.setMessage(response.getSkippedCount() > 0
         ? "Generated monthly bills; not generated " + response.getSkippedCount() + " records"
         : "Generated monthly bills");
@@ -440,6 +441,39 @@ public class BillServiceImpl implements BillService {
             .eq(BillMonthly::getBillMonth, billMonth)
             .eq(BillMonthly::getIsDeleted, 0)
             .last("LIMIT 1 FOR UPDATE"));
+  }
+
+  /** 公办民营收费标准固定：生成账单时把未维护的床位费、护理等级收费列出来，避免账单静默按 0 计 */
+  public static List<String> missingStandardWarnings(List<ElderProfile> elders, String billMonth,
+      java.util.function.Function<Long, BigDecimal> bedFeeByOrg,
+      java.util.function.Function<Long, Map<String, BigDecimal>> careFeesByOrg) {
+    List<String> warnings = new ArrayList<>();
+    Map<Long, List<ElderProfile>> byOrg = new java.util.LinkedHashMap<>();
+    for (ElderProfile elder : elders) {
+      byOrg.computeIfAbsent(elder.getOrgId(), k -> new ArrayList<>()).add(elder);
+    }
+    for (Map.Entry<Long, List<ElderProfile>> entry : byOrg.entrySet()) {
+      BigDecimal bedFee = bedFeeByOrg.apply(entry.getKey());
+      if (bedFee == null || bedFee.signum() <= 0) {
+        warnings.add("床位费标准未配置（" + billMonth + "），床位费按 0 计");
+      }
+      Map<String, BigDecimal> careFees = careFeesByOrg.apply(entry.getKey());
+      Map<String, Integer> missing = new java.util.TreeMap<>();
+      for (ElderProfile elder : entry.getValue()) {
+        String level = elder.getCareLevel() == null || elder.getCareLevel().isBlank() ? "（未设置护理等级）" : elder.getCareLevel().trim();
+        if (!careFees.containsKey(level)) {
+          missing.merge(level, 1, Integer::sum);
+        }
+      }
+      missing.forEach((level, count) -> warnings.add("护理等级「" + level + "」未配置收费标准，" + count + " 位长者护理费按 0 计"));
+    }
+    return warnings;
+  }
+
+  private List<String> missingStandardWarnings(List<ElderProfile> elders, String billMonth) {
+    return missingStandardWarnings(elders, billMonth,
+        orgId -> billingConfigService.getConfigValue(orgId, "BED_FEE_MONTHLY", billMonth),
+        orgId -> billingConfigService.getCareLevelFees(orgId, billMonth));
   }
 
   private BigDecimal resolveCareFee(Long orgId, String careLevel, String billMonth) {

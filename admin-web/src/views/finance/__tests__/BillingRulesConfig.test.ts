@@ -8,6 +8,7 @@ const api = vi.hoisted(() => ({ getFinanceBillingConfig: vi.fn(), upsertFinanceB
 const confirm = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const warning = vi.hoisted(() => vi.fn())
 vi.mock('../../../api/finance', () => api)
+vi.mock('../../../api/nursing', () => ({ getCareLevelNameOptions: vi.fn().mockResolvedValue([]) }))
 vi.mock('../../../utils/actionConfirm', () => ({ confirmAction: confirm }))
 vi.mock('../../../stores/user', () => ({ useUserStore: () => ({ roles: ['FINANCE_MINISTER'] }) }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))

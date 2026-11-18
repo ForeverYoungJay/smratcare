@@ -6,6 +6,7 @@ const api = vi.hoisted(() => ({ getBillingCareLevelFees: vi.fn(), getBillingFeeH
   getFinanceConfigImpactPreview: vi.fn(), upsertBillingCareLevelFee: vi.fn() }))
 const user = vi.hoisted(() => ({ staffInfo: { orgId: '1' } }))
 vi.mock('../../../api/finance', () => api)
+vi.mock('../../../api/nursing', () => ({ getCareLevelNameOptions: vi.fn().mockResolvedValue([{ value: 'L2', label: 'L2' }]) }))
 vi.mock('../../../stores/user', () => ({ useUserStore: () => user }))
 vi.mock('../../../utils/actionConfirm', () => ({ confirmAction: vi.fn().mockResolvedValue(true) }))
 vi.mock('ant-design-vue', () => ({ message: { success: vi.fn(), error: vi.fn() } }))
@@ -14,7 +15,7 @@ function mountEditor() {
   return mount(CareLevelFeeEditor, { props: { month: '2026-11' }, global: { stubs: {
     'a-modal': { template: '<div><slot /></div>' }, 'a-form': { template: '<form><slot /></form>', methods: { validate: () => Promise.resolve(), clearValidate: () => {} } },
     StatefulBlock: true,
-    ...Object.fromEntries(['alert', 'table', 'divider', 'row', 'col', 'form-item', 'input', 'input-number', 'switch', 'card', 'space', 'button', 'date-picker', 'radio-group', 'radio-button', 'descriptions', 'descriptions-item'].map(name => [`a-${name}`, true]))
+    ...Object.fromEntries(['alert', 'select', 'table', 'divider', 'row', 'col', 'form-item', 'input', 'input-number', 'switch', 'card', 'space', 'button', 'date-picker', 'radio-group', 'radio-button', 'descriptions', 'descriptions-item'].map(name => [`a-${name}`, true]))
   } } })
 }
 beforeEach(() => {

@@ -134,6 +134,9 @@ def logistics():
             'receiverName': '护理部', 'applyDept': '护理部',
             'items': [{'productId': product, 'warehouseId': wh, 'quantity': 5, 'reason': '领用'}]})
     sheet_id = ident(sheet)
+    early = call('logistics_emp', 'POST', f'/api/inventory/outbound/sheet/confirm?id={sheet_id}', allow=('审批',))
+    if '_skipped' not in (early if isinstance(early, dict) else {}):
+        raise SystemExit('✗ 领用单未审批就出库了')
     appr = ident(call('logistics_emp', 'POST', '/api/oa/approval', {
         'approvalType': 'MATERIAL_APPLY', 'title': TAG + '出库审批',
         'formData': json.dumps({'outboundSheetId': str(sheet_id)})}))
@@ -143,7 +146,7 @@ def logistics():
             r2 = call('admin', 'PUT', f'/api/oa/approval/{appr}/approve?remark=同意', allow=('已', '状态'))
             if '_skipped' in (r2 if isinstance(r2, dict) else {}):
                 break
-    step('领用出库：领用单 → OA 逐级审批 → 自动出库，库存', stock())
+    step('领用出库：领用单 →（未审批直接出库被拒）→ OA 逐级审批 → 自动出库，库存', stock())
     if stock() != 95:
         raise SystemExit('✗ 审批完成后库存应为 95')
 

@@ -10,7 +10,7 @@ export function getBillDetail(elderId: Id, month: string) {
 }
 
 export function generateBill(month: string) {
-  return request.post<void>('/api/bill/generate', null, { params: { month } })
+  return request.post<{ generatedCount: number; skippedCount: number; warnings?: string[] }>('/api/bill/generate', null, { params: { month } })
 }
 
 export function getBillDeductionPreview(billId: Id) {

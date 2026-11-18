@@ -133,6 +133,8 @@ def main():
     # 9 财务：出账、收款
     gen = call('finance_emp', 'POST', f'/api/bill/generate?month={MONTH}')
     step('财务员工 生成本月账单', {k: gen.get(k) for k in ('generatedCount', 'skippedCount')})
+    for warning in gen.get('warnings') or []:
+        print(f'  ⚠ {warning}')
     bills = call('finance_emp', 'GET', f'/api/bill/page?elderId={elder_id}&month={MONTH}&pageNo=1&pageSize=5')['records']
     if not bills:
         raise SystemExit('✗ 已签约入住的长者没有生成本月账单')

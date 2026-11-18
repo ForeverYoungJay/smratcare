@@ -372,7 +372,7 @@
 <script setup lang="ts">
 import { useCompletionGuide } from '../../composables/useCompletionGuide'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { message } from 'ant-design-vue'
+import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
@@ -861,8 +861,12 @@ async function submitGenerate() {
   }
   generating.value = true
   try {
-    await generateBill(dayjs(generateForm.month).format('YYYY-MM'))
+    const result = await generateBill(dayjs(generateForm.month).format('YYYY-MM'))
     message.success('生成成功')
+    if (result?.warnings?.length) {
+      // 标准缺失时对应费用按 0 计，提醒财务到「计费规则」补齐后重新生成
+      Modal.warning({ title: '计费标准不完整', content: result.warnings.join('；') + '。请到「计费规则」补齐后重新生成本月账单。', width: 520 })
+    }
     generateOpen.value = false
     fetchData()
   } finally {

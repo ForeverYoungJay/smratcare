@@ -94,6 +94,14 @@ export function getCareLevelList(params?: any, config?: Record<string, any>) {
   return request.get<CareLevelItem[]>('/api/nursing/care-levels/list', { params, ...config })
 }
 
+/** 护理等级只认护理部「护理等级」字典的名称：长者档案、护理收费标准都从这里选，账单才能按等级取到月费 */
+export async function getCareLevelNameOptions(current?: string) {
+  const list = await getCareLevelList(undefined, { silent403: true }).catch(() => [] as CareLevelItem[])
+  const names = (list || []).filter((item) => item.enabled !== 0).map((item) => String(item.levelName || '').trim()).filter(Boolean)
+  if (current && !names.includes(current)) names.push(current)
+  return Array.from(new Set(names)).map((value) => ({ value, label: value }))
+}
+
 export function createCareLevel(data: Partial<CareLevelItem>) {
   return request.post<CareLevelItem>('/api/nursing/care-levels', data)
 }

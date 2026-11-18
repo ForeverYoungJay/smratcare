@@ -42,12 +42,7 @@
           </a-space>
         </a-form-item>
         <a-form-item label="护理等级" name="careLevel">
-          <a-select v-model:value="form.careLevel" placeholder="请选择护理等级">
-            <a-select-option value="A">A</a-select-option>
-            <a-select-option value="B">B</a-select-option>
-            <a-select-option value="C">C</a-select-option>
-            <a-select-option value="D">D</a-select-option>
-          </a-select>
+          <a-select v-model:value="form.careLevel" :options="careLevelOptions" placeholder="请选择护理等级（护理部「护理等级」中维护）" />
         </a-form-item>
         <a-form-item label="责任护理员" name="responsibleStaffId">
           <a-select
@@ -128,6 +123,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 import { getElderDetail, updateElder, uploadElderFile } from '../../api/elder'
+import { getCareLevelNameOptions } from '../../api/nursing'
 import { getBedList, getBuildingList, getFloorList, getRoomList } from '../../api/bed'
 import type { BedItem, BuildingItem, ElderItem, FloorItem, RoomItem, Id } from '../../types/api'
 
@@ -360,8 +356,11 @@ watch(
   }
 )
 
+const careLevelOptions = ref<Array<{ value: string; label: string }>>([])
+
 onMounted(async () => {
   await Promise.all([load(), loadAssets()])
   syncAssetSelectionByBed(form.bedId as Id | undefined)
+  careLevelOptions.value = await getCareLevelNameOptions(form.careLevel || undefined)
 })
 </script>
