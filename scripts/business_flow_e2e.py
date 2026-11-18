@@ -82,11 +82,12 @@ def main():
     elder_id = step('护理部长 建长者档案', elder['id'] if isinstance(elder, dict) else elder)
     call('nursing_minister', 'POST', '/api/assessment/records', {
         'elderId': elder_id, 'elderName': TAG + '长者', 'assessmentType': 'ADMISSION', 'assessmentDate': str(TODAY),
-        'archiveNo': contract_no, 'levelCode': 'L2', 'score': 60, 'resultSummary': '半自理，建议二级护理'})
+        'archiveNo': contract_no, 'levelCode': '2级', 'score': 60, 'resultSummary': '半自理，建议二级护理'})
     stage = call('marketing_emp', 'GET', f'/api/crm/contracts/{contract_id}')['flowStage']
     step('护理部长 入住评估（合同阶段应为待选床）', stage)
     if stage != 'PENDING_BED_SELECT':
         raise SystemExit('✗ 评估完成后合同没有进入待选床')
+    step('长者护理等级（按护理部字典自动填入，字典无匹配则为空）', call('nursing_minister', 'GET', f'/api/elder/{elder_id}').get('careLevel'))
 
     # 4 财务：入住费用审核
     audit = call('finance_emp', 'POST', '/api/finance/fee/admission-audit',

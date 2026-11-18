@@ -95,7 +95,7 @@ class VisitModuleTest {
 
   @Test
   void duplicate_slot_for_same_elder_is_rejected() {
-    VisitBookRequest first = bookingRequest(LocalDateTime.now().plusHours(3), "AM");
+    VisitBookRequest first = bookingRequest(LocalDate.now().plusDays(1).atTime(10, 0), "AM");
     visitService.book(first);
 
     VisitBookRequest duplicate = bookingRequest(first.getVisitTime().plusMinutes(20), "AM");

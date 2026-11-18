@@ -77,6 +77,7 @@ DELETE FROM crm_lead WHERE id IN (SELECT id FROM t_l);
 DELETE FROM elder WHERE id IN (SELECT id FROM t_e);
 DELETE FROM family_user WHERE id IN (SELECT id FROM t_f);
 DELETE FROM billing_config WHERE remark = '流程测试临时';
+DELETE FROM care_level WHERE remark = '流程测试临时';
 
 -- 人事线
 CREATE TEMPORARY TABLE t_st AS SELECT id FROM staff WHERE username LIKE 'flow%' AND real_name LIKE '流程测试%';
