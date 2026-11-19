@@ -213,6 +213,7 @@ import StatusTag from '../../components/smartcare/StatusTag.vue'
 import WorkbenchModuleCard from '../../components/smartcare/WorkbenchModuleCard.vue'
 import DepartmentHomeOverview from '../../components/workbench/DepartmentHomeOverview.vue'
 import { getOaTaskCalendar, getPortalSummary, getQuickChatState } from '../../api/oa'
+import { getLeadPage } from '../../api/marketing'
 import { getAttendanceOverview, punchAttendance } from '../../api/schedule'
 import type { AttendanceDashboardOverview, OaPortalSummary, OaTask } from '../../types'
 import { useUserStore } from '../../stores/user'
@@ -280,6 +281,8 @@ let messageSyncUnsubscribe = () => {}
 let refreshInFlight = false
 const calendarRows = ref<OaTask[]>([])
 const portalSummary = ref<OaPortalSummary | null>(null)
+// 与市场工作台「待跟进」同口径：跟进日期已到的客户；无市场权限时为 null（显示 --）
+const followupDueCount = ref<number | null>(null)
 const messagePreviews = ref<QuickChatPreviewItem[]>([])
 const departmentSnapshot = ref<DepartmentWorkbenchSnapshot | null>(null)
 const departmentDataStatus = ref<WorkbenchDataStatus>('idle')
@@ -763,10 +766,10 @@ const allModules = computed<PrimaryModule[]>(() => ([
     path: '/marketing/workbench',
     metricLabel: '客户跟进',
     metricHelper: '咨询线索、预约参观与转化',
-    metricValue: displayNumber(portalSummary.value?.suggestionCount),
+    metricValue: displayNumber(followupDueCount.value),
     tone: 'success',
     items: [
-      { title: '待回访客户', desc: '咨询、试住和参观回访统一管理。', path: '/marketing/workbench', tag: `跟进 ${displayNumber(portalSummary.value?.suggestionCount)}`, tone: 'pending' },
+      { title: '待回访客户', desc: '咨询、试住和参观回访统一管理。', path: '/marketing/workbench', tag: `跟进 ${displayNumber(followupDueCount.value)}`, tone: 'pending' },
       { title: '营销渠道概览', desc: '查看来源和转化效率。', path: '/marketing/workbench', tag: '营销视图', tone: 'normal' }
     ]
   },
@@ -843,7 +846,12 @@ async function loadWorkbench(options: { silent?: boolean } = {}) {
       }),
       refreshAttendance().catch(capture('考勤')),
       loadCalendar(),
-      refreshMessagePreviews().catch(capture('消息'))
+      refreshMessagePreviews().catch(capture('消息')),
+      canAccess('/marketing/workbench')
+        ? getLeadPage({ pageNo: 1, pageSize: 1, followupDueOnly: true, followupDateTo: dayjs().format('YYYY-MM-DD') }, { silent403: true, silentError: true })
+          .then((page) => { followupDueCount.value = Number(page.total ?? 0) })
+          .catch(() => { followupDueCount.value = null })
+        : Promise.resolve()
     ])
     portalSummary.value = portal
     departmentDataStatus.value = departmentResult.status
