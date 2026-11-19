@@ -59,8 +59,9 @@ describe('one page per function', () => {
     expect(resolveAuthorizedLoginTarget(router, '', ['FINANCE_EMPLOYEE'], ['/finance/payments/register'])).toBe('/finance/bills/detail-query')
     setToken('local-test-token'); setRoles(['FINANCE_EMPLOYEE']); setPagePermissions(['/workbench', '/finance/payments/register'])
     setupPermission(router)
+    // 部门首页不再是默认首页：未授权时与其他页面一样进 403，登录落地仍是我的工作台
     await router.push('/finance/workbench')
-    expect(router.currentRoute.value.path).toBe('/workbench/overview')
+    expect(router.currentRoute.value.path).toBe('/403')
   })
 
   it.each([
@@ -170,8 +171,8 @@ describe('one page per function', () => {
   })
 
   it('lands the three departments on their own daily work page', () => {
-    expect(resolveDefaultHome(['FINANCE_EMPLOYEE'])).toBe('/finance/workbench')
-    expect(resolveDefaultHome(['MARKETING_MINISTER'])).toBe('/marketing/workbench')
-    expect(resolveDefaultHome(['HR_EMPLOYEE'])).toBe('/hr/overview')
+    expect(resolveDefaultHome(['FINANCE_EMPLOYEE'])).toBe('/workbench/overview')
+    expect(resolveDefaultHome(['MARKETING_MINISTER'])).toBe('/workbench/overview')
+    expect(resolveDefaultHome(['HR_EMPLOYEE'])).toBe('/workbench/overview')
   })
 })

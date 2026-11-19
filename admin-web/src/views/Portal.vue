@@ -163,7 +163,7 @@
 
       <SectionPanel
         title="安全与健康预警"
-        description="高风险长者、异常生命体征和行为预警需要优先闭环，所有缺明细的数据都保持可见占位。"
+        description="体检/巡检未闭环、事故和行为预警需要优先闭环，所有缺明细的数据都保持可见占位。"
       >
         <div class="portal-grid portal-grid--risk-cards">
           <EntitySummaryCard
@@ -511,7 +511,7 @@ const riskClosureItems = computed(() => ([
   },
   {
     title: '安全事件',
-    desc: `高风险长者 ${displayNumber(portal.value?.elderAbnormalCount)} 位，联动巡房、跌倒、离床和应急处理。`,
+    desc: `体检待跟进长者 ${displayNumber(portal.value?.elderAbnormalCount)} 位，需医护完成巡检或复核。`,
     tag: numberValue(portal.value?.elderAbnormalCount) > 0 ? '高优先' : '平稳',
     tone: numberValue(portal.value?.elderAbnormalCount) > 0 ? 'danger' as const : 'offline' as const,
     path: '/stats/operations?tab=safety'
@@ -657,17 +657,17 @@ const secondaryMetrics = computed(() => ([
 const alertFocusCards = computed(() => ([
   {
     avatar: '高',
-    title: '高风险长者',
-    subtitle: '重点关注跌倒、离床、异常波动等高风险对象。',
-    meta: [`当前关注 ${displayNumber(portal.value?.elderAbnormalCount)}`, '按未闭环体检异常涉及长者去重统计'],
+    title: '体检待跟进长者',
+    subtitle: '有未闭环体检异常或待完成巡检的长者。',
+    meta: [`当前关注 ${displayNumber(portal.value?.elderAbnormalCount)}`, '按未闭环体检/巡检涉及长者去重统计'],
     tagText: numberValue(portal.value?.elderAbnormalCount) > 0 ? '高优先级' : '暂平稳',
     tagTone: numberValue(portal.value?.elderAbnormalCount) > 0 ? 'danger' as const : 'normal' as const,
     path: '/health/inspection?status=OPEN'
   },
   {
     avatar: '体',
-    title: '体检异常未闭环',
-    subtitle: '聚焦体温、血压、血氧等异常与跟进中记录。',
+    title: '体检/巡检未闭环',
+    subtitle: '体检异常与跟进中、待首次巡检的记录。',
     meta: [`异常 ${displayNumber(portal.value?.healthAbnormalCount)}`, '需护理与医生复核'],
     tagText: numberValue(portal.value?.healthAbnormalCount) > 0 ? '待复核' : '正常',
     tagTone: numberValue(portal.value?.healthAbnormalCount) > 0 ? 'warning' as const : 'normal' as const,
@@ -687,8 +687,8 @@ const alertFocusCards = computed(() => ([
 const riskItems = computed<RiskItemWithPath[]>(() => ([
   {
     key: 'risk-elder',
-    title: '高风险长者',
-    description: '需要重点巡视与连续观察的长者',
+    title: '体检待跟进长者',
+    description: '有未闭环体检异常或待完成巡检的长者',
     levelText: '危险',
     tone: 'danger',
     value: displayNumber(portal.value?.elderAbnormalCount),
@@ -697,8 +697,8 @@ const riskItems = computed<RiskItemWithPath[]>(() => ([
   },
   {
     key: 'risk-health',
-    title: '异常生命体征',
-    description: '今日采集到的异常生命体征记录',
+    title: '体检/巡检未闭环',
+    description: '体检异常、跟进中和待首次巡检的记录',
     levelText: '警告',
     tone: 'warning',
     value: displayNumber(portal.value?.healthAbnormalCount),

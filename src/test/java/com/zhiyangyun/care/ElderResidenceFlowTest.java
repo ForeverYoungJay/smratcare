@@ -77,6 +77,26 @@ class ElderResidenceFlowTest {
   }
 
   @Test
+  void second_apply_refused_while_first_awaits_settlement() {
+    mockAdminAuth();
+    ElderProfile elder = createElder("SecondApply");
+    DischargeApplyCreateRequest createRequest = new DischargeApplyCreateRequest();
+    createRequest.setElderId(elder.getId());
+    createRequest.setPlannedDischargeDate(LocalDate.now());
+    createRequest.setReason("首次申请");
+    var created = residenceController.createDischargeApply(createRequest).getData();
+    DischargeApplyReviewRequest review = new DischargeApplyReviewRequest();
+    review.setStatus(ResidenceLifecycleConstants.DISCHARGE_APPLY_APPROVED);
+    review.setReviewRemark("同意");
+    residenceController.reviewDischargeApply(created.getId(), review);
+
+    createRequest.setReason("重复申请");
+    IllegalStateException ex = assertThrows(IllegalStateException.class,
+        () -> residenceController.createDischargeApply(createRequest));
+    assertEquals("该老人已有办理中的退住申请，请继续办理原申请", ex.getMessage());
+  }
+
+  @Test
   void direct_discharge_with_unpaid_bill_is_refused() {
     mockAdminAuth();
     ElderProfile elder = createElder("AutoFail");

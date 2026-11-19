@@ -39,21 +39,9 @@ export const LEGACY_ROLE_ALIASES: Readonly<Record<string, readonly RoleCode[]>> 
   MANAGER: [ROLE_CODES.MARKETING_MINISTER]
 }
 
-export const DEFAULT_HOME_BY_ROLE: Readonly<Partial<Record<RoleCode, string>>> = {
-  SYS_ADMIN: '/system', DIRECTOR: '/portal', ADMIN: '/portal',
-  NURSING_EMPLOYEE: '/workbench/overview', NURSING_MINISTER: '/workbench/overview',
-  MEDICAL_EMPLOYEE: '/workbench/overview', MEDICAL_MINISTER: '/workbench/overview',
-  FINANCE_EMPLOYEE: '/finance/workbench', FINANCE_MINISTER: '/finance/workbench',
-  LOGISTICS_EMPLOYEE: '/workbench/overview', LOGISTICS_MINISTER: '/workbench/overview',
-  HR_EMPLOYEE: '/hr/overview', HR_MINISTER: '/hr/overview',
-  MARKETING_EMPLOYEE: '/marketing/workbench', MARKETING_MINISTER: '/marketing/workbench'
-}
-
-const DEFAULT_HOME_PRIORITY: RoleCode[] = [ROLE_CODES.SYS_ADMIN, ROLE_CODES.DIRECTOR, ROLE_CODES.ADMIN, ...DEPARTMENT_MINISTER_ROLES, ...DEPARTMENT_EMPLOYEE_ROLES]
-export function resolveDefaultHome(roles: string[]): string {
-  const normalized = new Set(roles.map((role) => String(role || '').trim().toUpperCase()))
-  const role = DEFAULT_HOME_PRIORITY.find((code) => normalized.has(code))
-  return (role && DEFAULT_HOME_BY_ROLE[role]) || '/workbench/overview'
+// 所有岗位登录后先进「我的工作台」，部门业务从侧栏进入
+export function resolveDefaultHome(_roles: string[]): string {
+  return '/workbench/overview'
 }
 export const isSystemAdministrator = (roles: string[]) => roles.includes(ROLE_CODES.SYS_ADMIN)
 export const isBusinessAdministrator = (roles: string[]) => roles.includes(ROLE_CODES.ADMIN)

@@ -78,6 +78,40 @@ class ElderServiceTest {
   }
 
   @Test
+  void bed_change_clears_elder_from_old_bed() {
+    Bed first = new Bed();
+    first.setOrgId(1L);
+    first.setRoomId(10L);
+    first.setBedNo("04");
+    first.setBedQrCode("QR-MOVE-1");
+    first.setStatus(1);
+    bedMapper.insert(first);
+    Bed second = new Bed();
+    second.setOrgId(1L);
+    second.setRoomId(10L);
+    second.setBedNo("05");
+    second.setBedQrCode("QR-MOVE-2");
+    second.setStatus(1);
+    bedMapper.insert(second);
+
+    AssignBedRequest request = new AssignBedRequest();
+    request.setBedId(first.getId());
+    request.setStartDate(LocalDate.now().minusDays(2));
+    elderService.assignBed(200L, request);
+    request.setBedId(second.getId());
+    request.setStartDate(LocalDate.now());
+    elderService.assignBed(200L, request);
+
+    // 调床释放旧床：状态与占用人必须一起清空（之前 updateById 跳过 null，旧床留着长者）
+    Bed released = bedMapper.selectById(first.getId());
+    assertEquals(1, released.getStatus());
+    assertNull(released.getElderId());
+    assertNull(released.getOccupancySource());
+
+    elderService.unbindBed(200L, LocalDate.now(), "cleanup", null, null);
+  }
+
+  @Test
   void reassign_same_bed_is_idempotent() {
     Bed newBed = new Bed();
     newBed.setOrgId(1L);

@@ -1008,6 +1008,16 @@ public class ElderResidenceController {
     if (pendingCount > 0) {
       throw new IllegalStateException("该老人已有待审核退住申请");
     }
+    // 已审批但还没结算/释放床位的申请仍在办理中，再建一张会出现同一长者两条超时退住
+    long inProgress = dischargeApplyMapper.selectCount(Wrappers.lambdaQuery(ElderDischargeApply.class)
+        .eq(ElderDischargeApply::getIsDeleted, 0)
+        .eq(ElderDischargeApply::getOrgId, orgId)
+        .eq(ElderDischargeApply::getElderId, request.getElderId())
+        .eq(ElderDischargeApply::getStatus, ResidenceLifecycleConstants.DISCHARGE_APPLY_APPROVED)
+        .eq(ElderDischargeApply::getAutoDischargeStatus, ResidenceLifecycleConstants.AUTO_DISCHARGE_PENDING_SETTLEMENT));
+    if (inProgress > 0) {
+      throw new IllegalStateException("该老人已有办理中的退住申请，请继续办理原申请");
+    }
     ElderDischargeApply record = new ElderDischargeApply();
     record.setTenantId(orgId);
     record.setOrgId(orgId);
