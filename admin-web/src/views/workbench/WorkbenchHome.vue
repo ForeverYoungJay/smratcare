@@ -836,7 +836,7 @@ async function loadWorkbench(options: { silent?: boolean } = {}) {
   }
   try {
     const [portal, departmentResult, , calendarOk] = await Promise.all([
-      getPortalSummary({ silent403: true, silentError: true }).catch(capture('工作待办')),
+      getPortalSummary({ silent403: true, silentError: true, params: { scope: 'PERSONAL' } }).catch(capture('工作待办')),
       loadDepartmentWorkbenchSnapshot(workbenchProfile.value, canAccess, {
         staffId: userStore.staffInfo?.id,
         username: userStore.staffInfo?.username
