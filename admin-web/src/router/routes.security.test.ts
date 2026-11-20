@@ -44,7 +44,7 @@ describe('route security foundation', () => {
       'elder/discharge-apply', 'elder/trial-stay', 'elder/medical-outing',
       'elder/death-register',
       'logistics', 'care', 'finance', 'health', 'medical-care', 'fire',
-      'ltci', 'stats', 'ai', 'card', 'life', 'dining', 'assessment',
+      'ltci', 'digital-twin', 'stats', 'ai', 'card', 'life', 'dining', 'assessment',
       'survey', 'oa', 'hr', 'system', 'demo'
     ])
   })
@@ -137,7 +137,7 @@ describe('route security foundation', () => {
     expect(resolveRouteAccess(router, ['NURSING_EMPLOYEE'], '/workbench/approvals', getRecommendedPagePermissions('NURSING_EMPLOYEE')).canAccess).toBe(false)
     expect(resolveRouteAccess(router, ['NURSING_MINISTER'], '/workbench/approvals', getRecommendedPagePermissions('NURSING_MINISTER')).canAccess).toBe(true)
     expect(resolveRouteAccess(router, ['SYS_ADMIN'], '/system/role', getRecommendedPagePermissions('SYS_ADMIN')).canAccess).toBe(true)
-    expect(resolveRouteAccess(router, ['ADMIN'], '/system/role', getRecommendedPagePermissions('ADMIN')).canAccess).toBe(false)
+    expect(resolveRouteAccess(router, ['ADMIN'], '/system/role', getRecommendedPagePermissions('ADMIN')).canAccess).toBe(true)
     expect(resolveRouteAccess(router, ['DIRECTOR'], '/stats/security-policy', getRecommendedPagePermissions('DIRECTOR')).canAccess).toBe(false)
     expect(resolveRouteAccess(router, ['DIRECTOR'], '/stats/org/monthly-operation', getRecommendedPagePermissions('DIRECTOR')).canAccess).toBe(true)
   })

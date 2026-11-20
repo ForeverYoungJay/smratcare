@@ -20,9 +20,9 @@ function depth(items: MenuItem[], current = 1): number {
 
 describe('two-level job navigation', () => {
   it('gives logistics staff the business group and keeps management for the minister', () => {
-    expect(jobMenu('LOGISTICS_EMPLOYEE').map((item) => item.label)).toEqual(['后勤部业务', '我的办公'])
+    expect(jobMenu('LOGISTICS_EMPLOYEE').map((item) => item.label)).toEqual(['后勤部业务', '数字孪生中心', '我的办公'])
     const minister = jobMenu('LOGISTICS_MINISTER')
-    expect(minister.map((item) => item.label)).toEqual(['后勤部业务', '后勤部管理', '我的办公'])
+    expect(minister.map((item) => item.label)).toEqual(['后勤部业务', '后勤部管理', '数字孪生中心', '我的办公'])
     expect(paths(minister)).toEqual(expect.arrayContaining(['/logistics/task-center', '/logistics/reports/maintenance-todo-log']))
   })
 
@@ -56,7 +56,7 @@ describe('two-level job navigation', () => {
   it('gives the director a concise operating and risk navigation', () => {
     const menu = jobMenu('DIRECTOR')
     expect(menu.map((item) => item.label)).toEqual([
-      '经营总览', '部门运行', '经营报表', '长者查询', '风险与异常', '我的办公'
+      '经营总览', '部门运行', '经营报表', '长者查询', '风险与异常', '数字孪生中心', '我的办公'
     ])
     expect(paths(menu)).not.toContain('/system')
   })
@@ -122,7 +122,7 @@ describe('two-level job navigation', () => {
   it('keeps system administration separate from daily business', () => {
     const menu = jobMenu('SYS_ADMIN')
     expect(menu.map((item) => item.label)).toEqual([
-      '系统管理首页', '组织与权限', '安全与审计', '我的办公'
+      '系统管理首页', '组织与权限', '安全与审计', '数字孪生中心', '我的办公'
     ])
     expect(paths(menu)).not.toContain('/portal')
     expect(paths(menu)).not.toContain('/medical-care')
@@ -134,9 +134,10 @@ describe('two-level job navigation', () => {
     'FINANCE_EMPLOYEE', 'FINANCE_MINISTER', 'LOGISTICS_EMPLOYEE', 'LOGISTICS_MINISTER',
     'HR_EMPLOYEE', 'HR_MINISTER', 'MARKETING_EMPLOYEE', 'MARKETING_MINISTER',
     'DIRECTOR', 'ADMIN', 'SYS_ADMIN'
-  ])('%s has no more than nine first-level items and no more than two levels', (role) => {
+  ])('%s has no more than ten first-level items and no more than two levels', (role) => {
     const menu = jobMenu(role)
-    expect(menu.length).toBeLessThanOrEqual(9)
+    // 9 个业务/办公入口 + 所有岗位共用的「数字孪生中心」
+    expect(menu.length).toBeLessThanOrEqual(10)
     expect(depth(menu)).toBeLessThanOrEqual(2)
     const menuPaths = paths(menu)
     expect(new Set(menuPaths).size).toBe(menuPaths.length)

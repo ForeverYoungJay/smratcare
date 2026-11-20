@@ -10,6 +10,7 @@ import {
   CheckSquareOutlined,
   DatabaseOutlined,
   FireOutlined,
+  GlobalOutlined,
   HomeOutlined,
   MedicineBoxOutlined,
   ScheduleOutlined,
@@ -50,6 +51,7 @@ const iconRegistry = {
   DatabaseOutlined,
   SettingOutlined,
   SafetyCertificateOutlined,
+  GlobalOutlined,
   SafetyOutlined: FireOutlined,
   FundProjectionScreenOutlined: AlertOutlined
 } as const

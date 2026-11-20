@@ -126,11 +126,11 @@ describe('one page per function', () => {
     expect(workspace.tabs.filter((t) => canUseWorkspaceTab(t, roles, pages, [])).map((t) => t.path)).toEqual(pages)
   })
 
-  it('keeps role management and security policy system-admin-only inside shared pages', () => {
+  it('opens role management to the business admin but keeps security policy system-admin-only', () => {
     const router = makeRouter()
-    for (const path of ['/system/role', '/stats/security-policy']) {
+    for (const [path, adminAllowed] of [['/system/role', true], ['/stats/security-policy', false]] as const) {
       const location = router.resolve(workspaceLocation(path)!).fullPath
-      expect(resolveRouteAccess(router, ['ADMIN'], location, []).canAccess).toBe(false)
+      expect(resolveRouteAccess(router, ['ADMIN'], location, []).canAccess).toBe(adminAllowed)
       expect(resolveRouteAccess(router, ['SYS_ADMIN'], location, getRecommendedPagePermissions('SYS_ADMIN')).canAccess).toBe(true)
     }
   })

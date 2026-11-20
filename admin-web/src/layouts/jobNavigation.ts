@@ -18,6 +18,9 @@ const OFFICE: JobEntry = {
   ])
 }
 
+/** 数字孪生中心：所有岗位都能看园区总览，各模式的数据权限由服务端按岗位校验 */
+const DIGITAL_TWIN: JobEntry = { label: '数字孪生中心', path: '/digital-twin', icon: 'GlobalOutlined', section: 'operations' }
+
 /** 各部门的主页面（部门员工与部长共用；没有权限的页面由 availablePaths 自动过滤） */
 const DEPARTMENTS: Array<{ department: DepartmentCode; roles: RoleCode[]; minister: RoleCode; entries: JobEntry[] }> = [
   { department: 'NURSING', roles: [ROLE_CODES.NURSING_EMPLOYEE, ROLE_CODES.NURSING_MINISTER], minister: ROLE_CODES.NURSING_MINISTER, entries: pages([
@@ -77,6 +80,8 @@ const ADMIN_ENTRIES: JobEntry[] = [
     ['长者工作台', '/elder/in-hospital-overview'], ['长者列表', '/elder/list'], ['入住办理中心', '/elder/admission-processing'],
     ['床位与状态管理', '/elder/bed-panorama'], ['费用与退住', '/elder/status-change/discharge-settlement']]) },
   { label: '业务基础配置', path: '/base-config/elder-type', icon: 'DatabaseOutlined', section: 'system' },
+  // 业务管理员可维护岗位的页面权限；系统超管角色仍是保留角色，后端拒绝新增、修改、删除
+  { label: '角色与权限', path: '/system/role', icon: 'SafetyCertificateOutlined', section: 'system' },
   { label: '制度知识与公告', path: '/oa/library', icon: 'SettingOutlined', section: 'system' }
 ]
 
@@ -147,7 +152,7 @@ function entry(raw: JobEntry, availablePaths: Set<string>, order: number): MenuI
 }
 
 function buildMenu(entries: JobEntry[], availablePaths: Set<string>) {
-  return uniqueEntries([...entries, OFFICE].map((item, index) => entry(item, availablePaths, index + 1)).filter(Boolean) as MenuItem[])
+  return uniqueEntries([...entries, DIGITAL_TWIN, OFFICE].map((item, index) => entry(item, availablePaths, index + 1)).filter(Boolean) as MenuItem[])
 }
 
 export function supportsJobNavigation(roles: string[]) {

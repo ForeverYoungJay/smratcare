@@ -200,7 +200,7 @@ export const systemRoutes: RouteRecordRaw[] = [
             path: 'role',
             name: 'SystemRoleManage',
             component: () => import('../views/System/RoleManage.vue'),
-            meta: { title: '角色与权限', roles: ['SYS_ADMIN'] }
+            meta: { title: '角色与权限', roles: ['SYS_ADMIN', 'ADMIN'] }
           },
           {
             path: 'department',

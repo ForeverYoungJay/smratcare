@@ -3,6 +3,16 @@ import { DEPARTMENT_ALL_ROLES, ROLE_CODES } from '../access/policy'
 
 export const analyticsRoutes: RouteRecordRaw[] = [
   {
+    // 数字孪生中心：一个三维场景 + 6 个只读模式（?mode=），不做设备控制、不显示长者身份或视频画面
+    path: 'digital-twin',
+    name: 'DigitalTwinCenter',
+    component: () => import('../views/digital-twin/DigitalTwinCenter.vue'),
+    meta: {
+      title: '数字孪生中心', icon: 'GlobalOutlined', navSection: 'operations', navOrder: 65,
+      roles: [...DEPARTMENT_ALL_ROLES, ROLE_CODES.STAFF, ROLE_CODES.DIRECTOR, ROLE_CODES.ADMIN, ROLE_CODES.SYS_ADMIN]
+    }
+  },
+  {
         path: 'stats',
         name: 'Stats',
         meta: {

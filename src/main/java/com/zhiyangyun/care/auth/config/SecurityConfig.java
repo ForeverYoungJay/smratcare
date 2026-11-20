@@ -112,6 +112,7 @@ public class SecurityConfig {
             .requestMatchers("/api/admin/hr/**").hasAnyRole(STAFF_ROLES)
             // Shared option pools are used by quick chat and multiple staff pickers.
             .requestMatchers("/api/admin/staff/options", "/api/admin/departments/options").hasAnyRole(STAFF_ROLES)
+            .requestMatchers("/api/digital-twin/admin/**").hasAnyRole("ADMIN", "SYS_ADMIN")
             .requestMatchers("/api/admin/**").hasAnyRole(MINISTER_OR_HIGHER_ROLES)
             .requestMatchers("/api/base-config/**").hasAnyRole(MINISTER_OR_HIGHER_ROLES)
             .requestMatchers("/api/care/**", "/api/nursing/**").hasAnyRole(MEDICAL_AND_NURSING_ROLES)
