@@ -22,4 +22,7 @@ export interface LoginResponse {
   roles: string[]
   permissions?: string[]
   pagePermissions?: string[]
+  /** 仍在用默认密码：未签发 token，需凭 challengeToken 设置新密码 */
+  mustChangePassword?: boolean
+  challengeToken?: string
 }

@@ -190,10 +190,7 @@ public class MyOfficeController {
     if (request.oldPassword() == null || !passwordEncoder.matches(request.oldPassword(), staff.getPasswordHash())) {
       throw new IllegalArgumentException("原密码不正确");
     }
-    String next = request.newPassword() == null ? "" : request.newPassword().trim();
-    if (next.length() < MIN_PASSWORD_LENGTH || !next.matches(".*[A-Za-z].*") || !next.matches(".*\\d.*")) {
-      throw new IllegalArgumentException("新密码至少 " + MIN_PASSWORD_LENGTH + " 位，且同时包含字母和数字");
-    }
+    String next = requireStrongPassword(request.newPassword());
     if (passwordEncoder.matches(next, staff.getPasswordHash())) {
       throw new IllegalArgumentException("新密码不能与原密码相同");
     }
@@ -224,6 +221,15 @@ public class MyOfficeController {
           row.put("userAgent", log.getUserAgent());
           return row;
         }).toList());
+  }
+
+  /** 新密码规则：至少 8 位，同时含字母和数字；返回去掉首尾空格后的密码 */
+  public static String requireStrongPassword(String newPassword) {
+    String next = newPassword == null ? "" : newPassword.trim();
+    if (next.length() < MIN_PASSWORD_LENGTH || !next.matches(".*[A-Za-z].*") || !next.matches(".*\\d.*")) {
+      throw new IllegalArgumentException("新密码至少 " + MIN_PASSWORD_LENGTH + " 位，且同时包含字母和数字");
+    }
+    return next;
   }
 
   private StaffAccount requireMe() {

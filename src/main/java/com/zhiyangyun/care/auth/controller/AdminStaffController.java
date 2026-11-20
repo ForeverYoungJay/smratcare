@@ -39,7 +39,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/staff")
 public class AdminStaffController {
-  private static final String DEFAULT_INITIAL_PASSWORD = "123456";
+  public static final String DEFAULT_INITIAL_PASSWORD = "123456";
   private static final String RESERVED_SYS_ADMIN_CODE = "SYS_ADMIN";
   private static final String HIDDEN_PLATFORM_USERNAME = "sysadmin_root";
   private final StaffMapper staffMapper;

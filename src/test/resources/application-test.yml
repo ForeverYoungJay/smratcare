@@ -29,6 +29,7 @@ security:
     secret: "test-secret-test-secret-test-secret"
     expiration-minutes: 60
     blacklist-enabled: false
+  force-default-password-change: false
 
 app:
   file-storage:

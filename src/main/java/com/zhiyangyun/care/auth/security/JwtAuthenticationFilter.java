@@ -53,9 +53,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       String token = header.substring(7);
       try {
         Claims claims = tokenProvider.parseToken(token);
-        // 2FA 挑战令牌仅用于第二步短信验证码校验，不能作为访问令牌
-        if (TokenProvider.TOKEN_TYPE_2FA_CHALLENGE.equals(claims.get(TokenProvider.CLAIM_TOKEN_TYPE, String.class))) {
-          log.info("Rejected 2FA challenge token used as access token for path={}", request.getRequestURI());
+        // 挑战令牌（2FA、首次改密）只用于登录流程本身，不能作为访问令牌
+        if (claims.get(TokenProvider.CLAIM_TOKEN_TYPE, String.class) != null) {
+          log.info("Rejected challenge token used as access token for path={}", request.getRequestURI());
           SecurityContextHolder.clearContext();
           filterChain.doFilter(request, response);
           return;

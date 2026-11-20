@@ -28,9 +28,36 @@
           </div>
         </div>
 
-        <a-form v-if="!twoFactor.active" :model="form" @finish="onSubmit">
-          <a-form-item name="username" :rules="[{ required: true, message: '请输入员工账号或工号' }]">
-            <a-input v-model:value="form.username" size="large" placeholder="请输入员工账号 / 工号" autocomplete="username">
+        <a-form v-if="pwdChange.active" :model="pwdChange" layout="vertical" @finish="onSetInitialPassword">
+          <a-alert
+            type="warning"
+            show-icon
+            style="margin-bottom: 16px"
+            message="首次登录请修改密码"
+            description="你正在使用默认密码，设置新密码后才能进入系统。新密码至少 8 位，同时包含字母和数字。"
+          />
+          <a-form-item
+            label="新密码"
+            name="newPassword"
+            :rules="[{ required: true, message: '请输入新密码' }, { pattern: /^(?=.*[A-Za-z])(?=.*\d).{8,}$/, message: '至少 8 位，同时包含字母和数字' }]"
+          >
+            <a-input-password v-model:value="pwdChange.newPassword" size="large" autocomplete="new-password" />
+          </a-form-item>
+          <a-form-item
+            label="确认新密码"
+            name="confirm"
+            :rules="[{ required: true, message: '请再次输入新密码' }, { validator: checkConfirm }]"
+          >
+            <a-input-password v-model:value="pwdChange.confirm" size="large" autocomplete="new-password" />
+          </a-form-item>
+          <a-button type="primary" html-type="submit" block size="large" class="login-card__submit" :loading="pwdChange.submitting">设置新密码并登录</a-button>
+          <div class="twofa-actions">
+            <a-button type="link" size="small" @click="backToPasswordStep">返回重新登录</a-button>
+          </div>
+        </a-form>
+        <a-form v-else-if="!twoFactor.active" :model="form" @finish="onSubmit">
+          <a-form-item name="username" :rules="[{ required: true, message: '请输入员工账号、工号或手机号' }]">
+            <a-input v-model:value="form.username" size="large" placeholder="员工账号 / 工号 / 手机号" autocomplete="username">
               <template #prefix><UserOutlined /></template>
             </a-input>
           </a-form-item>
@@ -119,7 +146,7 @@ import { onUnmounted, reactive, ref, watch } from 'vue'
 import { AppstoreOutlined, HeartOutlined, HomeOutlined, IdcardOutlined, LockOutlined, QrcodeOutlined, SafetyCertificateOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import brandLogoUrl from '../assets/guifeng-logo.png'
-import { login } from '../api/auth'
+import { login, setInitialPassword } from '../api/auth'
 import { verifyTwoFactor, resendTwoFactorCode } from '../api/complianceSecurity'
 import { useUserStore } from '../stores/user'
 import { resolveAuthorizedLoginTarget } from '../router/permission'
@@ -173,7 +200,63 @@ function startTwoFactorCountdown(seconds = 60) {
   }, 1000)
 }
 
+// 默认密码首次登录：第一步只返回改密令牌，设置新密码后才签发正式 token
+const pwdChange = reactive({
+  active: false,
+  challengeToken: '',
+  newPassword: '',
+  confirm: '',
+  submitting: false
+})
+
+function checkConfirm() {
+  return pwdChange.confirm && pwdChange.confirm !== pwdChange.newPassword
+    ? Promise.reject(new Error('两次输入的密码不一致'))
+    : Promise.resolve()
+}
+
+// 登录类接口的返回：可能要求改密、可能要求 2FA，否则直接进入系统
+async function handleLoginResult(res: any) {
+  if (res?.mustChangePassword) {
+    pwdChange.active = true
+    pwdChange.challengeToken = res.challengeToken || ''
+    pwdChange.newPassword = ''
+    pwdChange.confirm = ''
+    return
+  }
+  if (res?.requireTwoFactor) {
+    // 机构安全策略开启 2FA：进入短信验证码第二步
+    twoFactor.active = true
+    twoFactor.challengeToken = res.challengeToken || ''
+    twoFactor.phone = res.twoFactorPhone || ''
+    twoFactor.code = ''
+    startTwoFactorCountdown()
+    return
+  }
+  await finishLogin(res)
+}
+
+async function onSetInitialPassword() {
+  pwdChange.submitting = true
+  try {
+    const res = await setInitialPassword({ challengeToken: pwdChange.challengeToken, newPassword: pwdChange.newPassword })
+    pwdChange.active = false
+    pwdChange.challengeToken = ''
+    form.password = ''
+    message.success('新密码已设置')
+    await handleLoginResult(res)
+  } catch (error: any) {
+    // 错误提示由请求拦截器统一弹出；令牌失效时回到第一步
+    const msg = String(error?.message || error?.response?.data?.message || '')
+    if (msg.includes('重新登录')) backToPasswordStep()
+  } finally {
+    pwdChange.submitting = false
+  }
+}
+
 function backToPasswordStep() {
+  pwdChange.active = false
+  pwdChange.challengeToken = ''
   twoFactor.active = false
   twoFactor.challengeToken = ''
   twoFactor.phone = ''
@@ -267,17 +350,8 @@ async function onSubmit() {
   loading.value = true
   try {
     const res = await login(form)
-    if ((res as any)?.requireTwoFactor) {
-      // 机构安全策略开启 2FA：进入短信验证码第二步
-      twoFactor.active = true
-      twoFactor.challengeToken = (res as any).challengeToken || ''
-      twoFactor.phone = (res as any).twoFactorPhone || ''
-      twoFactor.code = ''
-      startTwoFactorCountdown()
-      return
-    }
     writeRemembered(rememberAccount.value ? form.username.trim() : '')
-    await finishLogin(res)
+    await handleLoginResult(res)
   } catch (error: any) {
     const status = Number(error?.response?.status || 0)
     const backendMsg = String(error?.response?.data?.message || error?.response?.data?.msg || error?.message || '')

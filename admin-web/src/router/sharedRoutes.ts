@@ -45,7 +45,8 @@ export const sharedRoutes: RouteRecordRaw[] = [
             path: 'chat',
             name: 'WorkbenchChat',
             component: () => import('../views/chat/ChatWorkspace.vue'),
-            meta: { title: '协同消息' }
+            // 聊天对所有登录员工开放，不受角色页面清单限制
+            meta: { title: '协同消息', publicForAuthenticated: true }
           },
           {
             path: 'payslips',

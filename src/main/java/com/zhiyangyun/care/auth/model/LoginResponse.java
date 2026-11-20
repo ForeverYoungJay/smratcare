@@ -16,4 +16,6 @@ public class LoginResponse {
   private String challengeToken;
   /** 接收短信验证码的手机号（脱敏展示） */
   private String twoFactorPhone;
+  /** 仍在用默认密码：本次未签发正式 token，需凭 challengeToken 调 /api/auth/password/initial 设置新密码 */
+  private Boolean mustChangePassword;
 }

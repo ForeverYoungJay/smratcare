@@ -93,7 +93,7 @@ public class SecurityConfig {
             .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
             .requestMatchers("/uploads/**").permitAll()
             // 2FA 第二步：凭 challengeToken + 短信验证码换取正式令牌（challengeToken 在请求体中校验）
-            .requestMatchers("/api/auth/2fa/verify", "/api/auth/2fa/resend").permitAll()
+            .requestMatchers("/api/auth/2fa/verify", "/api/auth/2fa/resend", "/api/auth/password/initial").permitAll()
             .requestMatchers("/api/auth/login",
                 "/api/auth/family/bootstrap",
                 "/api/auth/family/login",
