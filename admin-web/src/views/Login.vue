@@ -67,7 +67,10 @@
             </a-input-password>
           </a-form-item>
           <div class="login-card__row">
-            <a-checkbox v-model:checked="rememberAccount">记住账号</a-checkbox>
+            <span>
+              <a-checkbox v-model:checked="rememberAccount">记住账号</a-checkbox>
+              <a-checkbox v-model:checked="rememberPassword">记住密码</a-checkbox>
+            </span>
             <a class="login-card__link" @click="onForgotPassword">忘记密码？</a>
           </div>
           <a-button type="primary" html-type="submit" block size="large" class="login-card__submit" :loading="loading">登 录</a-button>
@@ -142,7 +145,7 @@
 
 <script setup lang="ts">
 import { message } from 'ant-design-vue'
-import { onUnmounted, reactive, ref, watch } from 'vue'
+import { onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { AppstoreOutlined, HeartOutlined, HomeOutlined, IdcardOutlined, LockOutlined, QrcodeOutlined, SafetyCertificateOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import brandLogoUrl from '../assets/guifeng-logo.png'
@@ -174,6 +177,35 @@ const form = reactive({
 })
 const rememberAccount = ref(Boolean(form.username))
 watch(rememberAccount, (on) => { if (!on) writeRemembered('') })
+
+// 记住密码交给浏览器自带的密码管理器保存；页面只记“是否记住”，从不自己存密码
+const REMEMBER_PASSWORD_KEY = 'login.rememberPassword'
+const rememberPassword = ref((() => {
+  try { return localStorage.getItem(REMEMBER_PASSWORD_KEY) === '1' } catch { return false }
+})())
+watch(rememberPassword, (on) => {
+  try {
+    if (on) localStorage.setItem(REMEMBER_PASSWORD_KEY, '1')
+    else localStorage.removeItem(REMEMBER_PASSWORD_KEY)
+  } catch { /* 存储不可用时不影响登录 */ }
+})
+const PasswordCredentialCtor = (window as any).PasswordCredential
+
+function saveBrowserCredential(username: string, password: string) {
+  if (!rememberPassword.value || !PasswordCredentialCtor || !username || !password) return
+  navigator.credentials.store(new PasswordCredentialCtor({ id: username, password })).catch(() => {})
+}
+
+onMounted(async () => {
+  if (!rememberPassword.value || !PasswordCredentialCtor || form.password) return
+  try {
+    const cred: any = await navigator.credentials.get({ password: true, mediation: 'optional' } as any)
+    if (cred?.password) {
+      form.username = cred.id
+      form.password = cred.password
+    }
+  } catch { /* 浏览器不支持或用户取消时手动输入 */ }
+})
 
 const loading = ref(false)
 
@@ -242,7 +274,7 @@ async function onSetInitialPassword() {
     const res = await setInitialPassword({ challengeToken: pwdChange.challengeToken, newPassword: pwdChange.newPassword })
     pwdChange.active = false
     pwdChange.challengeToken = ''
-    form.password = ''
+    form.password = pwdChange.newPassword // 记住密码时保存的是新密码，不是默认密码
     message.success('新密码已设置')
     await handleLoginResult(res)
   } catch (error: any) {
@@ -389,6 +421,7 @@ async function onSubmit() {
 async function finishLogin(res: any) {
   resetBedMapDatasetState()
   userStore.setAuth(res)
+  saveBrowserCredential(form.username.trim(), form.password)
   const redirect = normalizeRedirectPath(typeof route.query.redirect === 'string' ? route.query.redirect : '')
   const nextPath = resolveAuthorizedLoginTarget(router, redirect, userStore.roles || [], userStore.pagePermissions || [], userStore.permissions || [])
   await router.replace(nextPath)
