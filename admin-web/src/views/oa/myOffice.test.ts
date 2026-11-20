@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import dayjs from 'dayjs'
-import { defaultReportPeriod, draftFromStats, passwordProblem } from './myOffice'
+import { defaultReportPeriod, draftFromStats, monthGrid, overtimeHours, passwordProblem, workdaysSoFar } from './myOffice'
 
 describe('my office helpers', () => {
   it('uses Monday-to-Sunday weeks and calendar months for report periods', () => {
@@ -20,5 +20,19 @@ describe('my office helpers', () => {
     expect(passwordProblem('abc123')).toContain('8 位')
     expect(passwordProblem('abcdefgh')).toContain('字母和数字')
     expect(passwordProblem('Guifeng2026')).toBe('')
+  })
+
+  it('builds a Monday-first month grid with records', () => {
+    const grid = monthGrid('2026-11', [{ date: '2026-11-03', status: 'NORMAL' }])
+    expect(grid.slice(0, 6)).toEqual([null, null, null, null, null, null]) // 2026-11-01 是周日
+    expect(grid[6]).toMatchObject({ date: '2026-11-01', day: 1 })
+    expect(grid.find((c) => c?.date === '2026-11-03')?.record).toEqual({ date: '2026-11-03', status: 'NORMAL' })
+    expect(grid.filter(Boolean)).toHaveLength(30)
+  })
+
+  it('counts weekdays so far and approved overtime hours', () => {
+    expect(workdaysSoFar('2026-11', dayjs('2026-11-19'))).toBe(14)
+    expect(workdaysSoFar('2026-10', dayjs('2026-11-19'))).toBe(22)
+    expect(overtimeHours([{ startTime: '2026-11-03 18:00', endTime: '2026-11-03 20:30' }, { startTime: '2026-11-04 18:00' }])).toBe(2.5)
   })
 })

@@ -73,6 +73,19 @@ export function getNoticeReads(id: string | number) {
   return request.get<{ readCount: number; targetCount: number | null; readers: { staffName: string; readAt: string }[] }>(`/api/oa/notice/${id}/reads`)
 }
 
+/** 待办转交（当前负责人或发起人）、催办（发起人，30 分钟一次）、处理历史 */
+export function transferTodo(id: string | number, data: { staffId: string; note?: string }) {
+  return request.put<OaTodo>(`/api/oa/todo/${id}/transfer`, data)
+}
+
+export function urgeTodo(id: string | number) {
+  return request.post<void>(`/api/oa/todo/${id}/urge`)
+}
+
+export function getTodoHistory(id: string | number) {
+  return request.get<{ action: string; actor?: string; detail?: string; time: string }[]>(`/api/oa/todo/${id}/history`)
+}
+
 export function createNotice(data: Partial<OaNotice>) {
   return request.post<OaNotice>('/api/oa/notice', data)
 }
@@ -472,39 +485,6 @@ export function getOaTaskPage(params: any) {
 
 export function getOaTaskSummary(params: any) {
   return request.get<OaTaskSummary>('/api/oa/task/summary', { params })
-}
-
-export interface OaQuickChatStatePayload {
-  id?: number
-  orgId?: Id
-  staffId?: Id
-  stateJson?: string
-  updateTime?: string
-}
-
-export function getQuickChatState() {
-  return request.get<OaQuickChatStatePayload>('/api/oa/quick-chat/state')
-}
-
-export function saveQuickChatState(stateJson: string) {
-  return request.put<OaQuickChatStatePayload>('/api/oa/quick-chat/state', { stateJson })
-}
-
-export function fanoutQuickChatState(stateJson: string, targetStaffIds: Array<string | number>) {
-  return request.post<number>('/api/oa/quick-chat/state/fanout', { stateJson, targetStaffIds })
-}
-
-export interface OaQuickChatEventItemPayload {
-  eventType: string
-  roomId?: string
-  room?: Record<string, any>
-  message?: Record<string, any>
-  meta?: Record<string, any>
-  targetStaffIds?: Array<string | number>
-}
-
-export function publishQuickChatEventBatch(events: OaQuickChatEventItemPayload[]) {
-  return request.post<number>('/api/oa/quick-chat/state/event/batch', { events })
 }
 
 export function getOaTaskCalendar(params: any) {

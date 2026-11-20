@@ -13,124 +13,144 @@
       </template>
     </a-alert>
 
-    <header class="workbench-greeting">
-      <div class="workbench-greeting__copy">
-        <h1>{{ workbenchHeadline }}</h1>
-        <p :title="workbenchSubline">{{ workbenchSubline }}</p>
-      </div>
-      <div class="workbench-greeting__actions">
-        <small>{{ todayDateLabel }} · 更新于 {{ refreshedAt }}</small>
-        <a-button
-          v-for="action in attendanceActionButtons"
-          :key="action"
-          :loading="attendancePending === action"
-          :disabled="attendanceSubmitting && attendancePending !== action"
-          @click="handleAttendanceAction(action)"
-        >{{ attendanceActionLabel(action) }}</a-button>
-        <a-button :loading="loading" @click="loadWorkbench()">刷新</a-button>
-      </div>
-    </header>
+    <div class="of-page-title"><h1>我的工作台</h1><span>欢迎使用弋阳龟峰颐养中心员工自助办公平台 · 更新于 {{ refreshedAt }}</span>
+      <a-button size="small" :loading="loading" style="margin-left: auto" @click="loadWorkbench()">刷新</a-button>
+    </div>
+    <OfficeHero :shift="attendanceOverview.expectedWorkStart ? `${attendanceOverview.expectedWorkStart}–${attendanceOverview.expectedWorkEnd}` : ''">
+      {{ workbenchPersona.subline }}
+    </OfficeHero>
 
     <div v-if="initialLoading" class="workbench-skeleton">
       <a-skeleton active :title="false" :paragraph="{ rows: 3 }" />
       <a-skeleton active :title="false" :paragraph="{ rows: 6 }" />
     </div>
 
-    <section v-if="!initialLoading" class="workbench-kpis" aria-label="今日关键指标">
-      <button
-        v-for="item in todayFocusCards"
-        :key="item.key"
-        type="button"
-        class="workbench-kpi"
-        :class="`workbench-kpi--${item.tone}`"
-        @click="openPath(item.path)"
-      >
-        <span class="workbench-kpi__icon" aria-hidden="true"><component :is="item.icon" /></span>
-        <span class="workbench-kpi__body"><span>{{ item.label }}</span><strong>{{ item.value }}</strong><small>{{ item.helper }}</small></span>
-        <RightOutlined class="workbench-kpi__arrow" aria-hidden="true" />
-      </button>
-    </section>
+    <template v-if="!initialLoading">
+      <div class="of-grid-3">
+        <article class="of-card">
+          <div class="of-card__head"><h3><AppstoreOutlined />今日工作概览</h3></div>
+          <div class="wb-overview">
+            <button v-for="item in overviewNumbers" :key="item.label" type="button" :class="item.tone" @click="openPath(item.path)">
+              <b>{{ item.value }}</b><span>{{ item.label }}</span>
+            </button>
+          </div>
+        </article>
+        <article class="of-card">
+          <div class="of-card__head"><h3><ClockCircleOutlined />考勤状态</h3><button type="button" class="of-link" @click="openPath('/workbench/attendance')">考勤详情 ›</button></div>
+          <div class="wb-attendance" :class="{ 'wb-attendance--warn': !todayRecord?.checkInTime }">
+            <b>今日：{{ attendanceOverview.todayStatusLabel || '未打卡' }}</b>
+            <div>上班 {{ attendanceOverview.expectedWorkStart || '--:--' }}
+              <em>{{ todayRecord?.checkInTime ? `已打卡 ${dayjs(todayRecord.checkInTime).format('HH:mm')}` : '待打卡' }}</em></div>
+            <div>下班 {{ attendanceOverview.expectedWorkEnd || '--:--' }}
+              <em>{{ todayRecord?.checkOutTime ? `已打卡 ${dayjs(todayRecord.checkOutTime).format('HH:mm')}` : '待打卡' }}</em></div>
+            <a-space v-if="attendanceActionButtons.length" wrap style="margin-top: 8px">
+              <a-button
+                v-for="action in attendanceActionButtons"
+                :key="action"
+                size="small"
+                :type="action === 'IN' || action === 'OUT' ? 'primary' : 'default'"
+                :loading="attendancePending === action"
+                :disabled="attendanceSubmitting && attendancePending !== action"
+                @click="handleAttendanceAction(action)"
+              >{{ attendanceActionLabel(action) }}</a-button>
+            </a-space>
+          </div>
+        </article>
+        <article class="of-card">
+          <div class="of-card__head"><h3><TrophyOutlined />我的积分</h3><button type="button" class="of-link" @click="openPath('/workbench/payslips')">积分明细 ›</button></div>
+          <div class="wb-points">
+            <div><small>积分余额</small><b>{{ pointsSummary ? pointsSummary.balance : '--' }}<small> 分</small></b></div>
+            <div><small>全院排名</small><b>{{ pointsSummary?.rank ? `第 ${pointsSummary.rank} 名` : '--' }}</b><small v-if="pointsSummary?.rankTotal">共 {{ pointsSummary.rankTotal }} 人</small></div>
+          </div>
+        </article>
+      </div>
 
-    <section v-if="!initialLoading" class="workbench-main" aria-label="工作台总览">
-      <div class="workbench-column">
-        <article class="workbench-panel workbench-panel--todos">
-          <div class="workbench-panel__head"><h2>我的待办 <small>({{ portalSummary?.openTodoCount ?? 0 }})</small></h2><button type="button" @click="openPath('/workbench/todo')">查看全部 <RightOutlined aria-hidden="true" /></button></div>
+      <div class="of-grid-3">
+        <article class="of-card">
+          <div class="of-card__head"><h3><CheckSquareOutlined />我的待办 <small>（共 {{ portalSummary?.openTodoCount ?? 0 }} 项）</small></h3><button type="button" class="of-link" @click="openPath('/workbench/todo')">全部待办 ›</button></div>
           <div class="workbench-filter" role="group" aria-label="待办筛选">
             <button v-for="filter in todoFilterOptions" :key="filter.key" type="button" :class="{ active: todoFilter === filter.key }" :aria-pressed="todoFilter === filter.key" @click="todoFilter = filter.key">{{ filter.label }}</button>
           </div>
-          <div v-if="visibleTodos.length" class="workbench-todo-list">
-            <button v-for="todo in visibleTodos" :key="todo.id" type="button" class="workbench-todo-row" @click="openPath('/workbench/todo')">
-              <span class="workbench-todo-row__mark" aria-hidden="true"></span>
-              <span class="workbench-todo-row__title">{{ todo.title }}</span>
-              <span class="workbench-todo-row__status" :class="{ overdue: isTodoOverdue(todo) }">{{ isTodoOverdue(todo) ? '已逾期' : '待处理' }}</span>
-              <time v-if="todo.dueTime" :datetime="todo.dueTime">{{ dayjs(todo.dueTime).format('MM-DD HH:mm') }}</time>
-            </button>
-          </div>
-          <div v-else class="workbench-empty">{{ portalSummary?.openTodoCount ? '当前筛选暂无待办，查看全部可继续处理。' : '今天没有待处理事项。' }}</div>
-          <button type="button" class="workbench-coordination-link" @click="openPath('/oa/staff-collaboration')">
-            <span>跨部门协同</span><strong>{{ portalSummary?.ongoingTaskCount ?? 0 }}</strong><span>项进行中</span><RightOutlined aria-hidden="true" />
+          <div v-if="!visibleTodos.length" class="of-empty">{{ portalSummary?.openTodoCount ? '当前筛选暂无待办' : '今天没有待处理事项' }}</div>
+          <button v-for="todo in visibleTodos.slice(0, 4)" :key="todo.id" type="button" class="of-row wb-row-btn" @click="openPath('/workbench/todo')">
+            <span class="of-kpi__icon tone-green wb-row-icon"><FileTextOutlined /></span>
+            <div class="of-row__main"><b>{{ todo.title }}</b><small>{{ todo.dueTime ? `截止 ${dayjs(todo.dueTime).format('MM-DD HH:mm')}` : '无截止时间' }}</small></div>
+            <span class="of-pill" :class="isTodoOverdue(todo) ? 'tone-red' : 'tone-orange'">{{ isTodoOverdue(todo) ? '已逾期' : '待处理' }}</span>
           </button>
         </article>
-        <article class="workbench-panel workbench-panel--quick">
-          <div class="workbench-panel__head"><h2>常用入口</h2><button type="button" @click="openPath('/function-map')">全部功能 <RightOutlined aria-hidden="true" /></button></div>
-          <div class="workbench-shortcuts">
-            <button v-for="action in visibleQuickActions" :key="action.path" type="button" class="workbench-shortcut" :class="`workbench-shortcut--${action.tone}`" @click="openPath(action.path)">
+        <article class="of-card">
+          <div class="of-card__head"><h3><CalendarOutlined />今日日程 <small>（{{ selectedDateAgenda.length }} 项）</small></h3><button type="button" class="of-link" @click="openPath('/workbench/schedule')">查看日程 ›</button></div>
+          <div v-if="!selectedDateAgenda.length" class="of-empty">今日暂无日程安排</div>
+          <div class="wb-timeline">
+            <div v-for="item in selectedDateAgenda.slice(0, 4)" :key="item.id" class="wb-timeline__row">
+              <time>{{ item.startTime ? dayjs(item.startTime).format('HH:mm') : '全天' }}{{ item.endTime ? ` – ${dayjs(item.endTime).format('HH:mm')}` : '' }}</time>
+              <div class="of-row__main"><b>{{ item.title }}</b><small>{{ agendaTypeText(item.calendarType) }}</small></div>
+              <StatusTag :text="agendaStatusText(item)" :tone="agendaTone(item)" />
+            </div>
+          </div>
+        </article>
+        <article class="of-card">
+          <div class="of-card__head"><h3><BarChartOutlined />本月考勤统计 <small>（{{ dayjs().format('M') }}月）</small></h3><button type="button" class="of-link" @click="openPath('/workbench/attendance')">详细数据 ›</button></div>
+          <div class="wb-donut-row">
+            <div class="of-donut" :style="{ background: attendanceDonut }"><div><small>出勤天数</small><b>{{ attendanceOverview.onDutyDays ?? 0 }}</b></div></div>
+            <div class="of-legend">
+              <div v-for="item in attendanceLegend" :key="item.label"><i :style="{ background: item.color }"></i>{{ item.label }}<b>{{ item.value }} {{ item.unit }}</b></div>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <div class="of-grid-3">
+        <article class="of-card">
+          <div class="of-card__head">
+            <h3><NotificationOutlined />近期公告</h3>
+            <button type="button" class="of-link" @click="inboxTab === 'messages' ? openAllMessages() : openPath('/oa/notice')">查看更多 ›</button>
+          </div>
+          <div class="workbench-filter" role="group" aria-label="公告与消息切换">
+            <button type="button" :class="{ active: inboxTab === 'notices' }" :aria-pressed="inboxTab === 'notices'" @click="inboxTab = 'notices'">公告</button>
+            <button type="button" :class="{ active: inboxTab === 'messages' }" :aria-pressed="inboxTab === 'messages'" @click="inboxTab = 'messages'">消息<template v-if="unreadMessageCount"> · {{ unreadMessageCount }} 未读</template></button>
+          </div>
+          <template v-if="inboxTab === 'notices'">
+            <div v-if="!visibleNotices.length" class="of-empty">暂无已发布公告</div>
+            <button v-for="notice in visibleNotices" :key="notice.id" type="button" class="of-row wb-row-btn" @click="openPath('/oa/notice')">
+              <span class="of-pill tone-green">公告</span>
+              <div class="of-row__main"><b>{{ notice.title }}</b></div>
+              <time class="of-muted">{{ notice.publishTime ? dayjs(notice.publishTime).format('MM-DD') : '' }}</time>
+            </button>
+          </template>
+          <template v-else>
+            <div v-if="!messagePreviews.length" class="of-empty">暂无消息</div>
+            <button v-for="item in messagePreviews" :key="item.roomId" type="button" class="of-row wb-row-btn" @click="openMessage(item)">
+              <div class="of-row__main"><b>{{ item.roomName }}</b><small>{{ item.content }}</small></div>
+              <span v-if="item.unreadCount" class="of-pill tone-red">{{ item.unreadCount }}</span>
+            </button>
+          </template>
+        </article>
+        <article class="of-card">
+          <div class="of-card__head"><h3><ThunderboltOutlined />快捷操作</h3><button type="button" class="of-link" @click="openPath('/function-map')">更多应用 ›</button></div>
+          <div class="of-tile-grid">
+            <button v-for="action in visibleQuickActions" :key="action.path" type="button" class="of-tile" :class="TILE_TONE[action.tone] || 'tone-green'" @click="openPath(action.path)">
               <component :is="action.icon" aria-hidden="true" /><span>{{ action.label }}</span>
             </button>
           </div>
         </article>
-      </div>
-      <div class="workbench-column">
-        <article class="workbench-panel workbench-panel--agenda">
-          <div class="workbench-panel__head"><h2>今日工作日程</h2><button type="button" @click="openPath('/workbench/schedule')">完整日历 <RightOutlined aria-hidden="true" /></button></div>
-          <div class="workbench-agenda">
-            <div v-for="item in selectedDateAgenda.slice(0, 5)" :key="item.id" class="workbench-agenda__row">
-              <time :datetime="item.startTime || item.endTime">{{ item.startTime ? dayjs(item.startTime).format('HH:mm') : '全天' }}</time>
-              <span>{{ item.title }}</span><StatusTag :text="agendaTypeText(item.calendarType)" :tone="agendaTone(item)" />
+        <article class="of-card">
+          <div class="of-card__head"><h3><FormOutlined />工作总结</h3><button type="button" class="of-link" @click="openPath('/workbench/reports')">全部总结 ›</button></div>
+          <div class="wb-report">
+            <div class="wb-report__cta">
+              <b>本月工作总结</b>
+              <small>总结完成情况、服务亮点与改进建议</small>
+              <a-button type="primary" size="small" @click="openPath('/workbench/reports')">撰写总结 ›</a-button>
             </div>
-            <div v-if="!selectedDateAgenda.length" class="workbench-empty">今日暂无日程安排，可在日历中添加。</div>
+            <div class="of-legend">
+              <div>本月已提交<b>{{ reportSummary?.monthSubmittedCount ?? '--' }} 篇</b></div>
+              <div>草稿待提交<b>{{ reportSummary?.draftCount ?? '--' }} 篇</b></div>
+              <div>本月出勤<b>{{ attendanceOverview.onDutyDays ?? 0 }} 天</b></div>
+            </div>
           </div>
         </article>
-        <article class="workbench-panel workbench-panel--inbox">
-          <div class="workbench-panel__head">
-            <h2>消息与公告</h2>
-            <button type="button" @click="inboxTab === 'messages' ? openAllMessages() : openPath('/oa/notice')">全部 <RightOutlined aria-hidden="true" /></button>
-          </div>
-          <div class="workbench-filter" role="group" aria-label="消息与公告切换">
-            <button type="button" :class="{ active: inboxTab === 'messages' }" :aria-pressed="inboxTab === 'messages'" @click="inboxTab = 'messages'">消息<template v-if="unreadMessageCount"> · {{ unreadMessageCount }} 未读</template></button>
-            <button type="button" :class="{ active: inboxTab === 'notices' }" :aria-pressed="inboxTab === 'notices'" @click="inboxTab = 'notices'">公告</button>
-          </div>
-          <template v-if="inboxTab === 'messages'">
-            <div v-if="messagePreviews.length" class="workbench-message-list" role="list">
-              <button
-                v-for="item in messagePreviews"
-                :key="item.roomId"
-                type="button"
-                class="workbench-message-row"
-                :aria-label="`${item.roomName}，${item.senderName}：${item.content}${item.unreadCount ? `，${item.unreadCount}条未读` : ''}`"
-                @click="openMessage(item)"
-              >
-                <span class="workbench-message-row__avatar" aria-hidden="true">{{ item.senderName.slice(0, 1) }}</span>
-                <span class="workbench-message-row__body">
-                  <span class="workbench-message-row__meta"><strong>{{ item.roomName }}</strong><time :datetime="item.createdAt">{{ messageTimeText(item.createdAt) }}</time></span>
-                  <span class="workbench-message-row__preview">{{ item.senderName }}：{{ item.content }}</span>
-                </span>
-                <span v-if="item.unreadCount" class="workbench-message-row__unread" role="status" aria-atomic="true">{{ item.unreadCount }}</span>
-              </button>
-            </div>
-            <div v-else class="workbench-empty">暂无消息，新的协作消息会显示在这里。</div>
-          </template>
-          <template v-else>
-            <div v-if="visibleNotices.length" class="workbench-notice-list">
-              <button v-for="notice in visibleNotices" :key="notice.id" type="button" class="workbench-notice-row" @click="openPath('/oa/notice')">
-                <span class="workbench-notice-row__dot" aria-hidden="true"></span><span>{{ notice.title }}</span><time v-if="notice.publishTime" :datetime="notice.publishTime">{{ dayjs(notice.publishTime).format('MM-DD') }}</time>
-              </button>
-            </div>
-            <div v-else class="workbench-empty">暂无已发布公告。</div>
-          </template>
-        </article>
       </div>
-    </section>
+    </template>
 
     <div v-if="!initialLoading" class="workbench-details-title"><span>岗位业务明细</span><h2>继续处理今天的工作</h2></div>
 
@@ -200,33 +220,39 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref, type Component } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import {
-  AlertOutlined, CalendarOutlined, ClockCircleOutlined,
-  FileTextOutlined, HeartOutlined, MedicineBoxOutlined, RightOutlined,
-  ScheduleOutlined, TeamOutlined, ToolOutlined, UnorderedListOutlined
+  AppstoreOutlined, BarChartOutlined, BookOutlined, CalendarOutlined, CheckSquareOutlined, ClockCircleOutlined,
+  FileTextOutlined, FormOutlined, HeartOutlined, MedicineBoxOutlined, NotificationOutlined,
+  ScheduleOutlined, SendOutlined, TeamOutlined, ThunderboltOutlined, ToolOutlined, TrophyOutlined, UnorderedListOutlined
 } from '@ant-design/icons-vue'
+import OfficeHero from '../oa/office/OfficeHero.vue'
+import '../oa/office/office.css'
+import { getPointsSummary } from '../../api/me'
+import { getOaWorkReportSummary } from '../../api/oa'
+import type { OaWorkReportSummary } from '../../types'
 import OverviewMetricCard from '../../components/smartcare/OverviewMetricCard.vue'
 import StatusTag from '../../components/smartcare/StatusTag.vue'
 import WorkbenchModuleCard from '../../components/smartcare/WorkbenchModuleCard.vue'
 import DepartmentHomeOverview from '../../components/workbench/DepartmentHomeOverview.vue'
-import { getOaTaskCalendar, getPortalSummary, getQuickChatState } from '../../api/oa'
+import { getOaTaskCalendar, getPortalSummary } from '../../api/oa'
 import { getLeadPage } from '../../api/marketing'
+import { getConversations } from '../../api/chat'
 import { getAttendanceOverview, punchAttendance } from '../../api/schedule'
 import type { AttendanceDashboardOverview, OaPortalSummary, OaTask } from '../../types'
 import { useUserStore } from '../../stores/user'
 import { useRouter } from 'vue-router'
 import { resolveRouteAccess } from '../../utils/routeAccess'
-import { buildWorkbenchKpis, resolveWorkbenchProfile, type WorkbenchKpiTone } from '../../workbench/model'
+import { resolveWorkbenchProfile, type WorkbenchKpiTone } from '../../workbench/model'
 import {
   loadDepartmentWorkbenchSnapshot,
   type DepartmentWorkbenchSnapshot,
   type WorkbenchDataStatus
 } from '../../workbench/dataSources'
 import type { DepartmentHomeDataState, DepartmentHomeMetric } from '../../workbench/departmentHome'
-import { buildQuickChatPreviews, QUICK_CHAT_OPEN_EVENT, type QuickChatPreviewItem } from '../../utils/quickChatPreview'
+import { QUICK_CHAT_OPEN_EVENT, type QuickChatPreviewItem } from '../../utils/quickChatPreview'
 import { subscribeLiveSync } from '../../utils/liveSync'
 
 type AttendanceAction = 'IN' | 'OUT' | 'START_LUNCH' | 'END_LUNCH' | 'START_OUTING' | 'END_OUTING'
@@ -523,36 +549,12 @@ const workbenchPersona = computed<WorkbenchPersona>(() => {
   }
 })
 
-const roleLabel = computed(() => workbenchProfile.value.roleLabel)
 
-const staffDisplayName = computed(() =>
-  String(userStore.staffInfo?.realName || userStore.staffInfo?.username || '当前员工')
-)
 
-const attendanceWindowLabel = computed(() => {
-  const start = attendanceOverview.expectedWorkStart || '--:--'
-  const end = attendanceOverview.expectedWorkEnd || '--:--'
-  return `今日班次 ${start} - ${end}`
-})
 
-const todayDateLabel = computed(() => dayjs().format('YYYY年M月D日'))
-const workbenchHeadline = computed(() => {
-  const hour = dayjs().hour()
-  return `${staffDisplayName.value}，${hour < 11 ? '早上' : hour < 18 ? '下午' : '晚上'}好！`
-})
 
-const workbenchSubline = computed(() =>
-  `${roleLabel.value} · ${attendanceWindowLabel.value} · ${workbenchPersona.value.subline}`
-)
 
-const kpiIcons: Record<string, Component> = { overdue: ClockCircleOutlined, health: AlertOutlined, approvals: ScheduleOutlined }
 
-const todayFocusCards = computed(() => buildWorkbenchKpis(workbenchPersona.value.key, workbenchPersona.value.summaryMetrics, {
-  overdue: displayNumber(portalSummary.value?.overdueTodoCount),
-  healthRisk: displayNumber(portalSummary.value?.healthAbnormalCount),
-  healthPath: canAccess('/medical-care/unified-task-center') ? '/medical-care/unified-task-center' : '/workbench/todo',
-  approvals: displayNumber(portalSummary.value?.pendingApprovalCount)
-}).map((item) => ({ ...item, icon: kpiIcons[item.key] ?? UnorderedListOutlined })))
 
 const todoFilter = ref<'all' | 'today' | 'overdue'>('all')
 const todoFilterOptions = [
@@ -572,22 +574,17 @@ const visibleTodos = computed(() => (portalSummary.value?.todos || [])
     : !!todo.dueTime && dayjs(todo.dueTime).isSame(dayjs(), 'day')))
   .slice(0, 6))
 
-const inboxTab = ref<'messages' | 'notices'>('messages')
+const inboxTab = ref<'messages' | 'notices'>('notices')
 const unreadMessageCount = computed(() => messagePreviews.value.reduce((sum, item) => sum + (item.unreadCount || 0), 0))
 
 const visibleNotices = computed(() => (portalSummary.value?.notices || []).slice(0, 5))
-
-function quickChatIdentityAliases() {
-  return [userStore.staffInfo?.id, userStore.staffInfo?.username, userStore.staffInfo?.staffNo, 'me']
-}
 
 function openAllMessages() {
   window.dispatchEvent(new CustomEvent(QUICK_CHAT_OPEN_EVENT))
 }
 
 function openMessage(item: QuickChatPreviewItem) {
-  item.unreadCount = 0
-  window.dispatchEvent(new CustomEvent(QUICK_CHAT_OPEN_EVENT, { detail: { roomId: item.roomId } }))
+  router.push({ path: '/workbench/chat', query: { c: item.roomId } })
 }
 
 function messageTimeText(value: string) {
@@ -597,16 +594,51 @@ function messageTimeText(value: string) {
 }
 
 const quickActions = [
+  { label: '发起申请', path: '/oa/approval', icon: SendOutlined, tone: 'green' },
+  { label: '我的考勤', path: '/workbench/attendance', icon: ClockCircleOutlined, tone: 'blue' },
+  { label: '规章制度', path: '/oa/document', icon: BookOutlined, tone: 'purple' },
   { label: '长者档案', path: '/elder/resident-360', icon: TeamOutlined, tone: 'green' },
   { label: '护理记录', path: '/care/service/nursing-records', icon: HeartOutlined, tone: 'coral' },
   { label: '健康监测', path: '/health/management/data', icon: MedicineBoxOutlined, tone: 'blue' },
   { label: '排班管理', path: '/care/scheduling/shift-calendar', icon: CalendarOutlined, tone: 'blue' },
   { label: '服务工单', path: '/logistics/task-center', icon: FileTextOutlined, tone: 'blue' },
-  { label: '物资申领', path: '/oa/approval', icon: UnorderedListOutlined, tone: 'amber' },
   { label: '审批中心', path: '/workbench/approvals', icon: ScheduleOutlined, tone: 'green' },
   { label: '报修维护', path: '/logistics/assets/maintenance-record', icon: ToolOutlined, tone: 'blue' }
 ]
-const visibleQuickActions = computed(() => quickActions.filter((action) => canAccess(action.path)))
+const visibleQuickActions = computed(() => quickActions.filter((action) => canAccess(action.path)).slice(0, 8))
+const TILE_TONE: Record<string, string> = { green: 'tone-green', coral: 'tone-red', blue: 'tone-blue', amber: 'tone-orange', purple: 'tone-purple' }
+
+const pointsSummary = ref<{ balance: number; rank?: number | string | null; rankTotal?: number | string } | null>(null)
+const reportSummary = ref<OaWorkReportSummary | null>(null)
+const todayRecord = computed(() => (attendanceOverview.days || []).find((d) => d.date === dayjs().format('YYYY-MM-DD')))
+const overviewNumbers = computed(() => [
+  { label: '待办事项', value: displayNumber(portalSummary.value?.openTodoCount), path: '/workbench/todo', tone: 'tone-green' },
+  { label: '待我审批', value: displayNumber(portalSummary.value?.pendingApprovalCount), path: '/oa/approval?scope=PENDING_REVIEW', tone: 'tone-orange' },
+  { label: '今日日程', value: selectedDateAgenda.value.length, path: '/workbench/schedule', tone: 'tone-blue' },
+  { label: '考勤异常', value: attendanceOverview.abnormalCount ?? 0, path: '/workbench/attendance', tone: 'tone-purple' }
+])
+const attendanceLegend = computed(() => [
+  { label: '正常出勤', value: attendanceOverview.onDutyDays ?? 0, unit: '天', color: '#1f9d74' },
+  { label: '请假', value: attendanceOverview.leaveDays ?? 0, unit: '天', color: '#f0b429' },
+  { label: '迟到', value: attendanceOverview.lateCount ?? 0, unit: '次', color: '#e5675a' },
+  { label: '早退', value: attendanceOverview.earlyLeaveCount ?? 0, unit: '次', color: '#9aa5a0' },
+  { label: '异常', value: attendanceOverview.abnormalCount ?? 0, unit: '次', color: '#7a55c7' }
+])
+/** 圆环：按天数/次数占比画扇区（没有数据时整圈灰色） */
+const attendanceDonut = computed(() => {
+  const parts = attendanceLegend.value.filter((p) => Number(p.value) > 0)
+  const total = parts.reduce((sum, p) => sum + Number(p.value), 0)
+  if (!total) return '#e9eeeb'
+  let acc = 0
+  return `conic-gradient(${parts.map((p) => { const from = acc; acc += (Number(p.value) / total) * 360; return `${p.color} ${from}deg ${acc}deg` }).join(', ')})`
+})
+function agendaStatusText(item: OaTask) {
+  if (item.status === 'DONE') return '已完成'
+  const start = item.startTime ? dayjs(item.startTime) : null
+  const end = item.endTime ? dayjs(item.endTime) : null
+  if (start && end && dayjs().isAfter(start) && dayjs().isBefore(end)) return '进行中'
+  return start && dayjs().isBefore(start) ? '待开始' : '待完成'
+}
 
 const attendanceActionButtons = computed<AttendanceAction[]>(() => {
   const status = String(attendanceOverview.todayStatus || '').toUpperCase()
@@ -816,14 +848,17 @@ async function loadCalendar(): Promise<boolean> {
 
 async function refreshAttendance() {
   const data = await getAttendanceOverview({
-    staffId: (userStore.staffInfo?.id as string | number | undefined) || undefined
+    staffId: userStore.staffInfo?.id ? String(userStore.staffInfo.id) : undefined
   })
   Object.assign(attendanceOverview, data || {})
 }
 
 async function refreshMessagePreviews() {
-  const quickChat = await getQuickChatState()
-  messagePreviews.value = buildQuickChatPreviews(quickChat?.stateJson || '', quickChatIdentityAliases(), 5)
+  // 最近沟通来自服务端会话（只含我所在的会话），未读按已读游标计算
+  messagePreviews.value = (await getConversations()).slice(0, 5).map((c) => ({
+    roomId: c.id, roomName: c.title, senderName: '', content: c.lastMessagePreview || '暂无消息',
+    createdAt: c.lastMessageAt || '', unreadCount: Number(c.unread || 0)
+  }))
 }
 
 async function loadWorkbench(options: { silent?: boolean } = {}) {
@@ -847,6 +882,8 @@ async function loadWorkbench(options: { silent?: boolean } = {}) {
       refreshAttendance().catch(capture('考勤')),
       loadCalendar(),
       refreshMessagePreviews().catch(capture('消息')),
+      getPointsSummary().then((data) => { pointsSummary.value = data }).catch(() => { pointsSummary.value = null }),
+      getOaWorkReportSummary({ mineOnly: true }).then((data) => { reportSummary.value = data }).catch(() => { reportSummary.value = null }),
       canAccess('/marketing/workbench')
         ? getLeadPage({ pageNo: 1, pageSize: 1, followupDueOnly: true, followupDateTo: dayjs().format('YYYY-MM-DD') }, { silent403: true, silentError: true })
           .then((page) => { followupDueCount.value = Number(page.total ?? 0) })
@@ -927,6 +964,29 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.unified-workbench { display: grid; gap: 16px; }
+.wb-overview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.wb-overview button { display: grid; justify-items: center; gap: 4px; padding: 14px 4px; border: 0; border-radius: 12px; cursor: pointer; }
+.wb-overview b { font-size: 28px; line-height: 1.1; }
+.wb-overview span { color: #33433a; font-size: 13px; }
+.wb-attendance { display: grid; gap: 6px; padding: 14px 16px; border-radius: 12px; background: #eef8f2; color: #33433a; }
+.wb-attendance--warn { background: #fff6ea; }
+.wb-attendance > b { font-size: 18px; color: #17734f; }
+.wb-attendance--warn > b { color: #c27c1a; }
+.wb-attendance em { margin-left: 8px; font-style: normal; color: #6b7a74; }
+.wb-points { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.wb-points > div { display: grid; gap: 4px; padding: 14px; border-radius: 12px; background: #fdf7ec; }
+.wb-points > div + div { background: #f4f1fb; }
+.wb-points b { font-size: 24px; color: #1d3a2f; }
+.wb-points small { color: #6b7a74; font-weight: 400; font-size: 12px; }
+.wb-row-btn { width: 100%; border: 0; border-bottom: 1px solid #f0f3f1; background: none; text-align: left; cursor: pointer; }
+.wb-row-icon { width: 34px; height: 34px; font-size: 16px; }
+.wb-timeline__row { display: flex; align-items: center; gap: 12px; padding: 9px 0 9px 14px; border-left: 2px solid #d7ebe0; }
+.wb-timeline__row time { flex: none; width: 96px; color: #33433a; font-size: 13px; font-variant-numeric: tabular-nums; }
+.wb-donut-row { display: flex; align-items: center; gap: 18px; }
+.wb-report { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: center; }
+.wb-report__cta { display: grid; gap: 6px; padding: 14px; border-radius: 12px; background: #fdf7ec; }
+.wb-report__cta small { color: #6b7a74; }
 .unified-workbench {
   display: grid;
   gap: 16px;

@@ -10,7 +10,13 @@ import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.compliance.entity.AuthLoginLog;
 import com.zhiyangyun.care.compliance.mapper.AuthLoginLogMapper;
+import com.zhiyangyun.care.hr.entity.HrLeaveQuota;
+import com.zhiyangyun.care.hr.entity.StaffPointsAccount;
 import com.zhiyangyun.care.hr.entity.StaffProfile;
+import com.zhiyangyun.care.hr.mapper.HrLeaveQuotaMapper;
+import com.zhiyangyun.care.hr.mapper.StaffPointsAccountMapper;
+import com.zhiyangyun.care.oa.entity.OaApproval;
+import com.zhiyangyun.care.oa.mapper.OaApprovalMapper;
 import com.zhiyangyun.care.hr.entity.StaffTrainingRecord;
 import com.zhiyangyun.care.hr.mapper.StaffProfileMapper;
 import com.zhiyangyun.care.hr.mapper.StaffTrainingRecordMapper;
@@ -41,10 +47,15 @@ public class MyOfficeController {
   private final AuthLoginLogMapper loginLogMapper;
   private final PasswordEncoder passwordEncoder;
   private final AuditLogService auditLogService;
+  private final HrLeaveQuotaMapper quotaMapper;
+  private final OaApprovalMapper approvalMapper;
+  private final StaffPointsAccountMapper pointsAccountMapper;
+  private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
   public MyOfficeController(StaffMapper staffMapper, DepartmentMapper departmentMapper, StaffProfileMapper profileMapper,
       StaffTrainingRecordMapper trainingMapper, AuthLoginLogMapper loginLogMapper, PasswordEncoder passwordEncoder,
-      AuditLogService auditLogService) {
+      AuditLogService auditLogService, HrLeaveQuotaMapper quotaMapper, OaApprovalMapper approvalMapper,
+      StaffPointsAccountMapper pointsAccountMapper, com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
     this.staffMapper = staffMapper;
     this.departmentMapper = departmentMapper;
     this.profileMapper = profileMapper;
@@ -52,6 +63,78 @@ public class MyOfficeController {
     this.loginLogMapper = loginLogMapper;
     this.passwordEncoder = passwordEncoder;
     this.auditLogService = auditLogService;
+    this.quotaMapper = quotaMapper;
+    this.approvalMapper = approvalMapper;
+    this.pointsAccountMapper = pointsAccountMapper;
+    this.objectMapper = objectMapper;
+  }
+
+  /**
+   * 本年假期余额：额度由人事维护；已用 = 本年已批准请假中同假别的 leaveDays 之和（只读，不另存）。
+   * 没有维护额度的假别不显示余额。
+   */
+  @GetMapping("/leave-balance")
+  public Result<List<Map<String, Object>>> leaveBalance() {
+    StaffAccount staff = requireMe();
+    int year = java.time.LocalDate.now().getYear();
+    List<HrLeaveQuota> quotas = quotaMapper.selectList(Wrappers.lambdaQuery(HrLeaveQuota.class)
+        .eq(HrLeaveQuota::getStaffId, staff.getId()).eq(HrLeaveQuota::getQuotaYear, year));
+    if (quotas.isEmpty()) {
+      return Result.ok(List.of());
+    }
+    Map<String, java.math.BigDecimal> used = new java.util.HashMap<>();
+    for (OaApproval approval : approvalMapper.selectList(Wrappers.lambdaQuery(OaApproval.class)
+        .eq(OaApproval::getIsDeleted, 0).eq(OaApproval::getApplicantId, staff.getId())
+        .eq(OaApproval::getApprovalType, "LEAVE").eq(OaApproval::getStatus, "APPROVED")
+        .ge(OaApproval::getStartTime, java.time.LocalDate.of(year, 1, 1).atStartOfDay())
+        .lt(OaApproval::getStartTime, java.time.LocalDate.of(year + 1, 1, 1).atStartOfDay()))) {
+      try {
+        var form = objectMapper.readTree(approval.getFormData() == null ? "{}" : approval.getFormData());
+        String type = form.path("leaveType").asText("");
+        java.math.BigDecimal days = form.hasNonNull("leaveDays") ? new java.math.BigDecimal(form.path("leaveDays").asText("0")) : java.math.BigDecimal.ZERO;
+        used.merge(type, days, java.math.BigDecimal::add);
+      } catch (Exception ignored) {
+        // 表单格式异常的旧单据不计入，避免一条坏数据让整页报错
+      }
+    }
+    return Result.ok(quotas.stream().map(q -> {
+      java.math.BigDecimal u = used.getOrDefault(q.getLeaveType(), java.math.BigDecimal.ZERO);
+      Map<String, Object> row = new LinkedHashMap<>();
+      row.put("leaveType", q.getLeaveType());
+      row.put("quotaDays", q.getQuotaDays());
+      row.put("usedDays", u);
+      row.put("remainingDays", q.getQuotaDays().subtract(u).max(java.math.BigDecimal.ZERO));
+      return row;
+    }).toList());
+  }
+
+  /** 我的积分：余额、全院排名、积分兑现申请记录（来自审批 POINTS_CASH） */
+  @GetMapping("/points-summary")
+  public Result<Map<String, Object>> pointsSummary() {
+    StaffAccount staff = requireMe();
+    StaffPointsAccount account = pointsAccountMapper.selectOne(Wrappers.lambdaQuery(StaffPointsAccount.class)
+        .eq(StaffPointsAccount::getStaffId, staff.getId()).last("LIMIT 1"));
+    int balance = account == null || account.getPointsBalance() == null ? 0 : account.getPointsBalance();
+    Long ahead = pointsAccountMapper.selectCount(Wrappers.lambdaQuery(StaffPointsAccount.class)
+        .eq(StaffPointsAccount::getOrgId, staff.getOrgId()).gt(StaffPointsAccount::getPointsBalance, balance));
+    Long total = pointsAccountMapper.selectCount(Wrappers.lambdaQuery(StaffPointsAccount.class)
+        .eq(StaffPointsAccount::getOrgId, staff.getOrgId()));
+    Map<String, Object> result = new LinkedHashMap<>();
+    result.put("balance", balance);
+    result.put("rank", account == null ? null : ahead + 1);
+    result.put("rankTotal", total);
+    result.put("exchanges", approvalMapper.selectList(Wrappers.lambdaQuery(OaApproval.class)
+            .eq(OaApproval::getIsDeleted, 0).eq(OaApproval::getApplicantId, staff.getId())
+            .eq(OaApproval::getApprovalType, "POINTS_CASH").orderByDesc(OaApproval::getCreateTime).last("LIMIT 10"))
+        .stream().map(a -> {
+          Map<String, Object> row = new LinkedHashMap<>();
+          row.put("title", a.getTitle());
+          row.put("amount", a.getAmount());
+          row.put("status", a.getStatus());
+          row.put("time", a.getCreateTime());
+          return row;
+        }).toList());
+    return Result.ok(result);
   }
 
   /** 本人档案：基本、岗位、合同、紧急联系人、证书（只读） */

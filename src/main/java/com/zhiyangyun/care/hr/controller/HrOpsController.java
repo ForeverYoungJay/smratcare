@@ -74,13 +74,14 @@ public class HrOpsController {
   private final OaTaskMapper taskMapper;
   private final StaffPointsService pointsService;
   private final AuditLogService auditLogService;
+  private final com.zhiyangyun.care.hr.mapper.HrLeaveQuotaMapper leaveQuotaMapper;
 
   public HrOpsController(HrPayrollBatchMapper batchMapper, HrPayrollLineMapper lineMapper,
       HrAttendancePeriodMapper periodMapper, HrAttendanceAdjustmentMapper adjustmentMapper,
       HrPerformanceAppealMapper appealMapper, StaffPointsLogMapper pointsLogMapper,
       StaffServicePlanMapper servicePlanMapper, AttendanceRecordMapper attendanceMapper,
       StaffMapper staffMapper, OaTaskMapper taskMapper, StaffPointsService pointsService,
-      AuditLogService auditLogService) {
+      AuditLogService auditLogService, com.zhiyangyun.care.hr.mapper.HrLeaveQuotaMapper leaveQuotaMapper) {
     this.batchMapper = batchMapper;
     this.lineMapper = lineMapper;
     this.periodMapper = periodMapper;
@@ -93,6 +94,7 @@ public class HrOpsController {
     this.taskMapper = taskMapper;
     this.pointsService = pointsService;
     this.auditLogService = auditLogService;
+    this.leaveQuotaMapper = leaveQuotaMapper;
   }
 
   // ---------- 工资批次 ----------
@@ -536,6 +538,53 @@ public class HrOpsController {
       throw new IllegalArgumentException("积分余额不足，无法冲正");
     }
     audit("REVERSE", logId, adjust.getRemark());
+  }
+
+  // ---------- 年度假期额度（人事维护） ----------
+
+  @PreAuthorize(PREPARE)
+  @GetMapping("/admin/hr/leave-quota")
+  public Result<List<com.zhiyangyun.care.hr.entity.HrLeaveQuota>> leaveQuotas(@RequestParam Integer year) {
+    return Result.ok(leaveQuotaMapper.selectList(Wrappers.lambdaQuery(com.zhiyangyun.care.hr.entity.HrLeaveQuota.class)
+        .eq(com.zhiyangyun.care.hr.entity.HrLeaveQuota::getOrgId, AuthContext.getOrgId())
+        .eq(com.zhiyangyun.care.hr.entity.HrLeaveQuota::getQuotaYear, year)));
+  }
+
+  public record LeaveQuotaRequest(Long staffId, Integer year, String leaveType, BigDecimal quotaDays) {}
+
+  /** 设置某员工某年某假别的额度（覆盖），留审计 */
+  @PreAuthorize(HR_MANAGER)
+  @PostMapping("/admin/hr/leave-quota")
+  public Result<com.zhiyangyun.care.hr.entity.HrLeaveQuota> saveLeaveQuota(@RequestBody LeaveQuotaRequest request) {
+    StaffAccount staff = request.staffId() == null ? null : staffMapper.selectById(request.staffId());
+    if (staff == null || !Objects.equals(staff.getOrgId(), AuthContext.getOrgId())) {
+      throw new IllegalArgumentException("员工不存在");
+    }
+    if (request.year() == null || request.leaveType() == null || request.leaveType().isBlank()
+        || request.quotaDays() == null || request.quotaDays().signum() < 0) {
+      throw new IllegalArgumentException("请填写年份、假别和额度（不能为负数）");
+    }
+    var quota = leaveQuotaMapper.selectOne(Wrappers.lambdaQuery(com.zhiyangyun.care.hr.entity.HrLeaveQuota.class)
+        .eq(com.zhiyangyun.care.hr.entity.HrLeaveQuota::getStaffId, staff.getId())
+        .eq(com.zhiyangyun.care.hr.entity.HrLeaveQuota::getQuotaYear, request.year())
+        .eq(com.zhiyangyun.care.hr.entity.HrLeaveQuota::getLeaveType, request.leaveType().trim()));
+    if (quota == null) {
+      quota = new com.zhiyangyun.care.hr.entity.HrLeaveQuota();
+      quota.setOrgId(staff.getOrgId());
+      quota.setStaffId(staff.getId());
+      quota.setQuotaYear(request.year());
+      quota.setLeaveType(request.leaveType().trim());
+    }
+    quota.setQuotaDays(request.quotaDays());
+    quota.setUpdatedByName(AuthContext.getUsername());
+    quota.setUpdateTime(LocalDateTime.now());
+    if (quota.getId() == null) {
+      leaveQuotaMapper.insert(quota);
+    } else {
+      leaveQuotaMapper.updateById(quota);
+    }
+    audit("LEAVE_QUOTA", staff.getId(), request.year() + " " + request.leaveType() + " 额度 " + request.quotaDays());
+    return Result.ok(quota);
   }
 
   // ---------- 返聘查重与离职清单 ----------

@@ -1,6 +1,6 @@
 <template>
-  <PageContainer title="我的日程" subTitle="聚合个人、部门工作、日常计划和协同安排，按我的工作视角查看、创建和闭环每一天。" kicker="个人工作区">
-    <MyShiftStrip />
+  <PageContainer title="我的日程" subTitle="欢迎使用弋阳龟峰颐养中心员工自助办公平台；排班自动同步，日程可按月、周、日查看" kicker="个人工作区">
+    <ScheduleOverviewPanel />
     <template #extra>
       <ActionToolbar wrap>
         <a-button @click="applyQuickScope('today')">回到今天</a-button>
@@ -396,7 +396,7 @@
 </template>
 
 <script setup lang="ts">
-import MyShiftStrip from './MyShiftStrip.vue'
+import ScheduleOverviewPanel from './ScheduleOverviewPanel.vue'
 import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import type { Dayjs } from 'dayjs'

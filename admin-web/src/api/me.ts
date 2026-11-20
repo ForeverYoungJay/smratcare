@@ -28,3 +28,10 @@ export interface MyLogin { time: string; type?: string; result?: string; failRea
 export const getMyProfile = () => request.get<MyProfile>('/api/me/profile')
 export const getMyLogins = () => request.get<MyLogin[]>('/api/me/logins')
 export const changeMyPassword = (data: { oldPassword: string; newPassword: string }) => request.post<void>('/api/me/password', data)
+
+/** 本年假期余额：额度由人事维护，已用天数来自已批准的请假审批 */
+export const getLeaveBalance = () =>
+  request.get<{ leaveType: string; quotaDays: number; usedDays: number; remainingDays: number }[]>('/api/me/leave-balance')
+/** 我的积分：余额、全院排名、积分兑现申请记录 */
+export const getPointsSummary = () =>
+  request.get<{ balance: number; rank?: number | string | null; rankTotal?: number | string; exchanges: { title: string; amount?: number; status: string; time: string }[] }>('/api/me/points-summary')

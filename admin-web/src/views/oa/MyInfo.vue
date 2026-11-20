@@ -1,6 +1,8 @@
 <template>
-  <PageContainer title="我的信息" subTitle="个人档案、账号安全，以及在岗节奏、费用状态与绩效画像">
+  <PageContainer title="我的信息" subTitle="个人信息中心 · 管理您的基本信息、岗位信息、合同与安全设置">
     <MyAccountPanel />
+    <a-collapse ghost class="mi-more">
+      <a-collapse-panel key="timeline" header="在岗与费用画像（入职、试用期、合同、绩效、报销与电费时间线）">
     <div class="my-info-shell">
       <section class="hero-panel">
         <div class="hero-copy">
@@ -173,6 +175,8 @@
         </div>
       </section>
     </div>
+      </a-collapse-panel>
+    </a-collapse>
   </PageContainer>
 </template>
 
@@ -256,6 +260,7 @@ loadSummary()
 </script>
 
 <style scoped>
+.mi-more { margin-top: 16px; background: #fff; border: 1px solid #e8eee9; border-radius: 16px; }
 .my-info-shell {
   --sand: #f6efe4;
   --sand-deep: #ecd7b3;

@@ -420,9 +420,10 @@ public class OaApprovalController {
         && !"MATERIAL_APPLY".equals(normalized)
         && !"OFFICIAL_SEAL".equals(normalized)
         && !"SHIFT_CHANGE".equals(normalized)
+        && !"PROFILE_CHANGE".equals(normalized)
         && !"MARKETING_PLAN".equals(normalized)) {
       throw new IllegalArgumentException(
-          "approvalType 仅支持 LEAVE/OVERTIME/REIMBURSE/PURCHASE/INCOME_PROOF/BANK_CARD/POINTS_CASH/MATERIAL_APPLY/OFFICIAL_SEAL/SHIFT_CHANGE/MARKETING_PLAN");
+          "approvalType 仅支持 LEAVE/OVERTIME/REIMBURSE/PURCHASE/INCOME_PROOF/BANK_CARD/POINTS_CASH/MATERIAL_APPLY/OFFICIAL_SEAL/SHIFT_CHANGE/PROFILE_CHANGE/MARKETING_PLAN");
     }
     return normalized;
   }

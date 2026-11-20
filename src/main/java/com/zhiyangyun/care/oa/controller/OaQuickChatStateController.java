@@ -36,6 +36,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/oa/quick-chat/state")
 @PreAuthorize("isAuthenticated()")
 public class OaQuickChatStateController {
+  /** 旧版跨员工写入与事件转发关闭；本人历史数据仍可读取 */
+  private static final boolean DISABLED = true;
   private static final int MAX_STATE_BYTES = 2 * 1024 * 1024;
   private static final TypeReference<List<Map<String, Object>>> ROOM_LIST_TYPE = new TypeReference<>() {};
   private static final TypeReference<Map<String, Object>> STATE_OBJECT_TYPE = new TypeReference<>() {};
@@ -91,6 +93,10 @@ public class OaQuickChatStateController {
 
   @PostMapping("/fanout")
   public Result<Integer> fanoutState(@Valid @RequestBody OaQuickChatFanoutRequest request) {
+    // 已停用：旧版快捷聊天允许把任意内容写进其他员工的聊天数据；改用服务端会话 /api/chat
+    if (DISABLED) {
+      throw new IllegalArgumentException("旧版快捷聊天已停用，请使用「协同消息」");
+    }
     String stateJson = request.getStateJson();
     if (stateJson != null && stateJson.getBytes(StandardCharsets.UTF_8).length > MAX_STATE_BYTES) {
       throw new IllegalArgumentException("聊天同步数据过大，请减少历史记录后重试");
@@ -157,6 +163,9 @@ public class OaQuickChatStateController {
 
   @PostMapping("/event/batch")
   public Result<Integer> publishBatchEvents(@Valid @RequestBody OaQuickChatEventBatchRequest request) {
+    if (DISABLED) {
+      throw new IllegalArgumentException("旧版快捷聊天已停用，请使用「协同消息」");
+    }
     Long orgId = AuthContext.getOrgId();
     int delivered = 0;
     for (OaQuickChatEventItemRequest item : request.getEvents()) {

@@ -1,10 +1,11 @@
 <template>
-  <PageContainer title="考勤与请假" subTitle="我的打卡、考勤月报与请假/加班/调班申请；院长可切换员工查看">
+  <PageContainer title="考勤与请假" subTitle="员工自助服务 · 考勤打卡、请假申请、加班申报与异常处理">
+    <AttendanceSelfPanel v-if="isViewingSelf" :overview="overview" :month="query.month" :punching="punching" @punch="handlePunch" style="margin-bottom: 16px" />
     <a-card class="attendance-hero" :bordered="false">
       <div class="hero-head">
         <div>
-          <div class="hero-title">考勤与请假联动中心</div>
-          <div class="hero-sub">支持院长按员工查看打卡、外出、午休、请假联动日程并打印月报</div>
+          <div class="hero-title">考勤明细与月报</div>
+          <div class="hero-sub">按月查看每日打卡、午休、外出与请假；可打印或导出月报{{ canManageAttendance ? '，可切换员工查看' : '' }}</div>
         </div>
         <a-tag color="processing">{{ query.month }} 月</a-tag>
       </div>
@@ -41,8 +42,6 @@
               <a-space wrap>
                 <a-button type="primary" @click="fetchData">查询</a-button>
                 <a-button @click="reset">重置</a-button>
-                <a-button v-if="showPunchInButton" type="primary" :loading="punching" @click="handlePunch('IN')">上班打卡</a-button>
-                <a-button v-if="showPunchOutButton" :loading="punching" @click="handlePunch('OUT')">下班打卡</a-button>
                 <a-button @click="printCurrentEmployee">打印当前员工</a-button>
                 <a-button @click="exportCurrentEmployee">导出月报</a-button>
                 <a-button @click="goLeaveApproval">填写请假</a-button>
@@ -56,9 +55,7 @@
       </div>
     </a-card>
 
-    <MyApprovalStrip :apply-types="[{ type: 'LEAVE', label: '请假申请' }, { type: 'OVERTIME', label: '加班申请' }, { type: 'SHIFT_CHANGE', label: '调班申请' }]" />
-
-    <a-row :gutter="16" class="metrics-row business-stat-strip">
+    <a-row v-if="!isViewingSelf" :gutter="16" class="metrics-row business-stat-strip">
       <a-col :xs="24" :sm="12" :lg="6">
         <a-card class="metric-card metric-card-teal" :bordered="false">
           <a-statistic title="当月在岗天数" :value="overview.onDutyDays || 0" />
@@ -136,15 +133,6 @@
               <span>当季考勤时间：</span>
               <span>{{ seasonLabel }} {{ overview.expectedWorkStart || '--:--' }} - {{ overview.expectedWorkEnd || '--:--' }}</span>
             </div>
-            <a-space v-if="isViewingSelf" wrap>
-              <a-button v-if="showPunchInButton" type="primary" :loading="punching" @click="handlePunch('IN')">上班打卡</a-button>
-              <a-button v-if="showStartLunchButton" :loading="punching" @click="handlePunch('START_LUNCH')">开始午休</a-button>
-              <a-button v-if="showEndLunchButton" type="primary" ghost :loading="punching" @click="handlePunch('END_LUNCH')">结束午休</a-button>
-              <a-button v-if="showStartOutingButton" :loading="punching" @click="handlePunch('START_OUTING')">开始外出</a-button>
-              <a-button v-if="showEndOutingButton" type="primary" ghost :loading="punching" @click="handlePunch('END_OUTING')">结束外出</a-button>
-              <a-button v-if="showPunchOutButton" :loading="punching" @click="handlePunch('OUT')">下班打卡</a-button>
-              <span v-if="!showPunchInButton && !showStartLunchButton && !showEndLunchButton && !showStartOutingButton && !showEndOutingButton && !showPunchOutButton" class="muted">当前状态无需再次打卡</span>
-            </a-space>
           </ActionToolbar>
         </a-card>
 
@@ -204,7 +192,7 @@
 </template>
 
 <script setup lang="ts">
-import MyApprovalStrip from './MyApprovalStrip.vue'
+import AttendanceSelfPanel from './AttendanceSelfPanel.vue'
 import ActionToolbar from "../../components/ActionToolbar.vue"
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
@@ -317,38 +305,6 @@ const todayStatusColor = computed(() => {
   if (status === 'OFF_DUTY') return 'purple'
   return 'default'
 })
-const showPunchInButton = computed(() => {
-  if (!isViewingSelf.value) return false
-  const status = String(overview.value?.todayStatus || '').toUpperCase()
-  return !status || status === 'NOT_CHECKED_IN'
-})
-const showPunchOutButton = computed(() => {
-  if (!isViewingSelf.value) return false
-  const status = String(overview.value?.todayStatus || '').toUpperCase()
-  return status === 'ON_DUTY'
-})
-const showStartLunchButton = computed(() => {
-  if (!isViewingSelf.value) return false
-  const status = String(overview.value?.todayStatus || '').toUpperCase()
-  const hasLunchStarted = !!currentDayRecord.value?.lunchBreakStartTime
-  return status === 'ON_DUTY' && !hasLunchStarted
-})
-const showEndLunchButton = computed(() => {
-  if (!isViewingSelf.value) return false
-  const status = String(overview.value?.todayStatus || '').toUpperCase()
-  return status === 'LUNCH_BREAK'
-})
-const showStartOutingButton = computed(() => {
-  if (!isViewingSelf.value) return false
-  const status = String(overview.value?.todayStatus || '').toUpperCase()
-  const hasOutingStarted = !!currentDayRecord.value?.outingStartTime
-  return status === 'ON_DUTY' && !hasOutingStarted
-})
-const showEndOutingButton = computed(() => {
-  if (!isViewingSelf.value) return false
-  const status = String(overview.value?.todayStatus || '').toUpperCase()
-  return status === 'OUTING'
-})
 const currentDayRecord = computed(() => {
   const today = dayjs().format('YYYY-MM-DD')
   return (overview.value?.days || []).find((item: any) => String(item?.date || '') === today)
@@ -387,7 +343,7 @@ async function fetchData() {
   try {
     const targetStaffId = query.staffId ?? currentStaffId.value ?? undefined
     const [overviewResp, ruleResp] = await Promise.all([
-      getAttendanceOverview({ staffId: targetStaffId, month: query.month }),
+      getAttendanceOverview({ staffId: targetStaffId ? String(targetStaffId) : undefined, month: query.month }),
       getAttendanceSeasonRule()
     ])
     overview.value = overviewResp || { days: [] }
@@ -556,15 +512,11 @@ useLiveSyncRefresh({
 
 <style scoped>
 .attendance-hero {
-  background: linear-gradient(135deg, #0f766e 0%, #0ea5e9 52%, #33698a 100%);
-  color: #fff;
+  background: #fff;
+  color: #1d3a2f;
+  border: 1px solid #e8eee9;
   border-radius: 16px;
-  box-shadow: 0 14px 30px rgba(2, 12, 27, 0.18);
-}
-
-.attendance-hero :deep(.ant-form-item-label > label),
-.attendance-hero :deep(.ant-form-item) {
-  color: #fff !important;
+  box-shadow: 0 2px 10px rgba(29, 58, 47, 0.04);
 }
 
 .hero-head {

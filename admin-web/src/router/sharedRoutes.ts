@@ -41,6 +41,13 @@ export const sharedRoutes: RouteRecordRaw[] = [
             meta: { title: '我的信息' }
           },
           {
+            // 协同消息与聊天待办（?tab=tasks）；顶栏「快捷聊天 / 聊天待办」都进这里
+            path: 'chat',
+            name: 'WorkbenchChat',
+            component: () => import('../views/chat/ChatWorkspace.vue'),
+            meta: { title: '协同消息' }
+          },
+          {
             path: 'payslips',
             name: 'WorkbenchPayslips',
             component: () => import('../views/hr/MyHrSelf.vue'),

@@ -722,6 +722,7 @@ const typeOptions = [
   { label: '物资申领', value: 'MATERIAL_APPLY' },
   { label: '用章申请', value: 'OFFICIAL_SEAL' },
   { label: '换班申请', value: 'SHIFT_CHANGE' },
+  { label: '资料更正', value: 'PROFILE_CHANGE' },
   { label: '营销方案审批', value: 'MARKETING_PLAN' }
 ]
 const approverRoleOptions = [
@@ -969,6 +970,7 @@ const workflowStepsMap: Record<string, string[]> = {
   POINTS_CASH: ['员工申请', '院长审批', '自动扣减积分', '财务发放现金', '归档'],
   OFFICIAL_SEAL: ['申请人提交', '行政审核', '院长审批', '盖章归档'],
   SHIFT_CHANGE: ['申请人提交', '被换班员工确认', '人事审批', '部门主管审批', '归档'],
+  PROFILE_CHANGE: ['员工提交', '人事核对材料', '人事更新正式档案', '归档'],
   MARKETING_PLAN: ['营销经理提交方案', '院长审批', '审批意见回写方案', '发布执行']
 }
 const workflowHintMap: Record<string, string> = {
@@ -982,6 +984,7 @@ const workflowHintMap: Record<string, string> = {
   POINTS_CASH: '按 300 积分 = 10 元自动换算，审批通过后自动扣减积分余额。',
   OFFICIAL_SEAL: '请明确用途、对象、时间，避免跨用途盖章风险。',
   SHIFT_CHANGE: '换班申请需先由被换班员工确认，同意后再进入人事与主管审批，最终自动更新双方排班与日程。',
+  PROFILE_CHANGE: '说明需要更正的字段与正确内容，附证明材料；人事核对后在员工档案中更正，员工不能直接改正式档案。',
   MARKETING_PLAN: '营销方案提交后会同步到营销管理的审批状态，并支持发布/驳回意见联动。'
 }
 const workflowSteps = computed(() => workflowStepsMap[form.approvalType] || ['申请', '审批', '归档'])

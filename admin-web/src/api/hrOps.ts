@@ -96,3 +96,7 @@ export const getMyPoints = () => request.get<PointsLog[]>('/api/hr/points/my')
 export const checkStaffDuplicate = (params: { phone?: string; name?: string }) =>
   request.get<{ staffId: string; staffNo?: string; realName: string; onJob: boolean; samePhone: boolean }[]>(`${admin}/staff/duplicate-check`, { params })
 export const getOffboardingChecklist = (staffId: Id) => request.get<ChecklistItem[]>(`${admin}/staff/${staffId}/offboarding-checklist`)
+
+export interface LeaveQuota { id: Id; staffId: Id; quotaYear: number; leaveType: string; quotaDays: number; updatedByName?: string }
+export const getLeaveQuotas = (year: number) => request.get<LeaveQuota[]>(`${admin}/leave-quota`, { params: { year } })
+export const saveLeaveQuota = (data: { staffId: string; year: number; leaveType: string; quotaDays: number }) => request.post<LeaveQuota>(`${admin}/leave-quota`, data)

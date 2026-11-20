@@ -7,7 +7,7 @@
       <span v-for="tag in activeFilterTags" :key="tag" class="selection-pill">{{ tag }}</span>
     </template>
 
-    <MyApprovalStrip />
+    <TodoOverviewPanel :summary="summary" :refresh-key="refreshKey" @filter="applyStatusFilter" @create="openCreate" />
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="标题/内容/负责人" allow-clear style="width: 240px" />
@@ -30,6 +30,9 @@
           <span class="action-group-title">单条操作</span>
           <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="editSelected">编辑</a-button>
           <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="doneSelected">完成</a-button>
+          <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="followUp?.openTransfer(selectedSingleRecord!)">转交</a-button>
+          <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="followUp?.urge(selectedSingleRecord!)">催办</a-button>
+          <a-button :disabled="!selectedSingleRecord" @click="followUp?.openHistory(selectedSingleRecord!)">处理历史</a-button>
           <a-select v-model:value="snoozeDays" style="width: 110px">
             <a-select-option :value="1">延后1天</a-select-option>
             <a-select-option :value="3">延后3天</a-select-option>
@@ -290,11 +293,13 @@
         </a-form-item>
       </a-form>
     </a-modal>
+    <TodoFollowUp ref="followUp" @changed="fetchData" />
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import MyApprovalStrip from './MyApprovalStrip.vue'
+import TodoOverviewPanel from './TodoOverviewPanel.vue'
+import TodoFollowUp from './TodoFollowUp.vue'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
@@ -344,6 +349,14 @@ const query = reactive({
   pageSize: 10
 })
 const autoRefresh = ref(true)
+const refreshKey = ref(0)
+
+/** 顶部数字卡片点击：切换列表的状态筛选（全部 / 待处理 / 已完成） */
+function applyStatusFilter(status: string) {
+  query.status = status || undefined
+  query.pageNo = 1
+  fetchData()
+}
 const AUTO_REFRESH_INTERVAL_MS = 60 * 1000
 let autoRefreshTimer: number | undefined
 const activeSummaryFilter = ref<'total' | 'open' | 'done' | 'approval' | 'birthday' | 'normal' | 'dueToday' | 'overdue' | 'unassigned'>('total')
@@ -470,6 +483,7 @@ const rowSelection = computed(() => ({
   }
 }))
 const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.id))))
+const followUp = ref<InstanceType<typeof TodoFollowUp>>()
 const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
 const isSelectedSingleOpen = computed(() => selectedSingleRecord.value?.status === 'OPEN')
 const isSelectedBirthdayReminder = computed(() => {
@@ -507,6 +521,7 @@ const policyForm = reactive({
 })
 
 async function fetchData() {
+  refreshKey.value += 1
   loading.value = true
   summaryLoading.value = true
   tableError.value = ''

@@ -328,6 +328,8 @@ export interface OaWorkReport {
   reviewComment?: string
   reviewScore?: number
   reviewedAt?: string
+  createTime?: string
+  updateTime?: string
 }
 
 export interface OaWorkReportSummary {
