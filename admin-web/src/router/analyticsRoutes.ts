@@ -9,7 +9,7 @@ export const analyticsRoutes: RouteRecordRaw[] = [
     name: 'DigitalTwinCenter',
     component: () => import('../views/digital-twin/TwinScreen.vue'),
     meta: {
-      title: '数字孪生中心', icon: 'GlobalOutlined', navSection: 'operations', navOrder: 65,
+      title: '数字孪生中心', icon: 'GlobalOutlined', navSection: 'command', navOrder: 0,
       roles: [...DEPARTMENT_ALL_ROLES, ROLE_CODES.STAFF, ROLE_CODES.DIRECTOR, ROLE_CODES.ADMIN, ROLE_CODES.SYS_ADMIN]
     }
   },

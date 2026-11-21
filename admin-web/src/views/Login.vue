@@ -55,14 +55,14 @@
             <a-button type="link" size="small" @click="backToPasswordStep">返回重新登录</a-button>
           </div>
         </a-form>
-        <a-form v-else-if="!twoFactor.active" :model="form" @finish="onSubmit">
+        <a-form v-else-if="!twoFactor.active" ref="loginFormRef" :model="form" @finish="onSubmit">
           <a-form-item name="username" :rules="[{ required: true, message: '请输入员工账号、工号或手机号' }]">
-            <a-input v-model:value="form.username" size="large" placeholder="员工账号 / 工号 / 手机号" autocomplete="username">
+            <a-input v-model:value="form.username" size="large" placeholder="员工账号 / 工号 / 手机号" name="username" autocomplete="username">
               <template #prefix><UserOutlined /></template>
             </a-input>
           </a-form-item>
           <a-form-item name="password" :rules="[{ required: true, message: '请输入密码' }]">
-            <a-input-password v-model:value="form.password" size="large" placeholder="请输入密码" autocomplete="current-password">
+            <a-input-password v-model:value="form.password" size="large" placeholder="请输入密码" name="password" autocomplete="current-password">
               <template #prefix><LockOutlined /></template>
             </a-input-password>
           </a-form-item>
@@ -73,7 +73,7 @@
             </span>
             <a class="login-card__link" @click="onForgotPassword">忘记密码？</a>
           </div>
-          <a-button type="primary" html-type="submit" block size="large" class="login-card__submit" :loading="loading">登 录</a-button>
+          <a-button type="primary" html-type="submit" block size="large" class="login-card__submit" :loading="loading" @click.capture="syncAutofilledFields">登 录</a-button>
         </a-form>
         <a-form v-else layout="vertical" @finish="onVerifyTwoFactor">
           <a-alert
@@ -196,16 +196,30 @@ function saveBrowserCredential(username: string, password: string) {
   navigator.credentials.store(new PasswordCredentialCtor({ id: username, password })).catch(() => {})
 }
 
+// 打开登录页就向浏览器要已保存的账号密码：不依赖本页的“记住密码”标记（标记可能丢），
+// 浏览器里没有保存过时直接返回空、不弹任何东西；保存了多个账号时由浏览器弹出账号选择
 onMounted(async () => {
-  if (!rememberPassword.value || !PasswordCredentialCtor || form.password) return
+  if (!PasswordCredentialCtor || form.password) return
   try {
     const cred: any = await navigator.credentials.get({ password: true, mediation: 'optional' } as any)
     if (cred?.password) {
       form.username = cred.id
       form.password = cred.password
+      rememberPassword.value = true
     }
   } catch { /* 浏览器不支持或用户取消时手动输入 */ }
 })
+
+// Chrome 自动填充的值在用户点击前不触发 input 事件，v-model 里还是空的，会被校验拦成“请输入密码”；
+// 点击登录（此时浏览器已放开填充值）先把输入框里的值同步回表单再校验
+const loginFormRef = ref<{ $el?: HTMLElement } | null>(null)
+function syncAutofilledFields() {
+  const root = loginFormRef.value?.$el
+  const username = root?.querySelector<HTMLInputElement>('input[name="username"]')?.value
+  const password = root?.querySelector<HTMLInputElement>('input[name="password"]')?.value
+  if (username && !form.username) form.username = username
+  if (password && !form.password) form.password = password
+}
 
 const loading = ref(false)
 

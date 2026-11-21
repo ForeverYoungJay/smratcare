@@ -22,10 +22,11 @@ import {
 } from '@ant-design/icons-vue'
 import type { MenuItem } from './menu'
 
-export type NavSectionKey = 'entry' | 'care' | 'operations' | 'compliance' | 'support' | 'system'
+export type NavSectionKey = 'command' | 'entry' | 'care' | 'operations' | 'compliance' | 'support' | 'system'
 
-/** 分区顺序即侧栏顺序：个人办公（我的工作台、待办、考勤等）放最上面，业务在后 */
+/** 分区顺序即侧栏顺序：运营中心（数字孪生大屏）置顶，其次个人办公（我的工作台、待办、考勤等），业务在后 */
 export const NAV_SECTION_LABELS: Record<NavSectionKey, string> = {
+  command: '运营中心',
   entry: '个人办公',
   care: '长者服务',
   operations: '经营运营',

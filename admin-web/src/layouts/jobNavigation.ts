@@ -19,7 +19,7 @@ const OFFICE: JobEntry = {
 }
 
 /** 数字孪生中心：所有岗位都能看园区总览，各模式的数据权限由服务端按岗位校验 */
-const DIGITAL_TWIN: JobEntry = { label: '数字孪生中心', path: '/digital-twin', icon: 'GlobalOutlined', section: 'operations' }
+const DIGITAL_TWIN: JobEntry = { label: '数字孪生中心', path: '/digital-twin', icon: 'GlobalOutlined', section: 'command' }
 
 /** 各部门的主页面（部门员工与部长共用；没有权限的页面由 availablePaths 自动过滤） */
 const DEPARTMENTS: Array<{ department: DepartmentCode; roles: RoleCode[]; minister: RoleCode; entries: JobEntry[] }> = [

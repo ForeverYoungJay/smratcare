@@ -39,9 +39,9 @@ export const LEGACY_ROLE_ALIASES: Readonly<Record<string, readonly RoleCode[]>> 
   MANAGER: [ROLE_CODES.MARKETING_MINISTER]
 }
 
-// 所有岗位登录后先进「我的工作台」，部门业务从侧栏进入
-export function resolveDefaultHome(_roles: string[]): string {
-  return '/workbench/overview'
+// 管理员（业务管理员、系统管理员）登录后进运营中心（数字孪生大屏）；其他岗位先进「我的工作台」，部门业务从侧栏进入
+export function resolveDefaultHome(roles: string[]): string {
+  return roles.some((role) => role === ROLE_CODES.ADMIN || role === ROLE_CODES.SYS_ADMIN) ? '/digital-twin' : '/workbench/overview'
 }
 export const isSystemAdministrator = (roles: string[]) => roles.includes(ROLE_CODES.SYS_ADMIN)
 export const isBusinessAdministrator = (roles: string[]) => roles.includes(ROLE_CODES.ADMIN)

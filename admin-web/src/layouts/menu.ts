@@ -13,7 +13,7 @@ export interface MenuItem {
   roles?: string[]
   desc?: string
   aliases?: string[]
-  navSection?: 'entry' | 'care' | 'operations' | 'compliance' | 'support' | 'system'
+  navSection?: 'command' | 'entry' | 'care' | 'operations' | 'compliance' | 'support' | 'system'
   navOrder?: number
   navPinned?: boolean
   children?: MenuItem[]

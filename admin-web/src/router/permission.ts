@@ -41,7 +41,8 @@ export function setupPermission(router: Router) {
     const publicPages = ['/home', '/enterprise', '/admin', '/login', '/403']
 
     if (!token && !publicPages.includes(to.path)) {
-      next(resolveLoginRedirectTarget(to.fullPath))
+      // 未登录打开根路径时，'/' 按“无角色”解析成了默认首页；不带回跳，登录后按角色决定落地页
+      next(to.redirectedFrom?.path === '/' ? '/login' : resolveLoginRedirectTarget(to.fullPath))
       return
     }
 

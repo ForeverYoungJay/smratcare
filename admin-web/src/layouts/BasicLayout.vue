@@ -306,6 +306,7 @@ import { buildGroupedMenuItems } from './navigation'
 import { loadRecentVisits, saveRecentVisit, type RecentVisitItem } from '../utils/recentVisits'
 import { resolveRouteAccess } from '../utils/routeAccess'
 import { resolveDefaultHome } from '../access/policy'
+import { fuzzyFilter } from '../utils/fuzzySearch'
 import { QUICK_CHAT_OPEN_EVENT } from '../utils/quickChatPreview'
 
 const completionGuide = ref<CompletionGuideState | null>(null)
@@ -601,6 +602,7 @@ const currentTitle = computed(() => {
   const title = route.meta?.title as string | undefined
   return title || ''
 })
+const searchFields = (item: SearchPaletteItem) => ({ title: item.title, extra: `${item.description} ${item.keywords || ''}` })
 const searchPageItems = computed<SearchPaletteItem[]>(() => {
   const collect = (items: any[], parents: string[] = []): SearchPaletteItem[] =>
     items.flatMap((item) => {
@@ -632,10 +634,8 @@ const searchPageItems = computed<SearchPaletteItem[]>(() => {
         keywords
       }]
     })
-  const keyword = globalSearchKeyword.value.trim().toLowerCase()
   const list = collect(accessibleMenu.value)
-  if (!keyword) return list.slice(0, 16)
-  return list.filter((item) => `${item.title} ${item.description} ${item.keywords || ''}`.toLowerCase().includes(keyword)).slice(0, 16)
+  return fuzzyFilter(list, globalSearchKeyword.value, searchFields).slice(0, 16)
 })
 const searchActionItems = computed<SearchPaletteItem[]>(() => {
   const items: SearchPaletteItem[] = [
@@ -645,18 +645,14 @@ const searchActionItems = computed<SearchPaletteItem[]>(() => {
     { key: 'action-search-chat-todo', title: '打开聊天任务', description: '查看聊天任务与催办清单', group: '常用动作', action: 'openQuickChatTodo' },
     { key: 'action-search-profile', title: '打开个人设置', description: '查看头像、手机号与主题设置', group: '常用动作', action: 'openHeaderSettings' }
   ]
-  const keyword = globalSearchKeyword.value.trim().toLowerCase()
   const accessible = items.filter((item) => !item.path || canOpenPath(item.path))
-  if (!keyword) return accessible
-  return accessible.filter((item) => `${item.title} ${item.description}`.toLowerCase().includes(keyword))
+  return fuzzyFilter(accessible, globalSearchKeyword.value, searchFields)
 })
 const searchRecentItems = computed<SearchPaletteItem[]>(() => {
-  const keyword = globalSearchKeyword.value.trim().toLowerCase()
   const base = recentVisitItems.value
     .filter((item) => canOpenPath(item.path))
     .map((item) => ({ key: item.key, title: item.title, description: item.path, group: '最近访问', path: item.path }))
-  if (!keyword) return base.slice(0, 8)
-  return base.filter((item) => `${item.title} ${item.description}`.toLowerCase().includes(keyword)).slice(0, 8)
+  return fuzzyFilter(base, globalSearchKeyword.value, searchFields).slice(0, 8)
 })
 const breadcrumbs = computed(() => {
   const homeTitle = (userStore.roles || []).includes('SYS_ADMIN')

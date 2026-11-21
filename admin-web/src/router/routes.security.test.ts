@@ -110,7 +110,8 @@ describe('route security foundation', () => {
   it('uses distinct role-specific default homes', () => {
     expect(resolveDefaultHome(['NURSING_EMPLOYEE'])).toBe('/workbench/overview')
     expect(resolveDefaultHome(['DIRECTOR'])).toBe('/workbench/overview')
-    expect(resolveDefaultHome(['SYS_ADMIN'])).toBe('/workbench/overview')
+    expect(resolveDefaultHome(['SYS_ADMIN'])).toBe('/digital-twin')
+    expect(resolveDefaultHome(['ADMIN'])).toBe('/digital-twin')
   })
 
   it('ignores a redirect left by a previous account when the new role cannot open it', () => {
