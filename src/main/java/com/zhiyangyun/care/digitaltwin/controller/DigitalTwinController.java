@@ -131,6 +131,7 @@ public class DigitalTwinController {
 
   @GetMapping("/assets")
   public Result<List<Map<String, Object>>> assets(@RequestParam(required = false) String type) {
+    syncMissingBuildings(); // 楼栋主数据新增的楼栋自动接入，不再等管理员手动同步
     List<DtSpatialAsset> rows = assetMapper.selectList(Wrappers.lambdaQuery(DtSpatialAsset.class)
         .eq(DtSpatialAsset::getOrgId, orgId())
         .eq(type != null && !type.isBlank(), DtSpatialAsset::getAssetType, type)
@@ -236,6 +237,14 @@ public class DigitalTwinController {
   @Transactional
   public Result<Map<String, Object>> syncBuildings() {
     requireBindingAdmin();
+    int created = syncMissingBuildings();
+    long buildings = buildingMapper.selectCount(Wrappers.lambdaQuery(Building.class)
+        .eq(Building::getOrgId, orgId()).eq(Building::getIsDeleted, 0));
+    return Result.ok(Map.of("created", created, "buildings", buildings));
+  }
+
+  /** shortcut: synchronized 只防单实例内并发重复创建；多实例部署时改用数据库唯一约束或分布式锁 */
+  private synchronized int syncMissingBuildings() {
     Set<Long> bound = new HashSet<>(boundBuildings().values());
     DtSceneVersion scene = sceneMapper.selectOne(Wrappers.lambdaQuery(DtSceneVersion.class)
         .eq(DtSceneVersion::getOrgId, orgId()).eq(DtSceneVersion::getStatus, "PUBLISHED")
@@ -283,7 +292,7 @@ public class DigitalTwinController {
       audit("DT_ASSET_SYNC", binding, code + " ← 楼栋主数据 " + b.getName());
       created++;
     }
-    return Result.ok(Map.of("created", created, "buildings", buildings.size()));
+    return created;
   }
 
   // ---------- 管理员：业务绑定（SecurityConfig 已限定 ADMIN/SYS_ADMIN，这里再校验一次） ----------

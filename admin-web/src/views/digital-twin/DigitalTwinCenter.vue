@@ -1,9 +1,7 @@
 <template>
   <PageContainer title="数字孪生中心" sub-title="智慧园区 · 一个三维场景，六个只读视图；数字来自源业务表，办理跳转原模块">
     <template #badge>
-      <a-tag v-if="scene" :color="hasReal ? 'green' : DATA_MODE_TAG[scene.dataMode].color">
-        {{ hasReal ? '楼栋来自主数据 · 布局示意' : DATA_MODE_TAG[scene.dataMode].label }}
-      </a-tag>
+      <a-tag v-if="scene" color="green">楼栋来自主数据 · 布局示意</a-tag>
     </template>
     <template #extra>
       <a-button :loading="loadState === 'loading'" @click="reload">刷新</a-button>
@@ -44,9 +42,7 @@
             </li>
             <li v-if="!filtered.length" class="twin-empty">没有匹配的楼栋</li>
           </ul>
-          <p v-if="!hasReal" class="twin-tip">
-            还没有接入楼栋主数据，场景里是概念占位楼栋。{{ scene?.canManageBindings ? '点「从楼栋主数据同步」接入。' : '请联系管理员同步。' }}
-          </p>
+          <p v-if="!hasReal" class="twin-tip">楼栋主数据里还没有楼栋，请先在楼栋管理中添加。</p>
         </div>
 
         <div class="twin-block">
@@ -67,11 +63,10 @@
       <section class="twin-stage">
         <div ref="canvasHost" class="twin-canvas" :class="{ hidden: loadState !== 'ready' }" />
         <template v-if="loadState === 'ready'">
-          <div v-if="showConceptMark" class="twin-watermark" aria-hidden="true">概念示意 · 非实测</div>
           <div class="twin-hud">
             <div class="twin-hud-title">
               <strong>{{ currentMode.label }}</strong>
-              <span>{{ hasReal ? '楼栋、楼层取自主数据；位置与外形为示意，不具测绘精度' : '概念示意 · dataMode=DEMO · ' + (scene?.coordinateNote || '示意坐标') }}</span>
+              <span>楼栋、楼层取自主数据；位置与外形为示意，不具测绘精度</span>
             </div>
             <div v-if="campusSummary?.metrics.length" class="twin-kpis" aria-label="全园指标">
               <div v-for="m in campusSummary.metrics.slice(0, 5)" :key="m.key" class="twin-kpi" :class="m.tone">
@@ -108,7 +103,7 @@
       <!-- 右：详情 -->
       <aside class="twin-detail">
         <div class="twin-hero" :class="{ concept: selected && !selected.buildingName }">
-          <small>{{ selected ? (selected.buildingName ? '楼栋 · 主数据' : '楼栋 · 概念占位') : '园区' }}</small>
+          <small>{{ selected ? (selected.buildingName ? '楼栋 · 主数据' : '楼栋 · 未接入主数据') : '园区' }}</small>
           <h3>{{ selected ? assetName(selected) : '全园' }}</h3>
           <div class="twin-hero-code">{{ selected?.assetId || CAMPUS_ID }} · 场景 {{ scene?.version || '—' }}</div>
           <a-button v-if="selected" type="text" size="small" class="twin-hero-close" @click="select(null)">返回园区</a-button>
@@ -184,7 +179,7 @@
     <footer class="twin-status">
       <span><i class="twin-dot" :class="loadState" />{{ loadState === 'ready' ? '场景运行中' : loadState === 'loading' ? '加载中' : '静态兜底' }}</span>
       <span>模型 {{ scene?.version || '—' }}（{{ scene?.modelUrl ? 'GLB' : '程序化楼栋' }}）</span>
-      <span>主数据楼栋 {{ realCount }} 栋 · 概念占位 {{ placed.length - realCount }} 栋</span>
+      <span>主数据楼栋 {{ realCount }} 栋</span>
       <span>场景加载 {{ loadedAt || '—' }}</span>
       <span>实时推送：尚未接入（数字在打开、切换时查询）</span>
     </footer>
@@ -240,7 +235,6 @@ const currentMode = computed(() => TWIN_MODES.find((m) => m.key === mode.value)!
 const placed = computed(() => placeBuildings(assets.value))
 const realCount = computed(() => placed.value.filter((p) => p.real).length)
 const hasReal = computed(() => realCount.value > 0)
-const showConceptMark = computed(() => placed.value.some((p) => !p.real))
 /** 列表只列场景里实际摆出来的楼栋（被主数据楼栋替换掉的占位不再列出） */
 const listed = computed(() => {
   const keys = new Set(placed.value.map((p) => p.key))
@@ -276,12 +270,12 @@ function labelOf(nodeKey: string) {
   return a ? (a.buildingName || shortLabel(a.assetId)) : nodeKey
 }
 function defaultSub(a: TwinAsset) {
-  return a.buildingName ? `${a.floorCount ?? 0} 层 · ${a.roomCount ?? 0} 间` : '概念占位'
+  return a.buildingName ? `${a.floorCount ?? 0} 层 · ${a.roomCount ?? 0} 间` : '未接入主数据'
 }
 function itemMeta(a: TwinAsset) {
   const o = overlayOf(a)
   if (overlayMode.value && o) return o.text
-  return a.buildingName ? defaultSub(a) : `${a.assetId} · 概念占位`
+  return a.buildingName ? defaultSub(a) : `${a.assetId} · 未接入主数据`
 }
 function dotColor(a: TwinAsset) {
   if (overlayMode.value) return hex(overlayColor(overlayMode.value, overlayOf(a)?.value ?? null))
@@ -574,10 +568,6 @@ onBeforeUnmount(() => {
 .twin-canvas :deep(.twin-label span:empty) { display: none; }
 .twin-canvas :deep(.twin-label--real) { border: 0; border-left: 3px solid var(--primary); }
 .twin-canvas :deep(.twin-label--real b) { color: var(--primary-strong); }
-.twin-watermark {
-  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none;
-  font-size: 44px; font-weight: 700; color: rgba(33, 112, 95, 0.07); transform: rotate(-18deg); letter-spacing: 6px;
-}
 .twin-hud {
   position: absolute; top: 12px; left: 12px; right: 12px; display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start;
   justify-content: space-between; pointer-events: none;

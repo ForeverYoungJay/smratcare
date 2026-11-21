@@ -54,8 +54,16 @@ class DigitalTwinControllerTest {
         + "(95041, 1, 95011, 'OPEN', 'HIGH', 0), (95042, 1, 95011, 'COMPLETED', 'NORMAL', 0), (95043, 2, 95012, 'OPEN', 'HIGH', 0)");
   }
 
+  /** 手工绑定规则要用尚未绑定的楼栋资产；演示占位已从库里删除，这里按需插入测试专用行 */
+  private void unboundAsset(long orgId, String code) {
+    jdbc.update("INSERT INTO dt_spatial_asset (org_id, asset_code, name, asset_type, parent_code, verification_status, sort_no) "
+        + "VALUES (?, ?, ?, 'BUILDING', 'GF-CAMPUS-001', 'UNVERIFIED', 1)", orgId, code, "测试未绑定楼栋 " + code);
+  }
+
   @AfterEach
   void cleanup() {
+    jdbc.update("DELETE FROM dt_business_binding WHERE asset_code LIKE 'GF-BLD-TMP-%'");
+    jdbc.update("DELETE FROM dt_spatial_asset WHERE asset_code LIKE 'GF-BLD-TMP-%'");
     jdbc.update("DELETE FROM dt_business_binding WHERE created_by BETWEEN 95101 AND 95106");
     jdbc.update("DELETE FROM audit_log WHERE entity_type = 'DT_BUSINESS_BINDING'");
     jdbc.update("DELETE FROM dt_spatial_asset WHERE asset_code LIKE 'GF-BLD-B%'");
@@ -67,26 +75,32 @@ class DigitalTwinControllerTest {
   }
 
   @Test
-  void conceptSceneIsReadableAndClearlyMarkedDemo() throws Exception {
+  void noDemoDataAndRealBuildingsAppearWithoutAdminSync() throws Exception {
     String nurse = login("dt_nurse");
     mvc.perform(auth(get("/api/digital-twin/scene"), nurse)).andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.dataMode", is("DEMO"))).andExpect(jsonPath("$.data.verificationStatus", is("CONCEPT")))
-        .andExpect(jsonPath("$.data.canManageBindings", is(false)));
+        .andExpect(jsonPath("$.data.dataMode", is("LIVE"))).andExpect(jsonPath("$.data.canManageBindings", is(false)));
+    // 普通员工打开即可看到本机构真实楼栋（自动接入主数据），没有示例占位楼栋
     JsonNode buildings = data(mvc.perform(auth(get("/api/digital-twin/assets").param("type", "BUILDING"), nurse)).andReturn());
-    assertThat(buildings.size()).isEqualTo(10);
-    assertThat(buildings.get(0).path("assetId").asText()).isEqualTo("GF-BLD-TMP-001");
-    assertThat(buildings.get(0).path("modelNodeKey").asText()).isEqualTo("BLD_TMP_001");
-    assertThat(buildings.get(0).path("verificationStatus").asText()).isEqualTo("CONCEPT");
-    mvc.perform(auth(get("/api/digital-twin/assets/GF-BLD-TMP-999"), nurse)).andExpect(status().isNotFound());
-    mvc.perform(auth(get("/api/digital-twin/assets/GF-BLD-TMP-001/summary").param("mode", "nope"), nurse)).andExpect(status().isBadRequest());
-    // 消防汇总只开放给后勤口径；护理员 403，未绑定楼栋不出数字
+    JsonNode real = null;
+    for (JsonNode b : buildings) {
+      assertThat(b.path("assetId").asText()).doesNotStartWith("GF-BLD-TMP-");
+      assertThat(b.path("bound").asBoolean()).isTrue();
+      if ("GF-BLD-B95001".equals(b.path("assetId").asText())) real = b;
+    }
+    assertThat(real).isNotNull();
+    assertThat(real.path("buildingName").asText()).isEqualTo("一号楼");
+    JsonNode campus = data(mvc.perform(auth(get("/api/digital-twin/assets").param("type", "CAMPUS"), nurse)).andReturn());
+    assertThat(campus.get(0).path("displayName").asText()).isEqualTo("园区");
+    mvc.perform(auth(get("/api/digital-twin/assets/GF-BLD-TMP-001"), nurse)).andExpect(status().isNotFound());
+    mvc.perform(auth(get("/api/digital-twin/assets/GF-BLD-B95001/summary").param("mode", "nope"), nurse)).andExpect(status().isBadRequest());
+    // 消防汇总只开放给后勤口径；护理员 403
     mvc.perform(auth(get("/api/digital-twin/assets/GF-CAMPUS-001/summary").param("mode", "fire"), nurse)).andExpect(status().isForbidden());
-    mvc.perform(auth(get("/api/digital-twin/assets/GF-BLD-TMP-001/summary").param("mode", "facility"), nurse))
-        .andExpect(jsonPath("$.data.dataMode", is("UNBOUND"))).andExpect(jsonPath("$.data.metrics.length()", is(0)));
   }
 
   @Test
   void onlyAdminsBindAndOnlyBedRolesSeeOccupancy() throws Exception {
+    unboundAsset(1L, "GF-BLD-TMP-001");
+    unboundAsset(1L, "GF-BLD-TMP-002");
     String nurse = login("dt_nurse");
     String fin = login("dt_fin");
     String body = "{\"assetId\":\"GF-BLD-TMP-001\",\"entityType\":\"BUILDING\",\"externalEntityId\":95001}";
@@ -170,6 +184,8 @@ class DigitalTwinControllerTest {
 
   @Test
   void tamperedIdsCannotReachAnotherOrganization() throws Exception {
+    unboundAsset(1L, "GF-BLD-TMP-001");
+    unboundAsset(2L, "GF-BLD-TMP-001");
     String admin = login("dt_admin");
     String admin2 = login("dt_admin2");
     // 绑定到别家机构的楼栋 ID：当作不存在
