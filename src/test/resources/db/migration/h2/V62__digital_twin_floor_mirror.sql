@@ -1,0 +1,15 @@
+-- H2 测试库缺 floor 表（生产库在 1_schema.sql 里）；数字孪生按楼栋统计楼层数需要它
+CREATE TABLE IF NOT EXISTS floor (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL,
+  org_id BIGINT NOT NULL,
+  building_id BIGINT NOT NULL,
+  floor_no VARCHAR(32) NOT NULL,
+  name VARCHAR(64) DEFAULT NULL,
+  status TINYINT NOT NULL DEFAULT 1,
+  sort_no INT NOT NULL DEFAULT 0,
+  created_by BIGINT DEFAULT NULL,
+  create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0
+);

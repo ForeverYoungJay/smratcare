@@ -38,7 +38,7 @@ class DigitalTwinControllerTest {
     // staffId, username, orgId, roleId, roleCode
     Object[][] users = {{95101L, "dt_admin", 1L, 95111L, "ADMIN"}, {95102L, "dt_nurse", 1L, 95112L, "NURSING_EMPLOYEE"},
         {95103L, "dt_fin", 1L, 95113L, "FINANCE_EMPLOYEE"}, {95104L, "dt_admin2", 2L, 95114L, "ADMIN"},
-        {95105L, "dt_nurse2", 2L, 95115L, "NURSING_EMPLOYEE"}};
+        {95105L, "dt_nurse2", 2L, 95115L, "NURSING_EMPLOYEE"}, {95106L, "dt_logi", 1L, 95116L, "LOGISTICS_EMPLOYEE"}};
     for (Object[] u : users) {
       jdbc.update("MERGE INTO staff (id, org_id, department_id, staff_no, username, password_hash, real_name, status) KEY(id) VALUES (?, ?, 10, ?, ?, ?, ?, 1)",
           u[0], u[2], "D" + u[0], u[1], HASH, u[1]);
@@ -49,12 +49,18 @@ class DigitalTwinControllerTest {
     jdbc.update("MERGE INTO room (id, org_id, building_id, room_no) KEY(id) VALUES (95011, 1, 95001, 'DT101'), (95012, 2, 95002, 'DT201')");
     jdbc.update("MERGE INTO bed (id, org_id, room_id, bed_no, bed_qr_code, status) KEY(id) VALUES "
         + "(95021, 1, 95011, '01', 'DTQ1', 2), (95022, 1, 95011, '02', 'DTQ2', 1), (95023, 2, 95012, '01', 'DTQ3', 2)");
+    jdbc.update("MERGE INTO floor (id, tenant_id, org_id, building_id, floor_no) KEY(id) VALUES (95031, 1, 1, 95001, '1F'), (95032, 1, 1, 95001, '2F')");
+    jdbc.update("MERGE INTO life_maintenance_request (id, org_id, room_id, status, priority, is_deleted) KEY(id) VALUES "
+        + "(95041, 1, 95011, 'OPEN', 'HIGH', 0), (95042, 1, 95011, 'COMPLETED', 'NORMAL', 0), (95043, 2, 95012, 'OPEN', 'HIGH', 0)");
   }
 
   @AfterEach
   void cleanup() {
-    jdbc.update("DELETE FROM dt_business_binding WHERE created_by BETWEEN 95101 AND 95105");
+    jdbc.update("DELETE FROM dt_business_binding WHERE created_by BETWEEN 95101 AND 95106");
     jdbc.update("DELETE FROM audit_log WHERE entity_type = 'DT_BUSINESS_BINDING'");
+    jdbc.update("DELETE FROM dt_spatial_asset WHERE asset_code LIKE 'GF-BLD-B%'");
+    jdbc.update("DELETE FROM life_maintenance_request WHERE id IN (95041, 95042, 95043)");
+    jdbc.update("DELETE FROM floor WHERE id IN (95031, 95032)");
     jdbc.update("DELETE FROM bed WHERE id IN (95021, 95022, 95023)");
     jdbc.update("DELETE FROM room WHERE id IN (95011, 95012)");
     jdbc.update("DELETE FROM building WHERE id IN (95001, 95002)");
@@ -73,8 +79,10 @@ class DigitalTwinControllerTest {
     assertThat(buildings.get(0).path("verificationStatus").asText()).isEqualTo("CONCEPT");
     mvc.perform(auth(get("/api/digital-twin/assets/GF-BLD-TMP-999"), nurse)).andExpect(status().isNotFound());
     mvc.perform(auth(get("/api/digital-twin/assets/GF-BLD-TMP-001/summary").param("mode", "nope"), nurse)).andExpect(status().isBadRequest());
-    mvc.perform(auth(get("/api/digital-twin/assets/GF-BLD-TMP-001/summary").param("mode", "fire"), nurse))
-        .andExpect(jsonPath("$.data.dataMode", is("NOT_CONNECTED"))).andExpect(jsonPath("$.data.metrics.length()", is(0)));
+    // 消防汇总只开放给后勤口径；护理员 403，未绑定楼栋不出数字
+    mvc.perform(auth(get("/api/digital-twin/assets/GF-CAMPUS-001/summary").param("mode", "fire"), nurse)).andExpect(status().isForbidden());
+    mvc.perform(auth(get("/api/digital-twin/assets/GF-BLD-TMP-001/summary").param("mode", "facility"), nurse))
+        .andExpect(jsonPath("$.data.dataMode", is("UNBOUND"))).andExpect(jsonPath("$.data.metrics.length()", is(0)));
   }
 
   @Test
@@ -85,7 +93,8 @@ class DigitalTwinControllerTest {
     mvc.perform(auth(post("/api/digital-twin/admin/bindings"), nurse).content(body)).andExpect(status().isForbidden());
     mvc.perform(auth(get("/api/digital-twin/admin/bindings"), nurse)).andExpect(status().isForbidden());
     mvc.perform(auth(get("/api/digital-twin/assets/GF-CAMPUS-001/summary").param("mode", "occupancy"), fin)).andExpect(status().isForbidden());
-    mvc.perform(auth(get("/api/digital-twin/assets/GF-CAMPUS-001/summary").param("mode", "video"), fin)).andExpect(status().isOk());
+    mvc.perform(auth(get("/api/digital-twin/assets/GF-CAMPUS-001/summary").param("mode", "video"), fin)).andExpect(status().isForbidden());
+    mvc.perform(auth(get("/api/digital-twin/overlay").param("mode", "occupancy"), fin)).andExpect(status().isForbidden());
 
     String admin = login("dt_admin");
     // 未绑定前不显示数字
@@ -112,6 +121,51 @@ class DigitalTwinControllerTest {
     assertThat(jdbc.queryForObject("SELECT binding_status FROM dt_business_binding WHERE id = ?", String.class, Long.valueOf(id))).isEqualTo("RETIRED");
     mvc.perform(auth(get("/api/digital-twin/assets/GF-BLD-TMP-001/summary").param("mode", "occupancy"), nurse))
         .andExpect(jsonPath("$.data.dataMode", is("UNBOUND")));
+  }
+
+  @Test
+  void adminSyncsRealBuildingsAndSummariesReadRealTables() throws Exception {
+    String nurse = login("dt_nurse");
+    String admin = login("dt_admin");
+    String logi = login("dt_logi");
+    mvc.perform(auth(post("/api/digital-twin/admin/sync-buildings"), nurse)).andExpect(status().isForbidden());
+    JsonNode first = data(mvc.perform(auth(post("/api/digital-twin/admin/sync-buildings"), admin)).andExpect(status().isOk()).andReturn());
+    assertThat(first.path("created").asInt()).isGreaterThanOrEqualTo(1);
+    // 再同步一次不重复生成
+    mvc.perform(auth(post("/api/digital-twin/admin/sync-buildings"), admin)).andExpect(jsonPath("$.data.created", is(0)));
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_log WHERE action_type = 'DT_ASSET_SYNC'", Integer.class)).isGreaterThanOrEqualTo(1);
+
+    JsonNode buildings = data(mvc.perform(auth(get("/api/digital-twin/assets").param("type", "BUILDING"), nurse)).andReturn());
+    JsonNode synced = null;
+    for (JsonNode b : buildings) {
+      if ("GF-BLD-B95001".equals(b.path("assetId").asText())) synced = b;
+      assertThat(b.path("assetId").asText()).isNotEqualTo("GF-BLD-B95002"); // 别家楼栋不会同步进来
+    }
+    assertThat(synced).isNotNull();
+    assertThat(synced.path("buildingName").asText()).isEqualTo("一号楼");
+    assertThat(synced.path("floorCount").asInt()).isEqualTo(2);
+    assertThat(synced.path("roomCount").asInt()).isEqualTo(1);
+    assertThat(synced.path("verificationStatus").asText()).isEqualTo("MASTER_DATA");
+
+    // 楼栋级报修：按房间归属，只数本楼、本机构
+    JsonNode facility = data(mvc.perform(auth(get("/api/digital-twin/assets/GF-BLD-B95001/summary").param("mode", "facility"), nurse))
+        .andExpect(jsonPath("$.data.dataMode", is("LIVE"))).andReturn());
+    assertThat(metric(facility, "openRequests")).isEqualTo(1);
+    assertThat(metric(facility, "urgentRequests")).isEqualTo(1);
+    JsonNode overlay = data(mvc.perform(auth(get("/api/digital-twin/overlay").param("mode", "occupancy"), nurse)).andReturn());
+    boolean found = false;
+    for (JsonNode o : overlay) {
+      if ("GF-BLD-B95001".equals(o.path("assetId").asText())) {
+        assertThat(o.path("value").asInt()).isEqualTo(50);
+        found = true;
+      }
+    }
+    assertThat(found).isTrue();
+    // 消防、视频：后勤可看全园口径；楼栋级未映射时不出数字
+    mvc.perform(auth(get("/api/digital-twin/assets/GF-CAMPUS-001/summary").param("mode", "fire"), logi))
+        .andExpect(jsonPath("$.data.dataMode", is("LIVE")));
+    mvc.perform(auth(get("/api/digital-twin/assets/GF-BLD-B95001/summary").param("mode", "video"), logi))
+        .andExpect(jsonPath("$.data.dataMode", is("NOT_CONNECTED"))).andExpect(jsonPath("$.data.metrics.length()", is(0)));
   }
 
   @Test

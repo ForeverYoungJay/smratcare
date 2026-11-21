@@ -13,6 +13,8 @@ export interface TwinScene {
   dataMode: TwinDataMode
   canManageBindings: boolean
   canViewOccupancy: boolean
+  /** 当前岗位可看汇总的模式（服务端按角色计算） */
+  visibleModes: string[]
 }
 
 export interface TwinAsset {
@@ -25,9 +27,14 @@ export interface TwinAsset {
   sourceReference?: string
   verifiedAt?: string | null
   bound: boolean
+  /** 已绑定楼栋：以下三项实时读楼栋主数据 */
+  buildingName?: string
+  floorCount?: number
+  roomCount?: number
 }
 
-export interface TwinMetric { key: string; label: string; value: number | string | null; unit?: string }
+export interface TwinMetric { key: string; label: string; value: number | string | null; unit?: string; tone?: 'warn' | 'danger' }
+export interface TwinOverlayItem { assetId: string; value: number | null; text: string }
 export interface TwinSummary {
   assetId: string
   mode: string
@@ -56,6 +63,8 @@ export const getTwinScene = () => request.get<TwinScene>(`${base}/scene`)
 export const getTwinAssets = () => request.get<TwinAsset[]>(`${base}/assets`)
 export const getTwinSummary = (assetId: string, mode: string) =>
   request.get<TwinSummary>(`${base}/assets/${encodeURIComponent(assetId)}/summary`, { params: { mode } })
+export const getTwinOverlay = (mode: 'occupancy' | 'facility') => request.get<TwinOverlayItem[]>(`${base}/overlay`, { params: { mode } })
+export const syncTwinBuildings = () => request.post<{ created: number; buildings: number }>(`${base}/admin/sync-buildings`)
 export const getTwinBindings = (assetId: string) => request.get<TwinBinding[]>(`${base}/admin/bindings`, { params: { assetId } })
 export const createTwinBinding = (data: { assetId: string; entityType: 'BUILDING'; externalEntityId: string; remark?: string }) =>
   request.post<TwinBinding>(`${base}/admin/bindings`, data)
