@@ -145,7 +145,7 @@
 
 <script setup lang="ts">
 import { message } from 'ant-design-vue'
-import { onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { onUnmounted, reactive, ref, watch } from 'vue'
 import { AppstoreOutlined, HeartOutlined, HomeOutlined, IdcardOutlined, LockOutlined, QrcodeOutlined, SafetyCertificateOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import brandLogoUrl from '../assets/guifeng-logo.png'
@@ -178,37 +178,34 @@ const form = reactive({
 const rememberAccount = ref(Boolean(form.username))
 watch(rememberAccount, (on) => { if (!on) writeRemembered('') })
 
-// 记住密码交给浏览器自带的密码管理器保存；页面只记“是否记住”，从不自己存密码
+// 记住密码由本页自己存：浏览器密码管理器在 IP 访问（证书不匹配）和 Safari 下都不保存，用户勾了也没用。
+// shortcut: 密码明文存在本机 localStorage，公用电脑上不要勾；要更安全时改成后端签发的长期登录令牌
 const REMEMBER_PASSWORD_KEY = 'login.rememberPassword'
-const rememberPassword = ref((() => {
-  try { return localStorage.getItem(REMEMBER_PASSWORD_KEY) === '1' } catch { return false }
-})())
+const SAVED_PASSWORD_KEY = 'login.savedPassword'
+function readStore(key: string) {
+  try { return localStorage.getItem(key) || '' } catch { return '' }
+}
+const rememberPassword = ref(readStore(REMEMBER_PASSWORD_KEY) === '1')
+if (rememberPassword.value && form.username) form.password = readStore(SAVED_PASSWORD_KEY)
 watch(rememberPassword, (on) => {
   try {
     if (on) localStorage.setItem(REMEMBER_PASSWORD_KEY, '1')
-    else localStorage.removeItem(REMEMBER_PASSWORD_KEY)
+    else {
+      localStorage.removeItem(REMEMBER_PASSWORD_KEY)
+      localStorage.removeItem(SAVED_PASSWORD_KEY)
+    }
   } catch { /* 存储不可用时不影响登录 */ }
 })
-const PasswordCredentialCtor = (window as any).PasswordCredential
+// 记住密码要连账号一起记，否则下次只有密码没有账号
+watch(rememberPassword, (on) => { if (on) rememberAccount.value = true })
+watch(rememberAccount, (on) => { if (!on) rememberPassword.value = false })
 
-function saveBrowserCredential(username: string, password: string) {
-  if (!rememberPassword.value || !PasswordCredentialCtor || !username || !password) return
-  navigator.credentials.store(new PasswordCredentialCtor({ id: username, password })).catch(() => {})
-}
-
-// 打开登录页就向浏览器要已保存的账号密码：不依赖本页的“记住密码”标记（标记可能丢），
-// 浏览器里没有保存过时直接返回空、不弹任何东西；保存了多个账号时由浏览器弹出账号选择
-onMounted(async () => {
-  if (!PasswordCredentialCtor || form.password) return
+function saveRememberedPassword(password: string) {
   try {
-    const cred: any = await navigator.credentials.get({ password: true, mediation: 'optional' } as any)
-    if (cred?.password) {
-      form.username = cred.id
-      form.password = cred.password
-      rememberPassword.value = true
-    }
-  } catch { /* 浏览器不支持或用户取消时手动输入 */ }
-})
+    if (rememberPassword.value && password) localStorage.setItem(SAVED_PASSWORD_KEY, password)
+    else localStorage.removeItem(SAVED_PASSWORD_KEY)
+  } catch { /* 存储不可用时不影响登录 */ }
+}
 
 // Chrome 自动填充的值在用户点击前不触发 input 事件，v-model 里还是空的，会被校验拦成“请输入密码”；
 // 点击登录（此时浏览器已放开填充值）先把输入框里的值同步回表单再校验
@@ -435,7 +432,7 @@ async function onSubmit() {
 async function finishLogin(res: any) {
   resetBedMapDatasetState()
   userStore.setAuth(res)
-  saveBrowserCredential(form.username.trim(), form.password)
+  saveRememberedPassword(form.password)
   const redirect = normalizeRedirectPath(typeof route.query.redirect === 'string' ? route.query.redirect : '')
   const nextPath = resolveAuthorizedLoginTarget(router, redirect, userStore.roles || [], userStore.pagePermissions || [], userStore.permissions || [])
   await router.replace(nextPath)
