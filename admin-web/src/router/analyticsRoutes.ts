@@ -3,10 +3,11 @@ import { DEPARTMENT_ALL_ROLES, ROLE_CODES } from '../access/policy'
 
 export const analyticsRoutes: RouteRecordRaw[] = [
   {
-    // 数字孪生中心：一个三维场景 + 6 个只读模式（?mode=），不做设备控制、不显示长者身份或视频画面
+    // 数字孪生中心 = 运营大屏：三维园区 → 楼栋 → 楼层 → 房间，加全院汇聚指标；只读，不做设备控制、不播放视频
+    // 全院跨部门指标只对院长、管理员开放（服务端校验），其他岗位对应面板显示「无权查看」
     path: 'digital-twin',
     name: 'DigitalTwinCenter',
-    component: () => import('../views/digital-twin/DigitalTwinCenter.vue'),
+    component: () => import('../views/digital-twin/TwinScreen.vue'),
     meta: {
       title: '数字孪生中心', icon: 'GlobalOutlined', navSection: 'operations', navOrder: 65,
       roles: [...DEPARTMENT_ALL_ROLES, ROLE_CODES.STAFF, ROLE_CODES.DIRECTOR, ROLE_CODES.ADMIN, ROLE_CODES.SYS_ADMIN]

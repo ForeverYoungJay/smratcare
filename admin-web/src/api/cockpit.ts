@@ -34,12 +34,12 @@ export interface CockpitOverviewResponse {
   trend: CockpitTrendItem[]
 }
 
-export function getExecutiveOverview(params?: { orgId?: Id; trendDays?: number }) {
-  return request.get<CockpitOverviewResponse>('/stats/executive/overview', { params })
+export function getExecutiveOverview(params?: { orgId?: Id; trendDays?: number }, config?: Record<string, unknown>) {
+  return request.get<CockpitOverviewResponse>('/api/stats/executive/overview', { params, ...config })
 }
 
 export function refreshExecutiveSnapshot(params?: { orgId?: Id; trendDays?: number }) {
-  return request.post<CockpitOverviewResponse>('/stats/executive/snapshot/refresh', null, { params })
+  return request.post<CockpitOverviewResponse>('/api/stats/executive/snapshot/refresh', null, { params })
 }
 
 // ==================== 经营驾驶舱 BI（领域D：预聚合汇总表） ====================
@@ -105,25 +105,25 @@ export interface CockpitMetricDefinition {
 }
 
 export function getCockpitBiSummary(params?: { orgId?: Id }) {
-  return request.get<CockpitBiSummaryResponse>('/stats/executive/bi/summary', { params })
+  return request.get<CockpitBiSummaryResponse>('/api/stats/executive/bi/summary', { params })
 }
 
 export function getCockpitBiTrend(params?: { orgId?: Id; days?: number }) {
-  return request.get<CockpitBiTrendItem[]>('/stats/executive/bi/trend', { params })
+  return request.get<CockpitBiTrendItem[]>('/api/stats/executive/bi/trend', { params })
 }
 
 export function getCockpitBiDistribution(params?: { orgId?: Id }) {
-  return request.get<CockpitBiDistributionResponse>('/stats/executive/bi/distribution', { params })
+  return request.get<CockpitBiDistributionResponse>('/api/stats/executive/bi/distribution', { params })
 }
 
 export function getCockpitBiOrgCompare(params?: { month?: string }) {
-  return request.get<CockpitBiOrgCompareItem[]>('/stats/executive/bi/org-compare', { params })
+  return request.get<CockpitBiOrgCompareItem[]>('/api/stats/executive/bi/org-compare', { params })
 }
 
 export function getCockpitMetricDefinitions() {
-  return request.get<CockpitMetricDefinition[]>('/stats/executive/bi/metric-definitions')
+  return request.get<CockpitMetricDefinition[]>('/api/stats/executive/bi/metric-definitions')
 }
 
 export function recalcCockpitBiStats(params?: { date?: string; orgId?: Id }) {
-  return request.post<number>('/stats/executive/bi/recalc', null, { params })
+  return request.post<number>('/api/stats/executive/bi/recalc', null, { params })
 }

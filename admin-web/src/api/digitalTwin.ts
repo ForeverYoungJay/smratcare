@@ -47,26 +47,40 @@ export interface TwinSummary {
   metrics: TwinMetric[]
 }
 
-export interface TwinBinding {
-  id: string
-  assetId: string
-  entityType: string
-  externalEntityId: string
-  bindingStatus: 'PENDING' | 'ACTIVE' | 'RETIRED'
-  verifiedAt?: string | null
-  createTime?: string
-  remark?: string | null
+
+/** 楼栋内部：真实楼层 → 房间 → 床位 → 入住长者（长者信息仅对可查长者档案的岗位返回） */
+export interface TwinElder { elderId: string; name: string; gender?: number | null; age?: number | null; careLevel?: string | null; admissionDate?: string | null }
+export interface TwinBed { bedId: string; bedNo: string; bedType?: string | null; status: number; elder?: TwinElder }
+export interface TwinRoom {
+  roomId: string; roomNo: string; roomType?: string | null; orientation?: string | null; capacity?: number | null
+  bedCount: number; occupiedBeds: number; beds: TwinBed[]
 }
+export interface TwinFloor { key: string; floorNo: string; name?: string | null; roomCount: number; bedCount: number; occupiedBeds: number; rooms: TwinRoom[] }
+export interface TwinInterior { assetId: string; buildingName: string; canViewElders: boolean; floors: TwinFloor[]; updatedAt: string }
 
 const base = '/api/digital-twin'
 export const getTwinScene = () => request.get<TwinScene>(`${base}/scene`)
 export const getTwinAssets = () => request.get<TwinAsset[]>(`${base}/assets`)
+// 大屏上各岗位看不到的面板会 403，由页面显示「无权查看」，不弹错误提示
 export const getTwinSummary = (assetId: string, mode: string) =>
-  request.get<TwinSummary>(`${base}/assets/${encodeURIComponent(assetId)}/summary`, { params: { mode } })
-export const getTwinOverlay = (mode: 'occupancy' | 'facility') => request.get<TwinOverlayItem[]>(`${base}/overlay`, { params: { mode } })
-export const syncTwinBuildings = () => request.post<{ created: number; buildings: number }>(`${base}/admin/sync-buildings`)
-export const getTwinBindings = (assetId: string) => request.get<TwinBinding[]>(`${base}/admin/bindings`, { params: { assetId } })
-export const createTwinBinding = (data: { assetId: string; entityType: 'BUILDING'; externalEntityId: string; remark?: string }) =>
-  request.post<TwinBinding>(`${base}/admin/bindings`, data)
-export const publishTwinBinding = (id: string) => request.post<TwinBinding>(`${base}/admin/bindings/${id}/publish`)
-export const retireTwinBinding = (id: string) => request.post<TwinBinding>(`${base}/admin/bindings/${id}/retire`)
+  request.get<TwinSummary>(`${base}/assets/${encodeURIComponent(assetId)}/summary`, { params: { mode }, silent403: true } as Record<string, unknown>)
+export const getTwinInterior = (assetId: string) =>
+  request.get<TwinInterior>(`${base}/assets/${encodeURIComponent(assetId)}/interior`, { silent403: true } as Record<string, unknown>)
+export const getTwinOverlay = (mode: 'occupancy' | 'facility') =>
+  request.get<TwinOverlayItem[]>(`${base}/overlay`, { params: { mode }, silent403: true } as Record<string, unknown>)
+
+/** 运营大屏（院长、管理员）：真实业务表只读汇聚；没有数据源的块标 connected=false，不填 0 */
+export interface ScreenAlert { type: 'DEVICE' | 'FIRE' | 'MAINTENANCE' | 'HEALTH'; typeLabel: string; title: string; location?: string | null; time?: string | null; link: string }
+export interface ScreenTask { key: string; label: string; done: number; total: number | null; link: string }
+export interface TwinScreenOverview {
+  careLevels: { source: string; link: string; total: number; items: Array<{ name: string; count: number }> }
+  alerts: { source: string; openCount: number; items: ScreenAlert[] }
+  tasks: { source: string; items: ScreenTask[] }
+  workOrders: { source: string; link: string; total: number; completed: number; processing: number; open: number }
+  health: { source: string; link: string; measured: number; abnormal: number; abnormalElders: number; hourlyMeasured: number[]; hourlyAbnormal: number[] }
+  energy: { source: string; link: string; connected: boolean; month?: string; usageKwh?: number; feeAmount?: number; rooms?: number; byBuilding?: Array<{ name: string; usageKwh: number }> }
+  cameras: { source: string; link: string; total: number; enabled: number; items: Array<{ name: string; location?: string | null; enabled: boolean }> }
+  updatedAt: string
+}
+export const getTwinScreenOverview = () =>
+  request.get<TwinScreenOverview>(`${base}/screen/overview`, { silent403: true } as Record<string, unknown>)

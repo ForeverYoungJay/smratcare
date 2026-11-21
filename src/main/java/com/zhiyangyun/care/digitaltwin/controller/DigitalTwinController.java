@@ -16,6 +16,9 @@ import com.zhiyangyun.care.digitaltwin.mapper.DtBusinessBindingMapper;
 import com.zhiyangyun.care.digitaltwin.mapper.DtSceneVersionMapper;
 import com.zhiyangyun.care.digitaltwin.mapper.DtSpatialAssetMapper;
 import com.zhiyangyun.care.elder.entity.Bed;
+import com.zhiyangyun.care.elder.entity.ElderProfile;
+import com.zhiyangyun.care.elder.mapper.ElderMapper;
+import com.zhiyangyun.care.elder.security.ElderAuthz;
 import com.zhiyangyun.care.elder.entity.Room;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
@@ -30,7 +33,10 @@ import com.zhiyangyun.care.logistics.entity.LogisticsCamera;
 import com.zhiyangyun.care.logistics.mapper.LogisticsCameraMapper;
 import com.zhiyangyun.care.smart.entity.SmartDevice;
 import com.zhiyangyun.care.smart.mapper.SmartDeviceMapper;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Period;
+import java.util.Comparator;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -86,12 +92,17 @@ public class DigitalTwinController {
   private final MaintenanceRequestMapper maintenanceMapper;
   private final SmartDeviceMapper deviceMapper;
   private final LogisticsCameraMapper cameraMapper;
+  private final ElderMapper elderMapper;
+  private final ElderAuthz elderAuthz;
 
   public DigitalTwinController(DtSceneVersionMapper sceneMapper, DtSpatialAssetMapper assetMapper,
       DtBusinessBindingMapper bindingMapper, BuildingMapper buildingMapper, RoomMapper roomMapper,
       BedMapper bedMapper, AuditLogService auditLogService, FloorMapper floorMapper,
       FireLocationMapper fireLocationMapper, FireSafetyRecordMapper fireRecordMapper,
-      MaintenanceRequestMapper maintenanceMapper, SmartDeviceMapper deviceMapper, LogisticsCameraMapper cameraMapper) {
+      MaintenanceRequestMapper maintenanceMapper, SmartDeviceMapper deviceMapper, LogisticsCameraMapper cameraMapper,
+      ElderMapper elderMapper, ElderAuthz elderAuthz) {
+    this.elderMapper = elderMapper;
+    this.elderAuthz = elderAuthz;
     this.floorMapper = floorMapper;
     this.fireLocationMapper = fireLocationMapper;
     this.fireRecordMapper = fireRecordMapper;
@@ -225,6 +236,151 @@ public class DigitalTwinController {
       case "analytics" -> analytics(roomIds, out);
       default -> masterData(buildingId, out);
     });
+  }
+
+  /**
+   * 楼栋内部：真实楼层 → 房间 → 床位 → 入住长者，全部实时读主数据与长者档案。
+   * 床位状态给能看床位或长者的岗位；长者姓名等只给能查长者档案的岗位，身份证、电话一律不返回。
+   */
+  @GetMapping("/assets/{assetId}/interior")
+  public Result<Map<String, Object>> interior(@PathVariable String assetId) {
+    boolean canViewElders = elderAuthz.canReadElder();
+    if (!canViewElders && !canView("occupancy")) {
+      throw new AccessDeniedException("当前岗位无权查看楼栋内部床位");
+    }
+    DtSpatialAsset asset = requireAsset(assetId);
+    Long buildingId = "BUILDING".equals(asset.getAssetType()) ? boundBuilding(asset) : null;
+    Building building = buildingId == null ? null : buildingMapper.selectOne(Wrappers.lambdaQuery(Building.class)
+        .eq(Building::getId, buildingId).eq(Building::getOrgId, orgId()).eq(Building::getIsDeleted, 0));
+    if (building == null) {
+      throw new IllegalArgumentException("该楼栋尚未接入楼栋主数据");
+    }
+    List<Floor> floors = floorMapper.selectList(Wrappers.lambdaQuery(Floor.class)
+        .eq(Floor::getOrgId, orgId()).eq(Floor::getBuildingId, buildingId).eq(Floor::getIsDeleted, 0));
+    List<Room> rooms = roomMapper.selectList(Wrappers.lambdaQuery(Room.class)
+        .eq(Room::getOrgId, orgId()).eq(Room::getBuildingId, buildingId).eq(Room::getIsDeleted, 0));
+    List<Bed> beds = rooms.isEmpty() ? List.of() : bedMapper.selectList(Wrappers.lambdaQuery(Bed.class)
+        .eq(Bed::getOrgId, orgId()).eq(Bed::getIsDeleted, 0)
+        .in(Bed::getRoomId, rooms.stream().map(Room::getId).toList()));
+    List<Long> elderIds = beds.stream().filter(b -> b.getElderId() != null && Integer.valueOf(BedStatus.OCCUPIED).equals(b.getStatus()))
+        .map(Bed::getElderId).distinct().toList();
+    Map<Long, ElderProfile> elders = !canViewElders || elderIds.isEmpty() ? Map.of()
+        : elderMapper.selectList(Wrappers.lambdaQuery(ElderProfile.class)
+            .eq(ElderProfile::getOrgId, orgId()).eq(ElderProfile::getIsDeleted, 0).in(ElderProfile::getId, elderIds))
+            .stream().collect(Collectors.toMap(ElderProfile::getId, Function.identity()));
+    Map<Long, List<Bed>> bedsByRoom = beds.stream().collect(Collectors.groupingBy(Bed::getRoomId));
+
+    // 房间按 floor_id 归层；老数据没有 floor_id 时按楼层号匹配；都对不上的放「未分层」
+    Map<String, Floor> floorByNo = new HashMap<>();
+    floors.forEach(f -> floorByNo.putIfAbsent(f.getFloorNo(), f));
+    Map<Long, List<Room>> roomsByFloor = new LinkedHashMap<>();
+    List<Room> unassigned = new ArrayList<>();
+    for (Room r : rooms) {
+      Long floorId = r.getFloorId();
+      if (floorId == null && r.getFloorNo() != null && floorByNo.containsKey(r.getFloorNo())) {
+        floorId = floorByNo.get(r.getFloorNo()).getId();
+      }
+      Long fid = floorId;
+      if (fid != null && floors.stream().anyMatch(f -> f.getId().equals(fid))) {
+        roomsByFloor.computeIfAbsent(fid, k -> new ArrayList<>()).add(r);
+      } else {
+        unassigned.add(r);
+      }
+    }
+    List<Map<String, Object>> floorRows = new ArrayList<>();
+    floors.stream()
+        .sorted(Comparator.comparing((Floor f) -> f.getSortNo() == null ? 0 : f.getSortNo())
+            .thenComparing(Floor::getFloorNo, DigitalTwinController::naturalCompare))
+        .forEach(f -> floorRows.add(floorView(String.valueOf(f.getId()), f.getFloorNo(), f.getName(),
+            roomsByFloor.getOrDefault(f.getId(), List.of()), bedsByRoom, elders, canViewElders)));
+    if (!unassigned.isEmpty()) {
+      floorRows.add(floorView("unassigned", "待归属", "未关联楼层的房间", unassigned, bedsByRoom, elders, canViewElders));
+    }
+    Map<String, Object> out = new LinkedHashMap<>();
+    out.put("assetId", asset.getAssetCode());
+    out.put("buildingName", building.getName());
+    out.put("canViewElders", canViewElders);
+    out.put("floors", floorRows);
+    out.put("updatedAt", LocalDateTime.now());
+    return Result.ok(out);
+  }
+
+  private Map<String, Object> floorView(String key, String floorNo, String name, List<Room> rooms,
+      Map<Long, List<Bed>> bedsByRoom, Map<Long, ElderProfile> elders, boolean canViewElders) {
+    List<Map<String, Object>> roomRows = rooms.stream()
+        .sorted((a, b) -> naturalCompare(a.getRoomNo(), b.getRoomNo()))
+        .map(r -> {
+          List<Map<String, Object>> bedRows = bedsByRoom.getOrDefault(r.getId(), List.of()).stream()
+              .sorted((x, y) -> naturalCompare(x.getBedNo(), y.getBedNo()))
+              .map(b -> bedView(b, elders, canViewElders)).toList();
+          Map<String, Object> row = new LinkedHashMap<>();
+          row.put("roomId", String.valueOf(r.getId()));
+          row.put("roomNo", r.getRoomNo());
+          row.put("roomType", r.getRoomType());
+          row.put("orientation", r.getOrientation());
+          row.put("capacity", r.getCapacity());
+          row.put("bedCount", bedRows.size());
+          row.put("occupiedBeds", bedRows.stream().filter(b -> Integer.valueOf(BedStatus.OCCUPIED).equals(b.get("status"))).count());
+          row.put("beds", bedRows);
+          return row;
+        }).toList();
+    Map<String, Object> row = new LinkedHashMap<>();
+    row.put("key", key);
+    row.put("floorNo", floorNo);
+    row.put("name", name);
+    row.put("roomCount", roomRows.size());
+    row.put("bedCount", roomRows.stream().mapToLong(r -> ((Number) r.get("bedCount")).longValue()).sum());
+    row.put("occupiedBeds", roomRows.stream().mapToLong(r -> ((Number) r.get("occupiedBeds")).longValue()).sum());
+    row.put("rooms", roomRows);
+    return row;
+  }
+
+  /** 房号、床号按自然顺序排：数字段按数值比（2 < 10 < 101），其余按字符 */
+  static int naturalCompare(String a, String b) {
+    String x = a == null ? "" : a;
+    String y = b == null ? "" : b;
+    int i = 0;
+    int j = 0;
+    while (i < x.length() && j < y.length()) {
+      char cx = x.charAt(i);
+      char cy = y.charAt(j);
+      if (Character.isDigit(cx) && Character.isDigit(cy)) {
+        int si = i;
+        int sj = j;
+        while (i < x.length() && Character.isDigit(x.charAt(i))) i++;
+        while (j < y.length() && Character.isDigit(y.charAt(j))) j++;
+        java.math.BigInteger nx = new java.math.BigInteger(x.substring(si, i));
+        java.math.BigInteger ny = new java.math.BigInteger(y.substring(sj, j));
+        int c = nx.compareTo(ny);
+        if (c != 0) return c;
+      } else {
+        if (cx != cy) return Character.compare(cx, cy);
+        i++;
+        j++;
+      }
+    }
+    return Integer.compare(x.length() - i, y.length() - j);
+  }
+
+  private static Map<String, Object> bedView(Bed b, Map<Long, ElderProfile> elders, boolean canViewElders) {
+    Map<String, Object> row = new LinkedHashMap<>();
+    row.put("bedId", String.valueOf(b.getId()));
+    row.put("bedNo", b.getBedNo());
+    row.put("bedType", b.getBedType());
+    row.put("status", b.getStatus());
+    ElderProfile e = canViewElders && b.getElderId() != null && Integer.valueOf(BedStatus.OCCUPIED).equals(b.getStatus())
+        ? elders.get(b.getElderId()) : null;
+    if (e != null) {
+      Map<String, Object> elder = new LinkedHashMap<>();
+      elder.put("elderId", String.valueOf(e.getId()));
+      elder.put("name", e.getFullName());
+      elder.put("gender", e.getGender());
+      elder.put("age", e.getBirthDate() == null ? null : Period.between(e.getBirthDate(), LocalDate.now()).getYears());
+      elder.put("careLevel", e.getCareLevel());
+      elder.put("admissionDate", e.getAdmissionDate());
+      row.put("elder", elder);
+    }
+    return row;
   }
 
   // ---------- 管理员：从楼栋主数据同步 ----------

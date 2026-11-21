@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 /**
  * 经营驾驶舱 BI 每日预聚合定时任务：每日凌晨从业务表计算「昨日」的
  * 运营/财务/护理三张每日汇总（stats_daily_*），大屏只查汇总表不直查业务库。
- * 支持通过 POST /stats/executive/bi/recalc?date= 手动补算历史日期。
+ * 支持通过 POST /api/stats/executive/bi/recalc?date= 手动补算历史日期。
  */
 @Component
 public class CockpitDailyStatsScheduler {

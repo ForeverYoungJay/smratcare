@@ -126,6 +126,8 @@ public class SecurityConfig {
                 "/api/logistics/**",
                 "/api/life/dining/**").hasAnyRole(LOGISTICS_ROLES)
             .requestMatchers("/api/marketing/**").hasAnyRole(MARKETING_ROLES)
+            // 经营驾驶舱：角色由控制器 @PreAuthorize 决定（含医务、护理部长，不在 STATS_ROLES 里）
+            .requestMatchers("/api/stats/executive/**").authenticated()
             .requestMatchers("/api/stats/**").hasAnyRole(STATS_ROLES)
             .requestMatchers("/api/survey/**").hasAnyRole(SURVEY_ROLES)
             .requestMatchers("/api/oa/**").hasAnyRole(

@@ -38,7 +38,8 @@ class DigitalTwinControllerTest {
     // staffId, username, orgId, roleId, roleCode
     Object[][] users = {{95101L, "dt_admin", 1L, 95111L, "ADMIN"}, {95102L, "dt_nurse", 1L, 95112L, "NURSING_EMPLOYEE"},
         {95103L, "dt_fin", 1L, 95113L, "FINANCE_EMPLOYEE"}, {95104L, "dt_admin2", 2L, 95114L, "ADMIN"},
-        {95105L, "dt_nurse2", 2L, 95115L, "NURSING_EMPLOYEE"}, {95106L, "dt_logi", 1L, 95116L, "LOGISTICS_EMPLOYEE"}};
+        {95105L, "dt_nurse2", 2L, 95115L, "NURSING_EMPLOYEE"}, {95106L, "dt_logi", 1L, 95116L, "LOGISTICS_EMPLOYEE"},
+        {95107L, "dt_guard", 1L, 95117L, "GUARD"}};
     for (Object[] u : users) {
       jdbc.update("MERGE INTO staff (id, org_id, department_id, staff_no, username, password_hash, real_name, status) KEY(id) VALUES (?, ?, 10, ?, ?, ?, ?, 1)",
           u[0], u[2], "D" + u[0], u[1], HASH, u[1]);
@@ -46,9 +47,11 @@ class DigitalTwinControllerTest {
       jdbc.update("MERGE INTO staff_role (id, org_id, staff_id, role_id) KEY(id) VALUES (?, ?, ?, ?)", (Long) u[0] + 100, u[2], u[0], u[3]);
     }
     jdbc.update("MERGE INTO building (id, tenant_id, org_id, name, code) KEY(id) VALUES (95001, 1, 1, '一号楼', 'B1'), (95002, 2, 2, '别家楼', 'X1')");
-    jdbc.update("MERGE INTO room (id, org_id, building_id, room_no) KEY(id) VALUES (95011, 1, 95001, 'DT101'), (95012, 2, 95002, 'DT201')");
-    jdbc.update("MERGE INTO bed (id, org_id, room_id, bed_no, bed_qr_code, status) KEY(id) VALUES "
-        + "(95021, 1, 95011, '01', 'DTQ1', 2), (95022, 1, 95011, '02', 'DTQ2', 1), (95023, 2, 95012, '01', 'DTQ3', 2)");
+    jdbc.update("MERGE INTO room (id, org_id, building_id, floor_id, room_no) KEY(id) VALUES (95011, 1, 95001, 95031, 'DT101'), (95012, 2, 95002, NULL, 'DT201'), (95013, 1, 95001, 95031, 'DT12')");
+    jdbc.update("MERGE INTO elder (id, org_id, full_name, gender, birth_date, care_level, id_card_no, phone, status) KEY(id) VALUES "
+        + "(95051, 1, '孪生测试长者', 1, DATE '1940-05-01', '介护A', '110101194005010011', '13800000000', 1)");
+    jdbc.update("MERGE INTO bed (id, org_id, room_id, bed_no, bed_qr_code, status, elder_id) KEY(id) VALUES "
+        + "(95021, 1, 95011, '01', 'DTQ1', 2, 95051), (95022, 1, 95011, '02', 'DTQ2', 1, NULL), (95023, 2, 95012, '01', 'DTQ3', 2, NULL)");
     jdbc.update("MERGE INTO floor (id, tenant_id, org_id, building_id, floor_no) KEY(id) VALUES (95031, 1, 1, 95001, '1F'), (95032, 1, 1, 95001, '2F')");
     jdbc.update("MERGE INTO life_maintenance_request (id, org_id, room_id, status, priority, is_deleted) KEY(id) VALUES "
         + "(95041, 1, 95011, 'OPEN', 'HIGH', 0), (95042, 1, 95011, 'COMPLETED', 'NORMAL', 0), (95043, 2, 95012, 'OPEN', 'HIGH', 0)");
@@ -70,7 +73,8 @@ class DigitalTwinControllerTest {
     jdbc.update("DELETE FROM life_maintenance_request WHERE id IN (95041, 95042, 95043)");
     jdbc.update("DELETE FROM floor WHERE id IN (95031, 95032)");
     jdbc.update("DELETE FROM bed WHERE id IN (95021, 95022, 95023)");
-    jdbc.update("DELETE FROM room WHERE id IN (95011, 95012)");
+    jdbc.update("DELETE FROM elder WHERE id = 95051");
+    jdbc.update("DELETE FROM room WHERE id IN (95011, 95012, 95013)");
     jdbc.update("DELETE FROM building WHERE id IN (95001, 95002)");
   }
 
@@ -158,7 +162,7 @@ class DigitalTwinControllerTest {
     assertThat(synced).isNotNull();
     assertThat(synced.path("buildingName").asText()).isEqualTo("一号楼");
     assertThat(synced.path("floorCount").asInt()).isEqualTo(2);
-    assertThat(synced.path("roomCount").asInt()).isEqualTo(1);
+    assertThat(synced.path("roomCount").asInt()).isEqualTo(2);
     assertThat(synced.path("verificationStatus").asText()).isEqualTo("MASTER_DATA");
 
     // 楼栋级报修：按房间归属，只数本楼、本机构
@@ -212,6 +216,37 @@ class DigitalTwinControllerTest {
     long org2Beds = jdbc.queryForObject("SELECT COUNT(*) FROM bed WHERE org_id = 2 AND is_deleted = 0", Long.class);
     assertThat(metric(campus2, "totalBeds")).isEqualTo(org2Beds);
     assertThat(jdbc.queryForObject("SELECT binding_status FROM dt_business_binding WHERE id = ?", String.class, Long.valueOf(id))).isEqualTo("ACTIVE");
+  }
+
+  @Test
+  void buildingInteriorShowsRealFloorsRoomsBedsAndElders() throws Exception {
+    String nurse = login("dt_nurse");
+    mvc.perform(auth(get("/api/digital-twin/assets").param("type", "BUILDING"), nurse)).andExpect(status().isOk()); // 自动接入楼栋
+    String body = mvc.perform(auth(get("/api/digital-twin/assets/GF-BLD-B95001/interior"), nurse))
+        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+    assertThat(body).doesNotContain("110101194005010011").doesNotContain("13800000000"); // 身份证、电话不出接口
+    JsonNode interior = json.readTree(body).path("data");
+    assertThat(interior.path("buildingName").asText()).isEqualTo("一号楼");
+    assertThat(interior.path("canViewElders").asBoolean()).isTrue();
+    JsonNode floors = interior.path("floors");
+    assertThat(floors.size()).isEqualTo(2);
+    assertThat(floors.get(0).path("floorNo").asText()).isEqualTo("1F");
+    assertThat(floors.get(0).path("occupiedBeds").asInt()).isEqualTo(1);
+    assertThat(floors.get(1).path("roomCount").asInt()).isEqualTo(0);
+    // 房号按自然顺序：DT12 在 DT101 前（按字符排会反过来）
+    assertThat(floors.get(0).path("rooms").get(0).path("roomNo").asText()).isEqualTo("DT12");
+    JsonNode room = floors.get(0).path("rooms").get(1);
+    assertThat(room.path("roomNo").asText()).isEqualTo("DT101");
+    assertThat(room.path("bedCount").asInt()).isEqualTo(2);
+    JsonNode elder = room.path("beds").get(0).path("elder");
+    assertThat(elder.path("name").asText()).isEqualTo("孪生测试长者");
+    assertThat(elder.path("careLevel").asText()).isEqualTo("介护A");
+    assertThat(elder.path("age").asInt()).isGreaterThan(80);
+    assertThat(room.path("beds").get(1).has("elder")).isFalse();
+
+    // 既不能看床位也不能查长者的岗位 403；别家机构解析不到本机构楼栋
+    mvc.perform(auth(get("/api/digital-twin/assets/GF-BLD-B95001/interior"), login("dt_guard"))).andExpect(status().isForbidden());
+    mvc.perform(auth(get("/api/digital-twin/assets/GF-BLD-B95001/interior"), login("dt_nurse2"))).andExpect(status().isNotFound());
   }
 
   private long metric(JsonNode summary, String key) {
