@@ -42,7 +42,7 @@
       </a-table>
     </a-card>
 
-    <a-modal v-model:open="modalOpen" title="老人套餐" :confirm-loading="submitting" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="modalOpen" title="老人套餐" :confirm-loading="submitting" @ok="submit">
       <a-form ref="formRef" layout="vertical" :model="form" :rules="rules">
         <a-form-item name="elderId" label="老人" required>
           <a-select

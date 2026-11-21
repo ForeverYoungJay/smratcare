@@ -49,9 +49,12 @@ export interface FireSafetyRecordQuery {
   keyword?: string
   recordType?: FireSafetyRecordType
   inspectorName?: string
-  status?: FireSafetyStatus
+  /** ACTIVE = 未关闭（OPEN/RUNNING） */
+  status?: FireSafetyStatus | 'ACTIVE'
   checkTimeStart?: string
   checkTimeEnd?: string
+  /** 只看登记了问题的记录（隐患整改清单） */
+  issueOnly?: boolean
 }
 
 export interface FireSafetyTypeCount {

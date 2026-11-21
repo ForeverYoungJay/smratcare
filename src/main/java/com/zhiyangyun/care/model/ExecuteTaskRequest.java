@@ -9,7 +9,7 @@ public class ExecuteTaskRequest {
   @NotNull
   private Long taskDailyId;
 
-  @NotNull
+  /** 服务端以登录人覆盖，客户端无需传 */
   private Long staffId;
 
   @NotBlank

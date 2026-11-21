@@ -14,6 +14,7 @@ import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.elder.service.ElderOccupancyReadService;
+import com.zhiyangyun.care.finance.model.FinanceArrearsAgingItem;
 import com.zhiyangyun.care.finance.model.FinanceArrearsItem;
 import com.zhiyangyun.care.finance.model.FinanceCategoryConsumptionAnalysisResponse;
 import com.zhiyangyun.care.finance.model.FinanceReportEntrySummaryResponse;
@@ -38,6 +39,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -273,6 +275,46 @@ public class FinanceReportController {
         .limit(limit)
         .toList();
     return Result.ok(result);
+  }
+
+  /**
+   * 欠费账龄：账单没有单独的应缴日，按「账单月最后一天」为应缴日计算逾期天数；当月账单记为未到期。
+   */
+  @GetMapping("/arrears-aging")
+  public Result<List<FinanceArrearsAgingItem>> arrearsAging() {
+    Long orgId = AuthContext.getOrgId();
+    List<BillMonthly> bills = billMonthlyMapper.selectList(
+        Wrappers.lambdaQuery(BillMonthly.class)
+            .select(BillMonthly::getBillMonth, BillMonthly::getOutstandingAmount)
+            .eq(BillMonthly::getIsDeleted, 0)
+            .eq(orgId != null, BillMonthly::getOrgId, orgId)
+            .gt(BillMonthly::getOutstandingAmount, BigDecimal.ZERO));
+    return Result.ok(agingBuckets(bills, LocalDate.now()));
+  }
+
+  static List<FinanceArrearsAgingItem> agingBuckets(List<BillMonthly> bills, LocalDate today) {
+    String[][] defs = {{"CURRENT", "未到期"}, {"D30", "逾期1-30天"}, {"D60", "逾期31-60天"}, {"D90", "逾期61-90天"}, {"D90_PLUS", "逾期90天以上"}};
+    List<FinanceArrearsAgingItem> buckets = new ArrayList<>();
+    for (String[] def : defs) {
+      FinanceArrearsAgingItem item = new FinanceArrearsAgingItem();
+      item.setKey(def[0]);
+      item.setLabel(def[1]);
+      buckets.add(item);
+    }
+    for (BillMonthly bill : bills) {
+      if (bill.getOutstandingAmount() == null || bill.getBillMonth() == null) continue;
+      long days;
+      try {
+        days = ChronoUnit.DAYS.between(YearMonth.parse(bill.getBillMonth().trim()).atEndOfMonth(), today);
+      } catch (RuntimeException ex) {
+        continue;
+      }
+      int index = days <= 0 ? 0 : days <= 30 ? 1 : days <= 60 ? 2 : days <= 90 ? 3 : 4;
+      FinanceArrearsAgingItem bucket = buckets.get(index);
+      bucket.setAmount(bucket.getAmount().add(bill.getOutstandingAmount()));
+      bucket.setBillCount(bucket.getBillCount() + 1);
+    }
+    return buckets;
   }
 
   @GetMapping("/store-sales")

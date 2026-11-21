@@ -142,6 +142,8 @@ public class OaPortalController {
     List<OaNotice> notices = noticeMapper.selectList(Wrappers.lambdaQuery(OaNotice.class)
         .eq(OaNotice::getIsDeleted, 0)
         .eq(orgId != null, OaNotice::getOrgId, orgId)
+        .eq(OaNotice::getStatus, "PUBLISHED")
+        .ne(OaNotice::getAudience, "FAMILY")
         .orderByDesc(OaNotice::getPublishTime)
         .last("LIMIT 5"));
     List<OaTodo> todos = listScopedTodos(orgId, personalScope, staffId, username, 8);
@@ -222,6 +224,7 @@ public class OaPortalController {
         .eq(HealthInspection::getIsDeleted, 0)
         .eq(orgId != null, HealthInspection::getOrgId, orgId)
         .in(HealthInspection::getStatus, "ABNORMAL", "FOLLOWING")));
+    Long elderAbnormalCount = countDistinctAbnormalElders(orgId);
     Long inHospitalElderCount = count(elderMapper.selectCount(Wrappers.lambdaQuery(ElderProfile.class)
         .eq(ElderProfile::getIsDeleted, 0)
         .eq(orgId != null, ElderProfile::getOrgId, orgId)
@@ -286,7 +289,7 @@ public class OaPortalController {
     summary.setInventoryLowStockCount(inventoryLowStockCount);
     summary.setApprovalTimeoutCount(approvalTimeoutCount);
     summary.setPendingMedicalOrderCount(pendingMedicalOrderCount);
-    summary.setElderAbnormalCount(0L);
+    summary.setElderAbnormalCount(elderAbnormalCount);
     summary.setHealthAbnormalCount(healthAbnormalCount);
     summary.setElderContractExpiringCount(elderContractExpiringCount);
     summary.setIncidentOpenCount(incidentOpenCount);
@@ -304,6 +307,19 @@ public class OaPortalController {
     summary.setCollaborationGantt(collaborationGantt);
     summary.setLatestSuggestions(latestSuggestions);
     return Result.ok(summary);
+  }
+
+  /** 未闭环体检异常（ABNORMAL/FOLLOWING）涉及的长者数，按 elder_id 去重。 */
+  private Long countDistinctAbnormalElders(Long orgId) {
+    Object value = healthInspectionMapper.selectObjs(Wrappers.query(HealthInspection.class)
+            .select("COUNT(DISTINCT elder_id)")
+            .eq("is_deleted", 0)
+            .eq(orgId != null, "org_id", orgId)
+            .in("status", List.of("ABNORMAL", "FOLLOWING")))
+        .stream()
+        .findFirst()
+        .orElse(null);
+    return value instanceof Number number ? number.longValue() : 0L;
   }
 
   private Long countByApprovalType(Long orgId, String type) {

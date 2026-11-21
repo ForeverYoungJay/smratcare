@@ -12,16 +12,16 @@ import type {
   CareExecuteLogItem
 } from '../types'
 
-export function getTodayTasks(params: any) {
-  return fetchPage<CareTaskItem>('/api/care/tasks/today', params)
+export function getTodayTasks(params: any, config?: Record<string, any>) {
+  return fetchPage<CareTaskItem>('/api/care/tasks/today', params, config)
 }
 
 export function getTaskPage(params: any) {
   return fetchPage<CareTaskItem>('/api/care/tasks/page', params)
 }
 
-export function getTaskSummary(params: any) {
-  return request.get<CareTaskSummary>('/api/care/tasks/summary', { params })
+export function getTaskSummary(params: any, config?: Record<string, any>) {
+  return request.get<CareTaskSummary>('/api/care/tasks/summary', { params, ...config })
 }
 
 export function getTaskExecuteLogs(taskDailyId: number) {

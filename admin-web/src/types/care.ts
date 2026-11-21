@@ -14,6 +14,8 @@ export interface CareTaskItem {
   suspiciousFlag?: boolean
   overdueFlag?: boolean
   careLevel?: string
+  /** 模板里的服务项目清单，执行时逐项勾选 */
+  serviceItems?: string[]
 }
 
 export interface CareTaskSummary {
@@ -77,7 +79,7 @@ export interface CareTaskExceptionResolveRequest {
 
 export interface CareTaskCreateRequest {
   elderId: Id
-  templateId?: number
+  templateId?: Id
   taskName?: string
   planTime: string
   staffId?: number
@@ -91,6 +93,8 @@ export interface CareTaskTemplate {
   careLevelRequired?: string
   chargeAmount?: number
   enabled: boolean
+  /** 每行一项 */
+  serviceItems?: string
 }
 
 export interface CareExecuteLogItem {

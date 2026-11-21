@@ -9,10 +9,15 @@ import com.zhiyangyun.care.entity.CareTaskReview;
 import com.zhiyangyun.care.mapper.CareTaskDailyMapper;
 import com.zhiyangyun.care.mapper.CareTaskExecuteLogMapper;
 import com.zhiyangyun.care.mapper.CareTaskReviewMapper;
+import com.zhiyangyun.care.nursing.entity.CareIncident;
+import com.zhiyangyun.care.nursing.entity.NursingRectification;
 import com.zhiyangyun.care.nursing.entity.ServiceBooking;
 import com.zhiyangyun.care.nursing.entity.ShiftHandover;
+import com.zhiyangyun.care.nursing.mapper.CareIncidentMapper;
+import com.zhiyangyun.care.nursing.mapper.NursingRectificationMapper;
 import com.zhiyangyun.care.nursing.mapper.ServiceBookingMapper;
 import com.zhiyangyun.care.nursing.mapper.ShiftHandoverMapper;
+import com.zhiyangyun.care.nursing.model.NursingQualityMetricsResponse;
 import com.zhiyangyun.care.nursing.model.NursingReportSummaryResponse;
 import com.zhiyangyun.care.nursing.model.NursingStaffWorkloadItem;
 import com.zhiyangyun.care.nursing.service.NursingReportService;
@@ -29,16 +34,21 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class NursingReportServiceImpl implements NursingReportService {
+  private static final long ON_TIME_GRACE_MINUTES = 60;
   private final ServiceBookingMapper bookingMapper;
   private final CareTaskExecuteLogMapper executeLogMapper;
   private final CareTaskDailyMapper dailyMapper;
   private final CareTaskReviewMapper reviewMapper;
   private final ShiftHandoverMapper handoverMapper;
   private final StaffMapper staffMapper;
+  private final CareIncidentMapper incidentMapper;
+  private final NursingRectificationMapper rectificationMapper;
 
   public NursingReportServiceImpl(ServiceBookingMapper bookingMapper, CareTaskExecuteLogMapper executeLogMapper,
       CareTaskDailyMapper dailyMapper, CareTaskReviewMapper reviewMapper, ShiftHandoverMapper handoverMapper,
-      StaffMapper staffMapper) {
+      StaffMapper staffMapper, CareIncidentMapper incidentMapper, NursingRectificationMapper rectificationMapper) {
+    this.incidentMapper = incidentMapper;
+    this.rectificationMapper = rectificationMapper;
     this.bookingMapper = bookingMapper;
     this.executeLogMapper = executeLogMapper;
     this.dailyMapper = dailyMapper;
@@ -203,6 +213,118 @@ public class NursingReportServiceImpl implements NursingReportService {
     response.setFamilyReadableSummary(buildFamilyReadableSummary(response));
     response.setStaffWorkloads(workloads);
     return response;
+  }
+
+  @Override
+  public NursingQualityMetricsResponse qualityMetrics(Long tenantId, LocalDate dateFrom, LocalDate dateTo) {
+    LocalDate from = dateFrom == null ? LocalDate.now().withDayOfMonth(1) : dateFrom;
+    LocalDate to = dateTo == null ? LocalDate.now() : dateTo;
+
+    List<CareTaskDaily> tasks = dailyMapper.selectList(Wrappers.lambdaQuery(CareTaskDaily.class)
+        .eq(CareTaskDaily::getIsDeleted, 0)
+        .eq(CareTaskDaily::getTenantId, tenantId)
+        .ge(CareTaskDaily::getTaskDate, from)
+        .le(CareTaskDaily::getTaskDate, to)
+        .ne(CareTaskDaily::getStatus, "CANCELLED"));
+    Set<Long> taskIds = tasks.stream().map(CareTaskDaily::getId).collect(Collectors.toSet());
+    // 每个任务取最早一条成功执行记录（result_status=1）
+    Map<Long, CareTaskExecuteLog> successLogs = taskIds.isEmpty() ? Collections.emptyMap()
+        : executeLogMapper.selectList(Wrappers.lambdaQuery(CareTaskExecuteLog.class)
+            .eq(CareTaskExecuteLog::getIsDeleted, 0)
+            .eq(CareTaskExecuteLog::getResultStatus, 1)
+            .in(CareTaskExecuteLog::getTaskDailyId, taskIds)
+            .orderByAsc(CareTaskExecuteLog::getExecuteTime))
+            .stream()
+            .collect(Collectors.toMap(CareTaskExecuteLog::getTaskDailyId, l -> l, (a, b) -> a));
+    List<CareTaskDaily> doneTasks = tasks.stream().filter(t -> "DONE".equalsIgnoreCase(t.getStatus())).toList();
+    // 按时：DONE 且成功执行时间不晚于计划时间 + 60 分钟（无计划时间则不晚于任务当天结束）；任务表没有单独的时间窗字段
+    long onTime = doneTasks.stream().filter(t -> {
+      CareTaskExecuteLog log = successLogs.get(t.getId());
+      if (log == null || log.getExecuteTime() == null) {
+        return false;
+      }
+      LocalDateTime deadline = t.getPlanTime() != null ? t.getPlanTime().plusMinutes(ON_TIME_GRACE_MINUTES)
+          : t.getTaskDate().plusDays(1).atStartOfDay();
+      return !log.getExecuteTime().isAfter(deadline);
+    }).count();
+    // 记录完整：DONE 任务有一条成功执行记录且带执行人和执行时间
+    long recordComplete = doneTasks.stream().filter(t -> {
+      CareTaskExecuteLog log = successLogs.get(t.getId());
+      return log != null && log.getStaffId() != null && log.getExecuteTime() != null;
+    }).count();
+
+    List<ShiftHandover> handovers = handoverMapper.selectList(Wrappers.lambdaQuery(ShiftHandover.class)
+        .eq(ShiftHandover::getIsDeleted, 0)
+        .eq(ShiftHandover::getTenantId, tenantId)
+        .ge(ShiftHandover::getDutyDate, from)
+        .le(ShiftHandover::getDutyDate, to)
+        .in(ShiftHandover::getStatus, "HANDED_OVER", "CONFIRMED"));
+    long handoverConfirmed = handovers.stream().filter(h -> "CONFIRMED".equals(h.getStatus())).count();
+
+    List<CareIncident> incidents = incidentMapper.selectList(Wrappers.lambdaQuery(CareIncident.class)
+        .eq(CareIncident::getIsDeleted, 0)
+        .eq(CareIncident::getTenantId, tenantId)
+        .ge(CareIncident::getOccurredAt, from.atStartOfDay())
+        .lt(CareIncident::getOccurredAt, to.plusDays(1).atStartOfDay()));
+    long incidentClosed = incidents.stream().filter(i -> "CLOSED".equals(i.getStatus())).count();
+
+    List<NursingRectification> rectifications = rectificationMapper.selectList(
+        Wrappers.lambdaQuery(NursingRectification.class)
+            .eq(NursingRectification::getIsDeleted, 0)
+            .eq(NursingRectification::getTenantId, tenantId)
+            .ge(NursingRectification::getDueDate, from)
+            .le(NursingRectification::getDueDate, to));
+    long rectifyOnTime = rectifications.stream()
+        .filter(r -> "DONE".equals(r.getStatus()) && r.getClosedAt() != null
+            && !r.getClosedAt().toLocalDate().isAfter(r.getDueDate()))
+        .count();
+
+    LocalDateTime now = LocalDateTime.now();
+    Map<Long, NursingQualityMetricsResponse.Workload> loadMap = new HashMap<>();
+    for (CareTaskDaily task : tasks) {
+      if (task.getAssignedStaffId() == null) {
+        continue;
+      }
+      NursingQualityMetricsResponse.Workload item = loadMap.computeIfAbsent(task.getAssignedStaffId(), id -> {
+        NursingQualityMetricsResponse.Workload x = new NursingQualityMetricsResponse.Workload();
+        x.setStaffId(id);
+        return x;
+      });
+      item.setTaskCount(item.getTaskCount() + 1);
+      if ("DONE".equalsIgnoreCase(task.getStatus())) {
+        item.setDoneCount(item.getDoneCount() + 1);
+      }
+      // 与 CareTaskServiceImpl.isOverdue 口径一致：待执行且已过计划时间
+      if ("PENDING".equalsIgnoreCase(task.getStatus()) && task.getPlanTime() != null && task.getPlanTime().isBefore(now)) {
+        item.setOverdueCount(item.getOverdueCount() + 1);
+      }
+    }
+    Map<Long, StaffAccount> staffMap = loadMap.isEmpty() ? Collections.emptyMap()
+        : staffMapper.selectBatchIdsSafe(loadMap.keySet()).stream()
+            .collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
+    List<NursingQualityMetricsResponse.Workload> workloads = new ArrayList<>(loadMap.values());
+    workloads.forEach(w -> {
+      StaffAccount staff = staffMap.get(w.getStaffId());
+      w.setStaffName(staff == null ? null : staff.getRealName());
+    });
+    workloads.sort((a, b) -> Long.compare(b.getTaskCount(), a.getTaskCount()));
+
+    NursingQualityMetricsResponse response = new NursingQualityMetricsResponse();
+    response.setDateFrom(from);
+    response.setDateTo(to);
+    response.setMetrics(List.of(
+        metric("onTime", "任务按时完成率", onTime, tasks.size()),
+        metric("recordComplete", "服务记录完整率", recordComplete, doneTasks.size()),
+        metric("handoverConfirm", "交接班确认率", handoverConfirmed, handovers.size()),
+        metric("incidentClosure", "异常事件闭环率", incidentClosed, incidents.size()),
+        metric("rectifyOnTime", "整改按期完成率", rectifyOnTime, rectifications.size())));
+    response.setWorkloads(workloads);
+    return response;
+  }
+
+  private NursingQualityMetricsResponse.Metric metric(String key, String label, long numerator, long denominator) {
+    Double rate = denominator == 0 ? null : Math.round(numerator * 1000D / denominator) / 10D;
+    return new NursingQualityMetricsResponse.Metric(key, label, numerator, denominator, rate);
   }
 
   private double ratio(int numerator, int denominator) {

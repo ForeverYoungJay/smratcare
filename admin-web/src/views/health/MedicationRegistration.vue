@@ -1,6 +1,13 @@
 <template>
   <PageContainer title="用药登记" subTitle="记录每次执行用药">
-    <a-row :gutter="16" class="summary-row">
+    <template #extra>
+      <a-space>
+        <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
+        <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
+        <a-button type="primary" @click="openCreate">新增登记</a-button>
+      </a-space>
+    </template>
+    <a-row :gutter="16" class="summary-row business-stat-strip">
       <a-col :xs="24" :md="6">
         <a-card :bordered="false"><a-statistic title="登记总数" :value="summary.totalCount" /></a-card>
       </a-col>
@@ -25,12 +32,12 @@
       </a-space>
     </a-card>
     <a-card v-if="residentContext.active" :bordered="false" class="summary-row context-card">
-      <a-space wrap>
+      <ActionToolbar wrap>
         <a-tag color="processing">当前长者：{{ residentContext.name }}</a-tag>
         <a-button size="small" @click="goWithResident('/medical-care/inspection')">查看巡检</a-button>
         <a-button size="small" @click="goWithResident('/medical-care/nursing-log')">查看护理日志</a-button>
         <a-button size="small" @click="clearResidentContext">清除长者上下文</a-button>
-      </a-space>
+      </ActionToolbar>
     </a-card>
 
     <a-card :bordered="false" class="summary-row medication-task-panel">
@@ -102,13 +109,7 @@
       <a-form-item label="时间">
         <a-range-picker v-model:value="query.registerRange" show-time style="width: 320px" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
-          <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
-          <a-button type="primary" @click="openCreate">新增登记</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable
@@ -135,7 +136,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" title="用药登记" @ok="submit" :confirm-loading="saving" width="680px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="用药登记" @ok="submit" :confirm-loading="saving" width="680px">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">
@@ -169,6 +170,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
@@ -593,6 +595,10 @@ async function loadExportRecords() {
   }
 }
 
+// 支持从安全风险/员工台账页带 ?date=today 直达今日登记记录
+if (String(route.query.date || '').toLowerCase() === 'today') {
+  query.registerRange = [dayjs(), dayjs()]
+}
 fetchData()
 fetchMedicationTasks()
 searchElders('')

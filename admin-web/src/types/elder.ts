@@ -30,6 +30,8 @@ export interface ElderItem {
   roomNo?: string
   caregiverName?: string
   caregiverNames?: string[]
+  responsibleStaffId?: Id
+  responsibleStaffName?: string
   currentBed?: BedItem
   checkInDate?: string
   diseases?: ElderDiseaseItem[]
@@ -59,6 +61,7 @@ export interface ElderCreateRequest {
   bedStartDate?: string
   occupancyMode?: 'BED' | 'WHOLE_ROOM' | string
   clearBed?: boolean
+  responsibleStaffId?: Id
 }
 
 export interface ElderAssignBedRequest {
@@ -149,6 +152,10 @@ export interface FamilyRelationItem {
 
 export interface FamilyElderItem {
   elderId: Id
+  relationId?: Id
+  /** HEALTH,BILLING,PHOTO,PROXY,EMERGENCY；空 = 历史绑定（全部可见） */
+  authScopes?: string | null
+  validUntil?: string | null
   elderName?: string
   relation?: string
   isPrimary?: boolean | number
@@ -211,6 +218,7 @@ export interface CrmLeadItem {
   remark?: string
   createTime?: string
   updateTime?: string
+  allowDuplicate?: boolean
 }
 
 export interface AdmissionRequest {
@@ -472,8 +480,16 @@ export interface DischargeApplyItem {
   reviewedBy?: number
   reviewedByName?: string
   reviewedTime?: string
+  careHandoverTime?: string
+  careHandoverByName?: string
+  itemHandoverTime?: string
+  itemHandoverByName?: string
+  archiveTime?: string
+  archiveByName?: string
   createTime?: string
 }
+
+export type DischargeProgressStep = 'CARE_HANDOVER' | 'ITEM_HANDOVER' | 'ARCHIVE'
 
 export interface DischargeApplyCreateRequest {
   elderId: Id
@@ -532,4 +548,35 @@ export interface DeathRegisterUpdateRequest {
 
 export interface DeathRegisterCancelRequest {
   remark?: string
+}
+
+export type ElderWorkbenchTodoLevel = 'urgent' | 'high' | 'normal'
+
+export interface ElderWorkbenchTodoItem {
+  id: string
+  type: string
+  level: ElderWorkbenchTodoLevel
+  elderId?: Id
+  elderName?: string
+  title: string
+  detail?: string
+  dueTime?: string
+  department?: string
+  departmentName?: string
+  ownerStaffId?: Id
+  ownerName?: string
+  path: string
+  mine: boolean
+}
+
+export interface ElderWorkbenchTodoSummary {
+  scope: 'mine' | 'all'
+  items: ElderWorkbenchTodoItem[]
+  total: number
+  urgentCount: number
+  highCount: number
+  normalCount: number
+  mineCount: number
+  allCount: number
+  generatedAt?: string
 }

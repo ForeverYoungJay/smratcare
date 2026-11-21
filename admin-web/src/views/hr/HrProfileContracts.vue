@@ -1,5 +1,11 @@
 <template>
   <PageContainer title="劳动合同管理" subTitle="员工档案中心 / 劳动合同管理">
+    <template #extra>
+      <a-space>
+        <a-button @click="onExportCsv">导出 CSV</a-button>
+        <a-button @click="onExportExcel">导出 Excel</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="姓名/工号/手机号/合同编号" allow-clear style="width: 240px" />
@@ -7,15 +13,12 @@
       <a-form-item label="合同状态">
         <a-select v-model:value="query.contractStatus" allow-clear style="width: 180px" :options="statusOptions" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="onExportCsv">导出 CSV</a-button>
-          <a-button @click="onExportExcel">导出 Excel</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="staffId"
       :columns="columns"
       :data-source="rows"
@@ -39,7 +42,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="modalOpen" title="维护劳动合同" width="560px" @ok="submit" :confirm-loading="saving">
+    <a-modal :mask-closable="false" v-model:open="modalOpen" title="维护劳动合同" width="560px" @ok="submit" :confirm-loading="saving">
       <a-form :model="form" layout="vertical">
         <a-form-item label="员工">
           <a-input :value="`${form.realName || '-'}${form.staffNo ? ` (${form.staffNo})` : ''}`" disabled />

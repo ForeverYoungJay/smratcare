@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="机构月运营详情" subTitle="先看经营结论，再做横向比较和下钻明细">
     <template #extra>
-      <a-space>
+      <ActionToolbar>
         <a-button type="primary" @click="loadData">刷新</a-button>
         <a-button @click="exportCsvReport">导出报表</a-button>
         <a-dropdown>
@@ -16,7 +16,7 @@
             </a-menu>
           </template>
         </a-dropdown>
-      </a-space>
+      </ActionToolbar>
     </template>
     <template #meta>
       <a-space wrap size="small">
@@ -171,6 +171,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useRouter } from 'vue-router'

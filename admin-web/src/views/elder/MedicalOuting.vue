@@ -7,7 +7,7 @@
       </a-space>
     </template>
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline" class="search-bar">
+      <QueryBar :model="query" layout="inline" class="search-bar" @finish="fetchData">
         <a-form-item label="老人">
           <a-select
             v-model:value="query.elderId"
@@ -31,13 +31,15 @@
         <a-form-item label="关键词">
           <a-input v-model:value="query.keyword" allow-clear placeholder="医院/科室/诊断/原因" style="width: 220px" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="fetchData">搜索</a-button>
-            <a-button @click="reset">清空</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="fetchData">搜索</a-button>
+              <a-button @click="reset">清空</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
@@ -73,7 +75,7 @@
       />
     </a-card>
 
-    <a-modal v-model:open="createOpen" title="新增外出就医登记" @ok="submitCreate" :confirm-loading="submitting" width="560px">
+    <a-modal :mask-closable="false" v-model:open="createOpen" title="新增外出就医登记" @ok="submitCreate" :confirm-loading="submitting" width="560px">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人" name="elderId">
           <a-select
@@ -122,6 +124,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'

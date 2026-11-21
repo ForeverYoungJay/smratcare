@@ -1,5 +1,11 @@
 <template>
   <PageContainer title="菜品管理" subTitle="分类折叠查看菜品、本月制作次数与采购计划">
+    <template #extra>
+      <a-space>
+        <a-button @click="fetchAnalytics" :loading="analyticsLoading">刷新月度联动</a-button>
+        <a-button type="primary" @click="openCreate">新增菜品</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="菜品名称/分类" allow-clear />
@@ -10,12 +16,7 @@
       <a-form-item label="状态">
         <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 140px" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="fetchAnalytics" :loading="analyticsLoading">刷新月度联动</a-button>
-          <a-button type="primary" @click="openCreate">新增菜品</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <a-card class="analytics-card card-elevated" :bordered="false">
@@ -88,6 +89,8 @@
     </a-card>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -114,7 +117,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" title="菜品信息" :confirm-loading="saving" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="菜品信息" :confirm-loading="saving" @ok="submit">
       <a-form layout="vertical">
         <a-form-item label="菜品名称" required>
           <a-input v-model:value="form.dishName" />

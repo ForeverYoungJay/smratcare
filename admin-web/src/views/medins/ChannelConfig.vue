@@ -29,7 +29,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" :title="editForm.id ? '编辑渠道' : '新增渠道'" :confirm-loading="saving" @ok="submitEdit">
+    <a-modal :mask-closable="false" v-model:open="editOpen" :title="editForm.id ? '编辑渠道' : '新增渠道'" :confirm-loading="saving" @ok="submitEdit">
       <a-form layout="vertical">
         <a-form-item label="渠道编码" required>
           <a-input v-model:value="editForm.channel" placeholder="如 MOCK 或各地医保平台编码" :disabled="!!editForm.id" />

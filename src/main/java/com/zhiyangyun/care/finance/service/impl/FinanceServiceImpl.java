@@ -16,15 +16,22 @@ import com.zhiyangyun.care.finance.mapper.DischargeSettlementMapper;
 import com.zhiyangyun.care.finance.mapper.FinanceRefundVoucherMapper;
 import com.zhiyangyun.care.finance.mapper.PaymentRecordMapper;
 import com.zhiyangyun.care.finance.mapper.ReconciliationDailyMapper;
+import com.zhiyangyun.care.finance.model.BillDeductionPreviewResponse;
 import com.zhiyangyun.care.finance.model.PaymentRequest;
 import com.zhiyangyun.care.finance.model.PaymentResponse;
+import com.zhiyangyun.care.finance.model.PaymentVoucherUse;
 import com.zhiyangyun.care.finance.model.ReconcileResponse;
 import com.zhiyangyun.care.finance.service.FinanceMonthLockService;
 import com.zhiyangyun.care.finance.service.FinanceService;
+import com.zhiyangyun.care.finance.service.FinanceVoucherService;
+import com.zhiyangyun.care.ltci.entity.LtciSettlement;
+import com.zhiyangyun.care.ltci.mapper.LtciSettlementMapper;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -36,6 +43,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class FinanceServiceImpl implements FinanceService {
+  private static final DateTimeFormatter LTCI_MONTH_FMT = DateTimeFormatter.ofPattern("yyyyMM");
+
   private final BillMonthlyMapper billMonthlyMapper;
   private final PaymentRecordMapper paymentRecordMapper;
   private final ReconciliationDailyMapper reconciliationDailyMapper;
@@ -44,6 +53,8 @@ public class FinanceServiceImpl implements FinanceService {
   private final DischargeSettlementMapper dischargeSettlementMapper;
   private final ElderMapper elderMapper;
   private final FinanceMonthLockService financeMonthLockService;
+  private final FinanceVoucherService financeVoucherService;
+  private final LtciSettlementMapper ltciSettlementMapper;
 
   public FinanceServiceImpl(BillMonthlyMapper billMonthlyMapper,
       PaymentRecordMapper paymentRecordMapper,
@@ -52,7 +63,9 @@ public class FinanceServiceImpl implements FinanceService {
       FinanceRefundVoucherMapper financeRefundVoucherMapper,
       DischargeSettlementMapper dischargeSettlementMapper,
       ElderMapper elderMapper,
-      FinanceMonthLockService financeMonthLockService) {
+      FinanceMonthLockService financeMonthLockService,
+      FinanceVoucherService financeVoucherService,
+      LtciSettlementMapper ltciSettlementMapper) {
     this.billMonthlyMapper = billMonthlyMapper;
     this.paymentRecordMapper = paymentRecordMapper;
     this.reconciliationDailyMapper = reconciliationDailyMapper;
@@ -61,13 +74,24 @@ public class FinanceServiceImpl implements FinanceService {
     this.dischargeSettlementMapper = dischargeSettlementMapper;
     this.elderMapper = elderMapper;
     this.financeMonthLockService = financeMonthLockService;
+    this.financeVoucherService = financeVoucherService;
+    this.ltciSettlementMapper = ltciSettlementMapper;
   }
 
   @Override
   @Transactional
   public PaymentResponse pay(Long billId, PaymentRequest request, Long operatorStaffId) {
-    if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-      throw new IllegalArgumentException("Payment amount must be positive");
+    BigDecimal cash = scaleAmount(request.getAmount());
+    BigDecimal ltciDeduct = scaleAmount(request.getLtciDeductAmount());
+    BigDecimal discount = scaleAmount(request.getDiscountAmount());
+    List<PaymentVoucherUse> voucherUses = request.getVoucherUses() == null
+        ? List.of()
+        : request.getVoucherUses();
+    BigDecimal voucherTotal = sumVoucherUses(voucherUses);
+    assertNonNegativeDeductions(cash, ltciDeduct, discount);
+    BigDecimal settleTotal = cash.add(ltciDeduct).add(discount).add(voucherTotal);
+    if (settleTotal.compareTo(BigDecimal.ZERO) <= 0) {
+      throw new IllegalArgumentException("实收金额与抵扣金额不能同时为 0");
     }
     BillMonthly bill = findBillForUpdate(billId);
     if (bill == null) {
@@ -99,14 +123,22 @@ public class FinanceServiceImpl implements FinanceService {
     BigDecimal totalAmount = bill.getTotalAmount() == null ? BigDecimal.ZERO : bill.getTotalAmount();
     BigDecimal outstanding = totalAmount.subtract(paidAmount);
 
-    if (request.getAmount().compareTo(outstanding) > 0) {
-      throw new IllegalArgumentException("收款金额超过应收余额，请核对后重新登记");
+    if (settleTotal.compareTo(outstanding) > 0) {
+      throw new IllegalArgumentException("实收与抵扣合计超过应收余额，请核对后重新登记");
     }
+    assertDiscountReason(discount, request.getDiscountReason());
+    assertLtciDeductWithinQuota(bill, ltciDeduct, null);
 
     PaymentRecord record = new PaymentRecord();
     record.setOrgId(bill.getOrgId());
     record.setBillMonthlyId(bill.getId());
-    record.setAmount(request.getAmount());
+    record.setAmount(cash);
+    record.setPayableAmount(outstanding);
+    record.setLtciDeductAmount(ltciDeduct);
+    record.setDiscountAmount(discount);
+    record.setDiscountReason(trimToNull(request.getDiscountReason()));
+    record.setVoucherAmount(voucherTotal);
+    record.setSettledAmount(settleTotal);
     record.setPayMethod(safeMethod(request.getMethod()));
     record.setExternalTxnId(externalTxnId);
     record.setPaidAt(request.getPaidAt());
@@ -135,9 +167,17 @@ public class FinanceServiceImpl implements FinanceService {
       }
       throw ex;
     }
+    financeVoucherService.consume(
+        voucherUses,
+        bill.getOrgId(),
+        bill.getElderId(),
+        totalAmount,
+        bill.getId(),
+        record.getId(),
+        operatorStaffId);
     upsertPaymentConsumptionRecord(record, bill);
 
-    BigDecimal newPaid = paidAmount.add(request.getAmount());
+    BigDecimal newPaid = paidAmount.add(settleTotal);
     BigDecimal newOutstanding = totalAmount.subtract(newPaid);
     bill.setPaidAmount(newPaid);
     bill.setOutstandingAmount(newOutstanding);
@@ -148,14 +188,23 @@ public class FinanceServiceImpl implements FinanceService {
     }
     billMonthlyMapper.updateById(bill);
 
-    return toResponse(bill);
+    return withBreakdown(toResponse(bill), cash, ltciDeduct, discount, voucherTotal, settleTotal);
   }
 
   @Override
   @Transactional
   public PaymentResponse updatePaymentRecord(Long paymentRecordId, PaymentRequest request, Long operatorStaffId) {
-    if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-      throw new IllegalArgumentException("Payment amount must be positive");
+    BigDecimal cash = scaleAmount(request.getAmount());
+    BigDecimal ltciDeduct = scaleAmount(request.getLtciDeductAmount());
+    BigDecimal discount = scaleAmount(request.getDiscountAmount());
+    List<PaymentVoucherUse> voucherUses = request.getVoucherUses() == null
+        ? List.of()
+        : request.getVoucherUses();
+    BigDecimal voucherTotal = sumVoucherUses(voucherUses);
+    assertNonNegativeDeductions(cash, ltciDeduct, discount);
+    BigDecimal settleTotal = cash.add(ltciDeduct).add(discount).add(voucherTotal);
+    if (settleTotal.compareTo(BigDecimal.ZERO) <= 0) {
+      throw new IllegalArgumentException("实收金额与抵扣金额不能同时为 0");
     }
     PaymentRecord paymentRecord = findPaymentRecordForUpdate(paymentRecordId);
     if (paymentRecord == null) {
@@ -187,23 +236,42 @@ public class FinanceServiceImpl implements FinanceService {
       }
     }
     BigDecimal totalAmount = bill.getTotalAmount() == null ? BigDecimal.ZERO : bill.getTotalAmount();
-    BigDecimal otherPaid = paymentRecordMapper.selectList(
+    BigDecimal otherSettled = paymentRecordMapper.selectList(
             Wrappers.lambdaQuery(PaymentRecord.class)
                 .eq(PaymentRecord::getIsDeleted, 0)
                 .eq(PaymentRecord::getBillMonthlyId, bill.getId())
                 .ne(PaymentRecord::getId, paymentRecordId))
         .stream()
-        .map(PaymentRecord::getAmount)
-        .filter(amount -> amount != null && amount.compareTo(BigDecimal.ZERO) > 0)
+        .map(FinanceServiceImpl::settledOf)
+        .filter(amount -> amount.compareTo(BigDecimal.ZERO) > 0)
         .reduce(BigDecimal.ZERO, BigDecimal::add);
-    BigDecimal newPaid = otherPaid.add(request.getAmount());
+    BigDecimal newPaid = otherSettled.add(settleTotal);
     if (newPaid.compareTo(totalAmount) > 0) {
-      throw new IllegalArgumentException("收款金额超过应收余额，请核对后重新登记");
+      throw new IllegalArgumentException("实收与抵扣合计超过应收余额，请核对后重新登记");
     }
+    assertDiscountReason(discount, request.getDiscountReason());
+    assertLtciDeductWithinQuota(bill, ltciDeduct, paymentRecordId);
+
+    // 券额度先按原记录全额退回，再按本次登记重新核销，避免改小金额后额度被占死
+    financeVoucherService.release(paymentRecordId, operatorStaffId, "修改收款重算");
+    financeVoucherService.consume(
+        voucherUses,
+        bill.getOrgId(),
+        bill.getElderId(),
+        totalAmount,
+        bill.getId(),
+        paymentRecordId,
+        operatorStaffId);
 
     String beforeMethod = safeMethod(paymentRecord.getPayMethod());
     String nextMethod = safeMethod(request.getMethod());
-    paymentRecord.setAmount(request.getAmount());
+    paymentRecord.setAmount(cash);
+    paymentRecord.setPayableAmount(totalAmount.subtract(otherSettled));
+    paymentRecord.setLtciDeductAmount(ltciDeduct);
+    paymentRecord.setDiscountAmount(discount);
+    paymentRecord.setDiscountReason(trimToNull(request.getDiscountReason()));
+    paymentRecord.setVoucherAmount(voucherTotal);
+    paymentRecord.setSettledAmount(settleTotal);
     paymentRecord.setPayMethod(nextMethod);
     paymentRecord.setExternalTxnId(externalTxnId);
     paymentRecord.setPaidAt(request.getPaidAt());
@@ -233,7 +301,7 @@ public class FinanceServiceImpl implements FinanceService {
     bill.setStatus(newOutstanding.compareTo(BigDecimal.ZERO) == 0 ? 2 : (newPaid.compareTo(BigDecimal.ZERO) > 0 ? 1 : 0));
     billMonthlyMapper.updateById(bill);
     upsertPaymentConsumptionRecord(paymentRecord, bill);
-    return toResponse(bill);
+    return withBreakdown(toResponse(bill), cash, ltciDeduct, discount, voucherTotal, settleTotal);
   }
 
   @Override
@@ -358,6 +426,174 @@ public class FinanceServiceImpl implements FinanceService {
     billMonthlyMapper.updateById(bill);
   }
 
+  private static BigDecimal scaleAmount(BigDecimal value) {
+    return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP);
+  }
+
+  private static BigDecimal settledOf(PaymentRecord record) {
+    if (record == null) {
+      return BigDecimal.ZERO;
+    }
+    // 历史数据没有 settled_amount，退回到实收金额口径
+    return scaleAmount(record.getSettledAmount() == null ? record.getAmount() : record.getSettledAmount());
+  }
+
+  private static BigDecimal sumVoucherUses(List<PaymentVoucherUse> uses) {
+    if (uses == null || uses.isEmpty()) {
+      return BigDecimal.ZERO;
+    }
+    return uses.stream()
+        .filter(Objects::nonNull)
+        .map(item -> scaleAmount(item.getAmount()))
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
+  }
+
+  private static void assertNonNegativeDeductions(BigDecimal cash, BigDecimal ltciDeduct, BigDecimal discount) {
+    if (cash.compareTo(BigDecimal.ZERO) < 0) {
+      throw new IllegalArgumentException("实收金额不能为负数");
+    }
+    if (ltciDeduct.compareTo(BigDecimal.ZERO) < 0) {
+      throw new IllegalArgumentException("长护险抵扣不能为负数");
+    }
+    if (discount.compareTo(BigDecimal.ZERO) < 0) {
+      throw new IllegalArgumentException("折扣减免不能为负数");
+    }
+  }
+
+  private static void assertDiscountReason(BigDecimal discount, String reason) {
+    if (discount.compareTo(BigDecimal.ZERO) > 0 && trimToNull(reason) == null) {
+      throw new IllegalArgumentException("填写折扣减免金额时必须说明减免原因");
+    }
+  }
+
+  private static String trimToNull(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
+  }
+
+  /**
+   * 长护险抵扣不得超过本月统筹支付额度。仅在存在长护险结算单时限额，
+   * 未接入长护险结算的机构可按线下口径手工登记。
+   */
+  private void assertLtciDeductWithinQuota(BillMonthly bill, BigDecimal ltciDeduct, Long excludePaymentRecordId) {
+    if (ltciDeduct.compareTo(BigDecimal.ZERO) <= 0) {
+      return;
+    }
+    BigDecimal fundPay = resolveLtciFundPay(bill);
+    if (fundPay == null) {
+      return;
+    }
+    BigDecimal used = ltciDeductUsed(bill.getId(), excludePaymentRecordId);
+    BigDecimal available = fundPay.subtract(used);
+    if (ltciDeduct.compareTo(available) > 0) {
+      throw new IllegalArgumentException("长护险抵扣超过本月统筹额度，剩余可抵扣 "
+          + available.max(BigDecimal.ZERO) + " 元");
+    }
+  }
+
+  /** 本月长护险统筹支付额（元）；无结算单返回 null 表示不限额。 */
+  private BigDecimal resolveLtciFundPay(BillMonthly bill) {
+    if (bill == null || bill.getElderId() == null || bill.getBillMonth() == null) {
+      return null;
+    }
+    String settleMonth;
+    try {
+      settleMonth = YearMonth.parse(bill.getBillMonth()).format(LTCI_MONTH_FMT);
+    } catch (Exception ignored) {
+      return null;
+    }
+    LtciSettlement settlement = ltciSettlementMapper.selectOne(
+        Wrappers.lambdaQuery(LtciSettlement.class)
+            .eq(LtciSettlement::getIsDeleted, 0)
+            .eq(bill.getOrgId() != null, LtciSettlement::getOrgId, bill.getOrgId())
+            .eq(LtciSettlement::getElderId, bill.getElderId())
+            .eq(LtciSettlement::getSettleMonth, settleMonth)
+            .last("LIMIT 1"));
+    if (settlement == null || settlement.getFundPay() == null) {
+      return null;
+    }
+    // ltci_settlement 金额单位为分
+    return BigDecimal.valueOf(settlement.getFundPay())
+        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+  }
+
+  private BigDecimal ltciDeductUsed(Long billId, Long excludePaymentRecordId) {
+    if (billId == null) {
+      return BigDecimal.ZERO;
+    }
+    var wrapper = Wrappers.lambdaQuery(PaymentRecord.class)
+        .eq(PaymentRecord::getIsDeleted, 0)
+        .eq(PaymentRecord::getBillMonthlyId, billId);
+    if (excludePaymentRecordId != null) {
+      wrapper.ne(PaymentRecord::getId, excludePaymentRecordId);
+    }
+    return paymentRecordMapper.selectList(wrapper).stream()
+        .map(item -> scaleAmount(item.getLtciDeductAmount()))
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
+  }
+
+  @Override
+  public BillDeductionPreviewResponse deductionPreview(Long billId) {
+    BillMonthly bill = billId == null ? null : billMonthlyMapper.selectOne(
+        Wrappers.lambdaQuery(BillMonthly.class)
+            .eq(BillMonthly::getId, billId)
+            .eq(BillMonthly::getIsDeleted, 0)
+            .last("LIMIT 1"));
+    if (bill == null) {
+      throw new IllegalArgumentException("Bill not found");
+    }
+    ensureOrgAccess(bill.getOrgId());
+
+    BigDecimal totalAmount = scaleAmount(bill.getTotalAmount());
+    BigDecimal settled = scaleAmount(bill.getPaidAmount());
+    BigDecimal outstanding = totalAmount.subtract(settled);
+
+    BillDeductionPreviewResponse response = new BillDeductionPreviewResponse();
+    response.setBillId(bill.getId());
+    response.setElderId(bill.getElderId());
+    ElderProfile elder = bill.getElderId() == null ? null : elderMapper.selectById(bill.getElderId());
+    response.setElderName(elder == null ? null : elder.getFullName());
+    response.setBillMonth(bill.getBillMonth());
+    response.setTotalAmount(totalAmount);
+    response.setSettledAmount(settled);
+    response.setOutstandingAmount(outstanding.max(BigDecimal.ZERO));
+
+    BigDecimal fundPay = resolveLtciFundPay(bill);
+    BigDecimal ltciUsed = ltciDeductUsed(bill.getId(), null);
+    response.setLtciUsedAmount(ltciUsed);
+    if (fundPay == null) {
+      response.setLtciFundPayAmount(BigDecimal.ZERO);
+      response.setLtciAvailableAmount(response.getOutstandingAmount());
+      response.setLtciHint("本月无长护险结算单，抵扣额度不限制，按线下结算口径手工登记");
+    } else {
+      response.setLtciFundPayAmount(fundPay);
+      BigDecimal available = fundPay.subtract(ltciUsed).max(BigDecimal.ZERO);
+      response.setLtciAvailableAmount(available.min(response.getOutstandingAmount()));
+      response.setLtciHint("本月统筹支付 " + fundPay + " 元，已登记抵扣 " + ltciUsed + " 元");
+    }
+
+    response.setUsableVouchers(financeVoucherService.listUsable(bill.getElderId(), totalAmount, LocalDate.now()));
+    return response;
+  }
+
+  private static PaymentResponse withBreakdown(
+      PaymentResponse response,
+      BigDecimal cash,
+      BigDecimal ltciDeduct,
+      BigDecimal discount,
+      BigDecimal voucherAmount,
+      BigDecimal settledAmount) {
+    response.setCashAmount(cash);
+    response.setLtciDeductAmount(ltciDeduct);
+    response.setDiscountAmount(discount);
+    response.setVoucherAmount(voucherAmount);
+    response.setSettledAmount(settledAmount);
+    return response;
+  }
+
   private PaymentResponse toResponse(BillMonthly bill) {
     PaymentResponse response = new PaymentResponse();
     response.setBillId(bill.getId());
@@ -391,6 +627,8 @@ public class FinanceServiceImpl implements FinanceService {
     ElderProfile elder = bill.getElderId() == null ? null : elderMapper.selectById(bill.getElderId());
     if (current == null) {
       current = new ConsumptionRecord();
+      // finance_consumption_record.tenant_id 是 NOT NULL 且无默认值，不显式赋值会直接插入失败
+      current.setTenantId(bill.getOrgId());
       current.setOrgId(bill.getOrgId());
       current.setElderId(bill.getElderId());
       current.setSourceType("BILL_PAYMENT");

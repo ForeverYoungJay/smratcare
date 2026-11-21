@@ -2,7 +2,7 @@
   <PageContainer :title="pageTitle" :sub-title="pageSubTitle">
     <MarketingQuickNav parent-path="/marketing/reports" />
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline">
+      <QueryBar :model="query" layout="inline" @finish="loadData">
         <a-form-item label="开始日期">
           <a-date-picker v-model:value="query.dateFrom" value-format="YYYY-MM-DD" />
         </a-form-item>
@@ -12,15 +12,17 @@
         <a-form-item label="渠道">
           <a-input v-model:value="query.source" placeholder="渠道" allow-clear />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="loadData">查询</a-button>
-            <a-button @click="exportData">导出CSV</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">查询</a-button>
+              <a-button @click="exportData">导出CSV</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
-    <a-row :gutter="16">
+    <a-row class="business-stat-strip" :gutter="16">
       <a-col :xs="24" :sm="8">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic title="今日待回访" :value="todayDue" />
@@ -65,6 +67,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../../components/ActionToolbar.vue'
+import QueryBar from '../../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'

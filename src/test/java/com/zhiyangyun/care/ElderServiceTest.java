@@ -78,6 +78,40 @@ class ElderServiceTest {
   }
 
   @Test
+  void bed_change_clears_elder_from_old_bed() {
+    Bed first = new Bed();
+    first.setOrgId(1L);
+    first.setRoomId(10L);
+    first.setBedNo("04");
+    first.setBedQrCode("QR-MOVE-1");
+    first.setStatus(1);
+    bedMapper.insert(first);
+    Bed second = new Bed();
+    second.setOrgId(1L);
+    second.setRoomId(10L);
+    second.setBedNo("05");
+    second.setBedQrCode("QR-MOVE-2");
+    second.setStatus(1);
+    bedMapper.insert(second);
+
+    AssignBedRequest request = new AssignBedRequest();
+    request.setBedId(first.getId());
+    request.setStartDate(LocalDate.now().minusDays(2));
+    elderService.assignBed(200L, request);
+    request.setBedId(second.getId());
+    request.setStartDate(LocalDate.now());
+    elderService.assignBed(200L, request);
+
+    // 调床释放旧床：状态与占用人必须一起清空（之前 updateById 跳过 null，旧床留着长者）
+    Bed released = bedMapper.selectById(first.getId());
+    assertEquals(1, released.getStatus());
+    assertNull(released.getElderId());
+    assertNull(released.getOccupancySource());
+
+    elderService.unbindBed(200L, LocalDate.now(), "cleanup", null, null);
+  }
+
+  @Test
   void reassign_same_bed_is_idempotent() {
     Bed newBed = new Bed();
     newBed.setOrgId(1L);
@@ -299,8 +333,95 @@ class ElderServiceTest {
 
   @Test
   void page_query() {
-    var page = elderService.page(null, 1, 10, "Elder", false, null, null, null, null, null, null, null, null);
+    var page = elderService.page(null, 1, 10, "Elder", false, null, null, null, null, null, null, null, null, null, null);
     assertNotNull(page);
     assertEquals(1, page.getCurrent());
+  }
+
+  @Test
+  void page_query_filters_by_room_no() {
+    // 用独立机构号，避免往 org 1 里塞数据污染门户/看板等聚合断言（H2 内存库整轮共享）
+    final Long orgId = 9201L;
+
+    Room room = new Room();
+    room.setTenantId(orgId);
+    room.setOrgId(orgId);
+    room.setRoomNo("RM-FILTER-901");
+    room.setBuilding("筛选测试楼");
+    room.setCapacity(2);
+    room.setStatus(1);
+    roomMapper.insert(room);
+
+    Bed bed = new Bed();
+    bed.setTenantId(orgId);
+    bed.setOrgId(orgId);
+    bed.setRoomId(room.getId());
+    bed.setBedNo("RM-FILTER-901-1");
+    bed.setBedQrCode("QR-RM-FILTER-901-1");
+    bed.setStatus(BedStatus.OCCUPIED);
+    bedMapper.insert(bed);
+
+    ElderProfile elder = new ElderProfile();
+    elder.setTenantId(orgId);
+    elder.setOrgId(orgId);
+    elder.setFullName("房间筛选测试");
+    elder.setElderCode("RMCODE-901");
+    elder.setStatus(1);
+    elder.setBedId(bed.getId());
+    elderMapper.insert(elder);
+
+    bed.setElderId(elder.getId());
+    bedMapper.updateById(bed);
+
+    ElderBedRelation relation = new ElderBedRelation();
+    relation.setTenantId(orgId);
+    relation.setOrgId(orgId);
+    relation.setElderId(elder.getId());
+    relation.setBedId(bed.getId());
+    relation.setStartDate(LocalDate.now());
+    relation.setActiveFlag(1);
+    relationMapper.insert(relation);
+
+    var matched = elderService.page(
+        orgId, 1, 10, null, false, null, null, null, null, null, "RM-FILTER-901", null, null, null, null);
+    assertEquals(1, matched.getRecords().size());
+    assertEquals(elder.getId(), matched.getRecords().get(0).getId());
+
+    var unmatched = elderService.page(
+        orgId, 1, 10, null, false, null, null, null, null, null, "RM-FILTER-NOPE", null, null, null, null);
+    assertEquals(0, unmatched.getRecords().size());
+
+    assertEquals(1, elderService.page(
+        orgId, 1, 10, null, false, null, null, null, null, null, null, null, "筛选测试楼", null, null).getRecords().size());
+    assertEquals(0, elderService.page(
+        orgId, 1, 10, null, false, null, null, null, null, null, null, null, "别的楼", null, null).getRecords().size());
+    assertEquals(1, elderService.page(
+        orgId, 1, 10, "RMCODE-901", false, null, null, null, null, null, null, null, null, null, null).getRecords().size());
+  }
+
+  @Test
+  void responsible_staff_is_persisted_resolved_and_org_checked() {
+    com.zhiyangyun.care.elder.model.ElderCreateRequest create = new com.zhiyangyun.care.elder.model.ElderCreateRequest();
+    create.setTenantId(1L);
+    create.setOrgId(1L);
+    create.setFullName("责任护理员测试长者");
+    create.setElderCode("RS-STAFF-01");
+    create.setResponsibleStaffId(502L);
+    var created = elderService.create(create);
+    assertEquals(502L, created.getResponsibleStaffId());
+
+    var detail = elderService.get(created.getId(), 1L);
+    assertEquals("值班护理员甲", detail.getResponsibleStaffName());
+
+    com.zhiyangyun.care.elder.model.ElderUpdateRequest update = new com.zhiyangyun.care.elder.model.ElderUpdateRequest();
+    update.setTenantId(1L);
+    update.setResponsibleStaffId(503L);
+    elderService.update(created.getId(), update);
+    assertEquals("护理部长乙", elderService.get(created.getId(), 1L).getResponsibleStaffName());
+
+    com.zhiyangyun.care.elder.model.ElderUpdateRequest foreign = new com.zhiyangyun.care.elder.model.ElderUpdateRequest();
+    foreign.setTenantId(1L);
+    foreign.setResponsibleStaffId(987654321L);
+    assertThrows(IllegalArgumentException.class, () -> elderService.update(created.getId(), foreign));
   }
 }

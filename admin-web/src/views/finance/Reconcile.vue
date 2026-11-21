@@ -1,27 +1,29 @@
 <template>
   <PageContainer title="对账中心" subTitle="按日核对收款与账单变动">
     <a-card class="card-elevated" :bordered="false">
-      <a-form layout="inline" :model="query" class="search-form">
+      <QueryBar layout="inline" :model="query" class="search-form">
         <a-form-item label="日期">
           <a-date-picker v-model:value="query.date" />
         </a-form-item>
         <a-form-item label="打印备注">
           <a-input v-model:value="query.printRemark" allow-clear placeholder="例如：日结复核版" style="width: 200px" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="reconcile">生成对账</a-button>
-            <a-button @click="reset">重置</a-button>
-            <a-button @click="severityFilter = 'HIGH'">仅看高风险</a-button>
-            <a-button @click="severityFilter = 'ALL'">全部风险</a-button>
-            <a-button @click="go(`/finance/reconcile/issue-center?date=${dayjs(query.date).format('YYYY-MM-DD')}&sourceModule=RECONCILE`)">异常处理</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="reconcile">生成对账</a-button>
+              <a-button @click="reset">重置</a-button>
+              <a-button @click="severityFilter = 'HIGH'">仅看高风险</a-button>
+              <a-button @click="severityFilter = 'ALL'">全部风险</a-button>
+              <a-button @click="go(`/finance/reconcile/issue-center?date=${dayjs(query.date).format('YYYY-MM-DD')}&sourceModule=RECONCILE`)">异常处理</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <StatefulBlock style="margin-top: 16px;" :loading="loading" :error="errorMessage" @retry="loadSummary">
-      <a-row :gutter="[16, 16]">
+      <a-row class="business-stat-strip" :gutter="[16, 16]">
         <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="账单已收未核销" :value="summary.billPaidUnmatchedCount" /></a-card></a-col>
         <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="重复/冲正异常" :value="summary.duplicatedOrReversalPendingCount" /></a-card></a-col>
         <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="发票未关联" :value="summary.invoiceUnlinkedCount" /></a-card></a-col>
@@ -38,7 +40,7 @@
       />
 
       <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="对账结果">
-        <a-row :gutter="16">
+        <a-row class="business-stat-strip" :gutter="16">
           <a-col :span="6">
             <a-statistic title="日期" :value="result?.date || '-'" />
           </a-col>
@@ -52,7 +54,7 @@
             <a-statistic title="净收款" :value="result?.netReceived ?? 0" />
           </a-col>
         </a-row>
-        <a-row :gutter="16" style="margin-top: 12px;">
+        <a-row class="business-stat-strip" :gutter="16" style="margin-top: 12px;">
           <a-col :span="24">
             <a-statistic title="是否异常">
               <template #value>
@@ -94,22 +96,24 @@
     </StatefulBlock>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="对账历史">
-      <a-form layout="inline" :model="historyQuery" class="search-form">
+      <QueryBar layout="inline" :model="historyQuery" class="search-form" @finish="fetchHistory">
         <a-form-item label="开始日期">
           <a-date-picker v-model:value="historyQuery.from" />
         </a-form-item>
         <a-form-item label="结束日期">
           <a-date-picker v-model:value="historyQuery.to" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="fetchHistory">查询</a-button>
-            <a-button @click="resetHistory">重置</a-button>
-            <a-button @click="exportHistory">导出</a-button>
-            <a-button @click="printHistory">打印当前</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">查询</a-button>
+              <a-button @click="resetHistory">重置</a-button>
+              <a-button @click="exportHistory">导出</a-button>
+              <a-button @click="printHistory">打印当前</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
 
       <vxe-table border stripe show-overflow="title" :data="history" height="320" :loading="historyLoading">
         <vxe-column field="reconcileDate" title="对账日期" width="140">
@@ -143,6 +147,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

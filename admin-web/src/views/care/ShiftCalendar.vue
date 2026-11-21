@@ -1,5 +1,11 @@
 <template>
   <PageContainer title="排班" subTitle="排班落日程、值班提醒、换班申请一体化管理">
+    <template #extra>
+      <a-space>
+        <a-button v-if="canManageSchedule" type="primary" @click="openEdit()">新增排班</a-button>
+        <a-button @click="fetchSwaps">刷新换班申请</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item v-if="canManageSchedule" label="员工">
         <a-select
@@ -24,15 +30,12 @@
       <a-form-item label="日期范围">
         <a-range-picker v-model:value="query.range" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button v-if="canManageSchedule" type="primary" @click="openEdit()">新增排班</a-button>
-          <a-button @click="fetchSwaps">刷新换班申请</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -89,11 +92,11 @@
       </a-table>
     </a-card>
 
-    <a-modal v-model:open="editOpen" :title="form.id ? '编辑排班' : '新增排班'" @ok="submit" :confirm-loading="saving" width="620px">
-      <a-form layout="vertical">
+    <a-modal :mask-closable="false" v-model:open="editOpen" :title="form.id ? '编辑排班' : '新增排班'" @ok="submit" :confirm-loading="saving" width="620px">
+      <a-form ref="editFormRef" layout="vertical" :model="editModel" :rules="editRules">
         <a-row :gutter="16">
-          <a-col :span="12">
-            <a-form-item label="员工" required>
+          <a-col :xs="24" :md="12">
+            <a-form-item label="员工" name="staffId">
               <a-select
                 v-model:value="form.staffId"
                 show-search
@@ -105,21 +108,37 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :span="12">
+          <a-col :xs="24" :md="12">
             <a-form-item label="员工姓名">
-              <a-input v-model:value="form.staffName" />
+              <!-- 只读：以前这里可以自由输入，提交时又被下拉选中的姓名静默覆盖 -->
+              <a-input :value="resolvedStaffName" readonly placeholder="选择员工后自动带出" />
             </a-form-item>
           </a-col>
         </a-row>
         <a-row :gutter="16">
-          <a-col :span="12">
-            <a-form-item label="值班日期" required>
+          <a-col :xs="24" :md="12">
+            <a-form-item label="值班日期" name="dutyDate">
               <a-date-picker v-model:value="dutyDate" style="width: 100%" />
             </a-form-item>
           </a-col>
           <a-col :span="12">
             <a-form-item label="班次编码">
-              <a-input v-model:value="form.shiftCode" />
+              <a-select
+                v-model:value="form.shiftCode"
+                allow-clear
+                show-search
+                option-filter-prop="label"
+                placeholder="选择班次"
+                :loading="shiftCodeLoading"
+                :options="shiftCodeOptions"
+              >
+                <template #notFoundContent>
+                  <div class="shift-code-empty">
+                    还没有配置班次模板，
+                    <a @click="goShiftTemplates">前往排班方案配置</a>
+                  </div>
+                </template>
+              </a-select>
             </a-form-item>
           </a-col>
         </a-row>
@@ -136,7 +155,7 @@
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item label="结束时间">
+            <a-form-item label="结束时间" name="endTime">
               <a-date-picker
                 v-model:value="form.endTime"
                 show-time
@@ -160,7 +179,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="swapOpen" title="申请换班" @ok="submitSwap" :confirm-loading="swapSubmitting" width="720px">
+    <a-modal :mask-closable="false" v-model:open="swapOpen" title="申请换班" @ok="submitSwap" :confirm-loading="swapSubmitting" width="720px">
       <a-form layout="vertical">
         <a-form-item label="我的班次">
           <a-input :value="swapSourceText" disabled />
@@ -196,12 +215,14 @@
 import { computed, reactive, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
 import { message, Modal } from 'ant-design-vue'
+import type { FormInstance, FormRules } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../../stores/user'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { useStaffOptions } from '../../composables/useStaffOptions'
+import { useShiftCodeOptions } from '../../composables/useShiftCodeOptions'
 import {
   agreeShiftSwap,
   createSchedule,
@@ -225,6 +246,46 @@ const swapLoading = ref(false)
 const swapSubmitting = ref(false)
 const swapRows = ref<ShiftSwapRequestItem[]>([])
 const { staffOptions, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 200, preloadSize: 500 })
+const { shiftCodeOptions, shiftCodeLoading, loadShiftCodes, ensureShiftCode } = useShiftCodeOptions()
+
+const editFormRef = ref<FormInstance>()
+
+/** 姓名由所选员工带出，不再让用户手打第二遍 */
+const resolvedStaffName = computed(() => {
+  const selected = staffOptions.value.find((item) => String(item.value) === String(form.staffId))
+  return selected?.name || form.staffName || ''
+})
+
+/**
+ * a-form 需要一个自己的 model 才能做校验。
+ * 值班日期是独立的 ref、其余字段在 form 上，这里合并成一个校验用的视图对象。
+ */
+const editModel = computed(() => ({
+  staffId: form.staffId,
+  dutyDate: dutyDate.value,
+  endTime: form.endTime
+}))
+
+const editRules: FormRules = {
+  staffId: [{ required: true, message: '请选择员工' }],
+  dutyDate: [{ required: true, message: '请选择值班日期' }],
+  endTime: [
+    {
+      // 以前开始/结束时间完全不校验，可以存出“结束早于开始”的班次
+      validator: async () => {
+        if (!form.startTime || !form.endTime) return
+        if (dayjs(form.endTime).isAfter(dayjs(form.startTime))) return
+        throw new Error('结束时间必须晚于开始时间')
+      },
+      trigger: 'change'
+    }
+  ]
+}
+
+// 字典为空时给出口，别让人卡在一个选不了也填不了的下拉上
+function goShiftTemplates() {
+  router.push('/care/scheduling/shift-templates')
+}
 
 const query = reactive({
   staffId: undefined as string | undefined,
@@ -420,20 +481,23 @@ function openEdit(record?: ScheduleItem) {
     })
   }
   if (form.staffId) ensureSelectedStaff(form.staffId, form.staffName)
+  ensureShiftCode(form.shiftCode)
   dutyDate.value = form.dutyDate ? dayjs(form.dutyDate) : undefined
   editOpen.value = true
 }
 
 async function submit() {
-  if (!form.staffId || !dutyDate.value) {
-    message.warning(!form.staffId ? '请选择员工' : '请选择值班日期')
+  try {
+    await editFormRef.value?.validate()
+  } catch {
+    // 校验失败时 a-form 已经在对应字段下给出红字提示
     return
   }
-  const selected = staffOptions.value.find((item) => String(item.value) === String(form.staffId))
+  if (!dutyDate.value) return
   const payload = {
     ...form,
     staffId: form.staffId as Id,
-    staffName: selected?.name || form.staffName,
+    staffName: resolvedStaffName.value,
     dutyDate: dutyDate.value.format('YYYY-MM-DD')
   }
   if (saving.value) return
@@ -555,5 +619,6 @@ if (!canManageSchedule.value) {
 }
 
 searchStaff('')
+loadShiftCodes()
 fetchData()
 </script>

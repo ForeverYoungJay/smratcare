@@ -1,17 +1,16 @@
 <template>
   <PageContainer title="入职向导" subTitle="员工档案中心 / 统一入职建档、账号、合同、附件流程">
-    <section class="wizard-hero">
-      <div class="hero-copy">
-        <p class="eyebrow">入职办理流程</p>
-        <h1>把新增人员、建档、签合同、上传附件收成一条清晰的路径。</h1>
-        <p class="hero-text">
+    <section class="wizard-hero business-overview">
+      <div class="business-intro"><details class="business-help">
+          <summary>使用说明</summary>
+          <p class="business-help-title">把新增人员、建档、签合同、上传附件收成一条清晰的路径。</p>
+          <p class="hero-text">
           我们把分散页面重新编排成 4 个步骤。先建立员工主档，再继续补齐账号与监管、合同、附件；每一步都能直接跳过去并自动打开对应操作。
-        </p>
-        <div class="hero-actions">
+          </p>
+        </details><div class="hero-actions">
           <a-button type="primary" size="large" @click="startCreate">开始新增人员</a-button>
           <a-button size="large" @click="goToBasic">进入档案中心</a-button>
-        </div>
-      </div>
+        </div></div>
       <div class="hero-panel">
         <div class="status-ribbon">
           <span>当前对象</span>

@@ -3,13 +3,19 @@ package com.zhiyangyun.care.crm.service.impl;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zhiyangyun.care.crm.entity.CrmContract;
 import com.zhiyangyun.care.crm.entity.CrmContractAttachment;
+import com.zhiyangyun.care.crm.entity.CrmContractReminderConfig;
+import com.zhiyangyun.care.crm.entity.CrmLead;
+import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.crm.entity.CrmSmsTask;
 import com.zhiyangyun.care.crm.mapper.CrmContractAttachmentMapper;
 import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
+import com.zhiyangyun.care.crm.mapper.CrmContractReminderConfigMapper;
 import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
 import com.zhiyangyun.care.crm.mapper.CrmSmsTaskMapper;
 import com.zhiyangyun.care.crm.model.action.CrmContractAttachmentRequest;
 import com.zhiyangyun.care.crm.model.action.CrmContractAttachmentResponse;
+import com.zhiyangyun.care.crm.model.action.CrmContractReminderConfigRequest;
+import com.zhiyangyun.care.crm.model.action.CrmContractReminderConfigResponse;
 import com.zhiyangyun.care.crm.model.action.CrmSmsTaskCreateRequest;
 import com.zhiyangyun.care.crm.model.action.CrmSmsTaskResponse;
 import com.zhiyangyun.care.crm.service.CrmContractActionService;
@@ -21,6 +27,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,16 +39,19 @@ public class CrmContractActionServiceImpl implements CrmContractActionService {
   private final CrmContractAttachmentMapper attachmentMapper;
   private final CrmSmsTaskMapper smsTaskMapper;
   private final CrmLeadMapper leadMapper;
+  private final CrmContractReminderConfigMapper reminderConfigMapper;
 
   public CrmContractActionServiceImpl(
       CrmContractMapper contractMapper,
       CrmContractAttachmentMapper attachmentMapper,
       CrmSmsTaskMapper smsTaskMapper,
-      CrmLeadMapper leadMapper) {
+      CrmLeadMapper leadMapper,
+      CrmContractReminderConfigMapper reminderConfigMapper) {
     this.contractMapper = contractMapper;
     this.attachmentMapper = attachmentMapper;
     this.smsTaskMapper = smsTaskMapper;
     this.leadMapper = leadMapper;
+    this.reminderConfigMapper = reminderConfigMapper;
   }
 
   @Override
@@ -86,6 +97,9 @@ public class CrmContractActionServiceImpl implements CrmContractActionService {
     if (contractId == null) {
       return Collections.emptyList();
     }
+    if (!isOwnedContract(contractMapper.selectById(contractId), tenantId)) {
+      return Collections.emptyList();
+    }
     List<CrmContractAttachment> list = attachmentMapper.selectList(Wrappers.lambdaQuery(CrmContractAttachment.class)
         .eq(CrmContractAttachment::getIsDeleted, 0)
         .eq(CrmContractAttachment::getTenantId, tenantId)
@@ -98,6 +112,9 @@ public class CrmContractActionServiceImpl implements CrmContractActionService {
   public void deleteAttachment(Long tenantId, Long attachmentId) {
     CrmContractAttachment attachment = attachmentMapper.selectById(attachmentId);
     if (attachment == null || !tenantId.equals(attachment.getTenantId())) {
+      return;
+    }
+    if (!isOwnedContract(contractMapper.selectById(attachment.getContractId()), tenantId)) {
       return;
     }
     attachment.setIsDeleted(1);
@@ -161,11 +178,28 @@ public class CrmContractActionServiceImpl implements CrmContractActionService {
 
   @Override
   public List<CrmSmsTaskResponse> listSmsTasks(Long tenantId, Long contractId) {
+    if (contractId != null && !isOwnedContract(contractMapper.selectById(contractId), tenantId)) {
+      return Collections.emptyList();
+    }
+    Set<Long> accessibleContractIds = null;
+    if (contractId == null && requiresPersonalScope()) {
+      accessibleContractIds = contractMapper.selectList(Wrappers.lambdaQuery(CrmContract.class)
+              .eq(CrmContract::getTenantId, tenantId)
+              .eq(CrmContract::getIsDeleted, 0))
+          .stream().filter(item -> isOwnedContract(item, tenantId)).map(CrmContract::getId).collect(Collectors.toSet());
+      if (accessibleContractIds.isEmpty()) {
+        return Collections.emptyList();
+      }
+    }
     List<CrmSmsTask> list = smsTaskMapper.selectList(Wrappers.lambdaQuery(CrmSmsTask.class)
         .eq(CrmSmsTask::getIsDeleted, 0)
         .eq(CrmSmsTask::getTenantId, tenantId)
         .eq(contractId != null, CrmSmsTask::getContractId, contractId)
         .orderByDesc(CrmSmsTask::getCreateTime));
+    if (accessibleContractIds != null) {
+      Set<Long> allowed = accessibleContractIds;
+      list = list.stream().filter(item -> allowed.contains(item.getContractId())).toList();
+    }
     return list.stream().map(this::toResponse).toList();
   }
 
@@ -176,6 +210,9 @@ public class CrmContractActionServiceImpl implements CrmContractActionService {
     if (task == null || !tenantId.equals(task.getTenantId()) || Integer.valueOf(1).equals(task.getIsDeleted())) {
       return null;
     }
+    if (!isOwnedContract(contractMapper.selectById(task.getContractId()), tenantId)) {
+      return null;
+    }
     task.setStatus("SENT");
     task.setSendTime(LocalDateTime.now());
     task.setResultMessage("mock:发送成功");
@@ -183,8 +220,84 @@ public class CrmContractActionServiceImpl implements CrmContractActionService {
     return toResponse(task);
   }
 
+  @Override
+  public CrmContractReminderConfigResponse getReminderConfig(Long tenantId, Long orgId) {
+    CrmContractReminderConfig config = reminderConfigMapper.selectOne(
+        Wrappers.lambdaQuery(CrmContractReminderConfig.class)
+            .eq(CrmContractReminderConfig::getTenantId, tenantId)
+            .eq(CrmContractReminderConfig::getOrgId, orgId)
+            .eq(CrmContractReminderConfig::getIsDeleted, 0)
+            .last("LIMIT 1"));
+    return config == null ? defaultReminderConfig() : toResponse(config);
+  }
+
+  @Override
+  @Transactional
+  public CrmContractReminderConfigResponse saveReminderConfig(
+      Long tenantId, Long orgId, Long staffId, CrmContractReminderConfigRequest request) {
+    CrmContractReminderConfig config = reminderConfigMapper.selectOne(
+        Wrappers.lambdaQuery(CrmContractReminderConfig.class)
+            .eq(CrmContractReminderConfig::getTenantId, tenantId)
+            .eq(CrmContractReminderConfig::getOrgId, orgId)
+            .eq(CrmContractReminderConfig::getIsDeleted, 0)
+            .last("LIMIT 1"));
+    if (config == null) {
+      config = new CrmContractReminderConfig();
+      config.setTenantId(tenantId);
+      config.setOrgId(orgId);
+      config.setCreatedBy(staffId);
+    }
+    config.setEnabled(request.getEnabled());
+    config.setAdvanceDays(request.getAdvanceDays());
+    config.setSendTime(request.getSendTime());
+    config.setTemplateContent(request.getTemplateContent().trim());
+    if (config.getId() == null) {
+      reminderConfigMapper.insert(config);
+    } else {
+      reminderConfigMapper.updateById(config);
+    }
+    return toResponse(config);
+  }
+
+  private CrmContractReminderConfigResponse defaultReminderConfig() {
+    CrmContractReminderConfigResponse response = new CrmContractReminderConfigResponse();
+    response.setEnabled(true);
+    response.setAdvanceDays(30);
+    response.setSendTime("09:00");
+    response.setTemplateContent("您好，您的合同即将到期，请及时联系机构续签。");
+    return response;
+  }
+
+  private CrmContractReminderConfigResponse toResponse(CrmContractReminderConfig config) {
+    CrmContractReminderConfigResponse response = new CrmContractReminderConfigResponse();
+    response.setEnabled(config.getEnabled());
+    response.setAdvanceDays(config.getAdvanceDays());
+    response.setSendTime(config.getSendTime());
+    response.setTemplateContent(config.getTemplateContent());
+    return response;
+  }
+
   private boolean isOwnedContract(CrmContract contract, Long tenantId) {
-    return contract != null && Integer.valueOf(0).equals(contract.getIsDeleted()) && tenantId.equals(contract.getTenantId());
+    if (contract == null || !Integer.valueOf(0).equals(contract.getIsDeleted()) || !tenantId.equals(contract.getTenantId())) {
+      return false;
+    }
+    if (!requiresPersonalScope()) {
+      return true;
+    }
+    Long staffId = AuthContext.getStaffId();
+    if (staffId != null && staffId.equals(contract.getCreatedBy())) {
+      return true;
+    }
+    CrmLead lead = contract.getLeadId() == null ? null : leadMapper.selectById(contract.getLeadId());
+    return lead != null
+        && Integer.valueOf(0).equals(lead.getIsDeleted())
+        && tenantId.equals(lead.getTenantId())
+        && staffId != null
+        && (staffId.equals(lead.getOwnerStaffId()) || staffId.equals(lead.getCreatedBy()));
+  }
+
+  private boolean requiresPersonalScope() {
+    return AuthContext.hasRole("MARKETING_EMPLOYEE") && !AuthContext.isMinisterOrHigher();
   }
 
   private CrmContractAttachmentResponse toResponse(CrmContractAttachment attachment) {

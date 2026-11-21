@@ -18,6 +18,11 @@ export function deleteCardAccount(id: Id) {
   return request.delete<void>(`/api/card/account/${id}`)
 }
 
+/** 卡务操作：ACTIVATE/REPORT_LOSS/CANCEL_LOSS/FREEZE/UNFREEZE/REISSUE/CANCEL；补卡返回新卡 */
+export function cardLifecycle(id: Id, data: { action: string; reason?: string; newCardNo?: string }) {
+  return request.post<CardAccount>(`/api/card/account/${id}/lifecycle`, data)
+}
+
 export function rechargeCard(data: { cardAccountId: Id; amount: number; remark?: string }) {
   return request.post('/api/card/account/recharge', data)
 }

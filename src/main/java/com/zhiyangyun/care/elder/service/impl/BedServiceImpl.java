@@ -15,6 +15,8 @@ import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
 import com.zhiyangyun.care.elder.entity.Bed;
 import com.zhiyangyun.care.elder.entity.ElderBedRelation;
+import com.zhiyangyun.care.auth.entity.StaffAccount;
+import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.entity.Room;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
@@ -56,6 +58,7 @@ public class BedServiceImpl implements BedService {
   private final HealthDataRecordMapper healthDataRecordMapper;
   private final CrmLeadMapper crmLeadMapper;
   private final CrmContractMapper crmContractMapper;
+  private final StaffMapper staffMapper;
 
   public BedServiceImpl(
       BedMapper bedMapper,
@@ -67,7 +70,8 @@ public class BedServiceImpl implements BedService {
       AssessmentRecordMapper assessmentRecordMapper,
       HealthDataRecordMapper healthDataRecordMapper,
       CrmLeadMapper crmLeadMapper,
-      CrmContractMapper crmContractMapper) {
+      CrmContractMapper crmContractMapper,
+      StaffMapper staffMapper) {
     this.bedMapper = bedMapper;
     this.roomMapper = roomMapper;
     this.relationMapper = relationMapper;
@@ -78,6 +82,7 @@ public class BedServiceImpl implements BedService {
     this.healthDataRecordMapper = healthDataRecordMapper;
     this.crmLeadMapper = crmLeadMapper;
     this.crmContractMapper = crmContractMapper;
+    this.staffMapper = staffMapper;
   }
 
   @Override
@@ -425,6 +430,11 @@ public class BedServiceImpl implements BedService {
       Map<Long, Floor> floorMap,
       Map<Long, ElderProfile> elderMap,
       Map<Long, ElderBedRelation> activeRelationMap) {
+    Map<Long, String> staffNameMap = staffMapper.selectBatchIdsSafe(elderMap.values().stream()
+            .map(ElderProfile::getResponsibleStaffId).filter(Objects::nonNull).distinct().toList())
+        .stream()
+        .filter(staff -> !Integer.valueOf(1).equals(staff.getIsDeleted()) && staff.getRealName() != null)
+        .collect(Collectors.toMap(StaffAccount::getId, StaffAccount::getRealName, (left, right) -> left));
     List<BedResponse> responses = beds.stream().map(bed -> {
       BedResponse response = toResponse(bed);
       Room room = roomMap.get(bed.getRoomId());
@@ -451,8 +461,10 @@ public class BedServiceImpl implements BedService {
       if (elder != null) {
         response.setElderName(elder.getFullName());
         response.setElderGender(elder.getGender());
+        response.setElderBirthDate(elder.getBirthDate());
         response.setElderLifecycleStatus(ElderLifecycleStatus.normalize(elder.getLifecycleStatus()));
         response.setCareLevel(elder.getCareLevel());
+        response.setResponsibleStaffName(staffNameMap.get(elder.getResponsibleStaffId()));
       }
       return response;
     }).toList();
@@ -596,19 +608,7 @@ public class BedServiceImpl implements BedService {
   }
 
   private boolean isActiveLeadReservation(CrmLead lead) {
-    if (lead == null || lead.getReservationBedId() == null) {
-      return false;
-    }
-    if (Objects.equals(lead.getContractSignedFlag(), 1) || Objects.equals(lead.getStatus(), 3)) {
-      return false;
-    }
-    if ("SIGNED".equalsIgnoreCase(lead.getFlowStage())) {
-      return false;
-    }
-    return lead.getReservationBedId() != null
-        || !isBlank(lead.getReservationRoomNo())
-        || lead.getReservationAmount() != null
-        || !isBlank(lead.getReservationStatus());
+    return com.zhiyangyun.care.crm.constant.CrmReservationRules.isActiveReservation(lead, java.time.LocalDate.now());
   }
 
   private boolean hasActiveReservation(Long tenantId, Long bedId) {

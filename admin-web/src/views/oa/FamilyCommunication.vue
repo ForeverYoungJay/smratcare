@@ -1,5 +1,13 @@
 <template>
   <PageContainer title="家属反馈与沟通" subTitle="处理家属端在线沟通、语音留言、满意度评价、投诉建议与探视预约">
+    <template #extra>
+      <a-space wrap>
+        <a-button type="primary" @click="fetchData">刷新</a-button>
+        <a-button :disabled="!selectedRecord" @click="markSelected('PROCESSING')">标记处理中</a-button>
+        <a-button :disabled="!selectedRecord" type="primary" @click="openHandle(selectedRecord, 'DONE')">处理反馈</a-button>
+        <a-button :disabled="!selectedRecord" danger @click="openHandle(selectedRecord, 'CLOSED')">关闭</a-button>
+      </a-space>
+    </template>
     <template #meta>
       <span class="soft-pill">待处理 {{ pendingCount }}</span>
       <span class="soft-pill">处理中 {{ processingCount }}</span>
@@ -18,14 +26,7 @@
           <a-select-option value="CLOSED">已关闭</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-space wrap>
-          <a-button type="primary" @click="fetchData">刷新</a-button>
-          <a-button :disabled="!selectedRecord" @click="markSelected('PROCESSING')">标记处理中</a-button>
-          <a-button :disabled="!selectedRecord" type="primary" @click="openHandle(selectedRecord, 'DONE')">处理反馈</a-button>
-          <a-button :disabled="!selectedRecord" danger @click="openHandle(selectedRecord, 'CLOSED')">关闭</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <a-alert
@@ -36,7 +37,7 @@
       description="投诉建议、满意度评价和在线沟通统一在这里受理，处理反馈会同步回家属端历史记录。"
     />
 
-    <StatefulBlock :loading="loading" :error="error" :empty="!loading && !error && rows.length === 0" empty-text="暂无家属反馈与沟通记录" @retry="fetchData">
+    <StatefulBlock :filter-model="query" @clear-filters="clearListFilters" :loading="loading" :error="error" :empty="!loading && !error && rows.length === 0" empty-text="暂无家属反馈与沟通记录" @retry="fetchData">
       <a-table
         row-key="id"
         :columns="columns"
@@ -45,6 +46,7 @@
         :row-selection="{ selectedRowKeys, type: 'radio', onChange: onSelectChange }"
         @change="onTableChange"
       >
+
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
             <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
@@ -72,7 +74,7 @@
       </a-table>
     </StatefulBlock>
 
-    <a-modal v-model:open="handleOpen" title="处理家属反馈" :confirm-loading="handleSubmitting" @ok="submitHandle">
+    <a-modal :mask-closable="false" v-model:open="handleOpen" title="处理家属反馈" :confirm-loading="handleSubmitting" @ok="submitHandle">
       <a-form :model="handleForm" layout="vertical">
         <a-form-item label="处理状态">
           <a-select v-model:value="handleForm.status">
@@ -97,6 +99,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { clearFilters } from '../../utils/filterState'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
@@ -278,6 +281,12 @@ function statusColor(status?: string) {
 
 function isDone(status?: string) {
   return status === 'DONE' || status === 'ADOPTED' || status === 'RESOLVED'
+}
+
+
+function clearListFilters() {
+  clearFilters(query)
+  fetchData()
 }
 </script>
 

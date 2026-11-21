@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="积分账户" subTitle="积分余额与调整记录">
     <a-card class="card-elevated" :bordered="false">
-      <a-form layout="inline" :model="query" class="search-form">
+      <QueryBar layout="inline" :model="query" class="search-form" @finish="fetchData">
         <a-form-item label="关键词">
           <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" @select="() => { query.pageNo = 1; fetchData() }" />
         </a-form-item>
@@ -11,13 +11,15 @@
             <a-select-option :value="0">冻结</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="fetchData">搜索</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="fetchData">搜索</a-button>
+              <a-button @click="reset">重置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
@@ -67,7 +69,7 @@
       />
     </a-card>
 
-    <a-modal v-model:open="adjustOpen" title="积分调整" @ok="submitAdjust" :confirm-loading="adjusting">
+    <a-modal :mask-closable="false" v-model:open="adjustOpen" title="积分调整" @ok="submitAdjust" :confirm-loading="adjusting">
       <a-form layout="vertical" :model="adjustForm" :rules="adjustRules" ref="adjustFormRef">
         <a-form-item label="老人" name="elderId">
           <a-select
@@ -118,6 +120,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'

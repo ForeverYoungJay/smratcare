@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="编辑老人" subTitle="更新老人档案">
+  <component :is="embedded ? 'div' : PageContainer" v-bind="embedded ? {} : { title: '编辑老人', subTitle: '更新老人档案' }">
     <a-card class="card-elevated" :bordered="false">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" style="max-width: 760px">
         <a-form-item label="姓名" name="fullName">
@@ -42,12 +42,20 @@
           </a-space>
         </a-form-item>
         <a-form-item label="护理等级" name="careLevel">
-          <a-select v-model:value="form.careLevel" placeholder="请选择护理等级">
-            <a-select-option value="A">A</a-select-option>
-            <a-select-option value="B">B</a-select-option>
-            <a-select-option value="C">C</a-select-option>
-            <a-select-option value="D">D</a-select-option>
-          </a-select>
+          <a-select v-model:value="form.careLevel" :options="careLevelOptions" placeholder="请选择护理等级（护理部「护理等级」中维护）" />
+        </a-form-item>
+        <a-form-item label="责任护理员" name="responsibleStaffId">
+          <a-select
+            v-model:value="form.responsibleStaffId"
+            allow-clear
+            show-search
+            :filter-option="false"
+            :options="staffOptions"
+            :loading="staffLoading"
+            placeholder="输入姓名/工号搜索"
+            @search="searchStaff"
+            @focus="() => searchStaff('')"
+          />
         </a-form-item>
         <a-form-item label="风险预担" name="riskPrecommit">
           <a-select v-model:value="form.riskPrecommit" placeholder="请选择突发风险处置优先策略" allow-clear>
@@ -104,7 +112,7 @@
         <a-button type="primary" :loading="saving" @click="submit">保存</a-button>
       </a-space>
     </a-card>
-  </PageContainer>
+  </component>
 </template>
 
 <script setup lang="ts">
@@ -113,19 +121,26 @@ import { useRoute, useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
+import { useStaffOptions } from '../../composables/useStaffOptions'
 import { getElderDetail, updateElder, uploadElderFile } from '../../api/elder'
+import { getCareLevelNameOptions } from '../../api/nursing'
 import { getBedList, getBuildingList, getFloorList, getRoomList } from '../../api/bed'
 import type { BedItem, BuildingItem, ElderItem, FloorItem, RoomItem, Id } from '../../types/api'
 
+// embedded：在长者列表的右侧抽屉里使用，elderId 由父组件传入，保存/取消改为通知父组件
+const props = defineProps<{ embedded?: boolean; elderId?: Id }>()
+const emit = defineEmits<{ saved: []; cancel: [] }>()
 const route = useRoute()
 const router = useRouter()
+const { staffOptions, staffLoading, searchStaff, ensureSelectedStaff } = useStaffOptions()
 const formRef = ref<FormInstance>()
 const saving = ref(false)
 const uploadingHistoricalContract = ref(false)
-const currentElderId = computed(() => String(route.params.id || ''))
+const currentElderId = computed(() => String(props.elderId ?? route.params.id ?? ''))
 const originalBedId = ref<Id | undefined>(undefined)
 
-const form = reactive<Partial<ElderItem>>({
+// responsibleStaffId/Name 由后端同期补充到 ElderItem，类型未落地前用本地交叉类型
+const form = reactive<Partial<ElderItem> & { responsibleStaffId?: Id; responsibleStaffName?: string }>({
   fullName: '',
   elderCode: '',
   idCardNo: '',
@@ -137,6 +152,7 @@ const form = reactive<Partial<ElderItem>>({
   sourceType: undefined,
   historicalContractFileUrl: '',
   careLevel: '',
+  responsibleStaffId: undefined,
   riskPrecommit: undefined,
   status: 1,
   remark: '',
@@ -190,7 +206,8 @@ function sourceTypeText(value?: string) {
 }
 
 function back() {
-  router.push('/elder/list')
+  if (props.embedded) emit('cancel')
+  else router.push('/elder/list')
 }
 
 function clearBedSelection() {
@@ -199,13 +216,17 @@ function clearBedSelection() {
 }
 
 async function load() {
-  const id = String(route.params.id || '')
+  const id = currentElderId.value
   if (!id) return
   try {
     const data = await getElderDetail(id)
     Object.assign(form, data)
     form.bedId = data.bedId ?? data.currentBed?.id
     originalBedId.value = form.bedId
+    if (form.responsibleStaffId != null) {
+      form.responsibleStaffId = String(form.responsibleStaffId)
+      ensureSelectedStaff(form.responsibleStaffId, form.responsibleStaffName)
+    }
   } catch {
     message.error('加载失败')
   }
@@ -217,7 +238,7 @@ async function submit() {
     await formRef.value.validate()
     if (saving.value) return
     saving.value = true
-    const payload = { ...form }
+    const payload: typeof form & { clearBed?: boolean } = { ...form }
     if (payload.bedId && !payload.bedStartDate) {
       payload.bedStartDate = payload.admissionDate || new Date().toISOString().slice(0, 10)
     }
@@ -227,9 +248,10 @@ async function submit() {
         payload.clearBed = true
       }
     }
-    await updateElder(String(route.params.id || ''), payload)
+    await updateElder(currentElderId.value, payload)
     message.success('保存成功')
-    router.push('/elder/list')
+    if (props.embedded) emit('saved')
+    else router.push('/elder/list')
   } catch (error: any) {
     message.error(error?.message || error?.response?.data?.message || '保存失败')
   } finally {
@@ -334,8 +356,11 @@ watch(
   }
 )
 
+const careLevelOptions = ref<Array<{ value: string; label: string }>>([])
+
 onMounted(async () => {
   await Promise.all([load(), loadAssets()])
   syncAssetSelectionByBed(form.bedId as Id | undefined)
+  careLevelOptions.value = await getCareLevelNameOptions(form.careLevel || undefined)
 })
 </script>

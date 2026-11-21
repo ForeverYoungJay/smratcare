@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="失能等级评估" subTitle="长护险失能等级评估（国家标准：3 一级 + 17 二级指标，组合法判级 0-5）">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新建评估</a-button>
+    </template>
     <SearchForm :model="query" @search="onSearch" @reset="onReset">
       <a-form-item label="长者">
         <a-select
@@ -24,12 +27,12 @@
           <a-select-option v-for="s in statusOptions" :key="s.value" :value="s.value">{{ s.label }}</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openCreate">新建评估</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="onSearch"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -72,7 +75,7 @@
     </DataTable>
 
     <!-- 新建评估：申请 + 打分（一步提交） -->
-    <a-modal v-model:open="createOpen" title="新建失能评估" width="760px" :confirm-loading="saving" @ok="submitCreate">
+    <a-modal :mask-closable="false" v-model:open="createOpen" title="新建失能评估" width="760px" :confirm-loading="saving" @ok="submitCreate">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">
@@ -149,7 +152,7 @@
     </a-modal>
 
     <!-- 争议复核 -->
-    <a-modal v-model:open="disputeOpen" title="发起争议复核" :confirm-loading="saving" @ok="submitDispute">
+    <a-modal :mask-closable="false" v-model:open="disputeOpen" title="发起争议复核" :confirm-loading="saving" @ok="submitDispute">
       <a-form layout="vertical">
         <a-form-item label="争议理由" required>
           <a-textarea v-model:value="disputeForm.reason" :rows="3" placeholder="请填写争议/复核理由" />

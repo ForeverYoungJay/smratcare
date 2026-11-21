@@ -1,22 +1,24 @@
 <template>
   <PageContainer title="退款/冲正/作废" subTitle="集中查看作废账单与收款修正记录">
     <a-card class="card-elevated" :bordered="false">
-      <a-form layout="inline" :model="query" class="search-form">
+      <QueryBar layout="inline" :model="query" class="search-form" @finish="fetchData">
         <a-form-item label="月份">
           <a-date-picker v-model:value="query.month" picker="month" style="width: 160px" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="fetchData">查询</a-button>
-            <a-button @click="exportData">导出</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">查询</a-button>
+              <a-button @click="exportData">导出</a-button>
+              <a-button @click="reset">重置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
       <a-alert style="margin-top: 12px;" type="info" show-icon message="统一输出作废账单与收款修正记录，确保退款与冲正有据可查。" />
     </a-card>
 
-    <a-row :gutter="[12, 12]" style="margin-top: 16px;">
+    <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-top: 16px;">
       <a-col :xs="24" :xl="8"><a-card class="card-elevated" :bordered="false"><a-statistic title="作废账单" :value="invalidBills.length" /></a-card></a-col>
       <a-col :xs="24" :xl="8"><a-card class="card-elevated" :bordered="false"><a-statistic title="修正收款" :value="adjustedPayments.length" /></a-card></a-col>
       <a-col :xs="24" :xl="8"><a-card class="card-elevated" :bordered="false"><a-statistic title="修正金额" :value="adjustedAmount" suffix="元" :precision="2" /></a-card></a-col>
@@ -75,7 +77,7 @@
       </vxe-table>
     </a-card>
 
-    <a-modal v-model:open="approvalVisible" title="提交退款/冲正审批" :confirm-loading="submitLoading" @ok="submitApproval">
+    <a-modal :mask-closable="false" v-model:open="approvalVisible" title="提交退款/冲正审批" :confirm-loading="submitLoading" @ok="submitApproval">
       <a-form layout="vertical" :model="approvalForm">
         <a-form-item label="审批原因">
           <a-input v-model:value="approvalForm.reason" allow-clear />
@@ -95,6 +97,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

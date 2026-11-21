@@ -1,12 +1,24 @@
 <template>
   <PageContainer title="员工电费" subTitle="宿舍管理 / 员工月度电费">
+    <template #extra>
+      <ActionToolbar wrap>
+        <a-button @click="downloadTemplate">下载模板</a-button>
+        <a-upload :before-upload="beforeUpload" :show-upload-list="false" accept=".csv">
+          <a-button type="primary">上传电费 CSV</a-button>
+        </a-upload>
+        <a-button :loading="syncing" @click="syncFinance">同步财务</a-button>
+        <a-button @click="printCurrentView">一键打印</a-button>
+        <a-button @click="exportCurrentCsv">导出 CSV</a-button>
+        <a-button @click="exportCurrentExcel">导出 Excel</a-button>
+      </ActionToolbar>
+    </template>
     <div class="ops-shell">
-      <section class="hero-panel">
-        <div>
-          <p class="eyebrow">宿舍水电台账</p>
-          <h2>员工宿舍、电表、电费上传与财务推送统一处理</h2>
+      <section class="hero-panel business-overview">
+        <details class="business-help">
+          <summary>使用说明</summary>
+          <p class="business-help-title">员工宿舍、电表、电费上传与财务推送统一处理</p>
           <p class="hero-copy">支持按月批量上传员工电费金额，自动回写宿舍与电表信息，并一键同步财务或打印下载。</p>
-        </div>
+        </details>
         <div class="hero-metrics">
           <div class="metric-card">
             <span>已导入人数</span>
@@ -36,21 +48,12 @@
         <a-form-item label="财务同步">
           <a-select v-model:value="query.financeSyncStatus" allow-clear style="width: 180px" :options="syncOptions" />
         </a-form-item>
-        <template #extra>
-          <a-space wrap>
-            <a-button @click="downloadTemplate">下载模板</a-button>
-            <a-upload :before-upload="beforeUpload" :show-upload-list="false" accept=".csv">
-              <a-button type="primary">上传电费 CSV</a-button>
-            </a-upload>
-            <a-button :loading="syncing" @click="syncFinance">同步财务</a-button>
-            <a-button @click="printCurrentView">一键打印</a-button>
-            <a-button @click="exportCurrentCsv">导出 CSV</a-button>
-            <a-button @click="exportCurrentExcel">导出 Excel</a-button>
-          </a-space>
-        </template>
+
       </SearchForm>
 
       <DataTable
+        :filter-model="query"
+        @clear-filters="fetchData"
         rowKey="id"
         :columns="columns"
         :data-source="rows"
@@ -127,72 +130,23 @@
       </template>
     </a-drawer>
 
-    <a-drawer v-model:open="planDrawerOpen" title="宿舍联动信息" width="560">
-      <a-form :model="planForm" layout="vertical">
-        <a-form-item label="员工">
-          <a-select
-            v-model:value="planForm.staffId"
-            show-search
-            allow-clear
-            :filter-option="false"
-            :options="staffOptions"
-            :loading="staffLoading"
-            placeholder="选择员工"
-            @search="searchStaff"
-            @focus="() => !staffOptions.length && searchStaff('')"
-          />
-        </a-form-item>
-        <div class="dorm-head">
-          <span>是否住宿舍</span>
-          <a-switch :checked="Number(planForm.liveInDormitory) === 1" @change="(checked) => (planForm.liveInDormitory = checked ? 1 : 0)" />
-        </div>
-        <a-row :gutter="12">
-          <a-col :span="12">
-            <a-form-item label="宿舍楼栋">
-              <a-input v-model:value="planForm.dormitoryBuilding" placeholder="如 A栋" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="宿舍房间">
-              <a-input v-model:value="planForm.dormitoryRoomNo" placeholder="如 3-201" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="床位号">
-              <a-input v-model:value="planForm.dormitoryBedNo" placeholder="如 B02" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="电表号">
-              <a-input v-model:value="planForm.meterNo" placeholder="导入时可自动带出" />
-            </a-form-item>
-          </a-col>
-        </a-row>
-        <a-form-item label="备注">
-          <a-textarea v-model:value="planForm.remark" :rows="3" placeholder="如该员工和同宿舍拼表，按表号上传" />
-        </a-form-item>
-      </a-form>
-      <template #footer>
-        <a-space>
-          <a-button @click="planDrawerOpen = false">取消</a-button>
-          <a-button type="primary" :loading="savingPlan" @click="submitPlan">保存宿舍信息</a-button>
-        </a-space>
-      </template>
-    </a-drawer>
+
   </PageContainer>
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { exportCsv, exportExcel } from '../../utils/export'
-import { getHrElectricityFeePage, getHrStaffServicePlan, importHrElectricityFee, syncHrMonthlyFeeToFinance, upsertHrStaffServicePlan } from '../../api/hr'
-import type { HrStaffElectricityImportRow, HrStaffMonthlyFeeBillItem, HrStaffServicePlan, PageResult } from '../../types'
-import { useStaffOptions } from '../../composables/useStaffOptions'
+import { getHrElectricityFeePage, importHrElectricityFee, syncHrMonthlyFeeToFinance } from '../../api/hr'
+import type { HrStaffElectricityImportRow, HrStaffMonthlyFeeBillItem, PageResult } from '../../types'
 
+const router = useRouter()
 const currentMonth = new Date().toISOString().slice(0, 7)
 
 const query = reactive({
@@ -235,7 +189,6 @@ const rows = ref<HrStaffMonthlyFeeBillItem[]>([])
 const loading = ref(false)
 const importing = ref(false)
 const syncing = ref(false)
-const savingPlan = ref(false)
 const selectedRowKeys = ref<Array<string | number>>([])
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 
@@ -255,15 +208,6 @@ const rowSelection = computed(() => ({
     selectedRowKeys.value = keys
   }
 }))
-
-const planDrawerOpen = ref(false)
-const planForm = reactive<HrStaffServicePlan>({
-  staffId: undefined,
-  liveInDormitory: 1,
-  status: 'ENABLED'
-})
-
-const { staffOptions, staffLoading, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 120, preloadSize: 500 })
 
 async function fetchData() {
   loading.value = true
@@ -390,53 +334,10 @@ async function syncFinance(ids?: Array<string | number | undefined>) {
   }
 }
 
-async function openPlanDrawer(record?: HrStaffMonthlyFeeBillItem) {
-  resetPlanForm()
-  if (record?.staffId) {
-    ensureSelectedStaff(record.staffId, record.staffName)
-    const detail = await getHrStaffServicePlan(record.staffId)
-    Object.assign(planForm, {
-      staffId: detail?.staffId,
-      liveInDormitory: Number(detail?.liveInDormitory || 0),
-      dormitoryBuilding: detail?.dormitoryBuilding,
-      dormitoryRoomNo: detail?.dormitoryRoomNo,
-      dormitoryBedNo: detail?.dormitoryBedNo,
-      meterNo: detail?.meterNo,
-      status: detail?.status || 'ENABLED',
-      remark: detail?.remark
-    })
-  }
-  planDrawerOpen.value = true
+function openPlanDrawer(record?: HrStaffMonthlyFeeBillItem) {
+  router.push({ path: '/hr/expense/dormitory', query: { keyword: record?.staffName || '' } })
 }
 
-function resetPlanForm() {
-  Object.assign(planForm, {
-    staffId: undefined,
-    liveInDormitory: 1,
-    dormitoryBuilding: undefined,
-    dormitoryRoomNo: undefined,
-    dormitoryBedNo: undefined,
-    meterNo: undefined,
-    status: 'ENABLED',
-    remark: undefined
-  })
-}
-
-async function submitPlan() {
-  if (!planForm.staffId) {
-    message.warning('请选择员工')
-    return
-  }
-  savingPlan.value = true
-  try {
-    await upsertHrStaffServicePlan({ ...planForm })
-    message.success('宿舍信息已保存')
-    planDrawerOpen.value = false
-    fetchData()
-  } finally {
-    savingPlan.value = false
-  }
-}
 
 function financeSyncText(value?: string) {
   return value === 'SYNCED' ? '已同步' : '待同步'
@@ -540,7 +441,6 @@ function printCurrentView() {
 }
 
 onMounted(() => {
-  searchStaff('')
   fetchData()
 })
 </script>

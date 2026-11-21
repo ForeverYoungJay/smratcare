@@ -29,6 +29,8 @@ import com.zhiyangyun.care.elder.model.lifecycle.DeathRegisterCreateRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.DeathRegisterUpdateRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.DischargeApplyCreateRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.DischargeApplyReviewRequest;
+import com.zhiyangyun.care.elder.model.lifecycle.DischargeProgressRequest;
+import com.zhiyangyun.care.elder.model.lifecycle.DischargeProgressRules;
 import com.zhiyangyun.care.elder.model.lifecycle.MedicalOutingCreateRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.MedicalOutingReturnRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.OutingCreateRequest;
@@ -278,6 +280,9 @@ public class ElderResidenceController {
     if (record == null || !Objects.equals(orgId, record.getOrgId()) || Integer.valueOf(1).equals(record.getIsDeleted())) {
       throw new IllegalArgumentException("记录不存在");
     }
+    if (!ResidenceLifecycleConstants.OUTING_OUT.equals(record.getStatus())) {
+      throw new IllegalArgumentException("仅外出中的记录可以办理返院");
+    }
     OutingReturnRequest payload = request == null ? new OutingReturnRequest() : request;
     record.setStatus(ResidenceLifecycleConstants.OUTING_RETURNED);
     record.setActualReturnTime(payload.getActualReturnTime() == null ? LocalDateTime.now() : payload.getActualReturnTime());
@@ -412,6 +417,9 @@ public class ElderResidenceController {
     ElderMedicalOutingRecord record = medicalOutingMapper.selectById(id);
     if (record == null || !Objects.equals(orgId, record.getOrgId()) || Integer.valueOf(1).equals(record.getIsDeleted())) {
       throw new IllegalArgumentException("记录不存在");
+    }
+    if (!ResidenceLifecycleConstants.MEDICAL_OUTING_OUT.equals(record.getStatus())) {
+      throw new IllegalArgumentException("仅外出就医中的记录可以办理返院");
     }
     ElderProfile elder = resolveElder(record.getElderId());
     Integer beforeStatus = elder.getStatus();
@@ -1000,6 +1008,16 @@ public class ElderResidenceController {
     if (pendingCount > 0) {
       throw new IllegalStateException("该老人已有待审核退住申请");
     }
+    // 已审批但还没结算/释放床位的申请仍在办理中，再建一张会出现同一长者两条超时退住
+    long inProgress = dischargeApplyMapper.selectCount(Wrappers.lambdaQuery(ElderDischargeApply.class)
+        .eq(ElderDischargeApply::getIsDeleted, 0)
+        .eq(ElderDischargeApply::getOrgId, orgId)
+        .eq(ElderDischargeApply::getElderId, request.getElderId())
+        .eq(ElderDischargeApply::getStatus, ResidenceLifecycleConstants.DISCHARGE_APPLY_APPROVED)
+        .eq(ElderDischargeApply::getAutoDischargeStatus, ResidenceLifecycleConstants.AUTO_DISCHARGE_PENDING_SETTLEMENT));
+    if (inProgress > 0) {
+      throw new IllegalStateException("该老人已有办理中的退住申请，请继续办理原申请");
+    }
     ElderDischargeApply record = new ElderDischargeApply();
     record.setTenantId(orgId);
     record.setOrgId(orgId);
@@ -1109,6 +1127,25 @@ public class ElderResidenceController {
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "DISCHARGE_APPLY_DELETE", "ELDER", record.getElderId(), "删除退住申请");
     return Result.ok(true);
+  }
+
+  @PutMapping("/discharge-apply/{id}/progress")
+  @PreAuthorize("@elderAuthz.canManageDischarge()")
+  public Result<ElderDischargeApply> completeDischargeStep(@PathVariable Long id,
+                                                           @Valid @RequestBody DischargeProgressRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    ElderDischargeApply record = dischargeApplyMapper.selectById(id);
+    if (record == null || !Objects.equals(orgId, record.getOrgId()) || Integer.valueOf(1).equals(record.getIsDeleted())) {
+      throw new IllegalArgumentException("记录不存在");
+    }
+    ElderDischargeApply beforeSnapshot = copyDischargeApply(record);
+    DischargeProgressRules.complete(record, request.getStep(), AuthContext.getUsername(), LocalDateTime.now());
+    dischargeApplyMapper.updateById(record);
+    auditLogService.recordStructured(
+        orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "DISCHARGE_STEP_COMPLETE", "ELDER", record.getElderId(), "退住办理步骤完成:" + request.getStep(),
+        beforeSnapshot, record, request);
+    return Result.ok(record);
   }
 
   private boolean isTrialStatusValid(String status) {
@@ -1491,6 +1528,12 @@ public class ElderResidenceController {
     copy.setReviewedBy(source.getReviewedBy());
     copy.setReviewedByName(source.getReviewedByName());
     copy.setReviewedTime(source.getReviewedTime());
+    copy.setCareHandoverTime(source.getCareHandoverTime());
+    copy.setCareHandoverByName(source.getCareHandoverByName());
+    copy.setItemHandoverTime(source.getItemHandoverTime());
+    copy.setItemHandoverByName(source.getItemHandoverByName());
+    copy.setArchiveTime(source.getArchiveTime());
+    copy.setArchiveByName(source.getArchiveByName());
     copy.setCreatedBy(source.getCreatedBy());
     copy.setCreateTime(source.getCreateTime());
     copy.setUpdateTime(source.getUpdateTime());

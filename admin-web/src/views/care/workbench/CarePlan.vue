@@ -2,8 +2,8 @@
   <PageContainer title="照护计划" subTitle="按长者查看服务计划、护理等级与执行规则">
     <template #extra>
       <a-space>
-        <a-button @click="go('/care/service/service-plans')">全部计划</a-button>
-        <a-button type="primary" @click="go('/care/elder-packages')">长者套餐</a-button>
+        <a-button v-if="canManagePlans" @click="go('/care/service/service-plans')">全部计划</a-button>
+        <a-button v-if="canManagePackages" type="primary" @click="go('/care/elder-packages')">长者套餐</a-button>
       </a-space>
     </template>
 
@@ -50,10 +50,14 @@ import { getCareLevelList, getServicePlanPage } from '../../../api/nursing'
 import { normalizeResidentId } from '../../../utils/id'
 import type { CareLevelItem, Id, ServicePlanItem } from '../../../types'
 import { resolveCareError } from '../careError'
+import { getPagePermissions, getPermissions, getRoles } from '../../../utils/auth'
+import { resolveRouteAccess } from '../../../utils/routeAccess'
 
 const route = useRoute()
 const router = useRouter()
 const residentId = computed<Id | undefined>(() => normalizeResidentId(route.query as Record<string, unknown>))
+const canManagePlans = resolveRouteAccess(router, getRoles(), '/care/service/service-plans', getPagePermissions(), getPermissions()).canAccess
+const canManagePackages = resolveRouteAccess(router, getRoles(), '/care/elder-packages', getPagePermissions(), getPermissions()).canAccess
 
 const loadingPlans = ref(false)
 const loadingLevels = ref(false)

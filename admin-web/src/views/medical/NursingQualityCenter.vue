@@ -22,9 +22,9 @@
         </a-form-item>
         <a-form-item>
           <a-space>
-            <a-button @click="applyPreset('stable')">稳健</a-button>
-            <a-button @click="applyPreset('balanced')">平衡</a-button>
-            <a-button @click="applyPreset('sensitive')">敏感</a-button>
+            <a-tooltip title="口径最宽：事件统计近 45 天，超过 18 小时才算超时。报警最少，风险指数最低。"><a-button @click="applyPreset('stable')">稳健</a-button></a-tooltip>
+            <a-tooltip title="默认口径：事件统计近 30 天，超过 12 小时算超时。"><a-button @click="applyPreset('balanced')">平衡</a-button></a-tooltip>
+            <a-tooltip title="口径最严：事件统计近 14 天，超过 6 小时就算超时。同样的现场情况会算出更高的风险指数。"><a-button @click="applyPreset('sensitive')">敏感</a-button></a-tooltip>
             <a-button type="primary" @click="applyFilters">应用参数</a-button>
             <a-button @click="resetFilters">重置</a-button>
           </a-space>
@@ -35,7 +35,22 @@
     <a-card class="card-elevated quality-hero" :bordered="false" style="margin-top: 12px">
       <a-row :gutter="[14, 14]" align="middle">
         <a-col :xs="24" :xl="8">
-          <div class="quality-hero__title">护理质量风险指数</div>
+          <div class="quality-hero__title">
+              护理质量风险指数
+              <a-tooltip placement="bottomLeft" :overlay-style="{ maxWidth: '360px' }">
+                <template #title>
+                  <div>由六项加权累加，满分 100，分数越高越需要处理：</div>
+                  <div>· 护理任务超时率最多 32 分</div>
+                  <div>· 医嘱待执行率最多 24 分</div>
+                  <div>· 未闭环异常（巡检异常 + 事件）最多 24 分</div>
+                  <div>· 近期事件发生率最多 24 分</div>
+                  <div>· 整改任务逾期最多 12 分</div>
+                  <div>· 高风险长者人数最多 10 分</div>
+                  <div style="margin-top:6px">下方的阈值参数会改变“算不算超时/异常”的口径，因此调参会直接改变这个分数——分数变高不等于现场变差。</div>
+                </template>
+                <span class="risk-help" role="img" aria-label="风险指数说明">?</span>
+              </a-tooltip>
+          </div>
           <div class="quality-hero__score-row">
             <span class="quality-hero__score">{{ riskIndex }}</span>
             <a-tag :color="riskTagColor">{{ riskLabel }}</a-tag>
@@ -116,7 +131,7 @@
       </a-col>
     </a-row>
 
-    <a-row :gutter="12" style="margin-bottom: 12px">
+    <a-row class="business-stat-strip" :gutter="12" style="margin-bottom: 12px">
       <a-col :xs="12" :lg="4"><a-card :bordered="false" class="card-elevated"><a-statistic title="用药待执行" :value="summary.todayMedicationPendingCount || 0" /></a-card></a-col>
       <a-col :xs="12" :lg="4"><a-card :bordered="false" class="card-elevated"><a-statistic title="巡检待闭环" :value="summary.abnormalInspectionOpenCount || 0" /></a-card></a-col>
       <a-col :xs="12" :lg="4"><a-card :bordered="false" class="card-elevated"><a-statistic title="日志待补录" :value="summary.nursingLogPendingCount || 0" /></a-card></a-col>
@@ -127,72 +142,73 @@
 
     <a-tabs v-model:activeKey="activeTab" type="card">
       <a-tab-pane key="medication" tab="用药管理">
-        <a-space wrap>
+        <ActionToolbar wrap>
           <a-button type="primary" @click="go('/health/medication/medication-setting')">用药设置</a-button>
           <a-button @click="go('/medical-care/medication-registration')">用药登记</a-button>
           <a-button @click="go('/health/medication/medication-remaining')">剩余用药</a-button>
           <a-button @click="go('/health/medication/drug-deposit')">带药外出/缴存</a-button>
           <a-button @click="go('/health/medication/drug-dictionary')">过敏/禁忌提醒规则</a-button>
-        </a-space>
+        </ActionToolbar>
       </a-tab-pane>
       <a-tab-pane key="vital" tab="健康数据与巡查">
-        <a-space wrap>
+        <ActionToolbar wrap>
           <a-button type="primary" @click="go('/health/management/data?date=today')">生命体征采集</a-button>
           <a-button @click="go('/medical-care/inspection?date=today')">健康巡检</a-button>
           <a-button @click="go('/medical-care/nursing-log?filter=pending')">护理日志</a-button>
           <a-button @click="go('/medical-care/inspection?filter=abnormal&date=today')">异常预警清单</a-button>
-        </a-space>
+        </ActionToolbar>
       </a-tab-pane>
       <a-tab-pane key="plan" tab="护理计划与等级">
-        <a-space wrap>
+        <ActionToolbar wrap>
           <a-button type="primary" @click="go('/care/service/care-levels')">护理等级规则</a-button>
           <a-button @click="go('/care/service/service-items')">护理项目库</a-button>
           <a-button @click="go('/care/service/service-plans')">服务计划（周/月）</a-button>
           <a-button @click="go('/care/care-packages')">护理套餐库</a-button>
-        </a-space>
+        </ActionToolbar>
       </a-tab-pane>
       <a-tab-pane key="task" tab="护理任务与扫码执行">
-        <a-space wrap>
+        <ActionToolbar wrap>
           <a-button type="primary" @click="go('/medical-care/care-task-board?date=today&filter=all')">今日任务清单</a-button>
           <a-button type="primary" @click="go('/medical-care/unified-task-center')">统一任务中心</a-button>
           <a-button @click="go('/care/workbench/qr?mode=scan')">扫码执行</a-button>
           <a-button @click="go('/medical-care/care-task-board?date=today&filter=overdue')">超时与补录</a-button>
           <a-button @click="go('/medical-care/care-task-board?date=today&filter=overdue_or_missed')">任务异常入口</a-button>
-        </a-space>
+        </ActionToolbar>
       </a-tab-pane>
       <a-tab-pane key="handover" tab="交接班与班组">
-        <a-space wrap>
+        <ActionToolbar wrap>
           <a-button type="primary" @click="go('/medical-care/handovers?shift=当前班次')">交接清单</a-button>
           <a-button @click="go('/medical-care/handovers?tab=records')">交接记录</a-button>
           <a-button @click="go('/care/staff/caregiver-groups')">护士/护工分组</a-button>
           <a-button @click="go('/care/scheduling/shift-calendar')">排班查看与调整申请</a-button>
-        </a-space>
+        </ActionToolbar>
       </a-tab-pane>
       <a-tab-pane key="pharmacy" tab="药库与药品主数据">
-        <a-space wrap>
+        <ActionToolbar wrap>
           <a-button type="primary" @click="go('/health/medication/drug-dictionary')">药品字典</a-button>
           <a-button @click="go('/logistics/storage/warehouse')">药库库存</a-button>
           <a-button @click="go('/logistics/storage/inbound')">入库</a-button>
           <a-button @click="go('/logistics/storage/outbound')">出库</a-button>
           <a-button @click="go('/logistics/storage/supplier')">供应商</a-button>
           <a-button @click="go('/logistics/storage/purchase?filter=pending')">领药申请/发药记录</a-button>
-        </a-space>
+        </ActionToolbar>
       </a-tab-pane>
       <a-tab-pane key="quality" tab="质量与报表">
-        <a-space wrap>
+        <ActionToolbar wrap>
           <a-button type="primary" @click="go('/care/service/nursing-reports')">护理报表</a-button>
           <a-button @click="go('/medical-care/alert-rules')">异常规则配置</a-button>
           <a-button @click="go('/stats/org/monthly-operation')">执行率/覆盖率</a-button>
           <a-button @click="go('/survey/stats?filter=low_score_or_complaint')">投诉问卷分析</a-button>
           <a-button @click="go('/oa/work-execution/task?filter=overdue_rectify')">整改任务闭环</a-button>
           <a-button @click="go('/hr/performance')">绩效数据输出</a-button>
-        </a-space>
+        </ActionToolbar>
       </a-tab-pane>
     </a-tabs>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
@@ -515,6 +531,20 @@ onMounted(() => {
   background:
     radial-gradient(130% 110% at 100% 0%, rgba(var(--primary-rgb), 0.18) 0%, rgba(var(--primary-rgb), 0) 58%),
     linear-gradient(132deg, var(--surface-2) 0%, var(--surface-3) 45%, var(--surface-2) 100%);
+}
+
+.risk-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+  font-size: 11px;
+  cursor: help;
 }
 
 .quality-hero__title {

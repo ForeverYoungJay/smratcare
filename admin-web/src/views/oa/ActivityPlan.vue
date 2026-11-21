@@ -1,5 +1,12 @@
 <template>
   <PageContainer title="活动中心" subTitle="计划、方案、审批、执行与复盘在同一工作面完成。">
+    <template #extra>
+      <a-space wrap>
+        <a-button type="primary" :disabled="!canCreatePlan" @click="openPlanner()">新增计划</a-button>
+        <a-button :disabled="!selectedSingle" @click="openDetail(selectedSingle)">查看详情</a-button>
+        <a-button @click="downloadExport">导出 CSV</a-button>
+      </a-space>
+    </template>
     <div class="activity-hero">
       <div class="hero-copy">
         <span class="hero-kicker">活动策划</span>
@@ -42,13 +49,7 @@
       <a-form-item label="日期范围">
         <a-range-picker v-model:value="query.range" />
       </a-form-item>
-      <template #extra>
-        <a-space wrap>
-          <a-button type="primary" :disabled="!canCreatePlan" @click="openPlanner()">新增计划</a-button>
-          <a-button :disabled="!selectedSingle" @click="openDetail(selectedSingle)">查看详情</a-button>
-          <a-button @click="downloadExport">导出 CSV</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <div class="status-strip">
@@ -66,6 +67,8 @@
     </div>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :row-selection="rowSelection"
       :columns="columns"
@@ -125,7 +128,7 @@
       </template>
     </DataTable>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="plannerOpen"
       :title="plannerForm.id ? '编辑活动' : '新增活动'"
       width="920px"

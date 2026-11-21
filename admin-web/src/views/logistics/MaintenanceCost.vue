@@ -10,7 +10,7 @@
     </SearchForm>
 
     <a-card class="card-elevated" :bordered="false" style="margin-bottom: 12px">
-      <a-row :gutter="12">
+      <a-row class="business-stat-strip" :gutter="12">
         <a-col :span="6"><a-statistic title="工单数" :value="summary.totalCount" /></a-col>
         <a-col :span="6"><a-statistic title="高优先级" :value="summary.highPriorityCount" /></a-col>
         <a-col :span="6"><a-statistic title="超时工单" :value="summary.overdueCount" /></a-col>
@@ -18,7 +18,9 @@
       </a-row>
     </a-card>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'costAmount'">
           {{ resolveCost(record).toFixed(2) }} 元

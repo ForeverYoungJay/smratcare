@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="消费统计" subTitle="账单与商城消费分析">
     <template #extra>
-      <a-space>
+      <ActionToolbar>
         <a-button type="primary" @click="loadData">刷新</a-button>
         <a-button @click="exportSummary">导出统计</a-button>
         <a-dropdown>
@@ -16,7 +16,7 @@
             </a-menu>
           </template>
         </a-dropdown>
-      </a-space>
+      </ActionToolbar>
     </template>
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline">
@@ -95,7 +95,7 @@
       @apply-template="applyReportTemplate"
     />
 
-    <a-row :gutter="16" style="margin-top: 16px;">
+    <a-row class="business-stat-strip" :gutter="16" style="margin-top: 16px;">
       <a-col :span="6">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic title="账单消费总额" :value="stats.totalBillConsumption || 0" :precision="2" />
@@ -118,7 +118,7 @@
       </a-col>
     </a-row>
 
-    <a-row :gutter="16" style="margin-top: 16px;">
+    <a-row class="business-stat-strip" :gutter="16" style="margin-top: 16px;">
       <a-col :span="6">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic title="账单占比(%)" :value="stats.billConsumptionRatio || 0" :precision="2" />
@@ -153,6 +153,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'

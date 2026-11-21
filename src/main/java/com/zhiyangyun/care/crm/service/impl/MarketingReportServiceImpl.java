@@ -21,6 +21,8 @@ import com.zhiyangyun.care.crm.model.report.MarketingDataQualityResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingFollowupReportResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingLeadEntrySummaryResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingWorkbenchSummaryResponse;
+import com.zhiyangyun.care.crm.model.report.MarketingStaffActivityResponse;
+import com.zhiyangyun.care.crm.entity.CrmVisitAppointment;
 import com.zhiyangyun.care.crm.service.CrmTraceService;
 import com.zhiyangyun.care.crm.service.MarketingReportService;
 import com.zhiyangyun.care.elder.entity.Bed;
@@ -60,6 +62,8 @@ public class MarketingReportServiceImpl implements MarketingReportService {
   private final ElderOccupancyReadService elderOccupancyReadService;
   private final CrmMarketingPlanMapper marketingPlanMapper;
   private final CrmTraceService crmTraceService;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private com.zhiyangyun.care.crm.mapper.CrmVisitAppointmentMapper visitAppointmentMapper;
 
   public MarketingReportServiceImpl(
       CrmLeadMapper crmLeadMapper,
@@ -1411,5 +1415,63 @@ public class MarketingReportServiceImpl implements MarketingReportService {
       return "其他";
     }
     return value;
+  }
+
+  @Override
+  public MarketingStaffActivityResponse staffActivity(Long tenantId, String dateFrom, String dateTo) {
+    LocalDate from = parseDateOrNull(dateFrom);
+    LocalDate to = parseDateOrNull(dateTo);
+    LocalDateTime fromTime = from == null ? null : from.atStartOfDay();
+    LocalDateTime toTime = to == null ? null : to.plusDays(1).atStartOfDay();
+    List<CrmLead> leads = crmLeadMapper.selectList(leadWrapperByCreateTime(tenantId, dateFrom, dateTo, null, null));
+    List<CrmVisitAppointment> visits = visitAppointmentMapper == null ? List.of() : visitAppointmentMapper.selectList(
+        Wrappers.lambdaQuery(CrmVisitAppointment.class)
+            .eq(CrmVisitAppointment::getIsDeleted, 0)
+            .eq(tenantId != null, CrmVisitAppointment::getTenantId, tenantId)
+            .in(CrmVisitAppointment::getStatus, "ARRIVED", "COMPLETED")
+            .ge(fromTime != null, CrmVisitAppointment::getAppointmentTime, fromTime)
+            .lt(toTime != null, CrmVisitAppointment::getAppointmentTime, toTime));
+    List<CrmContract> contracts = crmContractMapper.selectList(Wrappers.lambdaQuery(CrmContract.class)
+        .eq(CrmContract::getIsDeleted, 0)
+        .eq(tenantId != null, CrmContract::getTenantId, tenantId)
+        .isNotNull(CrmContract::getSignedAt)
+        .ge(fromTime != null, CrmContract::getSignedAt, fromTime)
+        .lt(toTime != null, CrmContract::getSignedAt, toTime));
+    return aggregateStaffActivity(leads, visits, contracts, LocalDate.now());
+  }
+
+  /** 口径：线索按创建时间、到访按预约时间、签约按签署时间归入区间；超期 = 下次跟进日早于今天且未回访。 */
+  static MarketingStaffActivityResponse aggregateStaffActivity(
+      List<CrmLead> leads, List<CrmVisitAppointment> visits, List<CrmContract> contracts, LocalDate today) {
+    Map<String, MarketingStaffActivityResponse.StaffRow> rows = new LinkedHashMap<>();
+    java.util.function.Function<String, MarketingStaffActivityResponse.StaffRow> row = name -> rows.computeIfAbsent(
+        name == null || name.isBlank() ? "未分配" : name.trim(), key -> {
+          MarketingStaffActivityResponse.StaffRow r = new MarketingStaffActivityResponse.StaffRow();
+          r.setName(key);
+          return r;
+        });
+    for (CrmLead lead : leads) {
+      if (Objects.equals(lead.getStatus(), 3)) continue;
+      MarketingStaffActivityResponse.StaffRow r = row.apply(lead.getOwnerStaffName() != null ? lead.getOwnerStaffName() : lead.getMarketerName());
+      r.setLeads(r.getLeads() + 1);
+      if (lead.getNextFollowDate() != null && lead.getNextFollowDate().isBefore(today) && !"已回访".equals(lead.getFollowupStatus())) {
+        r.setOverdue(r.getOverdue() + 1);
+      }
+    }
+    for (CrmVisitAppointment visit : visits) {
+      MarketingStaffActivityResponse.StaffRow r = row.apply(visit.getOwnerStaffName());
+      r.setVisits(r.getVisits() + 1);
+    }
+    for (CrmContract contract : contracts) {
+      MarketingStaffActivityResponse.StaffRow r = row.apply(contract.getMarketerName());
+      r.setContracts(r.getContracts() + 1);
+    }
+    MarketingStaffActivityResponse response = new MarketingStaffActivityResponse();
+    response.setArrivedVisitCount(visits.size());
+    response.setArrivedLeadCount(visits.stream().map(CrmVisitAppointment::getLeadId).filter(Objects::nonNull).distinct().count());
+    response.setStaff(rows.values().stream()
+        .sorted((a, b) -> Long.compare(b.getLeads(), a.getLeads()))
+        .collect(Collectors.toList()));
+    return response;
   }
 }

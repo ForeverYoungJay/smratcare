@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="变更记录" subTitle="床位/状态/护理等级变更追踪">
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline" class="search-bar">
+      <QueryBar :model="query" layout="inline" class="search-bar" @finish="fetchData">
         <a-form-item label="老人姓名">
           <a-select
             v-model:value="query.elderId"
@@ -38,14 +38,16 @@
             show-time
           />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="fetchData">搜索</a-button>
-            <a-button @click="reset">清空</a-button>
-            <a-button @click="exportRows">导出</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="fetchData">搜索</a-button>
+              <a-button @click="reset">清空</a-button>
+              <a-button @click="exportRows">导出</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
@@ -77,6 +79,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { onMounted, reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { useElderOptions } from '../../composables/useElderOptions'

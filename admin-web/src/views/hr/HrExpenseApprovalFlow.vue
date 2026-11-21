@@ -1,5 +1,12 @@
 <template>
   <PageContainer title="报销审批流" subTitle="薪酬与费用 / 审批流">
+    <template #extra>
+      <ActionToolbar>
+        <a-button @click="onExportCsv">导出 CSV</a-button>
+        <a-button @click="onExportExcel">导出 Excel</a-button>
+        <a-button type="primary" @click="openDrawer">新建报销申请</a-button>
+      </ActionToolbar>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="标题/申请人/备注" allow-clear />
@@ -7,15 +14,11 @@
       <a-form-item label="审批状态">
         <a-select v-model:value="query.status" allow-clear style="width: 180px" :options="statusOptions" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="onExportCsv">导出 CSV</a-button>
-          <a-button @click="onExportExcel">导出 Excel</a-button>
-          <a-button type="primary" @click="openDrawer">新建报销申请</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -60,6 +63,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { onMounted, reactive, ref } from 'vue'
 import type { Dayjs } from 'dayjs'
 import { message } from 'ant-design-vue'

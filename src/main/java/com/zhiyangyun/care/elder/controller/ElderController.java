@@ -204,7 +204,9 @@ public class ElderController {
       @RequestParam(required = false) String fullName,
       @RequestParam(required = false) String idCardNo,
       @RequestParam(required = false) String bedNo,
+      @RequestParam(required = false) String roomNo,
       @RequestParam(required = false) String careLevel,
+      @RequestParam(required = false) String building,
       @RequestParam(required = false) String sortBy,
       @RequestParam(required = false) String sortOrder) {
     Integer queryStatus = status == null ? elderStatus : status;
@@ -219,7 +221,9 @@ public class ElderController {
         fullName,
         idCardNo,
         bedNo,
+        roomNo,
         careLevel,
+        building,
         sortBy,
         sortOrder));
   }

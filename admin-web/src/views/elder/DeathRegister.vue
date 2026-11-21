@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="死亡登记" subTitle="老人死亡信息登记与追溯">
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline" class="search-bar">
+      <QueryBar :model="query" layout="inline" class="search-bar" @finish="fetchData">
         <a-form-item label="老人">
           <a-select
             v-model:value="query.elderId"
@@ -25,24 +25,26 @@
         <a-form-item label="关键词">
           <a-input v-model:value="query.keyword" allow-clear placeholder="原因/证明编号/上报人" style="width: 240px" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="fetchData">搜索</a-button>
-            <a-button @click="reset">清空</a-button>
-            <a-button v-if="canManage" @click="exportRows">导出</a-button>
-            <a-button v-if="canManage" type="primary" @click="openCreate">新增死亡登记</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="fetchData">搜索</a-button>
+              <a-button @click="reset">清空</a-button>
+              <a-button v-if="canManage" @click="exportRows">导出</a-button>
+              <a-button v-if="canManage" type="primary" @click="openCreate">新增死亡登记</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <a-space style="margin-bottom: 12px" wrap>
+      <ActionToolbar style="margin-bottom: 12px" wrap>
         <a-tag color="blue">已选 {{ selectedRowKeys.length }} 条</a-tag>
         <a-button v-if="canManage" :disabled="selectedRowKeys.length !== 1" @click="openEditSelected">更正</a-button>
         <a-button v-if="canCancel" danger :disabled="!canCancelSelected" @click="cancelSelected">作废</a-button>
         <a-button v-if="canCancel" danger :disabled="selectedRowKeys.length === 0" @click="deleteSelected">删除</a-button>
-      </a-space>
+      </ActionToolbar>
       <a-table
         :data-source="rows"
         :columns="columns"
@@ -70,7 +72,7 @@
       />
     </a-card>
 
-    <a-modal v-model:open="createOpen" :title="editingId ? '更正死亡登记' : '新增死亡登记'" @ok="submitCreate" :confirm-loading="submitting" width="560px">
+    <a-modal :mask-closable="false" v-model:open="createOpen" :title="editingId ? '更正死亡登记' : '新增死亡登记'" @ok="submitCreate" :confirm-loading="submitting" width="560px">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人" name="elderId">
           <a-select
@@ -119,6 +121,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'

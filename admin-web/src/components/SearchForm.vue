@@ -1,42 +1,26 @@
 <template>
-  <section class="search-form-card card-elevated">
-    <div class="search-form-head">
-      <div class="search-copy">
-        <div class="search-copy__eyebrow">{{ title }}</div>
-        <strong>{{ heading }}</strong>
-        <span v-if="description">{{ description }}</span>
-        <div class="search-copy__meta">
-          <!-- 空态给一次性引导，有筛选后只保留状态徽标：说明长句不再在每页常驻挤占首屏 -->
-          <span v-if="activeFieldCount > 0" class="search-chip">已启用 {{ activeFieldCount }} 个筛选条件</span>
-          <span v-else class="search-chip search-chip--ghost">输入条件后回车即可查询</span>
-        </div>
-      </div>
-      <div class="search-side">
-        <div class="search-extra" v-if="$slots.extra">
-          <slot name="extra" />
-        </div>
-        <div class="search-actions">
-          <a-button type="primary" html-type="submit" @click="onSearch">{{ searchText }}</a-button>
-          <a-button @click="onReset">{{ resetText }}</a-button>
-        </div>
-      </div>
-    </div>
-
-    <a-form
-      :model="model"
-      layout="inline"
-      @finish="onSearch"
-      @elder-autosearch="onAutoSearch"
-      class="search-form"
-    >
+  <section class="search-form-card">
+    <QueryBar :model="model" @finish="onSearch" @elder-autosearch="onAutoSearch">
       <slot />
-    </a-form>
+      <template #actions>
+        <a-button type="primary" html-type="submit">{{ searchText }}</a-button>
+        <a-button @click="onReset">{{ resetText }}</a-button>
+        <ActionToolbar v-if="$slots.extra"><slot name="extra" /></ActionToolbar>
+      </template>
+    </QueryBar>
+    <div v-if="activeFieldCount || description" class="query-context">
+      <span v-if="activeFieldCount">已启用 {{ activeFieldCount }} 个条件</span>
+      <span v-if="description">{{ description }}</span>
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
+import QueryBar from './QueryBar.vue'
+import ActionToolbar from './ActionToolbar.vue'
 import dayjs from 'dayjs'
+import { countActiveFilters } from '../utils/filterState'
 
 const props = withDefaults(
   defineProps<{
@@ -56,15 +40,7 @@ const props = withDefaults(
 )
 const emit = defineEmits<{ (e: 'search'): void; (e: 'reset'): void }>()
 const initialModel: Record<string, any> = {}
-
-const activeFieldCount = computed(() =>
-  Object.values(props.model || {}).filter((value) => {
-    if (Array.isArray(value)) return value.length > 0
-    if (typeof value === 'string') return value.trim().length > 0
-    return value !== undefined && value !== null && value !== ''
-  }).length
-)
-const heading = computed(() => (activeFieldCount.value > 0 ? '当前已按条件筛选' : '筛选条件'))
+const activeFieldCount = computed(() => countActiveFilters(props.model))
 
 function cloneValue<T>(value: T): T {
   if (value === undefined || value === null || typeof value !== 'object') return value
@@ -115,118 +91,6 @@ function onReset() {
 </script>
 
 <style scoped>
-.search-form-card {
-  padding: 18px 20px;
-}
-
-.search-form-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--border-soft);
-}
-
-.search-copy {
-  display: grid;
-  gap: 6px;
-}
-
-.search-copy__eyebrow {
-  color: #8a9a94;
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  font-weight: 700;
-}
-
-.search-copy strong {
-  color: #22332e;
-  font-size: 16px;
-}
-
-.search-copy span {
-  color: #5c6f69;
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.search-copy__meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.search-chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 26px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--primary-soft);
-  color: var(--primary);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.search-chip--ghost {
-  background: rgba(95, 123, 149, 0.08);
-  color: #4f6a84;
-}
-
-.search-side {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.search-extra {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.search-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.search-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.search-form :deep(.ant-form-item) {
-  margin-inline-end: 0;
-  margin-bottom: 0;
-}
-
-@media (max-width: 768px) {
-  .search-form-head {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .search-side,
-  .search-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
-
-  .search-actions :deep(.ant-btn) {
-    flex: 1;
-  }
-
-  .search-form :deep(.ant-form-item) {
-    width: 100%;
-  }
-}
+.search-form-card { padding:0; border:0; background:none; box-shadow:none; }
+.query-context { display:flex; flex-wrap:wrap; gap:12px; margin:6px 0 0; color:var(--muted); font-size:13px; }
 </style>

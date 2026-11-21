@@ -34,6 +34,17 @@ public class OaDocument {
   private LocalDateTime uploadedAt;
 
   private String remark;
+  private Integer versionNo;
+  private Long prevVersionId;
+  /** 1 = 当前生效版本；新版本审核通过前为 0 */
+  private Integer isCurrent;
+  /** PENDING 待审核 / APPROVED 已审核 / REJECTED 已退回 */
+  private String reviewStatus;
+  private String reviewerName;
+  private LocalDateTime reviewedAt;
+  private String reviewNote;
+  /** 下次复核日期 */
+  private java.time.LocalDate reviewDueDate;
 
   private Long createdBy;
 

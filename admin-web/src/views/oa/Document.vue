@@ -1,5 +1,13 @@
 <template>
   <PageContainer title="文档管理" subTitle="文档库档案夹 + Word/PDF 上传">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新增文档</a-button>
+      <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
+      <a-button @click="downloadExport">导出CSV</a-button>
+      <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+      <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+      <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
+    </template>
     <a-row :gutter="16">
       <a-col :xs="24" :md="6">
         <a-card class="card-elevated folder-card" :bordered="false">
@@ -38,20 +46,22 @@
               <a-select-option value="PRIVATE">私有</a-select-option>
             </a-select>
           </a-form-item>
+          <a-form-item label="审核">
+            <a-select v-model:value="query.reviewStatus" allow-clear style="width: 120px">
+              <a-select-option value="PENDING">待审核</a-select-option>
+              <a-select-option value="REJECTED">已退回</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item>
+            <a-checkbox v-model:checked="query.reviewDue">30 天内需复核</a-checkbox>
+          </a-form-item>
           <a-form-item label="区域">
             <a-input v-model:value="query.regionCode" placeholder="如：A区/护理部" allow-clear style="width: 160px" />
           </a-form-item>
           <a-form-item label="当前档案夹">
             <a-tag color="blue">{{ selectedFolderName }}</a-tag>
           </a-form-item>
-          <template #extra>
-            <a-button type="primary" @click="openCreate">新增文档</a-button>
-            <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
-            <a-button @click="downloadExport">导出CSV</a-button>
-            <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
-            <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
-            <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
-          </template>
+
         </SearchForm>
 
         <div v-if="isComplianceMode" class="compliance-panel">
@@ -84,6 +94,8 @@
         </div>
 
         <DataTable
+          :filter-model="query"
+          @clear-filters="fetchData"
           rowKey="id"
           :row-selection="rowSelection"
           :columns="columns"
@@ -111,6 +123,20 @@
                 {{ record.name }}
               </a-button>
             </template>
+            <template v-else-if="column.key === 'version'">
+              v{{ record.versionNo || 1 }}
+              <a-tag :color="REVIEW_TAG[record.reviewStatus || 'APPROVED'].color">{{ REVIEW_TAG[record.reviewStatus || 'APPROVED'].label }}</a-tag>
+            </template>
+            <template v-else-if="column.key === 'reviewDueDate'">
+              <span :style="{ color: record.reviewDueDate && record.reviewDueDate <= today ? '#cf1322' : undefined }">{{ record.reviewDueDate || '-' }}</span>
+            </template>
+            <template v-else-if="column.key === 'docAction'">
+              <a-space size="small">
+                <a v-if="record.reviewStatus === 'PENDING' && canReview" @click="reviewRef?.openReview(record)">审核</a>
+                <a v-if="record.isCurrent === 1 && record.reviewStatus === 'APPROVED'" @click="reviewRef?.openNewVersion(record)">新版本</a>
+                <a @click="reviewRef?.openHistory(record)">版本记录</a>
+              </a-space>
+            </template>
             <template v-else-if="column.key === 'sizeBytes'">
               {{ formatSize(record.sizeBytes) }}
             </template>
@@ -125,7 +151,7 @@
       </a-col>
     </a-row>
 
-    <a-modal v-model:open="editOpen" title="文档" @ok="submit" :confirm-loading="saving" width="680px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="文档" @ok="submit" :confirm-loading="saving" width="680px">
       <a-form layout="vertical">
         <a-form-item label="上传文件（Word/PDF）">
           <a-upload
@@ -164,6 +190,9 @@
         <a-form-item label="文件地址">
           <a-input v-model:value="form.url" placeholder="上传后自动填充，可粘贴外链" />
         </a-form-item>
+        <a-form-item label="下次复核日期" extra="正式制度到期前需复核；已审核文档如需改动请上传新版本">
+          <a-date-picker v-model:value="form.reviewDueDate" value-format="YYYY-MM-DD" style="width: 200px" />
+        </a-form-item>
         <a-row :gutter="16">
           <a-col :span="12">
             <a-form-item label="大小">
@@ -179,7 +208,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="folderEditOpen"
       :title="folderForm.id ? '编辑档案夹' : '新增档案夹'"
       @ok="submitFolder"
@@ -235,6 +264,7 @@
         </a-form-item>
       </a-form>
     </a-modal>
+    <DocumentReview ref="reviewRef" @changed="fetchData" />
   </PageContainer>
 </template>
 
@@ -242,6 +272,9 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { useRoute } from 'vue-router'
+import dayjs from 'dayjs'
+import { useUserStore } from '../../stores/user'
+import DocumentReview from './DocumentReview.vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -272,10 +305,21 @@ const query = reactive({
   keyword: '',
   folderVisibility: undefined as string | undefined,
   regionCode: '',
+  reviewStatus: undefined as string | undefined,
+  reviewDue: false,
   pageNo: 1,
   pageSize: 10,
   folderId: ''
 })
+const today = dayjs().format('YYYY-MM-DD')
+const user = useUserStore()
+const canReview = computed(() => (user.roles || []).some((role) => ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'].includes(role)))
+const reviewRef = ref<InstanceType<typeof DocumentReview>>()
+const REVIEW_TAG: Record<string, { label: string; color: string }> = {
+  PENDING: { label: '待审核', color: 'orange' },
+  APPROVED: { label: '已审核', color: 'green' },
+  REJECTED: { label: '已退回', color: 'red' }
+}
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const selectedRowKeys = ref<string[]>([])
 
@@ -329,8 +373,11 @@ const columns = [
   { title: '档案夹', dataIndex: 'folder', key: 'folder', width: 160 },
   { title: '大小', dataIndex: 'sizeBytes', key: 'sizeBytes', width: 120 },
   { title: '上传人', dataIndex: 'uploaderName', key: 'uploaderName', width: 120 },
+  { title: '版本', key: 'version', width: 130 },
+  { title: '复核到期', key: 'reviewDueDate', width: 110 },
   { title: '上传时间', dataIndex: 'uploadedAt', key: 'uploadedAt', width: 170 },
-  { title: '备注', dataIndex: 'remark', key: 'remark' }
+  { title: '备注', dataIndex: 'remark', key: 'remark' },
+  { title: '操作', key: 'docAction', width: 170 }
 ]
 
 const editOpen = ref(false)
@@ -342,6 +389,7 @@ const form = reactive({
   folderId: undefined as string | undefined,
   url: '',
   sizeBytes: undefined as number | undefined,
+  reviewDueDate: undefined as string | undefined,
   uploaderName: '',
   remark: ''
 })
@@ -513,7 +561,9 @@ async function fetchData() {
       folderId: query.folderId || undefined,
       folderVisibility: query.folderVisibility || undefined,
       regionCode: query.regionCode || undefined,
-      keyword: query.keyword || undefined
+      keyword: query.keyword || undefined,
+      reviewStatus: query.reviewStatus || undefined,
+      reviewDue: query.reviewDue || undefined
     })
     rows.value = (res.list || []).map((item) => ({
       ...item,
@@ -541,6 +591,8 @@ function onReset() {
   query.keyword = ''
   query.folderVisibility = undefined
   query.regionCode = ''
+  query.reviewStatus = undefined
+  query.reviewDue = false
   query.pageNo = 1
   query.pageSize = 10
   pagination.current = 1
@@ -567,6 +619,7 @@ function openCreate() {
   form.folderId = resolveExistingFormFolderId(selectedFolderKey.value)
   form.url = ''
   form.sizeBytes = undefined
+  form.reviewDueDate = undefined
   form.uploaderName = ''
   form.remark = ''
   editOpen.value = true
@@ -578,6 +631,7 @@ function openEdit(record: OaDocument) {
   form.folderId = resolveExistingFormFolderId(record.folderId ? String(record.folderId) : undefined)
   form.url = record.url || ''
   form.sizeBytes = record.sizeBytes
+  form.reviewDueDate = record.reviewDueDate
   form.uploaderName = record.uploaderName || ''
   form.remark = record.remark || ''
   editOpen.value = true
@@ -600,6 +654,7 @@ async function submit() {
     folder: selectedFolder?.name,
     url: form.url,
     sizeBytes: form.sizeBytes,
+    reviewDueDate: form.reviewDueDate,
     uploaderName: form.uploaderName,
     remark: form.remark
   }

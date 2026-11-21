@@ -59,7 +59,7 @@
               <a-textarea v-model:value="plan.remark" :rows="3" placeholder="例如：法定节假日必须安排行政主任到岗" />
             </a-form-item>
           </a-form>
-          <a-space wrap>
+          <ActionToolbar wrap>
             <a-button type="primary" @click="generateSchedule">自动生成排班表</a-button>
             <a-button type="primary" ghost :loading="publishing" :disabled="rows.length === 0" @click="publishSchedule">
               保存并实施
@@ -67,7 +67,7 @@
             <a-button :loading="loadingPublished" @click="loadPublishedSchedule">加载已实施排班</a-button>
             <a-button @click="saveDraft">保存草稿</a-button>
             <a-button @click="resetPlan">重置</a-button>
-          </a-space>
+          </ActionToolbar>
         </a-card>
 
         <a-card title="导入排班记录" size="small" style="margin-top: 16px">
@@ -146,6 +146,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, reactive, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
 import { message } from 'ant-design-vue'

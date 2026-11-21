@@ -1,13 +1,13 @@
 <template>
   <PageContainer title="健康巡检" subTitle="日常巡检项目与整改闭环">
     <template #extra>
-      <a-space wrap>
+      <ActionToolbar wrap>
         <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
         <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
         <a-button type="primary" @click="openCreate">新增巡检</a-button>
-      </a-space>
+      </ActionToolbar>
     </template>
-    <a-row :gutter="16" class="summary-row">
+    <a-row :gutter="16" class="summary-row business-stat-strip">
       <a-col :xs="24" :md="6"><a-card :bordered="false"><a-statistic title="巡检总数" :value="summary.totalCount" /></a-card></a-col>
       <a-col :xs="24" :md="6"><a-card :bordered="false"><a-statistic title="异常数" :value="summary.abnormalCount" /></a-card></a-col>
       <a-col :xs="24" :md="6"><a-card :bordered="false"><a-statistic title="跟进中" :value="summary.followingCount" /></a-card></a-col>
@@ -32,12 +32,12 @@
       </a-space>
     </a-card>
     <a-card v-if="residentContext.active" :bordered="false" class="summary-row context-card">
-      <a-space wrap>
+      <ActionToolbar wrap>
         <a-tag color="processing">当前长者：{{ residentContext.name }}</a-tag>
         <a-button size="small" @click="goWithResident('/medical-care/medication-registration')">查看用药登记</a-button>
         <a-button size="small" @click="goWithResident('/medical-care/nursing-log')">查看护理日志</a-button>
         <a-button size="small" @click="clearResidentContext">清除长者上下文</a-button>
-      </a-space>
+      </ActionToolbar>
     </a-card>
 
     <a-card :bordered="false" class="summary-row" title="基础健康限值">
@@ -74,7 +74,7 @@
 
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="长者"><ElderNameAutocomplete v-model:value="query.keyword" placeholder="姓名(编号)" width="220px" /></a-form-item>
-      <a-form-item label="状态"><a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 180px" /></a-form-item>
+      <a-form-item label="状态"><a-select v-model:value="query.status" :options="filterStatusOptions" allow-clear style="width: 180px" /></a-form-item>
       <a-form-item label="日期">
         <a-range-picker v-model:value="query.inspectionRange" style="width: 280px" />
       </a-form-item>
@@ -89,6 +89,8 @@
     </a-card>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -149,7 +151,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" title="健康巡检" @ok="submit" :confirm-loading="saving" width="760px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="健康巡检" @ok="submit" :confirm-loading="saving" width="760px">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">
@@ -319,6 +321,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
@@ -518,6 +521,11 @@ const statusOptions = [
   { label: '异常', value: 'ABNORMAL' },
   { label: '跟进中', value: 'FOLLOWING' },
   { label: '已关闭', value: 'CLOSED' }
+]
+// 列表筛选比录入表单多一个「未闭环」聚合项（异常+跟进中），供首页风险卡片下钻
+const filterStatusOptions = [
+  { label: '未闭环（异常+跟进中）', value: 'OPEN' },
+  ...statusOptions
 ]
 const board = reactive({
   floor: '',
@@ -1330,6 +1338,11 @@ async function loadExportRecords() {
   }
 }
 
+// 支持从首页/安全风险页带 ?status=OPEN|ABNORMAL|... 直达对应筛选
+const initialStatusFilter = String(route.query.status || '').toUpperCase()
+if (filterStatusOptions.some((item) => item.value === initialStatusFilter)) {
+  query.status = initialStatusFilter
+}
 fetchData()
 searchElders('')
 loadVitalThresholds()

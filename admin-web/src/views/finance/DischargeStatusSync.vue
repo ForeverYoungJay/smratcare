@@ -1,20 +1,28 @@
 <template>
   <PageContainer title="结算完成状态回写" subTitle="退住结算后回写老人档案状态与床位状态">
     <a-card class="card-elevated" :bordered="false">
-      <a-space wrap>
-        <a-input-number v-model:value="query.limit" :min="20" :max="500" :step="20" style="width: 140px" />
-        <a-input v-model:value="query.printRemark" allow-clear placeholder="打印备注" style="width: 180px" />
-        <a-button type="primary" :loading="loading" @click="loadData">刷新巡检</a-button>
-        <a-button :loading="executing" @click="executeBatch">执行全部回写</a-button>
-        <a-button @click="exportCurrent">导出CSV</a-button>
-        <a-button @click="printCurrent">打印当前</a-button>
-        <a-button @click="go('/finance/discharge/settlement')">查看退住结算</a-button>
-        <a-button @click="go('/logistics/assets/room-state-map')">查看房态图</a-button>
-      </a-space>
+      <QueryBar :model="query" @finish="loadData">
+        <a-form-item label="筛选条件">
+          <a-input-number v-model:value="query.limit" :min="20" :max="500" :step="20" style="width: 140px" />
+        </a-form-item>
+        <a-form-item label="打印备注">
+          <a-input v-model:value="query.printRemark" allow-clear placeholder="打印备注" style="width: 180px" />
+        </a-form-item>
+        <template #actions>
+          <ActionToolbar>
+            <a-button type="primary" :loading="loading" html-type="submit">刷新巡检</a-button>
+            <a-button :loading="executing" @click="executeBatch">执行全部回写</a-button>
+            <a-button @click="exportCurrent">导出CSV</a-button>
+            <a-button @click="printCurrent">打印当前</a-button>
+            <a-button @click="go('/finance/discharge/settlement')">查看退住结算</a-button>
+            <a-button @click="go('/logistics/assets/room-state-map')">查看房态图</a-button>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <StatefulBlock style="margin-top: 16px;" :loading="loading" :error="errorMessage" @retry="loadData">
-      <a-row :gutter="[12, 12]" style="margin-bottom: 12px;">
+      <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 12px;">
         <a-col :xs="12" :lg="8"><a-card size="small"><a-statistic title="已结算单" :value="data?.settledCount || 0" /></a-card></a-col>
         <a-col :xs="12" :lg="8"><a-card size="small"><a-statistic title="待回写异常" :value="data?.issueCount || 0" /></a-card></a-col>
         <a-col :xs="12" :lg="8"><a-card size="small"><a-statistic title="巡检时间" :value="data?.checkedAt || '-'" /></a-card></a-col>
@@ -57,6 +65,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'

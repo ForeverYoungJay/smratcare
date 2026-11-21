@@ -1,6 +1,5 @@
 package com.zhiyangyun.care;
 
-import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -44,14 +43,44 @@ class OaPortalControllerTest {
   void summary_uses_elder_contract_and_medical_counts() throws Exception {
     String token = loginAndGetToken("admin", "123456");
 
-    mockMvc.perform(get("/api/oa/portal/summary")
+    String body = mockMvc.perform(get("/api/oa/portal/summary")
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code", is(0)))
-        .andExpect(jsonPath("$.data.pendingMedicalOrderCount", greaterThanOrEqualTo(1)))
-        .andExpect(jsonPath("$.data.elderContractExpiringCount", greaterThanOrEqualTo(1)))
-        .andExpect(jsonPath("$.data.healthAbnormalCount", greaterThanOrEqualTo(1)))
-        .andExpect(jsonPath("$.data.elderAbnormalCount", is(0)));
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+
+    // Long 字段经 JacksonLongToStringConfig 序列化为字符串，需解析后做数值断言
+    JsonNode data = objectMapper.readTree(body).path("data");
+    org.junit.jupiter.api.Assertions.assertTrue(data.path("pendingMedicalOrderCount").asLong() >= 1, "pendingMedicalOrderCount");
+    org.junit.jupiter.api.Assertions.assertTrue(data.path("elderContractExpiringCount").asLong() >= 1, "elderContractExpiringCount");
+    org.junit.jupiter.api.Assertions.assertTrue(data.path("healthAbnormalCount").asLong() >= 1, "healthAbnormalCount");
+    org.junit.jupiter.api.Assertions.assertTrue(data.path("elderAbnormalCount").asLong() >= 1, "elderAbnormalCount");
+  }
+
+  @Test
+  @Sql(statements = {
+      "DELETE FROM oa_notice WHERE id IN (8911, 8912)",
+      "INSERT INTO oa_notice (id, tenant_id, org_id, title, content, status, publish_time, is_deleted) "
+          + "VALUES (8911, 1, 1, '已发布公告', '公开内容', 'PUBLISHED', CURRENT_TIMESTAMP, 0)",
+      "INSERT INTO oa_notice (id, tenant_id, org_id, title, content, status, is_deleted) "
+          + "VALUES (8912, 1, 1, '草稿公告', '内部草稿', 'DRAFT', 0)"
+  })
+  void summary_only_returns_published_notices() throws Exception {
+    String token = loginAndGetToken("admin", "123456");
+
+    String body = mockMvc.perform(get("/api/oa/portal/summary")
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code", is(0)))
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+
+    String notices = objectMapper.readTree(body).path("data").path("notices").toString();
+    org.junit.jupiter.api.Assertions.assertTrue(notices.contains("已发布公告"));
+    org.junit.jupiter.api.Assertions.assertFalse(notices.contains("草稿公告"));
   }
 
   private String loginAndGetToken(String username, String password) throws Exception {

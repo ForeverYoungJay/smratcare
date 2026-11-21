@@ -19,6 +19,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -29,12 +30,20 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/care/tasks")
 public class CareTaskController {
+  private static final String READ_ACCESS =
+      "hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')";
+  private static final String EXECUTE_ACCESS =
+      "hasAnyRole('NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')";
+  private static final String MANAGE_ACCESS =
+      "hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')";
+
   private final CareTaskService careTaskService;
 
   public CareTaskController(CareTaskService careTaskService) {
     this.careTaskService = careTaskService;
   }
 
+  @PreAuthorize(READ_ACCESS)
   @GetMapping("/today")
   public List<CareTaskTodayItem> getTodayTasks(
       @RequestParam(required = false) Long staffId,
@@ -43,14 +52,16 @@ public class CareTaskController {
     LocalDate target = date == null || date.isBlank()
         ? LocalDate.now()
         : LocalDate.parse(date, DateTimeFormatter.ISO_DATE);
-    return careTaskService.getTodayTasks(AuthContext.getOrgId(), staffId, elderId, target);
+    return careTaskService.getTodayTasks(AuthContext.getOrgId(), effectiveStaffId(staffId), elderId, target);
   }
 
+  @PreAuthorize(READ_ACCESS)
   @GetMapping("/logs")
   public Result<List<CareTaskExecuteLogItem>> logs(@RequestParam Long taskDailyId) {
     return Result.ok(careTaskService.listExecuteLogs(AuthContext.getOrgId(), taskDailyId));
   }
 
+  @PreAuthorize(READ_ACCESS)
   @GetMapping("/page")
   public Result<IPage<CareTaskTodayItem>> page(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -72,10 +83,11 @@ public class CareTaskController {
       from = parsedDate;
       to = parsedDate;
     }
-    return Result.ok(careTaskService.page(AuthContext.getOrgId(), pageNo, pageSize, from, to, staffId, elderId,
-        roomNo, careLevel, status, keyword, overdueOnly));
+    return Result.ok(careTaskService.page(AuthContext.getOrgId(), pageNo, pageSize, from, to,
+        effectiveStaffId(staffId), elderId, roomNo, careLevel, status, keyword, overdueOnly));
   }
 
+  @PreAuthorize(READ_ACCESS)
   @GetMapping("/summary")
   public Result<CareTaskSummaryResponse> summary(
       @RequestParam(required = false) String date,
@@ -95,15 +107,18 @@ public class CareTaskController {
       from = parsedDate;
       to = parsedDate;
     }
-    return Result.ok(careTaskService.summary(AuthContext.getOrgId(), from, to, staffId, elderId, roomNo, careLevel,
-        status, keyword, overdueOnly));
+    return Result.ok(careTaskService.summary(AuthContext.getOrgId(), from, to, effectiveStaffId(staffId), elderId,
+        roomNo, careLevel, status, keyword, overdueOnly));
   }
 
+  @PreAuthorize(EXECUTE_ACCESS)
   @PostMapping("/execute")
   public ExecuteTaskResponse executeTask(@Valid @RequestBody ExecuteTaskRequest request) {
+    request.setStaffId(AuthContext.getStaffId());
     return careTaskService.executeTask(AuthContext.getOrgId(), request);
   }
 
+  @PreAuthorize(MANAGE_ACCESS)
   @PostMapping("/generate")
   public int generateTasks(@RequestParam(required = false) String date,
                            @RequestParam(required = false, defaultValue = "false") boolean force) {
@@ -113,6 +128,7 @@ public class CareTaskController {
     return careTaskService.generateDailyTasks(AuthContext.getOrgId(), target, force);
   }
 
+  @PreAuthorize(MANAGE_ACCESS)
   @PostMapping("/assign")
   public Result<Void> assign(@Valid @RequestBody CareTaskAssignRequest request) {
     careTaskService.assignTask(AuthContext.getOrgId(), request.getTaskDailyId(), request.getStaffId(),
@@ -120,6 +136,7 @@ public class CareTaskController {
     return Result.ok(null);
   }
 
+  @PreAuthorize(MANAGE_ACCESS)
   @PostMapping("/assign/batch")
   public Result<Integer> assignBatch(@RequestBody CareTaskBatchAssignRequest request) {
     int updated = careTaskService.assignBatch(
@@ -136,6 +153,7 @@ public class CareTaskController {
     return Result.ok(updated);
   }
 
+  @PreAuthorize(MANAGE_ACCESS)
   @PostMapping("/review")
   public Result<Void> review(@Valid @RequestBody CareTaskReviewRequest request) {
     LocalDateTime reviewTime = request.getReviewTime() == null || request.getReviewTime().isBlank()
@@ -154,6 +172,7 @@ public class CareTaskController {
     return Result.ok(null);
   }
 
+  @PreAuthorize(MANAGE_ACCESS)
   @PostMapping("/exception/resolve")
   public Result<Void> resolveException(@Valid @RequestBody CareTaskExceptionResolveRequest request) {
     careTaskService.resolveException(
@@ -168,6 +187,7 @@ public class CareTaskController {
     return Result.ok(null);
   }
 
+  @PreAuthorize(MANAGE_ACCESS)
   @PostMapping("/create")
   public Result<Long> create(@Valid @RequestBody CareTaskCreateRequest request) {
     Long id = careTaskService.createTask(AuthContext.getOrgId(), request);
@@ -179,5 +199,12 @@ public class CareTaskController {
       return null;
     }
     return LocalDate.parse(value, DateTimeFormatter.ISO_DATE);
+  }
+
+  private Long effectiveStaffId(Long requestedStaffId) {
+    if (AuthContext.hasRole("NURSING_EMPLOYEE") && !AuthContext.isMinisterOrHigher()) {
+      return AuthContext.getStaffId();
+    }
+    return requestedStaffId;
   }
 }

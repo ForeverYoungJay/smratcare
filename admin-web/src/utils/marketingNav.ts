@@ -1,8 +1,8 @@
-import type { RouteLocationRaw } from 'vue-router'
+import type { LocationQueryRaw, RouteLocationRaw } from 'vue-router'
 
 type LeadTab = 'consultation' | 'intent' | 'callback'
 type LeadStage = 'consultation' | 'evaluation' | 'signing' | 'admission' | 'lost'
-type FollowupEntry = 'records' | 'due' | 'today' | 'overdue'
+export type FollowupEntry = 'records' | 'due' | 'today' | 'overdue'
 type ReservationEntry = 'records' | 'lock' | 'expiring' | 'panorama'
 type ContractEntry = 'pending' | 'signed' | 'renewal' | 'change' | 'attachments'
 type FunnelEntry = 'consultation' | 'evaluation' | 'signing' | 'admission' | 'lost'
@@ -21,10 +21,10 @@ export type MarketingLeadQuery = {
   marketerName?: string
 }
 
-function compactQuery(query: Record<string, unknown>) {
+function compactQuery(query: Record<string, unknown>): LocationQueryRaw {
   return Object.fromEntries(
     Object.entries(query).filter(([, value]) => value !== undefined && value !== null && String(value) !== '')
-  )
+  ) as LocationQueryRaw
 }
 
 export function buildLeadRoute(entry: 'all' | 'intent' | 'invalid' | 'blacklist' | 'unknown-source' | 'medical-transfer', query?: MarketingLeadQuery): RouteLocationRaw {
@@ -39,6 +39,12 @@ export function buildFollowupRoute(entry: FollowupEntry, query?: Record<string, 
     path: `/marketing/interactions/${entry}`,
     query: compactQuery(query || {})
   }
+}
+
+export function followupEntryFromPath(path: string): FollowupEntry {
+  const segments = String(path || '').split('?')[0].split('/').filter(Boolean)
+  const entry = segments[segments.length - 1]
+  return entry === 'due' || entry === 'overdue' || entry === 'records' ? entry : 'today'
 }
 
 export function buildReservationRoute(entry: ReservationEntry, query?: Record<string, unknown>): RouteLocationRaw {

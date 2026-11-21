@@ -5,11 +5,11 @@
         <a-col :span="6">
           <a-space direction="vertical" style="width: 100%">
             <a-input v-model:value="keyword" placeholder="搜索疾病" allow-clear />
-            <a-space wrap>
+            <ActionToolbar wrap>
               <a-button type="primary" @click="openDiseaseModal()">新增疾病</a-button>
               <a-button :disabled="!currentDisease" @click="openDiseaseModal(currentDisease || undefined)">编辑疾病</a-button>
               <a-button danger :disabled="!currentDisease" @click="removeCurrentDisease">删除疾病</a-button>
-            </a-space>
+            </ActionToolbar>
             <a-list
               bordered
               :data-source="filteredDiseases"
@@ -28,7 +28,7 @@
           </a-space>
         </a-col>
         <a-col :span="18">
-          <a-space style="margin-bottom: 12px">
+          <ActionToolbar style="margin-bottom: 12px">
             <a-button @click="goToTagCreate">去新增标签</a-button>
             <a-button @click="goToProductTagging">去商品打标</a-button>
             <a-button type="primary" :loading="saving" @click="save">保存配置</a-button>
@@ -36,7 +36,7 @@
             <a-upload :before-upload="beforeImport" :show-upload-list="false" accept=".csv">
               <a-button>导入CSV</a-button>
             </a-upload>
-          </a-space>
+          </ActionToolbar>
           <a-typography-text type="secondary" style="display: block; margin-bottom: 12px">
             建议流程：先新增标签，再到商品信息打标，最后回本页做禁忌规则绑定。
           </a-typography-text>
@@ -58,7 +58,7 @@
       </a-row>
     </a-card>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="diseaseModalOpen"
       :title="editingDiseaseId ? '编辑疾病' : '新增疾病'"
       :confirm-loading="diseaseSaving"
@@ -77,6 +77,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from "../../components/ActionToolbar.vue"
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'

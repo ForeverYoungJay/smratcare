@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="积分台账" subTitle="任务积分、奖励扣减与人工调整。">
+    <template #extra>
+      <a-button type="primary" @click="openAdjust">积分调整</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="员工">
         <a-select
@@ -18,12 +21,12 @@
       <a-form-item label="日期范围">
         <a-range-picker v-model:value="query.range" />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openAdjust">积分调整</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -37,10 +40,14 @@
             {{ record.changePoints > 0 ? '+' : '' }}{{ record.changePoints }}
           </span>
         </template>
+        <template v-else-if="column.key === 'reverse'">
+          <a v-if="record.sourceType !== 'REVERSAL'" @click="reverse(record)">冲正</a>
+          <span v-else class="neg">冲正记录</span>
+        </template>
       </template>
     </DataTable>
 
-    <a-modal v-model:open="adjustOpen" title="积分调整" @ok="submitAdjust" :confirm-loading="adjusting">
+    <a-modal :mask-closable="false" v-model:open="adjustOpen" title="积分调整" @ok="submitAdjust" :confirm-loading="adjusting">
       <a-form layout="vertical">
         <a-form-item label="员工" required>
           <a-select
@@ -70,13 +77,14 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
-import { message } from 'ant-design-vue'
+import { h, reactive, ref } from 'vue'
+import { Input, message, Modal } from 'ant-design-vue'
 import type { Dayjs } from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { adjustStaffPoints, getStaffPointsLog } from '../../api/hr'
+import { reversePointsLog } from '../../api/hrOps'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 import type { StaffPointsLog, PageResult } from '../../types'
 
@@ -97,8 +105,28 @@ const columns = [
   { title: '余额', dataIndex: 'balanceAfter', key: 'balanceAfter', width: 100 },
   { title: '来源', dataIndex: 'sourceType', key: 'sourceType', width: 120 },
   { title: '时间', dataIndex: 'createTime', key: 'createTime', width: 180 },
-  { title: '备注', dataIndex: 'remark', key: 'remark', width: 200 }
+  { title: '备注', dataIndex: 'remark', key: 'remark', width: 200 },
+  { title: '', key: 'reverse', width: 90 }
 ]
+
+/** 更正积分用冲正：追加相反分值流水，原记录保留 */
+function reverse(record: StaffPointsLog) {
+  let reason = ''
+  Modal.confirm({
+    title: `冲正 ${record.staffName || ''} 的 ${record.changePoints > 0 ? '+' : ''}${record.changePoints} 分`,
+    content: () => h(Input.TextArea, { rows: 2, placeholder: '冲正原因（必填）', onChange: (e: Event) => { reason = (e.target as HTMLTextAreaElement).value } }),
+    okText: '确认冲正',
+    async onOk() {
+      if (!reason.trim()) {
+        message.warning('请填写冲正原因')
+        return Promise.reject(new Error('reason required'))
+      }
+      await reversePointsLog(String(record.id), reason.trim())
+      message.success('已冲正')
+      await fetchData()
+    }
+  })
+}
 
 const adjustOpen = ref(false)
 const adjusting = ref(false)

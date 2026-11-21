@@ -32,6 +32,8 @@ public class ElderResponse {
   private String bedNo;
   private String roomNo;
   private String careLevel;
+  private Long responsibleStaffId;
+  private String responsibleStaffName;
   private String riskPrecommit;
   private String remark;
   private String sourceType;

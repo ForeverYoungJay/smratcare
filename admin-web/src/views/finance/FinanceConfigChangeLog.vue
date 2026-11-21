@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="配置变更记录" subTitle="查看财务配置变更轨迹（谁在何时改了什么）">
     <a-card class="card-elevated" :bordered="false">
-      <a-form layout="inline" :model="query">
+      <QueryBar layout="inline" :model="query" @finish="loadData">
         <a-form-item label="开始日期">
           <a-date-picker v-model:value="query.from" style="width: 150px" />
         </a-form-item>
@@ -16,6 +16,7 @@
             <a-select-option value="FIN_BILLING_CONFIG_CREATE">新增</a-select-option>
             <a-select-option value="FIN_BILLING_CONFIG_UPDATE">更新</a-select-option>
             <a-select-option value="FIN_BILLING_CONFIG_ROLLBACK">回滚</a-select-option>
+            <a-select-option value="FIN_CARE_LEVEL_FEE_SAVE">护理收费调整</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="风险等级">
@@ -28,18 +29,20 @@
         <a-form-item label="打印备注">
           <a-input v-model:value="query.printRemark" allow-clear placeholder="例如：配置审计版" style="width: 180px" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="loadData">查询</a-button>
-            <a-button @click="reset">重置</a-button>
-            <a-button @click="exportData">导出</a-button>
-            <a-button @click="printCurrent">打印当前</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">查询</a-button>
+              <a-button @click="reset">重置</a-button>
+              <a-button @click="exportData">导出</a-button>
+              <a-button @click="printCurrent">打印当前</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
-    <a-row :gutter="[12, 12]" style="margin-top: 16px;">
+    <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-top: 16px;">
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="变更记录数" :value="filteredRows.length" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="可回滚数" :value="rollbackableCount" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="高风险变更" :value="highRiskCount" /></a-card></a-col>
@@ -68,7 +71,8 @@
         <vxe-column title="操作" width="160" fixed="right">
           <template #default="{ row }">
             <div class="row-action-links">
-              <a-button type="link" size="small" danger @click="rollback(row)">回滚</a-button>
+              <a-button v-if="String(row.actionType || '').startsWith('FIN_BILLING_CONFIG_')" type="link" size="small" danger @click="rollback(row)">回滚</a-button>
+              <span v-else>留痕记录</span>
             </div>
           </template>
         </vxe-column>
@@ -88,6 +92,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

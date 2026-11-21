@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="入住统计" subTitle="按月份查看入住与离院趋势">
     <template #extra>
-      <a-space>
+      <ActionToolbar>
         <a-button type="primary" @click="loadData">刷新</a-button>
         <a-button @click="exportSummary">导出汇总</a-button>
         <a-dropdown>
@@ -16,7 +16,7 @@
             </a-menu>
           </template>
         </a-dropdown>
-      </a-space>
+      </ActionToolbar>
     </template>
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline">
@@ -87,7 +87,7 @@
       @apply-template="applyReportTemplate"
     />
 
-    <a-row :gutter="16" style="margin-top: 16px;">
+    <a-row class="business-stat-strip" :gutter="16" style="margin-top: 16px;">
       <a-col :span="6">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic title="期间入住人数" :value="stats.totalAdmissions" />
@@ -110,7 +110,7 @@
       </a-col>
     </a-row>
 
-    <a-row :gutter="16" style="margin-top: 16px;">
+    <a-row class="business-stat-strip" :gutter="16" style="margin-top: 16px;">
       <a-col :span="6">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic title="离院/入住比(%)" :value="stats.dischargeToAdmissionRate" :precision="2" />
@@ -134,6 +134,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'

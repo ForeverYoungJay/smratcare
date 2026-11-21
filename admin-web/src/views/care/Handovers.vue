@@ -6,7 +6,23 @@
           <a-range-picker v-model:value="query.range" value-format="YYYY-MM-DD" />
         </a-form-item>
         <a-form-item label="班次编码">
-          <a-input v-model:value="query.shiftCode" placeholder="如 MORNING" allow-clear />
+          <a-select
+            v-model:value="query.shiftCode"
+            style="width: 200px"
+            allow-clear
+            show-search
+            option-filter-prop="label"
+            placeholder="选择班次"
+            :loading="shiftCodeLoading"
+            :options="shiftCodeOptions"
+          >
+            <template #notFoundContent>
+              <div class="shift-code-empty">
+                还没有配置班次模板，
+                <a @click="goShiftTemplates">前往排班方案配置</a>
+              </div>
+            </template>
+          </a-select>
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 140px" />
@@ -21,6 +37,16 @@
           </a-space>
         </a-form-item>
       </a-form>
+
+      <!-- 行会被刷成黄/红两色，页面上必须说明这两种颜色代表什么，否则新人只会慌 -->
+      <div class="handover-legend">
+        <span class="handover-legend__item">
+          <i class="handover-legend__swatch handover-legend__swatch--warning"></i>已交接，但对方还没确认
+        </span>
+        <span class="handover-legend__item">
+          <i class="handover-legend__swatch handover-legend__swatch--danger"></i>备注命中风险关键词，需要重点交代
+        </span>
+      </div>
 
       <a-table
         row-key="id"
@@ -43,15 +69,16 @@
           </template>
           <template v-else-if="column.key === 'actions'">
             <div class="row-action-links">
-              <a-button type="link" size="small" @click="openModal(record)">编辑</a-button>
-              <a-button type="link" size="small" danger @click="remove(record.id)">删除</a-button>
+              <a-button v-if="canConfirm(record)" type="link" size="small" @click="confirm(record)">接班确认</a-button>
+              <a-button v-if="record.status !== 'CONFIRMED'" type="link" size="small" @click="openModal(record)">编辑</a-button>
+              <a-button v-if="!record.status || record.status === 'DRAFT'" type="link" size="small" danger @click="remove(record.id)">删除</a-button>
             </div>
           </template>
         </template>
       </a-table>
     </a-card>
 
-    <a-modal v-model:open="modalOpen" title="交接日志" :confirm-loading="submitting" width="760" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="modalOpen" title="交接日志" :confirm-loading="submitting" width="760" @ok="submit">
       <a-form ref="formRef" layout="vertical" :model="form" :rules="rules">
         <a-row :gutter="16">
           <a-col :span="12">
@@ -61,7 +88,22 @@
           </a-col>
           <a-col :span="12">
             <a-form-item label="班次编码" name="shiftCode" required>
-              <a-input v-model:value="form.shiftCode" />
+              <a-select
+                v-model:value="form.shiftCode"
+                allow-clear
+                show-search
+                option-filter-prop="label"
+                placeholder="选择班次"
+                :loading="shiftCodeLoading"
+                :options="shiftCodeOptions"
+              >
+                <template #notFoundContent>
+                  <div class="shift-code-empty">
+                    还没有配置班次模板，
+                    <a @click="goShiftTemplates">前往排班方案配置</a>
+                  </div>
+                </template>
+              </a-select>
             </a-form-item>
           </a-col>
         </a-row>
@@ -119,7 +161,7 @@
         <a-row :gutter="16">
           <a-col :span="8">
             <a-form-item label="状态" name="status">
-              <a-select v-model:value="form.status" :options="statusOptions" />
+              <a-select v-model:value="form.status" :options="formStatusOptions" />
             </a-form-item>
           </a-col>
           <a-col :span="8">
@@ -128,8 +170,8 @@
             </a-form-item>
           </a-col>
           <a-col :span="8">
-            <a-form-item label="确认时间" name="confirmTime">
-              <a-date-picker v-model:value="form.confirmTime" show-time value-format="YYYY-MM-DDTHH:mm:ss" style="width: 100%" />
+            <a-form-item label="接班确认" extra="由接班人本人在列表点「接班确认」">
+              <span>{{ form.confirmTime ? String(form.confirmTime).replace('T', ' ') : '待接班人确认' }}</span>
             </a-form-item>
           </a-col>
         </a-row>
@@ -143,16 +185,18 @@ import { computed, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance } from 'ant-design-vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { useStaffOptions } from '../../composables/useStaffOptions'
-import { createShiftHandover, deleteShiftHandover, getShiftHandover, getShiftHandoverPage, updateShiftHandover } from '../../api/nursing'
+import { useShiftCodeOptions } from '../../composables/useShiftCodeOptions'
+import { confirmShiftHandover, createShiftHandover, deleteShiftHandover, getShiftHandover, getShiftHandoverPage, updateShiftHandover } from '../../api/nursing'
 import { handoverExportColumns, mapCareExportRows } from '../../constants/careExport'
 import { exportCsv, exportExcel } from '../../utils/export'
 import { getHandoverRiskKeywords, syncMedicalAlertRules } from '../../utils/medicalAlertRule'
 import { uploadOaFile } from '../../api/oa'
 import type { PageResult, ShiftHandoverItem } from '../../types'
 import { resolveCareError } from './careError'
+import { useUserStore } from '../../stores/user'
 
 const route = useRoute()
 const rows = ref<ShiftHandoverItem[]>([])
@@ -163,6 +207,15 @@ const submitting = ref(false)
 const uploadingAttachment = ref(false)
 const formRef = ref<FormInstance>()
 const { staffOptions, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 120 })
+const { shiftCodeOptions, shiftCodeLoading, loadShiftCodes, ensureShiftCode } = useShiftCodeOptions()
+
+const shiftTemplateRouter = useRouter()
+const userStore = useUserStore()
+
+// 字典为空时给出口，别让人卡在一个选不了也填不了的下拉上
+function goShiftTemplates() {
+  shiftTemplateRouter.push('/care/scheduling/shift-templates')
+}
 const attachmentFiles = ref<HandoverAttachmentFile[]>([])
 const lastAutoOpenTaskKey = ref('')
 
@@ -201,6 +254,8 @@ const statusOptions = [
   { label: '已交接', value: 'HANDED_OVER' },
   { label: '已确认', value: 'CONFIRMED' }
 ]
+// 「已确认」只能由接班人本人在列表里确认，表单里不让选
+const formStatusOptions = statusOptions.filter((item) => item.value !== 'CONFIRMED')
 
 const rules = {
   dutyDate: [{ required: true, message: '请选择班次日期', trigger: 'change' }],
@@ -275,6 +330,8 @@ function openModal(record?: ShiftHandoverItem) {
     })
     ensureSelectedStaff(record.fromStaffId, record.fromStaffName)
     ensureSelectedStaff(record.toStaffId, record.toStaffName)
+    // 历史记录里的班次编码可能已经不在模板字典里，补进选项才不会显示成空白
+    ensureShiftCode(record.shiftCode)
     attachmentFiles.value = parseAttachments(record.attachmentUrls)
   }
   modalOpen.value = true
@@ -330,8 +387,8 @@ async function submit() {
     submitting.value = true
     const normalizedStatus = form.status || 'DRAFT'
     const nowIso = dayjs().format('YYYY-MM-DDTHH:mm:ss')
-    const handoverTime = toIsoDateTime(form.handoverTime) || (normalizedStatus === 'HANDED_OVER' || normalizedStatus === 'CONFIRMED' ? nowIso : undefined)
-    const confirmTime = toIsoDateTime(form.confirmTime) || (normalizedStatus === 'CONFIRMED' ? nowIso : undefined)
+    const handoverTime = toIsoDateTime(form.handoverTime) || (normalizedStatus === 'HANDED_OVER' ? nowIso : undefined)
+    const confirmTime = toIsoDateTime(form.confirmTime)
     const payload: Partial<ShiftHandoverItem> = {
       dutyDate: form.dutyDate,
       shiftCode: form.shiftCode,
@@ -360,6 +417,22 @@ async function submit() {
     message.error(resolveCareError(error, '保存失败'))
   } finally {
     submitting.value = false
+  }
+}
+
+const currentStaffId = computed(() => String(userStore.staffInfo?.id ?? ''))
+
+function canConfirm(record: ShiftHandoverItem) {
+  return record.status === 'HANDED_OVER' && !!currentStaffId.value && String(record.toStaffId) === currentStaffId.value
+}
+
+async function confirm(record: ShiftHandoverItem) {
+  try {
+    await confirmShiftHandover(record.id)
+    message.success('已确认接班')
+    await load()
+  } catch (error) {
+    message.error(resolveCareError(error, '确认失败'))
   }
 }
 
@@ -586,6 +659,7 @@ async function beforeUploadAttachment(file: File) {
 syncQueryFromRoute()
 load()
 searchStaff('')
+loadShiftCodes()
 syncMedicalAlertRules().catch(() => {})
 
 watch(
@@ -607,10 +681,40 @@ watch(
   color: var(--muted);
   font-size: 12px;
 }
+.handover-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.handover-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.handover-legend__swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-soft);
+}
+.handover-legend__swatch--warning {
+  background: rgba(var(--warning-rgb), 0.35);
+}
+.handover-legend__swatch--danger {
+  background: rgba(var(--danger-rgb), 0.24);
+}
 :deep(.handover-row-warning > td) {
   background: rgba(var(--warning-rgb), 0.12) !important;
 }
 :deep(.handover-row-danger > td) {
   background: rgba(var(--danger-rgb), 0.08) !important;
+}
+.shift-code-empty {
+  padding: 8px 4px;
+  color: var(--muted);
+  font-size: 12px;
 }
 </style>

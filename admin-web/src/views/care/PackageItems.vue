@@ -40,7 +40,7 @@
       </a-table>
     </a-card>
 
-    <a-modal v-model:open="modalOpen" title="套餐明细" :confirm-loading="submitting" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="modalOpen" title="套餐明细" :confirm-loading="submitting" @ok="submit">
       <a-form ref="formRef" layout="vertical" :model="form" :rules="rules">
         <a-form-item name="packageId" label="所属套餐" required>
           <a-select v-model:value="form.packageId" placeholder="请选择套餐">

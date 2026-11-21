@@ -7,7 +7,7 @@ export const permissionCode: Directive = {
     const permissions = getPermissions()
     const allowed = needCodes.length === 0 || needCodes.some((p) => permissions.includes(p))
     if (!allowed) {
-      el.parentNode && el.parentNode.removeChild(el)
+      el.parentNode?.removeChild(el)
     }
   }
 }

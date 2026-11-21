@@ -63,6 +63,49 @@ export interface MarketingCallbackReport {
 
 export type MarketingCallbackType = 'checkin' | 'trial' | 'discharge' | 'score'
 
+export type CrmVisitAppointmentStatus = 'SCHEDULED' | 'ARRIVED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW'
+
+export interface CrmVisitAppointmentItem {
+  id: Id
+  leadId: Id
+  leadName?: string
+  elderName?: string
+  appointmentTime: string
+  visitorName: string
+  visitorPhone?: string
+  partySize: number
+  ownerStaffId?: Id
+  ownerStaffName?: string
+  status: CrmVisitAppointmentStatus
+  arrivedAt?: string
+  completedAt?: string
+  visitResult?: string
+  cancelReason?: string
+  nextFollowDate?: string
+  remark?: string
+  createTime?: string
+}
+
+export interface CrmVisitAppointmentPayload {
+  leadId: Id
+  appointmentTime: string
+  visitorName: string
+  visitorPhone?: string
+  partySize?: number
+  ownerStaffName?: string
+  remark?: string
+}
+
+export interface CrmLeadDuplicateItem {
+  id?: Id
+  name?: string
+  phone?: string
+  ownerStaffName?: string
+  status?: number
+  accessible: boolean
+  reasons: string[]
+}
+
 export interface CrmLeadAssignRequest {
   ownerStaffId: Id
   ownerStaffName?: string
@@ -167,6 +210,7 @@ export interface CrmLeadPageQuery extends PageQuery {
   followupDateFrom?: string
   followupDateTo?: string
   followupDueOnly?: boolean
+  scenario?: string
 }
 
 /** 合同分页查询条件（对应 CrmContractController#page 的请求参数）。 */
@@ -186,6 +230,8 @@ export interface CrmContractPageQuery extends PageQuery {
   overdueOnly?: boolean
   sortByOverdue?: boolean
   currentOwnerDept?: string
+  /** 合同到期提醒：仅返回生效中、未续签且到期日不晚于该日期的合同，按到期日升序 */
+  expiryReminderTo?: string
 }
 
 export interface MarketingDataQualityReport {
@@ -389,6 +435,13 @@ export interface SmsTaskItem {
   createTime?: string
 }
 
+export interface CrmContractReminderConfig {
+  enabled: boolean
+  advanceDays: number
+  sendTime: string
+  templateContent: string
+}
+
 export interface SmsTaskCreateRequest {
   leadIds?: Id[]
   contractIds?: Id[]
@@ -408,6 +461,16 @@ export type ContractChangeStatus = (typeof CONTRACT_CHANGE_STATUSES)[number]
 export interface CrmContractItem {
   [key: string]: any
   id: Id
+  /** 入住费用审核最新结论（财务只读）：APPROVED / PENDING / REJECTED */
+  financeAuditStatus?: string | null
+  /** 最近一次入住登记日期，空表示未移交入住 */
+  admittedDate?: string | null
+  /** LONG_TERM / SHORT_TERM / TRIAL / DAY_CARE */
+  contractType?: string | null
+  /** 参考月费（元），实际收费以财务审批为准 */
+  referenceMonthlyFee?: number | null
+  /** YYYY-MM-DD */
+  expectedAdmissionDate?: string | null
   name?: string
   phone?: string
   leadId?: Id
@@ -432,7 +495,7 @@ export interface CrmContractItem {
   flowStage?: ContractFlowStage
   currentOwnerDept?: 'MARKETING' | 'ASSESSMENT'
   orgName?: string
-  status?: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'SIGNED' | 'EFFECTIVE' | 'VOID'
+  status?: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'SIGNED' | 'EFFECTIVE' | 'VOID' | 'TERMINATED'
   changeWorkflowStatus?: ContractChangeStatus
   changeWorkflowRemark?: string
   smsSendCount?: number

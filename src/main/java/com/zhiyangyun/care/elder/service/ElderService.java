@@ -25,9 +25,15 @@ public interface ElderService {
       String fullName,
       String idCardNo,
       String bedNo,
+      String roomNo,
       String careLevel,
+      String building,
       String sortBy,
       String sortOrder);
+
+  /** 在给定长者范围内分页（护理档案「待复评」等先算出名单再分页的场景） */
+  IPage<ElderResponse> pageWithin(Long tenantId, long pageNo, long pageSize, String keyword, String lifecycleStatus,
+      java.util.Set<Long> onlyElderIds);
 
   ElderResponse assignBed(Long elderId, AssignBedRequest request);
 

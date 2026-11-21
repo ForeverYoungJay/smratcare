@@ -5,6 +5,9 @@ import lombok.Data;
 @Data
 public class FamilyElderItem {
   private Long elderId;
+  private Long relationId;
+  private String authScopes;
+  private java.time.LocalDate validUntil;
   private String elderName;
   private String relation;
   private Integer isPrimary;

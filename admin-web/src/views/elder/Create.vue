@@ -1,5 +1,8 @@
 <template>
-  <PageContainer title="新建老人" subTitle="补录平台启用前已入住长者，保留历史合同与资料，不走营销流程">
+  <component
+    :is="embedded ? 'div' : PageContainer"
+    v-bind="embedded ? {} : { title: '新建老人', subTitle: '补录平台启用前已入住长者，保留历史合同与资料，不走营销流程' }"
+  >
     <a-card class="card-elevated" :bordered="false">
       <a-alert
         type="info"
@@ -17,11 +20,11 @@
       />
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" style="max-width: 920px">
         <a-form-item name="fullName">
-          <template #label><span class="required-label">姓名</span></template>
+          <template #label>姓名</template>
           <a-input v-model:value="form.fullName" @blur="refreshDuplicateWarnings" />
         </a-form-item>
         <a-form-item name="idCardNo">
-          <template #label><span class="required-label">身份证号</span></template>
+          <template #label>身份证号</template>
           <a-input v-model:value="form.idCardNo" @blur="refreshDuplicateWarnings" />
         </a-form-item>
         <a-row :gutter="16">
@@ -37,11 +40,11 @@
           </a-col>
         </a-row>
         <a-form-item name="phone">
-          <template #label><span class="required-label">手机号</span></template>
+          <template #label>手机号</template>
           <a-input v-model:value="form.phone" @blur="refreshDuplicateWarnings" />
         </a-form-item>
         <a-form-item name="homeAddress">
-          <template #label><span class="required-label">家庭地址</span></template>
+          <template #label>家庭地址</template>
           <a-input v-model:value="form.homeAddress" />
         </a-form-item>
         <a-form-item label="医保复印件">
@@ -72,7 +75,7 @@
           </a-space>
         </a-form-item>
         <a-form-item name="gender">
-          <template #label><span class="required-label">性别</span></template>
+          <template #label>性别</template>
           <a-select v-model:value="form.gender" placeholder="请选择">
             <a-select-option :value="1">男</a-select-option>
             <a-select-option :value="2">女</a-select-option>
@@ -104,6 +107,19 @@
         </a-form-item>
         <a-form-item label="护理等级" name="careLevel">
           <a-input v-model:value="form.careLevel" placeholder="如：一级护理/二级护理" />
+        </a-form-item>
+        <a-form-item label="责任护理员" name="responsibleStaffId">
+          <a-select
+            v-model:value="form.responsibleStaffId"
+            allow-clear
+            show-search
+            :filter-option="false"
+            :options="staffOptions"
+            :loading="staffLoading"
+            placeholder="输入姓名/工号搜索"
+            @search="searchStaff"
+            @focus="() => searchStaff('')"
+          />
         </a-form-item>
         <a-form-item label="风险预担" name="riskPrecommit">
           <a-select v-model:value="form.riskPrecommit" placeholder="请选择突发风险处置优先策略" allow-clear>
@@ -228,16 +244,17 @@
         <a-button type="primary" :loading="saving" @click="submit">保存</a-button>
       </a-space>
     </a-card>
-  </PageContainer>
+  </component>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import type { FormInstance, FormRules } from 'ant-design-vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
+import { useStaffOptions } from '../../composables/useStaffOptions'
 import { bindFamily, createElder, getElderPage, updateElderDiseases, uploadElderFile } from '../../api/elder'
 import { admitElder } from '../../api/elderLifecycle'
 import { upsertFamilyUser } from '../../api/family'
@@ -245,14 +262,21 @@ import { getBedList, getBuildingList, getFloorList, getRoomList } from '../../ap
 import { getDiseaseList } from '../../api/store'
 import type { AdmissionRequest, BedItem, BuildingItem, ElderCreateRequest, ElderItem, FloorItem, Id, RoomItem } from '../../types'
 
+// embedded：在长者列表的右侧抽屉里使用，保存/取消改为通知父组件，不跳路由也不读路由预填
+const props = defineProps<{ embedded?: boolean }>()
+const emit = defineEmits<{ saved: []; cancel: [] }>()
 const router = useRouter()
 const route = useRoute()
+const { staffOptions, staffLoading, searchStaff } = useStaffOptions()
 const formRef = ref<FormInstance>()
 const saving = ref(false)
+/** 提交成功后跳走时不要再拦一次 */
+const submitted = ref(false)
 const formDerivedBirthDate = ref('')
 const syncingAssetSelection = ref(false)
 
-const form = reactive<ElderCreateRequest & { contractNo?: string; depositAmount?: number }>({
+// responsibleStaffId 由后端同期补充到 ElderCreateRequest，类型未落地前用本地交叉类型
+const form = reactive<ElderCreateRequest & { contractNo?: string; depositAmount?: number; responsibleStaffId?: Id }>({
   fullName: '',
   idCardNo: '',
   phone: '',
@@ -268,6 +292,7 @@ const form = reactive<ElderCreateRequest & { contractNo?: string; depositAmount?
   contractNo: '',
   depositAmount: undefined,
   careLevel: '',
+  responsibleStaffId: undefined,
   riskPrecommit: undefined,
   status: 1,
   remark: '',
@@ -473,7 +498,7 @@ const duplicateWarningText = computed(() =>
 const rules: FormRules = {
   fullName: [{ required: true, message: '请输入姓名' }],
   idCardNo: [{ required: true, validator: validateIdCardNo, trigger: 'blur' }],
-  phone: [{ validator: validatePhone, trigger: 'blur' }],
+  phone: [{ required: true, validator: validatePhone, trigger: 'blur' }],
   homeAddress: [{ required: true, validator: validateHomeAddress, trigger: 'blur' }],
   gender: [{ required: true, validator: validateGender, trigger: 'change' }],
   birthDate: [{ validator: validateBirthDate, trigger: 'change' }],
@@ -486,8 +511,36 @@ const rules: FormRules = {
 }
 
 function back() {
-  router.push('/elder/list')
+  if (props.embedded) emit('cancel')
+  else router.push('/elder/list')
 }
+
+/** 表单里是否已经填了东西（用于判断离开时要不要拦一下） */
+function hasUnsavedInput() {
+  const filledField = Object.entries(form).some(([key, value]) => {
+    if (key === 'status') return false
+    if (Array.isArray(value)) return value.length > 0
+    if (typeof value === 'string') return value.trim().length > 0
+    return value !== undefined && value !== null && value !== ''
+  })
+  return filledField || selectedDiseaseIds.value.length > 0 || familyDraftRows.value.length > 0
+}
+
+// 23 个字段填到一半点了侧边栏就全没了，且全站没有草稿保存
+onBeforeRouteLeave(async () => {
+  if (submitted.value || saving.value || !hasUnsavedInput()) return true
+  return await new Promise<boolean>((resolve) => {
+    Modal.confirm({
+      title: '离开会丢掉已填写的内容',
+      content: '这份长者档案还没有保存，离开后需要重新填写。确定要离开吗？',
+      okText: '离开，不保存',
+      okType: 'danger',
+      cancelText: '继续填写',
+      onOk: () => resolve(true),
+      onCancel: () => resolve(false)
+    })
+  })
+})
 
 async function submit() {
   if (!formRef.value) return
@@ -503,7 +556,7 @@ async function submit() {
       throw new Error('整租入住必须选择主床位')
     }
     let successMessage = '保存成功'
-    const payload: ElderCreateRequest = {
+    const payload: ElderCreateRequest & { responsibleStaffId?: Id } = {
       fullName: trimText(form.fullName),
       idCardNo: trimText(form.idCardNo) || undefined,
       phone: trimText(form.phone) || undefined,
@@ -517,6 +570,7 @@ async function submit() {
       birthDate: form.birthDate,
       admissionDate: form.admissionDate,
       careLevel: form.careLevel,
+      responsibleStaffId: form.responsibleStaffId,
       riskPrecommit: form.riskPrecommit,
       status: form.status,
       remark: trimText(form.remark) || undefined,
@@ -529,26 +583,38 @@ async function submit() {
       payload.bedStartDate = form.bedId ? form.bedStartDate : undefined
     }
     const created: ElderItem = await createElder(payload)
+    // 档案一旦建成，后续附属步骤（疾病、家属、入住）失败都不能再报笼统的“保存失败”——
+    // 否则新人会重填重交，直接产生重复档案。逐步收集失败项，最后一次性说清楚。
+    const followUpWarnings: string[] = []
     if (created?.id && selectedDiseaseIds.value.length > 0) {
-      await updateElderDiseases(created.id, selectedDiseaseIds.value)
+      try {
+        await updateElderDiseases(created.id, selectedDiseaseIds.value)
+      } catch (diseaseError: any) {
+        followUpWarnings.push(`疾病信息未保存（${diseaseError?.message || '请稍后重试'}）`)
+      }
     }
     if (created?.id && familyDraftRows.value.length > 0) {
       for (let i = 0; i < familyDraftRows.value.length; i += 1) {
         const familyRow = familyDraftRows.value[i]
-        const user = await upsertFamilyUser({
-          realName: trimText(familyRow.realName),
-          phone: trimText(familyRow.phone),
-          idCardNo: trimText(familyRow.idCardNo),
-          status: 1
-        })
-        const familyUserId = String(user?.id || familyRow.familyUserId || '').trim()
-        if (!familyUserId) continue
-        await bindFamily({
-          elderId: created.id,
-          familyUserId,
-          relation: trimText(familyRow.relation) || '家属',
-          isPrimary: familyRow.isPrimary ? 1 : 0
-        })
+        const familyLabel = trimText(familyRow.realName) || `第 ${i + 1} 位家属`
+        try {
+          const user = await upsertFamilyUser({
+            realName: trimText(familyRow.realName),
+            phone: trimText(familyRow.phone),
+            idCardNo: trimText(familyRow.idCardNo),
+            status: 1
+          })
+          const familyUserId = String(user?.id || familyRow.familyUserId || '').trim()
+          if (!familyUserId) continue
+          await bindFamily({
+            elderId: created.id,
+            familyUserId,
+            relation: trimText(familyRow.relation) || '家属',
+            isPrimary: familyRow.isPrimary ? 1 : 0
+          })
+        } catch (familyError: any) {
+          followUpWarnings.push(`家属「${familyLabel}」未绑定（${familyError?.message || '请稍后重试'}）`)
+        }
       }
     }
     if (shouldAdmit && created?.id) {
@@ -566,14 +632,20 @@ async function submit() {
         await admitElder(admission)
         successMessage = '已完成历史入住补录'
       } catch (admitError: any) {
-        message.warning(
-          admitError?.message
-            || '老人档案已创建，但自动办理入住失败，请到“入住办理”继续处理'
-        )
+        followUpWarnings.push(`自动办理入住失败（${admitError?.message || '请到“入住办理”继续处理'}）`)
       }
     }
-    message.success(successMessage)
-    router.push('/elder/list')
+    if (followUpWarnings.length > 0) {
+      message.warning({
+        content: `长者档案已创建成功，但以下信息未保存：${followUpWarnings.join('；')}。请到长者档案中补充，不要重复建档。`,
+        duration: 8
+      })
+    } else {
+      message.success(successMessage)
+    }
+    submitted.value = true
+    if (props.embedded) emit('saved')
+    else router.push('/elder/list')
   } catch (error: any) {
     // 表单校验失败时 antd 抛出的是 { errorFields } 对象（无 message），需从中取出首个字段错误提示，
     // 否则会被吞成通用“保存失败”，用户无法定位是哪个字段有问题。
@@ -858,7 +930,8 @@ onMounted(async () => {
   if (!familyDraftRows.value.length) {
     addFamilyDraftRow()
   }
-  const fullNameFromRoute = trimText(String(route.query.fullName || ''))
+  // 抽屉里挂在列表路由下，列表的 fullName 是筛选条件而不是预填
+  const fullNameFromRoute = props.embedded ? '' : trimText(String(route.query.fullName || ''))
   if (!form.fullName && fullNameFromRoute) {
     form.fullName = fullNameFromRoute
   }
@@ -866,7 +939,7 @@ onMounted(async () => {
     form.admissionDate = dayjs().format('YYYY-MM-DD')
   }
   await loadAssets()
-  await applyBedRoutePrefill()
+  if (!props.embedded) await applyBedRoutePrefill()
   loadDiseaseOptions()
 })
 </script>

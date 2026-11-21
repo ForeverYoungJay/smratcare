@@ -2,6 +2,8 @@ package com.zhiyangyun.care.store.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.zhiyangyun.care.oa.entity.OaApproval;
+import com.zhiyangyun.care.oa.mapper.OaApprovalMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhiyangyun.care.auth.model.Result;
@@ -77,6 +79,7 @@ public class InventoryController {
   private final StaffMapper staffMapper;
   private final DepartmentMapper departmentMapper;
   private final AuditLogService auditLogService;
+  private final OaApprovalMapper oaApprovalMapper;
 
   public InventoryController(InventoryService inventoryService,
       InventoryBatchMapper inventoryBatchMapper,
@@ -90,7 +93,8 @@ public class InventoryController {
       CrmContractMapper crmContractMapper,
       StaffMapper staffMapper,
       DepartmentMapper departmentMapper,
-      AuditLogService auditLogService) {
+      AuditLogService auditLogService,
+      OaApprovalMapper oaApprovalMapper) {
     this.inventoryService = inventoryService;
     this.inventoryBatchMapper = inventoryBatchMapper;
     this.inventoryAdjustmentMapper = inventoryAdjustmentMapper;
@@ -104,6 +108,7 @@ public class InventoryController {
     this.staffMapper = staffMapper;
     this.departmentMapper = departmentMapper;
     this.auditLogService = auditLogService;
+    this.oaApprovalMapper = oaApprovalMapper;
   }
 
   @PostMapping("/adjust")
@@ -291,6 +296,19 @@ public class InventoryController {
     return Result.ok(toOutboundSheetResponse(sheet, itemList, productMap, batchMap, resolveElderName(orgId, sheet.getElderId())));
   }
 
+  private boolean hasApprovedMaterialApply(InventoryOutboundSheet sheet) {
+    String id = String.valueOf(sheet.getId());
+    return oaApprovalMapper.selectList(Wrappers.lambdaQuery(OaApproval.class)
+            .eq(OaApproval::getIsDeleted, 0)
+            .eq(sheet.getOrgId() != null, OaApproval::getOrgId, sheet.getOrgId())
+            .eq(OaApproval::getApprovalType, "MATERIAL_APPLY")
+            .eq(OaApproval::getStatus, "APPROVED")
+            .like(OaApproval::getFormData, id))
+        .stream()
+        .anyMatch(approval -> approval.getFormData() != null
+            && approval.getFormData().matches("(?s).*\"outboundSheetId\"\\s*:\\s*\"?" + id + "\"?\\s*[,}].*"));
+  }
+
   @PostMapping("/outbound/sheet/confirm")
   @Transactional
   public Result<InventoryOutboundSheetResponse> confirmOutboundSheet(@RequestParam Long id) {
@@ -304,6 +322,10 @@ public class InventoryController {
     }
     if ("CONFIRMED".equalsIgnoreCase(sheet.getStatus())) {
       return Result.ok(getOutboundSheetDetail(id).getData());
+    }
+    // 领用必须先走「物资领用」审批；审批通过时系统会自动出库，这里只补处理审批已通过但当时未能出库的单子
+    if (!hasApprovedMaterialApply(sheet)) {
+      throw new IllegalStateException("领用单需先提交物资领用审批，审批通过后才能出库");
     }
     List<InventoryOutboundSheetItem> items = inventoryOutboundSheetItemMapper.selectList(
         Wrappers.lambdaQuery(InventoryOutboundSheetItem.class)

@@ -6,10 +6,7 @@ vi.mock('./auth', () => ({
 }))
 
 describe('export utils', () => {
-  const originalFetch = global.fetch
-  let clickSpy: ReturnType<typeof vi.spyOn>
-  let createObjectURLSpy: ReturnType<typeof vi.spyOn>
-  let revokeObjectURLSpy: ReturnType<typeof vi.spyOn>
+  const originalFetch = globalThis.fetch
 
   beforeEach(() => {
     // jsdom 的 Blob 未实现 arrayBuffer()，用 FileReader 兜底真实读取字节（Response 会把 Blob 变成字符串）
@@ -30,27 +27,24 @@ describe('export utils', () => {
     if (typeof URL.revokeObjectURL !== 'function') {
       ;(URL as unknown as { revokeObjectURL: () => void }).revokeObjectURL = () => {}
     }
-    clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
-    createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test')
-    revokeObjectURLSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
   })
 
   afterEach(() => {
-    global.fetch = originalFetch
-    clickSpy.mockRestore()
-    createObjectURLSpy.mockRestore()
-    revokeObjectURLSpy.mockRestore()
-    vi.clearAllMocks()
+    globalThis.fetch = originalFetch
+    vi.restoreAllMocks()
   })
 
   it('does not prepend a second BOM when CSV already contains one', async () => {
     let downloadedBlob: Blob | undefined
-    createObjectURLSpy.mockImplementation((blob: Blob | MediaSource) => {
+    vi.mocked(URL.createObjectURL).mockImplementation((blob: Blob | MediaSource) => {
       downloadedBlob = blob as Blob
       return 'blob:test'
     })
     // 用字节数组而非 Blob 构造 Response：测试环境（undici）会把 Blob body 字符串化为 "[object Blob]"
-    global.fetch = vi.fn().mockResolvedValue(
+    globalThis.fetch = vi.fn().mockResolvedValue(
       new Response(new Uint8Array([0xef, 0xbb, 0xbf, 0x61]), {
         status: 200,
         headers: {
@@ -68,11 +62,11 @@ describe('export utils', () => {
 
   it('prepends BOM when CSV does not contain one', async () => {
     let downloadedBlob: Blob | undefined
-    createObjectURLSpy.mockImplementation((blob: Blob | MediaSource) => {
+    vi.mocked(URL.createObjectURL).mockImplementation((blob: Blob | MediaSource) => {
       downloadedBlob = blob as Blob
       return 'blob:test'
     })
-    global.fetch = vi.fn().mockResolvedValue(
+    globalThis.fetch = vi.fn().mockResolvedValue(
       new Response('a', {
         status: 200,
         headers: {

@@ -1,11 +1,11 @@
 <template>
   <PageContainer title="心血管风险评估" subTitle="评估中心 > 缺血性心血管病风险评估">
     <template #extra>
-      <a-space wrap>
+      <ActionToolbar wrap>
         <a-button @click="exportCsvData">导出CSV</a-button>
         <a-button @click="exportExcelData">导出Excel</a-button>
         <a-button type="primary" @click="openCreate">新建风险评估</a-button>
-      </a-space>
+      </ActionToolbar>
     </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="长者"><ElderNameAutocomplete v-model:value="query.keyword" placeholder="姓名(编号)" width="220px" /></a-form-item>
@@ -21,7 +21,7 @@
     </SearchForm>
 
     <StatefulBlock :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
-      <a-row :gutter="[12, 12]" style="margin-bottom: 12px">
+      <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 12px">
         <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="总评估" :value="summary.totalCount || 0" /></a-card></a-col>
         <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已发布" :value="summary.publishedCount || 0" /></a-card></a-col>
         <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="草稿" :value="summary.draftCount || 0" /></a-card></a-col>
@@ -39,7 +39,9 @@
     </StatefulBlock>
 
     <StatefulBlock :loading="loading" :error="tableError" :empty="!loading && !tableError && rows.length === 0" empty-text="暂无心血管风险评估记录" @retry="fetchData">
-      <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="false" :pagination="pagination" :row-class-name="resolveRowClassName" @change="onTableChange">
+      <DataTable
+        :filter-model="query"
+        @clear-filters="fetchData" rowKey="id" :columns="columns" :data-source="rows" :loading="false" :pagination="pagination" :row-class-name="resolveRowClassName" @change="onTableChange">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'elderBed'">
             {{ record.elderName || '-' }} / {{ (record.elderId && bedNoMap[record.elderId]) || '-' }}
@@ -66,7 +68,7 @@
       </DataTable>
     </StatefulBlock>
 
-    <a-modal v-model:open="editOpen" :title="form.id ? '编辑心血管风险评估' : '新建心血管风险评估'" width="900px" @ok="submit" :confirm-loading="saving">
+    <a-modal :mask-closable="false" v-model:open="editOpen" :title="form.id ? '编辑心血管风险评估' : '新建心血管风险评估'" width="900px" @ok="submit" :confirm-loading="saving">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="8">
@@ -116,6 +118,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'

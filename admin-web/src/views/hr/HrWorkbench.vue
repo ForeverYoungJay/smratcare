@@ -1,27 +1,32 @@
 <template>
-  <PageContainer title="人力资源中心" subTitle="招聘、档案、考勤、费用与绩效激励一体化管理。">
-    <a-card :bordered="false" class="card-elevated" style="margin-bottom: 12px" title="卡片1：今日人力概况">
-      <a-row :gutter="16">
-        <a-col :xs="12" :md="4">
+  <PageContainer title="行政人事部工作台" subTitle="用专业的人力资源管理，支撑更温暖、更高效的颐养服务。" mode="scenic">
+    <a-card :bordered="false" class="card-elevated hr-primary-metrics" style="margin-bottom: 12px" title="今日人事重点">
+      <a-row class="business-stat-strip" :gutter="[12, 12]">
+        <a-col :xs="12" :md="6">
           <div class="stat-clickable" @click="goFirstAvailable(['/hr/profile/basic?status=1', '/hr/profile/social-security-reminders?scope=active'])">
             <a-statistic title="在职人数" :value="summary.onJobCount" />
           </div>
         </a-col>
-        <a-col :xs="12" :md="4">
+        <a-col :xs="12" :md="6">
           <div class="stat-clickable" @click="goFirstAvailable(['/hr/profile/basic?status=0', '/hr/profile/social-security-reminders?scope=inactive'])">
             <a-statistic title="离职人数" :value="summary.leftCount" />
           </div>
         </a-col>
-        <a-col :xs="12" :md="4">
+        <a-col :xs="12" :md="6">
           <div class="stat-clickable" @click="go('/hr/development/records?date=today')">
             <a-statistic title="今日培训" :value="summary.todayTrainingCount" />
           </div>
         </a-col>
-        <a-col :xs="12" :md="4">
+        <a-col :xs="12" :md="6">
           <div class="stat-clickable" @click="goFirstAvailable(['/hr/attendance/leave-approval?type=LEAVE&status=PENDING', '/workbench/approvals'])">
             <a-statistic title="请假审批待办" :value="summary.pendingLeaveApprovalCount" />
           </div>
         </a-col>
+      </a-row>
+    </a-card>
+
+    <a-card :bordered="false" class="card-elevated hr-secondary-metrics" style="margin-bottom: 12px" title="人事提醒与关怀">
+      <a-row class="business-stat-strip" :gutter="[12, 12]">
         <a-col :xs="12" :md="4">
           <div class="stat-clickable" @click="goFirstAvailable(['/hr/attendance/abnormal?date=today', '/workbench/attendance'])">
             <a-statistic title="考勤异常" :value="summary.attendanceAbnormalCount" />
@@ -50,7 +55,7 @@
       </a-row>
     </a-card>
 
-    <a-card :bordered="false" class="card-elevated" style="margin-bottom: 12px" title="卡片2：快速查找与常用入口">
+    <a-card :bordered="false" class="card-elevated" style="margin-bottom: 12px" title="快速查找与常用入口">
       <a-space wrap style="margin-bottom: 12px">
         <a-input-search v-model:value="actionKeyword" placeholder="搜索入口，如 合同 / 生日 / 报销 / 培训" allow-clear style="width: 320px" />
         <a-tag color="blue">匹配 {{ matchedActionCount }} 项</a-tag>
@@ -72,7 +77,7 @@
     <a-row :gutter="12">
       <a-col v-for="section in visibleSections" :key="section.title" :xs="24" :xl="8" style="margin-bottom: 12px">
         <a-card :bordered="false" class="card-elevated" :title="section.title">
-          <a-space wrap>
+          <ActionToolbar wrap>
             <template v-for="action in section.actions" :key="action.path">
               <div class="action-entry">
                 <a-badge v-if="action.path === '/workbench/todo?keyword=生日提醒'" :count="summary.birthdayTodoCount || 0" :offset="[2, -2]">
@@ -87,7 +92,7 @@
                 </a-tooltip>
               </div>
             </template>
-          </a-space>
+          </ActionToolbar>
         </a-card>
       </a-col>
     </a-row>
@@ -121,6 +126,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from "../../components/ActionToolbar.vue"
 import { StarFilled, StarOutlined } from '@ant-design/icons-vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
@@ -447,12 +453,23 @@ useLiveSyncRefresh({
 }
 
 .stat-clickable {
-  border-radius: 8px;
-  padding: 8px;
+  min-height: 96px;
+  border: 1px solid #e6ebe7;
+  border-radius: 11px;
+  padding: 15px;
+  background: #fbfdfb;
   cursor: pointer;
 }
 
 .stat-clickable:hover {
-  background: rgba(var(--primary-rgb), 0.06);
+  border-color: #94cbb7;
+  background: #f2faf5;
 }
+
+.hr-primary-metrics :deep(.ant-card-head), .hr-secondary-metrics :deep(.ant-card-head) { border-bottom: 0; }
+.hr-primary-metrics :deep(.ant-statistic-title) { color: #54645b; font-size: 14px; }
+.hr-primary-metrics :deep(.ant-statistic-content) { color: #173e31; font-family: "Noto Serif SC", "Songti SC", serif; font-size: 30px; }
+.hr-secondary-metrics :deep(.ant-statistic-title) { font-size: 12px; }
+.hr-secondary-metrics .stat-clickable { min-height: 76px; padding: 10px; }
+.stat-clickable:focus-visible { outline: 3px solid #25836c; outline-offset: 2px; }
 </style>

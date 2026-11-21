@@ -4,7 +4,7 @@
       <a-button type="primary" @click="openForm()">新增模板</a-button>
     </template>
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline" class="search-bar">
+      <QueryBar :model="query" layout="inline" class="search-bar" @finish="fetchData">
         <a-form-item label="关键字">
           <a-input v-model:value="query.keyword" placeholder="模板名称/编码" allow-clear />
         </a-form-item>
@@ -23,18 +23,20 @@
             <a-select-option :value="2">停用</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="fetchData">查询</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="fetchData">查询</a-button>
+              <a-button @click="reset">重置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <div class="table-actions">
-        <a-space>
+        <ActionToolbar>
           <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
           <a-button :disabled="!selectedSingleRecord" @click="configQuestionsSelected">配置题目</a-button>
           <a-button :disabled="!selectedSingleRecord" @click="openQrSelected">二维码</a-button>
@@ -49,7 +51,7 @@
           <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
           <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
           <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
-        </a-space>
+        </ActionToolbar>
       </div>
       <div class="publish-tip">发布后自动同步到家属端问卷列表与行政端问卷统计，可直接扫码填写。</div>
       <a-table
@@ -94,7 +96,7 @@
       />
     </a-card>
 
-    <a-modal v-model:open="open" title="模板" width="560px" :confirm-loading="submitting" @ok="submit" @cancel="() => (open = false)">
+    <a-modal :mask-closable="false" v-model:open="open" title="模板" width="560px" :confirm-loading="submitting" @ok="submit" @cancel="() => (open = false)">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="模板编码" name="templateCode">
           <a-input v-model:value="form.templateCode" placeholder="如 T_001" />
@@ -197,6 +199,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { onMounted, reactive, ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'

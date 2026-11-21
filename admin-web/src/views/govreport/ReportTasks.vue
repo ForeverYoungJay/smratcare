@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="监管上报" subTitle="民政金民工程 / 医保结算上报：构建报文 → 发送 → 回执 → 重试">
+    <template #extra>
+      <a-button type="primary" @click="openBuild">构建上报任务</a-button>
+    </template>
     <SearchForm :model="query" @search="onSearch" @reset="onReset">
       <a-form-item label="渠道">
         <a-select v-model:value="query.channel" allow-clear style="width: 160px" placeholder="全部渠道">
@@ -20,12 +23,12 @@
           <a-select-option value="FAILED">失败</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openBuild">构建上报任务</a-button>
-      </template>
+
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="onSearch" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'channel'">
           <a-tag :color="record.channel === 'MZ_JINMIN' ? 'geekblue' : 'purple'">{{ channelText(record.channel) }}</a-tag>
@@ -49,7 +52,7 @@
     </DataTable>
 
     <!-- 构建任务 -->
-    <a-modal v-model:open="buildOpen" title="构建上报任务" :confirm-loading="saving" @ok="submitBuild">
+    <a-modal :mask-closable="false" v-model:open="buildOpen" title="构建上报任务" :confirm-loading="saving" @ok="submitBuild">
       <a-form layout="vertical">
         <a-form-item label="渠道" required>
           <a-select v-model:value="buildForm.channel">

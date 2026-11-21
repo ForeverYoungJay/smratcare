@@ -17,6 +17,9 @@ public class CardAccountResponse {
   private LocalDateTime openTime;
   private LocalDateTime lastRechargeTime;
   private String remark;
+  private Long prevCardId;
+  private String statusReason;
+  private java.time.LocalDateTime statusChangedAt;
   private LocalDateTime createTime;
   private LocalDateTime updateTime;
 }

@@ -1,16 +1,22 @@
 <template>
   <PageContainer title="缴费渠道与收款账户" subTitle="配置收款渠道、账户号、户名与渠道启停">
     <a-card class="card-elevated" :bordered="false">
-      <a-space wrap>
-        <a-date-picker v-model:value="query.month" picker="month" style="width: 150px" />
-        <a-button type="primary" @click="loadData">刷新</a-button>
-        <a-button @click="openEdit()">新增渠道</a-button>
-        <a-button @click="batchToggleStatus(1)">批量启用</a-button>
-        <a-button @click="batchToggleStatus(0)">批量停用</a-button>
-        <a-button @click="exportData">导出</a-button>
-        <a-button @click="triggerImport">导入CSV</a-button>
-        <a-button @click="go('/finance/config/change-log')">查看变更记录</a-button>
-      </a-space>
+      <QueryBar :model="query" @finish="loadData">
+        <a-form-item label="月份">
+          <a-date-picker v-model:value="query.month" picker="month" style="width: 150px" />
+        </a-form-item>
+        <template #actions>
+          <ActionToolbar>
+            <a-button type="primary" html-type="submit">刷新</a-button>
+            <a-button @click="openEdit()">新增渠道</a-button>
+            <a-button @click="batchToggleStatus(1)">批量启用</a-button>
+            <a-button @click="batchToggleStatus(0)">批量停用</a-button>
+            <a-button @click="exportData">导出</a-button>
+            <a-button @click="triggerImport">导入CSV</a-button>
+            <a-button @click="go('/finance/config/change-log')">查看变更记录</a-button>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
     <a-card v-if="impactPreview" class="card-elevated" :bordered="false" style="margin-top: 12px;">
       <a-alert
@@ -44,7 +50,7 @@
       </vxe-table>
     </a-card>
 
-    <a-modal v-model:open="editOpen" title="缴费渠道" @ok="submitEdit" :confirm-loading="saving">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="缴费渠道" @ok="submitEdit" :confirm-loading="saving">
       <a-form layout="vertical" :model="form">
         <a-form-item label="渠道编码">
           <a-input v-model:value="form.channelCode" placeholder="如 ALIPAY / WECHAT / BANK" />
@@ -67,6 +73,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { onMounted, ref, computed } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="医嘱管理" subTitle="长期/临时医嘱开立与停嘱（长期医嘱按频次自动生成执行单）">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">开立医嘱</a-button>
+    </template>
     <SearchForm :model="query" @search="onSearch" @reset="onReset">
       <a-form-item label="长者">
         <a-select v-model:value="query.elderId" show-search allow-clear :filter-option="false" :options="elderOptions"
@@ -17,12 +20,12 @@
           <a-select-option v-for="c in categoryOptions" :key="c.value" :value="c.value">{{ c.label }}</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openCreate">开立医嘱</a-button>
-      </template>
+
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="onSearch" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'orderType'">
           <a-tag :color="record.orderType === 'TEMPORARY' ? 'gold' : 'blue'">{{ record.orderType === 'TEMPORARY' ? '临时' : '长期' }}</a-tag>
@@ -38,7 +41,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="createOpen" title="开立医嘱" :confirm-loading="saving" width="720px" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="createOpen" title="开立医嘱" :confirm-loading="saving" width="720px" @ok="submit">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">
@@ -91,7 +94,9 @@ import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import { useRoute } from 'vue-router'
 import { useElderOptions } from '../../composables/useElderOptions'
+import { normalizeResidentId } from '../../utils/id'
 import { getMedicalOrderPage, createMedicalOrder, stopMedicalOrder } from '../../api/medOrder'
 import { getDrugPage } from '../../api/pharmacy'
 import type { Id, MedicalOrder, PageResult } from '../../types'
@@ -113,7 +118,13 @@ const saving = ref(false)
 const rows = ref<MedicalOrder[]>([])
 const query = reactive({ elderId: undefined as Id | undefined, status: undefined as string | undefined, category: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
-const { elderOptions, searchElders } = useElderOptions({ pageSize: 50 })
+const { elderOptions, searchElders, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
+// 从长者健康档案进入时按 residentId 预先筛选该长者
+const routeResidentId = normalizeResidentId(useRoute().query as Record<string, unknown>)
+if (routeResidentId) {
+  query.elderId = routeResidentId
+  ensureSelectedElder(routeResidentId)
+}
 
 const drugOptions = ref<Array<{ label: string; value: Id }>>([])
 const drugLoading = ref(false)

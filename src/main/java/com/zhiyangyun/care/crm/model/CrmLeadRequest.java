@@ -1,5 +1,7 @@
 package com.zhiyangyun.care.crm.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.validation.constraints.AssertTrue;
 import lombok.Data;
 
 @Data
@@ -49,4 +51,15 @@ public class CrmLeadRequest {
   private String nextFollowDate;
   private String remark;
   private Long createdBy;
+  private Boolean allowDuplicate;
+
+  @JsonIgnore
+  @AssertTrue(message = "请填写线索姓名、咨询人姓名或老人姓名")
+  public boolean isLeadNamePresent() {
+    return hasText(name) || hasText(consultantName) || hasText(elderName);
+  }
+
+  private boolean hasText(String value) {
+    return value != null && !value.trim().isEmpty();
+  }
 }

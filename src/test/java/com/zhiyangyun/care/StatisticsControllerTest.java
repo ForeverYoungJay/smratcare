@@ -64,8 +64,8 @@ class StatisticsControllerTest {
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code", is(0)))
-        .andExpect(jsonPath("$.data.totalAdmissions", is(1)))
-        .andExpect(jsonPath("$.data.totalDischarges", is(1)));
+        .andExpect(jsonPath("$.data.totalAdmissions", is("1")))
+        .andExpect(jsonPath("$.data.totalDischarges", is("1")));
   }
 
   @Test
@@ -85,20 +85,20 @@ class StatisticsControllerTest {
   @Test
   @Sql(statements = {
       "INSERT INTO bill_monthly (id, org_id, elder_id, bill_month, total_amount, paid_amount, outstanding_amount, status, is_deleted) "
-          + "VALUES (8101, 1, 200, '2026-01', 120.00, 120.00, 0.00, 2, 0)",
+          + "VALUES (8101, 1, 200, '2018-01', 120.00, 120.00, 0.00, 2, 0)",
       "INSERT INTO bill_monthly (id, org_id, elder_id, bill_month, total_amount, paid_amount, outstanding_amount, status, is_deleted) "
-          + "VALUES (8102, 1, 201, '2026-01', 80.00, 80.00, 0.00, 2, 0)",
-      "INSERT INTO `order` (id, org_id, order_no, elder_id, total_amount, points_used, payable_amount, pay_status, order_status, create_time, update_time, is_deleted) "
-          + "VALUES (8201, 1, 'O-200', 200, 30.00, 0, 30.00, 1, 1, TIMESTAMP '2026-01-15 10:00:00', TIMESTAMP '2026-01-15 10:00:00', 0)",
-      "INSERT INTO `order` (id, org_id, order_no, elder_id, total_amount, points_used, payable_amount, pay_status, order_status, create_time, update_time, is_deleted) "
-          + "VALUES (8202, 1, 'O-201', 201, 50.00, 0, 50.00, 1, 1, TIMESTAMP '2026-01-20 10:00:00', TIMESTAMP '2026-01-20 10:00:00', 0)"
+          + "VALUES (8102, 1, 201, '2018-01', 80.00, 80.00, 0.00, 2, 0)",
+      "INSERT INTO `order` (id, org_id, order_no, elder_id, total_amount, points_used, payable_amount, pay_status, order_status, pay_time, create_time, update_time, is_deleted) "
+          + "VALUES (8201, 1, 'O-200', 200, 30.00, 0, 30.00, 1, 3, TIMESTAMP '2018-01-15 10:00:00', TIMESTAMP '2018-01-15 10:00:00', TIMESTAMP '2018-01-15 10:00:00', 0)",
+      "INSERT INTO `order` (id, org_id, order_no, elder_id, total_amount, points_used, payable_amount, pay_status, order_status, pay_time, create_time, update_time, is_deleted) "
+          + "VALUES (8202, 1, 'O-201', 201, 50.00, 0, 50.00, 1, 3, TIMESTAMP '2018-01-20 10:00:00', TIMESTAMP '2018-01-20 10:00:00', TIMESTAMP '2018-01-20 10:00:00', 0)"
   })
   void consumption_supports_elder_filter() throws Exception {
     String token = loginAndGetToken("admin", "123456");
 
     mockMvc.perform(get("/api/stats/consumption")
-            .param("from", "2026-01")
-            .param("to", "2026-01")
+            .param("from", "2018-01")
+            .param("to", "2018-01")
             .param("elderId", "200")
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
@@ -107,7 +107,7 @@ class StatisticsControllerTest {
         .andExpect(jsonPath("$.data.totalStoreConsumption", is(30.00)))
         .andExpect(jsonPath("$.data.totalConsumption", is(150.00)))
         .andExpect(jsonPath("$.data.topConsumerElders.length()", is(1)))
-        .andExpect(jsonPath("$.data.topConsumerElders[0].elderId", is(200)));
+        .andExpect(jsonPath("$.data.topConsumerElders[0].elderId", is("200")));
   }
 
   private String loginAndGetToken(String username, String password) throws Exception {

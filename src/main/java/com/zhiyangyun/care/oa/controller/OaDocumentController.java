@@ -17,6 +17,9 @@ import com.zhiyangyun.care.oa.model.OaDocumentRequest;
 import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.access.prepost.PreAuthorize;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -77,7 +80,9 @@ public class OaDocumentController {
       @RequestParam(required = false) String folder,
       @RequestParam(required = false) String folderVisibility,
       @RequestParam(required = false) String regionCode,
-      @RequestParam(required = false) String keyword) {
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String reviewStatus,
+      @RequestParam(required = false, defaultValue = "false") boolean reviewDue) {
     long resolvedPageNo = pageNo != null && pageNo > 0 ? pageNo : (page != null && page > 0 ? page : 1);
     long resolvedPageSize = pageSize != null && pageSize > 0 ? pageSize : (size != null && size > 0 ? size : 20);
     Long orgId = AuthContext.getOrgId();
@@ -102,6 +107,10 @@ public class OaDocumentController {
       wrapper.and(w -> w.like(OaDocument::getName, keyword)
           .or().like(OaDocument::getUploaderName, keyword));
     }
+    // 历史版本不在列表中重复出现；待审核的新版本要让审核人看到
+    wrapper.and(w -> w.eq(OaDocument::getIsCurrent, 1).or().eq(OaDocument::getReviewStatus, "PENDING"));
+    wrapper.eq(reviewStatus != null && !reviewStatus.isBlank(), OaDocument::getReviewStatus, reviewStatus);
+    wrapper.le(reviewDue, OaDocument::getReviewDueDate, LocalDate.now().plusDays(30));
     wrapper.orderByDesc(OaDocument::getUploadedAt).orderByDesc(OaDocument::getCreateTime);
     return Result.ok(documentMapper.selectPage(new Page<>(resolvedPageNo, resolvedPageSize), wrapper));
   }
@@ -274,8 +283,100 @@ public class OaDocumentController {
     doc.setUploaderName(normalizeText(uploaderName, MAX_UPLOADER_LENGTH));
     doc.setUploadedAt(request.getUploadedAt() == null ? LocalDateTime.now() : request.getUploadedAt());
     doc.setRemark(normalizeText(request.getRemark(), MAX_REMARK_LENGTH));
+    doc.setReviewDueDate(request.getReviewDueDate());
+    doc.setVersionNo(1);
+    doc.setIsCurrent(1);
+    doc.setReviewStatus("PENDING");
     doc.setCreatedBy(AuthContext.getStaffId());
     documentMapper.insert(doc);
+    return Result.ok(doc);
+  }
+
+  public record NewVersionRequest(String url, String name, Long sizeBytes, String remark) {}
+
+  /** 上传新版本：不覆盖原文件，新版本待审核，审核通过后才替换为当前版本 */
+  @PostMapping("/{id}/versions")
+  public Result<OaDocument> newVersion(@PathVariable Long id, @RequestBody NewVersionRequest request) {
+    OaDocument current = findAccessibleDocument(id);
+    if (current == null || !Integer.valueOf(1).equals(current.getIsCurrent())) {
+      throw new IllegalArgumentException("只能在当前版本上发起新版本");
+    }
+    String url = normalizeText(request.url(), MAX_URL_LENGTH);
+    if (url == null) {
+      throw new IllegalArgumentException("请上传新版本文件");
+    }
+    validateSize(request.sizeBytes());
+    Long pending = documentMapper.selectCount(Wrappers.lambdaQuery(OaDocument.class)
+        .eq(OaDocument::getIsDeleted, 0)
+        .eq(OaDocument::getPrevVersionId, id)
+        .eq(OaDocument::getReviewStatus, "PENDING"));
+    if (pending != null && pending > 0) {
+      throw new IllegalArgumentException("已有待审核的新版本，请先完成审核");
+    }
+    OaDocument next = new OaDocument();
+    next.setTenantId(current.getTenantId());
+    next.setOrgId(current.getOrgId());
+    next.setName(normalizeText(request.name() == null || request.name().isBlank() ? current.getName() : request.name(), MAX_NAME_LENGTH));
+    next.setFolder(current.getFolder());
+    next.setFolderId(current.getFolderId());
+    next.setUrl(url);
+    next.setSizeBytes(request.sizeBytes());
+    next.setUploaderId(AuthContext.getStaffId());
+    next.setUploaderName(normalizeText(AuthContext.getUsername(), MAX_UPLOADER_LENGTH));
+    next.setUploadedAt(LocalDateTime.now());
+    next.setRemark(normalizeText(request.remark(), MAX_REMARK_LENGTH));
+    next.setReviewDueDate(current.getReviewDueDate());
+    next.setVersionNo((current.getVersionNo() == null ? 1 : current.getVersionNo()) + 1);
+    next.setPrevVersionId(current.getId());
+    next.setIsCurrent(0);
+    next.setReviewStatus("PENDING");
+    next.setCreatedBy(AuthContext.getStaffId());
+    documentMapper.insert(next);
+    return Result.ok(next);
+  }
+
+  /** 历史版本：从该版本沿上一版本回溯 */
+  @GetMapping("/{id}/versions")
+  public Result<List<OaDocument>> versions(@PathVariable Long id) {
+    List<OaDocument> chain = new ArrayList<>();
+    OaDocument doc = findAccessibleDocument(id);
+    while (doc != null && chain.size() < 50) {
+      chain.add(doc);
+      doc = doc.getPrevVersionId() == null ? null : findAccessibleDocument(doc.getPrevVersionId());
+    }
+    return Result.ok(chain);
+  }
+
+  public record ReviewRequest(boolean pass, String note) {}
+
+  /** 审核：通过后成为当前版本、上一版本转为历史；上传人不能审核自己的版本 */
+  @PutMapping("/{id}/review")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @Transactional
+  public Result<OaDocument> review(@PathVariable Long id, @RequestBody ReviewRequest request) {
+    OaDocument doc = findAccessibleDocument(id);
+    if (doc == null || !"PENDING".equals(doc.getReviewStatus())) {
+      throw new IllegalArgumentException("仅待审核文档可审核");
+    }
+    if (Objects.equals(doc.getCreatedBy(), AuthContext.getStaffId())) {
+      throw new IllegalArgumentException("不能审核自己上传的版本");
+    }
+    if (!request.pass() && (request.note() == null || request.note().isBlank())) {
+      throw new IllegalArgumentException("退回请填写原因");
+    }
+    doc.setReviewStatus(request.pass() ? "APPROVED" : "REJECTED");
+    doc.setReviewerName(normalizeText(AuthContext.getUsername(), MAX_UPLOADER_LENGTH));
+    doc.setReviewedAt(LocalDateTime.now());
+    doc.setReviewNote(normalizeText(request.note(), MAX_REMARK_LENGTH));
+    if (request.pass() && doc.getPrevVersionId() != null) {
+      doc.setIsCurrent(1);
+      OaDocument prev = documentMapper.selectById(doc.getPrevVersionId());
+      if (prev != null) {
+        prev.setIsCurrent(0);
+        documentMapper.updateById(prev);
+      }
+    }
+    documentMapper.updateById(doc);
     return Result.ok(doc);
   }
 
@@ -288,6 +389,10 @@ public class OaDocumentController {
     validateSize(request.getSizeBytes());
     validatePayload(request);
     String normalizedUrl = normalizeText(request.getUrl(), MAX_URL_LENGTH);
+    if ("APPROVED".equals(doc.getReviewStatus()) && !Objects.equals(normalizedUrl, doc.getUrl())) {
+      throw new IllegalArgumentException("已审核的文档不能直接替换文件，请上传新版本");
+    }
+    doc.setReviewDueDate(request.getReviewDueDate());
     String normalizedFolder = normalizeText(request.getFolder(), MAX_FOLDER_LENGTH);
     Long resolvedFolderId = hasDocumentFolderIdColumn() ? resolveFolderId(request.getFolderId(), normalizedFolder) : null;
     doc.setName(normalizeText(resolveDocumentName(request.getName(), normalizedUrl), MAX_NAME_LENGTH));
@@ -655,6 +760,14 @@ public class OaDocumentController {
     columns.add(OaDocument::getUploaderName);
     columns.add(OaDocument::getUploadedAt);
     columns.add(OaDocument::getRemark);
+    columns.add(OaDocument::getVersionNo);
+    columns.add(OaDocument::getPrevVersionId);
+    columns.add(OaDocument::getIsCurrent);
+    columns.add(OaDocument::getReviewStatus);
+    columns.add(OaDocument::getReviewerName);
+    columns.add(OaDocument::getReviewedAt);
+    columns.add(OaDocument::getReviewNote);
+    columns.add(OaDocument::getReviewDueDate);
     columns.add(OaDocument::getCreatedBy);
     columns.add(OaDocument::getCreateTime);
     columns.add(OaDocument::getUpdateTime);
@@ -703,8 +816,7 @@ public class OaDocumentController {
   }
 
   private boolean hasTable(String tableName) {
-    return schemaCapabilityCache.computeIfAbsent("table:" + tableName, key -> {
-      Integer count = jdbcTemplate.queryForObject(
+    return schemaCapabilityCache.computeIfAbsent("table:" + tableName, key -> probe(() -> jdbcTemplate.queryForObject(
           """
               SELECT COUNT(1)
               FROM information_schema.TABLES
@@ -712,14 +824,11 @@ public class OaDocumentController {
                 AND TABLE_NAME = ?
               """,
           Integer.class,
-          tableName);
-      return count != null && count > 0;
-    });
+          tableName)));
   }
 
   private boolean hasColumn(String tableName, String columnName) {
-    return schemaCapabilityCache.computeIfAbsent("column:" + tableName + ":" + columnName, key -> {
-      Integer count = jdbcTemplate.queryForObject(
+    return schemaCapabilityCache.computeIfAbsent("column:" + tableName + ":" + columnName, key -> probe(() -> jdbcTemplate.queryForObject(
           """
               SELECT COUNT(1)
               FROM information_schema.COLUMNS
@@ -729,9 +838,17 @@ public class OaDocumentController {
               """,
           Integer.class,
           tableName,
-          columnName);
+          columnName)));
+  }
+
+  /** 探测语句是 MySQL 专用的；探测失败（如 H2）时按当前迁移后的完整结构处理 */
+  private boolean probe(java.util.function.Supplier<Integer> query) {
+    try {
+      Integer count = query.get();
       return count != null && count > 0;
-    });
+    } catch (org.springframework.dao.DataAccessException e) {
+      return true;
+    }
   }
 
   private String safe(Object value) {

@@ -7,7 +7,7 @@
       </a-space>
     </template>
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline" class="search-bar">
+      <QueryBar :model="query" layout="inline" class="search-bar" @finish="fetchData">
         <a-form-item label="老人姓名">
           <a-select
             v-model:value="query.elderId"
@@ -36,13 +36,15 @@
         <a-form-item label="试住开始日期">
           <a-range-picker v-model:value="query.trialStartDateRange" value-format="YYYY-MM-DD" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="fetchData">搜索</a-button>
-            <a-button @click="reset">清空</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="fetchData">搜索</a-button>
+              <a-button @click="reset">清空</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
@@ -79,7 +81,7 @@
       />
     </a-card>
 
-    <a-modal v-model:open="editOpen" :title="editId ? '编辑试住登记' : '新增试住登记'" @ok="submit" :confirm-loading="submitting" width="560px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" :title="editId ? '编辑试住登记' : '新增试住登记'" @ok="submit" :confirm-loading="submitting" width="560px">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人" name="elderId">
           <a-select
@@ -136,6 +138,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'

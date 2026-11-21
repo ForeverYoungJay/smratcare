@@ -18,12 +18,14 @@
 </template>
 
 <script setup lang="ts">
+import { useCompletionGuide } from '../../composables/useCompletionGuide'
 import { reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { generateTasksByPackage } from '../../api/standard'
 import { resolveCareError } from './careError'
 
+const showCompletion = useCompletionGuide()
 const loading = ref(false)
 const lastCount = ref<number | null>(null)
 const form = reactive({ date: '', force: false })
@@ -38,6 +40,7 @@ async function submit() {
     const count = await generateTasksByPackage({ date: form.date, force: form.force })
     lastCount.value = Number(count)
     message.success('任务已生成')
+    showCompletion('护理任务已生成', [{ label: '查看今日任务', path: '/care/today' }])
   } catch (error) {
     message.error(resolveCareError(error, '生成失败'))
   } finally {

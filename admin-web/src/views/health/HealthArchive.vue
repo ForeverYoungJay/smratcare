@@ -1,5 +1,13 @@
 <template>
   <PageContainer title="健康档案" subTitle="维护老人长期健康信息，并补充基础疾病入口">
+    <template #extra>
+      <a-space>
+        <a-button @click="goMedicalDiseaseManager">基础疾病维护</a-button>
+        <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
+        <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
+        <a-button type="primary" @click="openCreate">新增档案</a-button>
+      </a-space>
+    </template>
     <template #meta>
       <span class="soft-pill">档案总数 {{ pagination.total || rows.length }}</span>
       <span class="soft-pill">已维护疾病 {{ diseaseMaintainedCount }}</span>
@@ -35,17 +43,12 @@
       <a-form-item label="老人姓名">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="goMedicalDiseaseManager">基础疾病维护</a-button>
-          <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
-          <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
-          <a-button type="primary" @click="openCreate">新增档案</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -75,7 +78,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" title="健康档案" @ok="submit" :confirm-loading="saving" width="760px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="健康档案" @ok="submit" :confirm-loading="saving" width="760px">
       <a-form layout="vertical">
         <a-form-item label="老人" required>
           <a-select

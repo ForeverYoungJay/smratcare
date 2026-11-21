@@ -5,6 +5,10 @@ export interface OaNotice {
   publisherName?: string
   publishTime?: string
   status?: string
+  /** STAFF 员工 / FAMILY 家属 / ALL 全部 */
+  audience?: string
+  readCount?: number
+  readByMe?: boolean
 }
 
 export interface OaTodo {
@@ -64,6 +68,15 @@ export interface OaDocument {
   uploaderName?: string
   uploadedAt?: string
   remark?: string
+  versionNo?: number
+  prevVersionId?: string | number
+  isCurrent?: number
+  /** PENDING 待审核 / APPROVED 已审核 / REJECTED 已退回 */
+  reviewStatus?: string
+  reviewerName?: string
+  reviewedAt?: string
+  reviewNote?: string
+  reviewDueDate?: string
 }
 
 export interface OaDocumentFolder {
@@ -309,8 +322,14 @@ export interface OaWorkReport {
   riskIssue?: string
   nextPlan?: string
   status?: string
-  reporterId?: number
+  reporterId?: number | string
   reporterName?: string
+  reviewerName?: string
+  reviewComment?: string
+  reviewScore?: number
+  reviewedAt?: string
+  createTime?: string
+  updateTime?: string
 }
 
 export interface OaWorkReportSummary {

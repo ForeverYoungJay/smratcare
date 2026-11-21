@@ -1,5 +1,12 @@
 <template>
   <PageContainer title="AI健康评估报告" subTitle="报告查看、发布与一键生成任务">
+    <template #extra>
+      <a-space>
+        <a-button @click="exportCsvData">导出CSV</a-button>
+        <a-button @click="exportExcelData">导出Excel</a-button>
+        <a-button type="primary" @click="openCreate">生成报告</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="loadReports" @reset="onReset">
       <a-form-item label="报告类型">
         <a-select v-model:value="query.type" allow-clear style="width: 160px" :options="typeOptions" />
@@ -10,16 +17,12 @@
       <a-form-item label="日期范围">
         <a-range-picker v-model:value="query.range" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="exportCsvData">导出CSV</a-button>
-          <a-button @click="exportExcelData">导出Excel</a-button>
-          <a-button type="primary" @click="openCreate">生成报告</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" :row-class-name="resolveRowClassName" @change="onTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="loadReports" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" :row-class-name="resolveRowClassName" @change="onTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'typeLabel'">
           {{ typeLabel(record.type) }}

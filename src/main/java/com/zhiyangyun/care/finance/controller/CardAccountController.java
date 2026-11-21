@@ -17,6 +17,7 @@ import com.zhiyangyun.care.finance.model.CardAccountRequest;
 import com.zhiyangyun.care.finance.model.CardAccountResponse;
 import com.zhiyangyun.care.finance.model.CardTradeLogResponse;
 import com.zhiyangyun.care.finance.model.CardTradeRequest;
+import com.zhiyangyun.care.finance.support.CardLifecycle;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -39,8 +40,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/card/account")
-@PreAuthorize("hasAnyRole('FINANCE_EMPLOYEE','FINANCE_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+// 卡务（开卡、挂失、补卡、注销）由行政办理；充值、消费涉及资金，仅财务可操作
+@PreAuthorize("hasAnyRole('FINANCE_EMPLOYEE','FINANCE_MINISTER','HR_EMPLOYEE','HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
 public class CardAccountController {
+  private static final String FUNDS_ROLES = "hasAnyRole('FINANCE_EMPLOYEE','FINANCE_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')";
+
   private final CardAccountMapper cardAccountMapper;
   private final ElderMapper elderMapper;
   private final ElderAccountMapper elderAccountMapper;
@@ -93,20 +97,22 @@ public class CardAccountController {
   @Transactional
   public Result<CardAccount> create(@Valid @RequestBody CardAccountRequest request) {
     Long orgId = AuthContext.getOrgId();
-    CardAccount existing = cardAccountMapper.selectOne(Wrappers.lambdaQuery(CardAccount.class)
+    Long inUse = cardAccountMapper.selectCount(Wrappers.lambdaQuery(CardAccount.class)
         .eq(CardAccount::getIsDeleted, 0)
         .eq(orgId != null, CardAccount::getOrgId, orgId)
-        .eq(CardAccount::getElderId, request.getElderId()));
-    if (existing != null) {
-      throw new IllegalArgumentException("该老人已开通一卡通");
+        .eq(CardAccount::getElderId, request.getElderId())
+        .notIn(CardAccount::getStatus, CardLifecycle.CLOSED));
+    if (inUse != null && inUse > 0) {
+      throw new IllegalArgumentException("该老人已有在用的一卡通，挂失后请走补卡");
     }
     CardAccount account = new CardAccount();
     account.setTenantId(orgId);
     account.setOrgId(orgId);
     account.setElderId(request.getElderId());
     account.setCardNo(request.getCardNo() == null || request.getCardNo().isBlank() ? genCardNo() : request.getCardNo());
-    account.setStatus(request.getStatus() == null ? "ACTIVE" : request.getStatus());
-    account.setLossFlag(request.getLossFlag() == null ? 0 : request.getLossFlag());
+    // 新卡只能是“已申领待激活”或直接激活，其余状态走卡务操作
+    account.setStatus("PENDING".equals(request.getStatus()) ? "PENDING" : "ACTIVE");
+    account.setLossFlag(0);
     account.setOpenTime(LocalDateTime.now());
     account.setRemark(request.getRemark());
     account.setCreatedBy(AuthContext.getStaffId());
@@ -121,9 +127,8 @@ public class CardAccountController {
     if (account == null) {
       return Result.ok(null);
     }
+    // 状态只能通过卡务操作（/lifecycle）变更，编辑只改卡号和备注
     account.setCardNo(request.getCardNo() == null || request.getCardNo().isBlank() ? account.getCardNo() : request.getCardNo());
-    account.setStatus(request.getStatus() == null ? account.getStatus() : request.getStatus());
-    account.setLossFlag(request.getLossFlag() == null ? account.getLossFlag() : request.getLossFlag());
     account.setRemark(request.getRemark());
     cardAccountMapper.updateById(account);
     return Result.ok(account);
@@ -139,13 +144,57 @@ public class CardAccountController {
     return Result.ok(null);
   }
 
+  public record LifecycleRequest(String action, String reason, String newCardNo) {}
+
+  /** 卡务操作：激活、挂失、解挂、冻结、解冻、补卡（旧卡作废并关联新卡）、注销；返回操作后的卡（补卡返回新卡） */
+  @PostMapping("/{id}/lifecycle")
+  @Transactional
+  public Result<CardAccount> lifecycle(@PathVariable Long id, @RequestBody LifecycleRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    CardAccount card = cardAccountMapper.selectById(id);
+    if (card == null || !Integer.valueOf(0).equals(card.getIsDeleted())
+        || (orgId != null && !orgId.equals(card.getOrgId()))) {
+      throw new IllegalArgumentException("卡不存在");
+    }
+    String action = request.action() == null ? "" : request.action().trim().toUpperCase();
+    String next = CardLifecycle.next(card, action);
+    if (("REPORT_LOSS".equals(action) || "CANCEL".equals(action)) && (request.reason() == null || request.reason().isBlank())) {
+      throw new IllegalArgumentException("请填写挂失或注销原因");
+    }
+    LocalDateTime now = LocalDateTime.now();
+    card.setStatus(next);
+    card.setLossFlag("LOST".equals(next) ? 1 : 0);
+    card.setStatusReason(request.reason());
+    card.setStatusChangedAt(now);
+    cardAccountMapper.updateById(card);
+    if (!"REISSUE".equals(action)) {
+      return Result.ok(card);
+    }
+    CardAccount replacement = new CardAccount();
+    replacement.setTenantId(card.getTenantId());
+    replacement.setOrgId(card.getOrgId());
+    replacement.setElderId(card.getElderId());
+    replacement.setCardNo(request.newCardNo() == null || request.newCardNo().isBlank() ? genCardNo() : request.newCardNo().trim());
+    replacement.setStatus("PENDING");
+    replacement.setLossFlag(0);
+    replacement.setOpenTime(now);
+    replacement.setPrevCardId(card.getId());
+    replacement.setStatusReason("补卡，原卡 " + card.getCardNo());
+    replacement.setStatusChangedAt(now);
+    replacement.setCreatedBy(AuthContext.getStaffId());
+    cardAccountMapper.insert(replacement);
+    return Result.ok(replacement);
+  }
+
   @PostMapping("/recharge")
+  @PreAuthorize(FUNDS_ROLES)
   @Transactional
   public Result<ElderAccountLog> recharge(@Valid @RequestBody CardTradeRequest request) {
     return Result.ok(applyTrade(request, "CARD_RECHARGE", "CREDIT"));
   }
 
   @PostMapping("/consume")
+  @PreAuthorize(FUNDS_ROLES)
   @Transactional
   public Result<ElderAccountLog> consume(@Valid @RequestBody CardTradeRequest request) {
     return Result.ok(applyTrade(request, "CARD_CONSUME", "DEBIT"));
@@ -294,6 +343,9 @@ public class CardAccountController {
       r.setOpenTime(item.getOpenTime());
       r.setLastRechargeTime(item.getLastRechargeTime());
       r.setRemark(item.getRemark());
+      r.setPrevCardId(item.getPrevCardId());
+      r.setStatusReason(item.getStatusReason());
+      r.setStatusChangedAt(item.getStatusChangedAt());
       r.setCreateTime(item.getCreateTime());
       r.setUpdateTime(item.getUpdateTime());
       ElderAccount elderAccount = accountMap.get(item.getElderId());
@@ -321,7 +373,8 @@ public class CardAccountController {
         : cardAccountMapper.selectList(Wrappers.lambdaQuery(CardAccount.class)
             .eq(CardAccount::getIsDeleted, 0)
             .in(CardAccount::getElderId, elderIds)).stream()
-            .collect(Collectors.toMap(CardAccount::getElderId, c -> c, (a, b) -> a));
+            .collect(Collectors.toMap(CardAccount::getElderId, c -> c,
+                (a, b) -> CardLifecycle.CLOSED.contains(a.getStatus()) ? b : a));
 
     IPage<CardTradeLogResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
     resp.setRecords(page.getRecords().stream().map(log -> {

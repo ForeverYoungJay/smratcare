@@ -1,6 +1,6 @@
 <template>
   <PageContainer title="合同与票据" subTitle="合同附件与评估报告统一归档">
-    <a-row :gutter="16" style="margin-bottom: 12px">
+    <a-row class="business-stat-strip" :gutter="16" style="margin-bottom: 12px">
       <a-col :xs="24" :sm="12" :lg="6">
         <a-card class="card-elevated" :bordered="false" size="small">
           <a-statistic title="合同附件" :value="contractAttachmentCount" />
@@ -42,11 +42,11 @@
       <a-col :xs="24" :lg="16">
         <a-card class="card-elevated" :bordered="false" title="资料清单">
           <template #extra>
-            <a-space wrap>
+            <ActionToolbar wrap>
               <a-button @click="loadAll">刷新</a-button>
               <a-button @click="downloadBundle" :disabled="!filteredDocuments.length">导出清单</a-button>
               <a-button type="primary" @click="goContractSigning">{{ isHistoricalImport ? '去完善历史资料' : '去上传附件' }}</a-button>
-            </a-space>
+            </ActionToolbar>
           </template>
 
           <a-form layout="inline" class="search-bar" :model="selector">
@@ -165,6 +165,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../../components/ActionToolbar.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'

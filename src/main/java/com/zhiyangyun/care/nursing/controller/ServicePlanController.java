@@ -4,11 +4,13 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.zhiyangyun.care.audit.service.AuditLogService;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.nursing.entity.ServicePlanRevision;
 import com.zhiyangyun.care.nursing.model.ServicePlanRequest;
 import com.zhiyangyun.care.nursing.model.ServicePlanResponse;
 import com.zhiyangyun.care.nursing.service.ServicePlanService;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -50,19 +52,67 @@ public class ServicePlanController {
     Long tenantId = AuthContext.getOrgId();
     request.setTenantId(tenantId);
     request.setOrgId(tenantId);
-    ServicePlanResponse response = servicePlanService.update(id, request);
+    ServicePlanResponse response = servicePlanService.update(id, request, AuthContext.getStaffId(),
+        AuthContext.getUsername());
     auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "UPDATE", "SERVICE_PLAN", id, "更新服务计划");
     return Result.ok(response);
   }
 
   @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PostMapping("/{id}/approve")
+  public Result<ServicePlanResponse> approve(@PathVariable Long id) {
+    Long tenantId = AuthContext.getOrgId();
+    ServicePlanResponse response;
+    try {
+      response = servicePlanService.approve(id, tenantId, AuthContext.getStaffId());
+    } catch (IllegalStateException ex) {
+      return Result.error(400, ex.getMessage());
+    }
+    if (response == null) {
+      return Result.error(404, "护理计划不存在或无权限访问");
+    }
+    auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "APPROVE", "SERVICE_PLAN", id, "审核发布护理计划 v" + response.getRevision());
+    return Result.ok(response);
+  }
+
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PostMapping("/{id}/reject")
+  public Result<ServicePlanResponse> reject(@PathVariable Long id,
+      @RequestBody(required = false) Map<String, String> body) {
+    Long tenantId = AuthContext.getOrgId();
+    String reason = body == null ? null : body.get("reason");
+    if (reason == null || reason.isBlank()) {
+      return Result.error(400, "请填写退回原因");
+    }
+    ServicePlanResponse response;
+    try {
+      response = servicePlanService.reject(id, tenantId, reason.trim());
+    } catch (IllegalStateException ex) {
+      return Result.error(400, ex.getMessage());
+    }
+    if (response == null) {
+      return Result.error(404, "护理计划不存在或无权限访问");
+    }
+    auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "REJECT", "SERVICE_PLAN", id, "驳回护理计划" + (reason == null || reason.isBlank() ? "" : "：" + reason.trim()));
+    return Result.ok(response);
+  }
+
+  @PreAuthorize("hasAnyRole('NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @GetMapping("/{id}/revisions")
+  public Result<List<ServicePlanRevision>> revisions(@PathVariable Long id) {
+    return Result.ok(servicePlanService.revisions(id, AuthContext.getOrgId()));
+  }
+
+  @PreAuthorize("hasAnyRole('NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/{id}")
   public Result<ServicePlanResponse> get(@PathVariable Long id) {
     return Result.ok(servicePlanService.get(id, AuthContext.getOrgId()));
   }
 
-  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/page")
   public Result<IPage<ServicePlanResponse>> page(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -73,7 +123,7 @@ public class ServicePlanController {
     return Result.ok(servicePlanService.page(AuthContext.getOrgId(), pageNo, pageSize, elderId, status, keyword));
   }
 
-  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/list")
   public Result<List<ServicePlanResponse>> list(@RequestParam(required = false) String status) {
     return Result.ok(servicePlanService.list(AuthContext.getOrgId(), status));

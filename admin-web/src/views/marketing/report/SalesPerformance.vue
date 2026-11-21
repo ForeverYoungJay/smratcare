@@ -2,7 +2,7 @@
   <PageContainer title="销售负责人业绩" sub-title="按已签合同数、可识别金额与跟进及时率进行排行">
     <MarketingQuickNav parent-path="/marketing/reports" />
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline">
+      <QueryBar :model="query" layout="inline" @finish="loadData">
         <a-form-item label="负责人">
           <a-input v-model:value="query.marketerName" placeholder="负责人/营销人员关键字" allow-clear />
         </a-form-item>
@@ -12,13 +12,15 @@
             <a-select-option value="SIGNED">已签署</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="loadData">查询</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">查询</a-button>
+              <a-button @click="reset">重置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px">
@@ -36,6 +38,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../../components/ActionToolbar.vue'
+import QueryBar from '../../../components/QueryBar.vue'
 import { onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../../components/PageContainer.vue'

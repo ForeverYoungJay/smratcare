@@ -3,14 +3,18 @@ package com.zhiyangyun.care.elder.service.impl.lifecycle;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.zhiyangyun.care.assessment.entity.AssessmentRecord;
+import com.zhiyangyun.care.assessment.mapper.AssessmentRecordMapper;
 import com.zhiyangyun.care.bill.entity.BillMonthly;
 import com.zhiyangyun.care.bill.mapper.BillMonthlyMapper;
+import com.zhiyangyun.care.crm.constant.CrmReservationRules;
 import com.zhiyangyun.care.crm.entity.CrmContract;
 import com.zhiyangyun.care.crm.entity.CrmLead;
 import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
 import com.zhiyangyun.care.crm.service.CrmTraceService;
 import com.zhiyangyun.care.elder.model.AssignBedRequest;
+import com.zhiyangyun.care.elder.model.BedStatus;
 import com.zhiyangyun.care.elder.entity.Bed;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.entity.Room;
@@ -23,6 +27,10 @@ import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderChangeLogMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeMapper;
+import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeApplyMapper;
+import com.zhiyangyun.care.elder.entity.lifecycle.ElderDischargeApply;
+import com.zhiyangyun.care.elder.model.lifecycle.DischargeProgressRules;
+import com.zhiyangyun.care.elder.model.lifecycle.ResidenceLifecycleConstants;
 import com.zhiyangyun.care.elder.model.ElderDepartureType;
 import com.zhiyangyun.care.elder.model.ElderLifecycleStatus;
 import com.zhiyangyun.care.elder.model.ElderStatus;
@@ -38,7 +46,10 @@ import com.zhiyangyun.care.elder.service.ElderLifecycleStateService;
 import com.zhiyangyun.care.elder.service.lifecycle.ElderLifecycleService;
 import com.zhiyangyun.care.elder.service.ElderOccupancyService;
 import com.zhiyangyun.care.elder.service.ElderService;
+import com.zhiyangyun.care.finance.entity.AdmissionFeeAudit;
+import com.zhiyangyun.care.finance.mapper.AdmissionFeeAuditMapper;
 import com.zhiyangyun.care.finance.model.ElderAccountAdjustRequest;
+import com.zhiyangyun.care.finance.model.FeeWorkflowConstants;
 import com.zhiyangyun.care.finance.service.ElderAccountService;
 import com.zhiyangyun.care.store.entity.ElderPointsAccount;
 import com.zhiyangyun.care.store.mapper.ElderPointsAccountMapper;
@@ -75,6 +86,9 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
   private final CrmTraceService crmTraceService;
   private final ElderLifecycleStateService elderLifecycleStateService;
   private final ElderOccupancyService elderOccupancyService;
+  private final ElderDischargeApplyMapper dischargeApplyMapper;
+  private final AssessmentRecordMapper assessmentRecordMapper;
+  private final AdmissionFeeAuditMapper admissionFeeAuditMapper;
 
   public ElderLifecycleServiceImpl(ElderAdmissionMapper admissionMapper,
                                    ElderDischargeMapper dischargeMapper,
@@ -90,7 +104,13 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
                                    ElderPointsAccountMapper pointsAccountMapper,
                                    CrmContractMapper crmContractMapper,
                                    CrmLeadMapper crmLeadMapper,
-                                   CrmTraceService crmTraceService) {
+                                   CrmTraceService crmTraceService,
+                                   ElderDischargeApplyMapper dischargeApplyMapper,
+                                   AssessmentRecordMapper assessmentRecordMapper,
+                                   AdmissionFeeAuditMapper admissionFeeAuditMapper) {
+    this.assessmentRecordMapper = assessmentRecordMapper;
+    this.admissionFeeAuditMapper = admissionFeeAuditMapper;
+    this.dischargeApplyMapper = dischargeApplyMapper;
     this.admissionMapper = admissionMapper;
     this.dischargeMapper = dischargeMapper;
     this.changeLogMapper = changeLogMapper;
@@ -123,6 +143,10 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
       throw new IllegalStateException("整租入住必须选择主床位");
     }
     CrmContract contract = validateAdmissionContractGuard(request, elder);
+    // 历史入住补录（无合同记录）不走办理流程，其余与入住办理中心六步的前置条件保持一致
+    if (contract != null) {
+      validateAdmissionPreconditions(request, elder, contract);
+    }
     ElderAdmission admission = new ElderAdmission();
     admission.setTenantId(request.getTenantId());
     admission.setOrgId(request.getOrgId());
@@ -259,6 +283,47 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
       throw new IllegalStateException("合同绑定老人和当前办理老人不一致");
     }
     return contract;
+  }
+
+  /** 与前端 admissionSteps.ts 一致：入住评估、费用审核已确认、床位可用。 */
+  private void validateAdmissionPreconditions(AdmissionRequest request, ElderProfile elder, CrmContract contract) {
+    String stage = contract.getFlowStage() == null ? "" : contract.getFlowStage().trim().toUpperCase();
+    boolean contractPastAssessment = "PENDING_BED_SELECT".equals(stage) || "PENDING_SIGN".equals(stage);
+    if (!contractPastAssessment && assessmentRecordMapper.selectCount(Wrappers.lambdaQuery(AssessmentRecord.class)
+        .eq(AssessmentRecord::getIsDeleted, 0)
+        .eq(AssessmentRecord::getOrgId, elder.getOrgId())
+        .eq(AssessmentRecord::getElderId, elder.getId())
+        .eq(AssessmentRecord::getAssessmentType, "ADMISSION")
+        .ne(AssessmentRecord::getStatus, "DRAFT")) == 0) {
+      throw new IllegalStateException("缺少入住评估：请先完成并提交入住评估");
+    }
+    if (admissionFeeAuditMapper.selectCount(Wrappers.lambdaQuery(AdmissionFeeAudit.class)
+        .eq(AdmissionFeeAudit::getIsDeleted, 0)
+        .eq(AdmissionFeeAudit::getOrgId, elder.getOrgId())
+        .eq(AdmissionFeeAudit::getElderId, elder.getId())
+        .eq(AdmissionFeeAudit::getStatus, FeeWorkflowConstants.AUDIT_APPROVED)) == 0) {
+      throw new IllegalStateException("缺少已确认的入住费用：请先提交入住费用审核并由财务审核通过");
+    }
+    if (request.getBedId() == null) {
+      if (elder.getBedId() == null) {
+        throw new IllegalStateException("缺少床位：请先选择入住床位");
+      }
+      return;
+    }
+    Bed bed = bedMapper.selectById(request.getBedId());
+    if (bed == null || Integer.valueOf(1).equals(bed.getIsDeleted()) || !Objects.equals(bed.getOrgId(), elder.getOrgId())) {
+      throw new IllegalArgumentException("所选床位不存在");
+    }
+    boolean available = bed.getElderId() != null
+        ? bed.getElderId().equals(elder.getId())
+        : bed.getStatus() == null || bed.getStatus() == BedStatus.AVAILABLE;
+    if (!available) {
+      throw new IllegalStateException("所选床位不可用：已被占用、停用或维修中，请重新选择床位");
+    }
+    if (bed.getElderId() == null && CrmReservationRules.bedHeldByOthers(crmLeadMapper, crmContractMapper,
+        request.getTenantId(), bed.getId(), contract.getLeadId(), contract.getId(), LocalDate.now())) {
+      throw new IllegalStateException("所选床位已被其他客户预订或签约占用，请重新选择床位");
+    }
   }
 
   private void syncCrmAfterAdmission(CrmContract contract, AdmissionRequest request) {
@@ -481,6 +546,13 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
     if (unpaid > 0) {
       throw new IllegalStateException("存在未结清账单，无法办理出院");
     }
+    // 已审批、等待结算的退住申请：交接未完成前不能直接置为已退住并释放床位
+    DischargeProgressRules.assertReadyForRelease(dischargeApplyMapper.selectOne(Wrappers.lambdaQuery(ElderDischargeApply.class)
+        .eq(ElderDischargeApply::getIsDeleted, 0)
+        .eq(ElderDischargeApply::getElderId, request.getElderId())
+        .eq(ElderDischargeApply::getStatus, ResidenceLifecycleConstants.DISCHARGE_APPLY_APPROVED)
+        .eq(ElderDischargeApply::getAutoDischargeStatus, ResidenceLifecycleConstants.AUTO_DISCHARGE_PENDING_SETTLEMENT)
+        .last("LIMIT 1")));
     ElderDischarge discharge = new ElderDischarge();
     discharge.setTenantId(request.getTenantId());
     discharge.setOrgId(request.getOrgId());

@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="医保电子凭证" subTitle="长者医保电子凭证绑定登记与有效性校验（令牌仅存授权引用）">
+    <template #extra>
+      <a-button type="primary" @click="openBind">绑定登记</a-button>
+    </template>
     <SearchForm :model="query" @search="onSearch" @reset="onReset">
       <a-form-item label="长者">
         <a-select v-model:value="query.elderId" show-search allow-clear :filter-option="false" :options="elderOptions"
@@ -18,12 +21,12 @@
           <a-select-option value="FAILED">失败</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openBind">绑定登记</a-button>
-      </template>
+
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="onSearch" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'bindStatus'">
           <a-tag :color="record.bindStatus === 'BOUND' ? 'blue' : 'default'">
@@ -59,7 +62,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="bindOpen" title="医保电子凭证绑定登记" :confirm-loading="saving" @ok="submitBind">
+    <a-modal :mask-closable="false" v-model:open="bindOpen" title="医保电子凭证绑定登记" :confirm-loading="saving" @ok="submitBind">
       <a-form layout="vertical">
         <a-form-item label="长者" required>
           <a-select v-model:value="bindForm.elderId" show-search :filter-option="false" :options="elderOptions"

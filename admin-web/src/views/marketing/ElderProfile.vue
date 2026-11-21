@@ -2,7 +2,7 @@
   <PageContainer title="长者档案" sub-title="营销转化后的长者信息沉淀与跟踪">
     <MarketingQuickNav />
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline" class="search-bar">
+      <QueryBar :model="query" layout="inline" class="search-bar" @finish="fetchData">
         <a-form-item label="姓名">
           <a-input v-model:value="query.keyword" placeholder="请输入 姓名" allow-clear style="width: 220px" />
         </a-form-item>
@@ -13,13 +13,15 @@
             <a-select-option :value="3">离院</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="fetchData">查询</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="fetchData">查询</a-button>
+              <a-button @click="reset">重置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px">
@@ -58,6 +60,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'

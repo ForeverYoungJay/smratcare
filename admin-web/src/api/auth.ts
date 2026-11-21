@@ -7,6 +7,10 @@ export function login(data: LoginRequest) {
   return request.post<LoginResponse>('/api/auth/login', data)
 }
 
+export function setInitialPassword(data: { challengeToken: string; newPassword: string }) {
+  return request.post<LoginResponse>('/api/auth/password/initial', data)
+}
+
 export function logout() {
   return request.post<void>('/api/auth/logout')
 }

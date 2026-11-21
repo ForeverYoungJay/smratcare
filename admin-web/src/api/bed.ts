@@ -26,8 +26,8 @@ export function getRoomList() {
   return request.get<RoomItem[]>('/api/room/list')
 }
 
-export function getBedList() {
-  return request.get<BedItem[]>('/api/bed/list')
+export function getBedList(config?: Record<string, any>) {
+  return request.get<BedItem[]>('/api/bed/list', config)
 }
 
 export function getBedMap(config?: Record<string, any>) {
@@ -38,8 +38,8 @@ export function getBuildingPage(params: any) {
   return fetchPage<BuildingItem>('/api/asset/buildings/page', params)
 }
 
-export function getBuildingList() {
-  return request.get<BuildingItem[]>('/api/asset/buildings/list')
+export function getBuildingList(config?: Record<string, any>) {
+  return request.get<BuildingItem[]>('/api/asset/buildings/list', config)
 }
 
 export function createBuilding(data: Partial<BuildingItem>) {
@@ -70,8 +70,8 @@ export function getFloorPage(params: any) {
   return fetchPage<FloorItem>('/api/asset/floors/page', params)
 }
 
-export function getFloorList(params?: any) {
-  return request.get<FloorItem[]>('/api/asset/floors/list', { params })
+export function getFloorList(params?: any, config?: Record<string, any>) {
+  return request.get<FloorItem[]>('/api/asset/floors/list', { params, ...config })
 }
 
 export function createFloor(data: Partial<FloorItem>) {

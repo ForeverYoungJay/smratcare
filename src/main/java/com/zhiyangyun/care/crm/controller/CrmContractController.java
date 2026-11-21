@@ -11,8 +11,11 @@ import com.zhiyangyun.care.crm.model.action.CrmContractFinalizeRequest;
 import com.zhiyangyun.care.crm.service.CrmContractService;
 import com.zhiyangyun.care.crm.model.trace.CrmContractWorkflowLogResponse;
 import com.zhiyangyun.care.crm.service.CrmTraceService;
+import com.zhiyangyun.care.common.web.ResourceNotFoundException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -59,13 +62,13 @@ public class CrmContractController {
   @PreAuthorize(CRM_CONTRACT_WRITE)
   @PutMapping("/{id}")
   public Result<CrmContractResponse> update(@PathVariable Long id, @RequestBody CrmContractRequest request) {
-    return Result.ok(contractService.update(AuthContext.getOrgId(), AuthContext.getOrgId(), id, request));
+    return Result.ok(requireContract(contractService.update(AuthContext.getOrgId(), AuthContext.getOrgId(), id, request)));
   }
 
   @PreAuthorize(CRM_CONTRACT_READ)
   @GetMapping("/{id}")
   public Result<CrmContractResponse> get(@PathVariable Long id) {
-    return Result.ok(contractService.get(AuthContext.getOrgId(), id));
+    return Result.ok(requireContract(contractService.get(AuthContext.getOrgId(), id)));
   }
 
   @PreAuthorize(CRM_CONTRACT_READ)
@@ -87,7 +90,8 @@ public class CrmContractController {
       @RequestParam(required = false) Boolean excludeSigned,
       @RequestParam(required = false) Boolean overdueOnly,
       @RequestParam(required = false) Boolean sortByOverdue,
-      @RequestParam(required = false) String currentOwnerDept) {
+      @RequestParam(required = false) String currentOwnerDept,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate expiryReminderTo) {
     return Result.ok(contractService.page(
         AuthContext.getOrgId(),
         pageNo,
@@ -106,7 +110,8 @@ public class CrmContractController {
         excludeSigned,
         overdueOnly,
         sortByOverdue,
-        currentOwnerDept));
+        currentOwnerDept,
+        expiryReminderTo));
   }
 
   @PreAuthorize(CRM_CONTRACT_READ)
@@ -115,7 +120,7 @@ public class CrmContractController {
       @PathVariable Long id,
       @RequestParam(defaultValue = "20") int limit) {
     Long orgId = AuthContext.getOrgId();
-    contractService.get(orgId, id);
+    requireContract(contractService.get(orgId, id));
     return Result.ok(crmTraceService.listContractWorkflowLogs(orgId, id, limit));
   }
 
@@ -174,68 +179,68 @@ public class CrmContractController {
   @PreAuthorize(CRM_CONTRACT_WRITE)
   @PostMapping("/{id}/handoff-assessment")
   public Result<CrmContractResponse> handoffAssessment(@PathVariable Long id) {
-    return Result.ok(contractService.handoffToAssessment(AuthContext.getOrgId(), id));
+    return Result.ok(requireContract(contractService.handoffToAssessment(AuthContext.getOrgId(), id)));
   }
 
   @PreAuthorize(CRM_CONTRACT_WRITE)
   @PostMapping("/{id}/move-to-bed-select")
   public Result<CrmContractResponse> moveToBedSelect(@PathVariable Long id) {
-    return Result.ok(contractService.moveToBedSelect(AuthContext.getOrgId(), id));
+    return Result.ok(requireContract(contractService.moveToBedSelect(AuthContext.getOrgId(), id)));
   }
 
   @PreAuthorize(CRM_CONTRACT_WRITE)
   @PostMapping("/{id}/move-to-pending-sign")
   public Result<CrmContractResponse> moveToPendingSign(@PathVariable Long id) {
-    return Result.ok(contractService.moveToPendingSign(AuthContext.getOrgId(), id));
+    return Result.ok(requireContract(contractService.moveToPendingSign(AuthContext.getOrgId(), id)));
   }
 
   @PreAuthorize(CRM_CONTRACT_WRITE)
   @PostMapping("/{id}/change/start")
   public Result<CrmContractResponse> startChange(
       @PathVariable Long id, @RequestBody(required = false) CrmContractFinalizeRequest request) {
-    return Result.ok(contractService.startChange(AuthContext.getOrgId(), id, request == null ? null : request.getRemark()));
+    return Result.ok(requireContract(contractService.startChange(AuthContext.getOrgId(), id, request == null ? null : request.getRemark())));
   }
 
   @PreAuthorize(CRM_CONTRACT_WRITE)
   @PostMapping("/{id}/change/submit")
   public Result<CrmContractResponse> submitChange(
       @PathVariable Long id, @RequestBody(required = false) CrmContractFinalizeRequest request) {
-    return Result.ok(contractService.submitChange(AuthContext.getOrgId(), id, request == null ? null : request.getRemark()));
+    return Result.ok(requireContract(contractService.submitChange(AuthContext.getOrgId(), id, request == null ? null : request.getRemark())));
   }
 
   @PreAuthorize(CRM_CONTRACT_APPROVE)
   @PostMapping("/{id}/change/approve")
   public Result<CrmContractResponse> approveChange(
       @PathVariable Long id, @RequestBody(required = false) CrmContractFinalizeRequest request) {
-    return Result.ok(contractService.approveChange(AuthContext.getOrgId(), id, request == null ? null : request.getRemark()));
+    return Result.ok(requireContract(contractService.approveChange(AuthContext.getOrgId(), id, request == null ? null : request.getRemark())));
   }
 
   @PreAuthorize(CRM_CONTRACT_APPROVE)
   @PostMapping("/{id}/change/reject")
   public Result<CrmContractResponse> rejectChange(
       @PathVariable Long id, @RequestBody(required = false) CrmContractFinalizeRequest request) {
-    return Result.ok(contractService.rejectChange(AuthContext.getOrgId(), id, request == null ? null : request.getRemark()));
+    return Result.ok(requireContract(contractService.rejectChange(AuthContext.getOrgId(), id, request == null ? null : request.getRemark())));
   }
 
   @PreAuthorize(CRM_CONTRACT_APPROVE)
   @PostMapping("/{id}/approve")
   public Result<CrmContractResponse> approve(
       @PathVariable Long id, @RequestBody(required = false) CrmContractFinalizeRequest request) {
-    return Result.ok(contractService.approve(AuthContext.getOrgId(), id, request == null ? null : request.getRemark()));
+    return Result.ok(requireContract(contractService.approve(AuthContext.getOrgId(), id, request == null ? null : request.getRemark())));
   }
 
   @PreAuthorize(CRM_CONTRACT_APPROVE)
   @PostMapping("/{id}/reject")
   public Result<CrmContractResponse> reject(
       @PathVariable Long id, @RequestBody(required = false) CrmContractFinalizeRequest request) {
-    return Result.ok(contractService.reject(AuthContext.getOrgId(), id, request == null ? null : request.getRemark()));
+    return Result.ok(requireContract(contractService.reject(AuthContext.getOrgId(), id, request == null ? null : request.getRemark())));
   }
 
   @PreAuthorize(CRM_CONTRACT_APPROVE)
   @PostMapping("/{id}/void")
   public Result<CrmContractResponse> voidContract(
       @PathVariable Long id, @RequestBody(required = false) CrmContractFinalizeRequest request) {
-    return Result.ok(contractService.voidContract(AuthContext.getOrgId(), id, request == null ? null : request.getRemark()));
+    return Result.ok(requireContract(contractService.voidContract(AuthContext.getOrgId(), id, request == null ? null : request.getRemark())));
   }
 
   @PreAuthorize(CRM_CONTRACT_APPROVE)
@@ -243,7 +248,7 @@ public class CrmContractController {
   public Result<CrmContractResponse> finalizeContract(
       @PathVariable Long id, @RequestBody(required = false) CrmContractFinalizeRequest request) {
     String remark = request == null ? null : request.getRemark();
-    return Result.ok(contractService.finalizeSign(AuthContext.getOrgId(), AuthContext.getStaffId(), id, remark));
+    return Result.ok(requireContract(contractService.finalizeSign(AuthContext.getOrgId(), AuthContext.getStaffId(), id, remark)));
   }
 
   @PreAuthorize(CRM_CONTRACT_APPROVE)
@@ -254,5 +259,12 @@ public class CrmContractController {
       throw new IllegalStateException("当前合同不可删除，可能已进入受保护流程或无权限操作");
     }
     return Result.ok(null);
+  }
+
+  private CrmContractResponse requireContract(CrmContractResponse response) {
+    if (response == null) {
+      throw new ResourceNotFoundException("合同不存在或无权访问");
+    }
+    return response;
   }
 }

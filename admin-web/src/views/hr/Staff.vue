@@ -1,5 +1,25 @@
 <template>
   <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
+    <template #extra>
+      <a-button @click="router.push('/hr/profile/onboarding')">入职向导</a-button>
+      <a-button type="primary" @click="openDrawer()">新增人员</a-button>
+      <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑档案</a-button>
+      <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
+      <a-popover trigger="click" placement="bottomRight">
+        <template #content>
+          <div class="secondary-actions">
+            <a-button :disabled="!selectedSingleRecord" @click="viewSelected">查看</a-button>
+            <a-button :disabled="!selectedSingleRecord" @click="openEffectivePermissionPanel()">生效页面权限</a-button>
+            <a-button :disabled="!canReinstateSingle" @click="reinstateSelected">复职</a-button>
+            <a-button :disabled="selectedRowKeys.length === 0" @click="batchReinstate">批量复职</a-button>
+            <a-button @click="printBirthdayLedger">打印生日台账</a-button>
+            <a-button danger :disabled="!canTerminateSingle" @click="terminateSelected">离职</a-button>
+            <a-button danger :disabled="selectedRowKeys.length === 0" @click="batchTerminate">批量离职</a-button>
+          </div>
+        </template>
+        <a-button>更多操作</a-button>
+      </a-popover>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="姓名/工号/手机号" allow-clear />
@@ -27,19 +47,7 @@
           style="width: 220px"
         />
       </a-form-item>
-      <template #extra>
-        <a-button @click="router.push('/hr/profile/onboarding')">入职向导</a-button>
-        <a-button type="primary" @click="openDrawer()">新增人员</a-button>
-        <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑档案</a-button>
-        <a-button :disabled="!selectedSingleRecord" @click="viewSelected">查看</a-button>
-        <a-button :disabled="!selectedSingleRecord" @click="openEffectivePermissionPanel()">生效页面权限</a-button>
-        <a-button :disabled="!canReinstateSingle" @click="reinstateSelected">复职</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" @click="batchReinstate">批量复职</a-button>
-        <a-button @click="printBirthdayLedger">打印生日台账</a-button>
-        <a-button danger :disabled="!canTerminateSingle" @click="terminateSelected">离职</a-button>
-        <a-button danger :disabled="selectedRowKeys.length === 0" @click="batchTerminate">批量离职</a-button>
-        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
-      </template>
+
     </SearchForm>
 
     <a-alert
@@ -73,6 +81,8 @@
     </a-row>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="staffId"
       :row-selection="rowSelection"
       :columns="columns"
@@ -82,7 +92,10 @@
       @change="handleTableChange"
     >
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'status'">
+        <template v-if="column.key === 'realName'">
+          <a @click="profile360 = { staffId: record.staffId, name: record.realName }">{{ record.realName }}</a>
+        </template>
+        <template v-else-if="column.key === 'status'">
           <a-tag :color="record.status === 1 ? 'green' : 'default'">
             {{ record.status === 1 ? '在职' : '离职' }}
           </a-tag>
@@ -148,7 +161,10 @@
             <div class="form-rule-tip">选择岗位/角色后会按角色管理里的所属部门自动带出，也可手动调整。</div>
           </a-form-item>
           <a-form-item label="手机号">
-            <a-input v-model:value="accountForm.phone" />
+            <a-input v-model:value="accountForm.phone" @blur="checkDuplicate" />
+            <a-alert v-for="dup in duplicates" :key="dup.staffId" style="margin-top: 8px" show-icon :type="dup.onJob ? 'error' : 'warning'"
+              :message="`${dup.samePhone ? '手机号' : '姓名'}与已有档案「${dup.realName}${dup.staffNo ? ` / ${dup.staffNo}` : ''}」相同（${dup.onJob ? '在职' : '已离职'}）`"
+              :description="dup.onJob ? '请勿重复建档，人员有变更请在原档案上更正。' : '如为返聘，请在原档案上恢复在职，保留前次任职历史，不要新建档案。'" />
           </a-form-item>
           <a-form-item label="账号状态">
             <a-select v-model:value="accountForm.status" :options="statusOptions" />
@@ -280,10 +296,17 @@
       </template>
     </a-drawer>
 
-    <a-modal v-model:open="terminateOpen" title="员工离职" @ok="submitTerminate" :confirm-loading="terminating">
+    <a-modal :mask-closable="false" v-model:open="terminateOpen" title="员工离职" @ok="submitTerminate" :confirm-loading="terminating">
       <a-form layout="vertical">
         <a-form-item label="员工ID" required>
           <a-input v-model:value="terminateForm.staffId" disabled />
+        </a-form-item>
+        <a-form-item label="离职交接清单">
+          <div v-for="item in offboarding" :key="item.key" class="offboard-row">
+            <a-tag :color="item.done ? 'green' : 'orange'">{{ item.done ? '已完成' : '待处理' }}</a-tag>
+            <b>{{ item.label }}</b><span>{{ item.detail }}</span>
+          </div>
+          <div v-if="offboarding.some((item) => !item.done && item.key !== 'account')" class="form-rule-tip">仍有待处理事项；可以先办理离职，但请在离职日前完成交接。</div>
         </a-form-item>
         <a-form-item label="离职日期">
           <a-date-picker v-model:value="terminateForm.leaveDate" style="width: 100%" />
@@ -349,10 +372,12 @@
         </a-space>
       </a-spin>
     </a-modal>
+    <StaffProfile360 :open="!!profile360.staffId" :staff-id="profile360.staffId" :name="profile360.name" @close="profile360 = {}" />
   </PageContainer>
 </template>
 
 <script setup lang="ts">
+import { useCompletionGuide } from '../../composables/useCompletionGuide'
 import { computed, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
@@ -361,6 +386,8 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { getHrSocialSecuritySummary, getHrStaffPage, getHrProfile, upsertHrProfile, terminateStaff, reinstateStaff } from '../../api/hr'
+import { checkStaffDuplicate, getOffboardingChecklist, type ChecklistItem } from '../../api/hrOps'
+import StaffProfile360 from './StaffProfile360.vue'
 import { appendStaffRole, getRolePage, getStaffRoleAssignments } from '../../api/rbac'
 import { createStaff as createStaffAccount } from '../../api/staff'
 import { openPrintTableReport } from '../../utils/print'
@@ -368,6 +395,7 @@ import { useStaffOptions } from '../../composables/useStaffOptions'
 import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
 import type { HrSocialSecuritySummary, HrStaffProfile, PageResult, RoleItem, StaffItem } from '../../types'
 
+const showCompletion = useCompletionGuide()
 const RESERVED_ROLE_CODES = new Set(['SYS_ADMIN'])
 import { getPageTitle, getRecommendedPagePermissions, parseRoutePermissionsJson } from '../../utils/pageAccess'
 import { resolveHrError } from './hrError'
@@ -823,6 +851,7 @@ async function submit(nextStep: 'save' | 'account' | 'contract' | 'attachment' =
     }
     Object.assign(form, saved || {})
     message.success(saved?.contractNo ? `保存成功，合同编号：${saved.contractNo}` : '保存成功')
+    if (nextStep === 'save' && staffId) showCompletion('员工档案已保存', [{ label: '维护劳动合同', path: `/hr/profile/contracts?staffId=${encodeURIComponent(staffId)}` }, { label: '归档附件', path: `/hr/profile/attachments?staffId=${encodeURIComponent(staffId)}` }])
     drawerOpen.value = false
     await fetchData()
     await fetchSocialSecuritySummary()
@@ -872,6 +901,17 @@ function maybeAutoOpenProfile() {
   openDrawer({ staffId } as HrStaffProfile).catch(() => {})
 }
 
+const offboarding = ref<ChecklistItem[]>([])
+const profile360 = ref<{ staffId?: string | number; name?: string }>({})
+const duplicates = ref<Awaited<ReturnType<typeof checkStaffDuplicate>>>([])
+
+/** 新建人员前查重：同手机号或同名的已有档案（含已离职，返聘应恢复原档案） */
+async function checkDuplicate() {
+  const phone = String(accountForm.phone || '').trim()
+  const name = String(accountForm.realName || '').trim()
+  duplicates.value = phone || name ? await checkStaffDuplicate({ phone: phone || undefined, name: name || undefined }).catch(() => []) : []
+}
+
 const terminateOpen = ref(false)
 const terminating = ref(false)
 const terminateForm = reactive<{ staffId?: string | number; leaveDate?: any; leaveReason?: string }>({})
@@ -881,6 +921,8 @@ function openTerminate(record: HrStaffProfile) {
   terminateForm.leaveDate = record.leaveDate ? dayjs(record.leaveDate) : undefined
   terminateForm.leaveReason = record.leaveReason || ''
   terminateOpen.value = true
+  offboarding.value = []
+  getOffboardingChecklist(String(record.staffId)).then((items) => { offboarding.value = items }).catch(() => {})
 }
 
 async function submitTerminate() {
@@ -1044,6 +1086,9 @@ maybeAutoOpenProfile()
 </script>
 
 <style scoped>
+.offboard-row { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; font-size: 13px; }
+.offboard-row span { color: #6b7a74; }
+.secondary-actions { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; max-width:420px; }
 .selection-tip {
   color: var(--muted);
   font-size: 12px;

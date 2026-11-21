@@ -6,22 +6,24 @@
         <h2>先搜，再决定去哪个业务页。</h2>
         <p>适合按长者、账单号、收据号、外部流水号或合同号快速定位财务对象。</p>
       </div>
-      <a-form layout="inline" :model="query" class="search-form">
+      <QueryBar layout="inline" :model="query" class="search-form" @finish="loadData">
         <a-form-item label="关键词">
           <a-input v-model:value="query.keyword" allow-clear placeholder="长者 / 账单号 / 外部流水号 / 合同号" style="width: 320px" @pressEnter="loadData" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="loadData">搜索</a-button>
-            <a-button :disabled="!query.keyword.trim()" @click="exportData">导出结果</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="loadData">搜索</a-button>
+              <a-button :disabled="!query.keyword.trim()" @click="exportData">导出结果</a-button>
+              <a-button @click="reset">重置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <StatefulBlock style="margin-top: 16px;" :loading="loading" :error="errorMessage" @retry="loadData">
-      <a-row :gutter="[12, 12]" style="margin-bottom: 16px;">
+      <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 16px;">
         <a-col :xs="24" :md="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="长者命中" :value="result?.elders?.length || 0" /></a-card></a-col>
         <a-col :xs="24" :md="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="账单命中" :value="result?.bills?.length || 0" /></a-card></a-col>
         <a-col :xs="24" :md="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="收款命中" :value="result?.payments?.length || 0" /></a-card></a-col>
@@ -90,6 +92,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'

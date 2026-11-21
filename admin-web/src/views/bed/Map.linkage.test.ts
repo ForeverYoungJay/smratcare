@@ -5,11 +5,23 @@ import { emitLiveSync, inferLiveSyncTopics } from '../../utils/liveSync'
 import { resetBedMapDatasetState } from '../../composables/useBedMapDataset'
 
 const getBedMap = vi.hoisted(() => vi.fn())
+const getRoomList = vi.hoisted(() => vi.fn())
 const getBaseConfigItemList = vi.hoisted(() => vi.fn())
+const currentRoles = vi.hoisted(() => ({ value: ['LOGISTICS_MINISTER'] as string[] }))
+
+vi.mock('./components/FloorPlanBoard.vue', () => ({
+  default: {
+    name: 'FloorPlanBoard',
+    template: '<div class="floor-plan-board-stub"></div>'
+  }
+}))
 
 vi.mock('../../api/bed', () => ({
-  getBedMap
+  getBedMap,
+  getRoomList
 }))
+
+vi.mock('../../utils/auth', () => ({ getRoles: () => currentRoles.value }))
 
 vi.mock('../../api/baseConfig', () => ({
   getBaseConfigItemList
@@ -42,11 +54,13 @@ vi.mock('ant-design-vue', () => ({
 describe('BedMap live linkage', () => {
   beforeEach(() => {
     resetBedMapDatasetState()
+    currentRoles.value = ['LOGISTICS_MINISTER']
     vi.useFakeTimers()
     getBedMap.mockResolvedValue([
       { id: 1, roomId: 101, bedNo: '01', roomNo: 'A101', building: 'A栋', floorNo: '1F', status: 1 }
     ])
     getBaseConfigItemList.mockResolvedValue([])
+    getRoomList.mockResolvedValue([])
   })
 
   afterEach(() => {
@@ -110,5 +124,16 @@ describe('BedMap live linkage', () => {
     await flushPromises()
 
     expect(getBedMap).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not request manager-only residence config for logistics employees', async () => {
+    currentRoles.value = ['LOGISTICS_EMPLOYEE']
+    mount(BedMap, {
+      global: { stubs: { PageContainer: { template: '<div><slot /></div>' }, 'a-table': true, 'a-table-column': true } }
+    })
+    await flushPromises()
+    expect(getBedMap).toHaveBeenCalledOnce()
+    expect(getRoomList).toHaveBeenCalledOnce()
+    expect(getBaseConfigItemList).not.toHaveBeenCalled()
   })
 })

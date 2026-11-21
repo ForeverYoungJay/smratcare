@@ -1,5 +1,12 @@
 <template>
   <PageContainer title="合同到期提醒" subTitle="员工劳动合同按到期天数预警">
+    <template #extra>
+      <a-space>
+        <a-button @click="onExportCsv">导出 CSV</a-button>
+        <a-button @click="onExportExcel">导出 Excel</a-button>
+        <a-tag color="orange">当前口径：到期≤{{ query.warningDays }}天{{ query.includeExpired ? '（含已过期）' : '' }}</a-tag>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="姓名/工号/手机号/合同编号" allow-clear style="width: 240px" />
@@ -10,16 +17,12 @@
       <a-form-item label="包含已过期">
         <a-switch v-model:checked="query.includeExpired" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="onExportCsv">导出 CSV</a-button>
-          <a-button @click="onExportExcel">导出 Excel</a-button>
-          <a-tag color="orange">当前口径：到期≤{{ query.warningDays }}天{{ query.includeExpired ? '（含已过期）' : '' }}</a-tag>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="contractId"
       :columns="columns"
       :data-source="rows"

@@ -8,15 +8,15 @@ vi.mock('../utils/auth', () => ({
 }))
 
 describe('permission directive', () => {
-  it('keeps guarded elements for super roles', () => {
+  it('does not let ADMIN bypass an unrelated explicit role requirement', () => {
     mockRoles = ['ADMIN']
     const parent = document.createElement('div')
     const el = document.createElement('button')
     parent.appendChild(el)
 
-    permission.mounted?.(el, { value: ['HR_MINISTER'] } as any)
+    ;(permission as any).mounted?.(el, { value: ['HR_MINISTER'] } as any)
 
-    expect(parent.contains(el)).toBe(true)
+    expect(parent.contains(el)).toBe(false)
   })
 
   it('removes admin-only elements for minister roles without explicit admin', () => {
@@ -25,7 +25,7 @@ describe('permission directive', () => {
     const el = document.createElement('button')
     parent.appendChild(el)
 
-    permission.mounted?.(el, { value: ['ADMIN'] } as any)
+    ;(permission as any).mounted?.(el, { value: ['ADMIN'] } as any)
 
     expect(parent.contains(el)).toBe(false)
   })
@@ -36,7 +36,7 @@ describe('permission directive', () => {
     const el = document.createElement('button')
     parent.appendChild(el)
 
-    permission.mounted?.(el, { value: ['ADMIN'] } as any)
+    ;(permission as any).mounted?.(el, { value: ['ADMIN'] } as any)
 
     expect(parent.contains(el)).toBe(true)
   })

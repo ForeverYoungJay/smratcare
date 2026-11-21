@@ -46,11 +46,11 @@
           </a-col>
         </a-row>
       </a-form>
-      <a-space wrap>
+      <ActionToolbar wrap>
         <a-button type="primary" :loading="generating" @click="handleGenerate">生成排班方案</a-button>
         <a-button @click="constraintVisible = true">排班约束配置</a-button>
         <a-button @click="loadProposals">刷新方案列表</a-button>
-      </a-space>
+      </ActionToolbar>
     </a-card>
 
     <a-card :bordered="false" class="card-elevated" style="margin-top: 12px" title="方案列表">
@@ -148,7 +148,7 @@
       </div>
     </a-card>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="itemEditVisible"
       title="调整班次"
       :confirm-loading="itemSaving"
@@ -180,7 +180,7 @@
       </template>
     </a-modal>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="constraintVisible"
       title="排班约束配置"
       :confirm-loading="constraintSaving"
@@ -232,6 +232,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from "../../components/ActionToolbar.vue"
 import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'

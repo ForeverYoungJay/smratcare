@@ -84,6 +84,9 @@ public class CareTaskTemplateController {
     if (template.getEnabled() == null) {
       template.setEnabled(existing.getEnabled());
     }
+    if (template.getServiceItems() == null) {
+      template.setServiceItems(existing.getServiceItems());
+    }
     templateMapper.updateById(template);
     return Result.ok(template);
   }

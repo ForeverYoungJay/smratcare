@@ -27,4 +27,6 @@ public class ServicePlanRequest {
   private String status = "ACTIVE";
   private String remark;
   private Long createdBy;
+  /** 修改已发布计划时的变更原因，写入版本记录 */
+  private String changeReason;
 }

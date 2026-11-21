@@ -1,5 +1,11 @@
 <template>
   <PageContainer title="事故登记" subTitle="事故/意外记录与追踪">
+    <template #extra>
+      <a-space>
+        <a-button @click="exportRows">导出</a-button>
+        <a-button type="primary" @click="openCreate">新增事故</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="老人姓名">
         <ElderNameAutocomplete v-model:value="query.elderName" placeholder="请输入老人姓名(编号)" width="240px" />
@@ -29,15 +35,12 @@
           show-time
         />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="exportRows">导出</a-button>
-          <a-button type="primary" @click="openCreate">新增事故</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -74,7 +77,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" title="事故登记" @ok="submit" :confirm-loading="saving" width="640px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="事故登记" @ok="submit" :confirm-loading="saving" width="640px">
       <a-form layout="vertical">
         <a-form-item label="老人" required>
           <a-select
@@ -134,6 +137,7 @@
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
@@ -355,6 +359,16 @@ async function exportRows() {
   })
 }
 
+// 支持从首页/安全风险页带 ?status=OPEN|CLOSED、?level=NORMAL|MAJOR 直达对应筛选
+const route = useRoute()
+const initialStatus = String(route.query.status || '').toUpperCase()
+if (statusOptions.some((item) => item.value === initialStatus)) {
+  query.status = initialStatus as IncidentStatus
+}
+const initialLevel = String(route.query.level || '').toUpperCase()
+if (levelOptions.some((item) => item.value === initialLevel)) {
+  query.level = initialLevel as IncidentLevel
+}
 fetchData()
 searchElders('')
 </script>

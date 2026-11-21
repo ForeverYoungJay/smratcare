@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="退住申请" subTitle="退住流程前置申请与审核">
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline" class="search-bar">
+      <QueryBar :model="query" layout="inline" class="search-bar" @finish="fetchData">
         <a-form-item label="老人姓名">
           <a-select
             v-model:value="query.elderId"
@@ -29,26 +29,28 @@
         <a-form-item label="计划退住日期">
           <a-range-picker v-model:value="query.plannedDateRange" value-format="YYYY-MM-DD" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="fetchData">搜索</a-button>
-            <a-button @click="reset">清空</a-button>
-            <a-button @click="exportRows">导出</a-button>
-            <a-button type="primary" @click="openCreate">新增申请</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="fetchData">搜索</a-button>
+              <a-button @click="reset">清空</a-button>
+              <a-button @click="exportRows">导出</a-button>
+              <a-button type="primary" @click="openCreate">新增申请</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <a-space style="margin-bottom: 12px" wrap>
+      <ActionToolbar style="margin-bottom: 12px" wrap>
         <a-tag color="blue">已选 {{ selectedRowKeys.length }} 条</a-tag>
         <a-button :disabled="!canReviewSelected" @click="reviewSelected('APPROVED')">审核</a-button>
         <a-button :disabled="!canOpenFinanceAuditSelected" @click="openSelectedFinanceAudit">退住费用审核</a-button>
         <a-button :disabled="!canOpenSettlementSelected" @click="openSelectedSettlement">退院结算</a-button>
         <a-button danger :disabled="!canReviewSelected" @click="reviewSelected('REJECTED')">驳回</a-button>
         <a-button danger :disabled="selectedRowKeys.length === 0" @click="deleteSelected">删除</a-button>
-      </a-space>
+      </ActionToolbar>
       <a-table
         :data-source="rows"
         :columns="columns"
@@ -100,7 +102,7 @@
       />
     </a-card>
 
-    <a-modal v-model:open="createOpen" title="新增退住申请" @ok="submitCreate" :confirm-loading="submitting" width="520px">
+    <a-modal :mask-closable="false" v-model:open="createOpen" title="新增退住申请" @ok="submitCreate" :confirm-loading="submitting" width="520px">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人" name="elderId">
           <a-select
@@ -134,7 +136,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="reviewOpen" :title="reviewStatus === 'APPROVED' ? '通过申请' : '驳回申请'" @ok="submitReview" :confirm-loading="reviewSubmitting" width="480px">
+    <a-modal :mask-closable="false" v-model:open="reviewOpen" :title="reviewStatus === 'APPROVED' ? '通过申请' : '驳回申请'" @ok="submitReview" :confirm-loading="reviewSubmitting" width="480px">
       <a-form layout="vertical">
         <a-form-item v-if="reviewStatus === 'APPROVED'" label="审核清单">
           <a-space direction="vertical" style="width: 100%">
@@ -163,6 +165,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'

@@ -11,6 +11,7 @@ import com.zhiyangyun.care.elder.model.OccupancyRepairRequest;
 import com.zhiyangyun.care.elder.model.OccupancyRepairResponse;
 import com.zhiyangyun.care.elder.service.BedService;
 import com.zhiyangyun.care.elder.service.OccupancyConsistencyService;
+import com.zhiyangyun.care.elder.security.ElderAuthz;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -32,14 +33,17 @@ public class BedController {
   private final BedService bedService;
   private final OccupancyConsistencyService occupancyConsistencyService;
   private final AuditLogService auditLogService;
+  private final ElderAuthz elderAuthz;
 
   public BedController(
       BedService bedService,
       OccupancyConsistencyService occupancyConsistencyService,
-      AuditLogService auditLogService) {
+      AuditLogService auditLogService,
+      ElderAuthz elderAuthz) {
     this.bedService = bedService;
     this.occupancyConsistencyService = occupancyConsistencyService;
     this.auditLogService = auditLogService;
+    this.elderAuthz = elderAuthz;
   }
 
   @PreAuthorize("@elderAuthz.canWriteBed()")
@@ -87,7 +91,7 @@ public class BedController {
   @GetMapping("/map")
   public Result<java.util.List<BedResponse>> map(
       @RequestParam(defaultValue = "true") boolean includeRisk) {
-    return Result.ok(bedService.map(AuthContext.getOrgId(), includeRisk));
+    return Result.ok(bedService.map(AuthContext.getOrgId(), includeRisk && elderAuthz.canReadBedRisk()));
   }
 
   @PreAuthorize("@elderAuthz.canReadBed()")

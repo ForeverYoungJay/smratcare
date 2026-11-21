@@ -86,7 +86,7 @@ public class ElderServiceImpl implements ElderService {
       "create_time", "update_time", "is_deleted"
   };
   private static final String[] ROOM_PAGE_COLUMNS = {
-      "id", "tenant_id", "org_id", "room_no", "capacity", "status", "create_time", "update_time", "is_deleted"
+      "id", "tenant_id", "org_id", "room_no", "building", "capacity", "status", "create_time", "update_time", "is_deleted"
   };
 
   private final ElderMapper elderMapper;
@@ -153,6 +153,7 @@ public class ElderServiceImpl implements ElderService {
         : ElderLifecycleStatus.toLegacyStatus(requestedLifecycleStatus, request.getStatus());
     elder.setStatus(requestedLegacyStatus);
     elder.setCareLevel(normalizeText(request.getCareLevel()));
+    elder.setResponsibleStaffId(validateResponsibleStaff(request.getResponsibleStaffId(), request.getOrgId()));
     elder.setRiskPrecommit(normalizeText(request.getRiskPrecommit()));
     elder.setRemark(normalizeText(request.getRemark()));
     elder.setSourceType(normalizeSourceType(request.getSourceType(), null));
@@ -260,6 +261,9 @@ public class ElderServiceImpl implements ElderService {
     if (request.getCareLevel() != null) {
       elder.setCareLevel(normalizeText(request.getCareLevel()));
     }
+    if (request.getResponsibleStaffId() != null) {
+      elder.setResponsibleStaffId(validateResponsibleStaff(request.getResponsibleStaffId(), elder.getOrgId()));
+    }
     if (request.getRiskPrecommit() != null) {
       elder.setRiskPrecommit(normalizeText(request.getRiskPrecommit()));
     }
@@ -362,6 +366,7 @@ public class ElderServiceImpl implements ElderService {
     applyLifecycleFromAdmission(response, admission, contract);
     applySourceType(response, contract, admission);
     applyCaregiverInfo(response, elder);
+    applyResponsibleStaffNames(List.of(response));
     return response;
   }
 
@@ -377,9 +382,28 @@ public class ElderServiceImpl implements ElderService {
       String fullName,
       String idCardNo,
       String bedNo,
+      String roomNo,
       String careLevel,
+      String building,
       String sortBy,
       String sortOrder) {
+    return page(tenantId, pageNo, pageSize, keyword, signedOnly, status, lifecycleStatus, fullName, idCardNo, bedNo,
+        roomNo, careLevel, building, sortBy, sortOrder, null);
+  }
+
+  @Override
+  public IPage<ElderResponse> pageWithin(Long tenantId, long pageNo, long pageSize, String keyword, String lifecycleStatus,
+      Set<Long> onlyElderIds) {
+    return page(tenantId, pageNo, pageSize, keyword, false, null, lifecycleStatus, null, null, null, null, null, null,
+        null, null, onlyElderIds);
+  }
+
+  private IPage<ElderResponse> page(Long tenantId, long pageNo, long pageSize, String keyword, Boolean signedOnly,
+      Integer status, String lifecycleStatus, String fullName, String idCardNo, String bedNo, String roomNo,
+      String careLevel, String building, String sortBy, String sortOrder, Set<Long> onlyElderIds) {
+    if (onlyElderIds != null && onlyElderIds.isEmpty()) {
+      return new Page<>(pageNo, pageSize);
+    }
     Set<Long> latestSignedElderIds = null;
     if (Boolean.TRUE.equals(signedOnly)) {
       latestSignedElderIds = resolveLatestSignedElderIds(tenantId);
@@ -396,22 +420,33 @@ public class ElderServiceImpl implements ElderService {
     if (latestSignedElderIds != null) {
       baseWrapper.in("id", latestSignedElderIds);
     }
+    if (onlyElderIds != null) {
+      baseWrapper.in("id", onlyElderIds);
+    }
     List<ElderProfile> allRows = elderMapper.selectList(baseWrapper.orderByDesc("create_time"));
     Map<Long, Bed> bedMap = resolveCurrentBedMap(allRows);
     String normalizedKeyword = normalizeText(keyword);
     String normalizedFullName = normalizeText(fullName);
     String normalizedIdCardNo = normalizeText(idCardNo);
     String normalizedBedNo = normalizeText(bedNo);
+    String normalizedRoomNo = normalizeText(roomNo);
     String normalizedCareLevel = normalizeText(careLevel);
+    String normalizedBuilding = normalizeText(building);
+    // 房间号挂在床位关联的房间上，先一次性取回房间以免逐行查库
+    Map<Long, com.zhiyangyun.care.elder.entity.Room> pageRoomMap =
+        resolveRoomMap(new ArrayList<>(bedMap.values()));
     List<ElderProfile> filtered = allRows.stream()
         .filter(elder -> matchesPageFilters(
             elder,
             bedMap.get(elder.getId()),
+            resolveRoomOfBed(pageRoomMap, bedMap.get(elder.getId())),
             normalizedKeyword,
             normalizedFullName,
             normalizedIdCardNo,
             normalizedBedNo,
-            normalizedCareLevel))
+            normalizedRoomNo,
+            normalizedCareLevel,
+            normalizedBuilding))
         .sorted(buildPageComparator(sortBy, sortOrder, bedMap))
         .collect(Collectors.toCollection(ArrayList::new));
     Page<ElderProfile> manualPage = new Page<>(pageNo, pageSize, filtered.size());
@@ -594,6 +629,7 @@ public class ElderServiceImpl implements ElderService {
       applySourceType(response, contract, admissionMap.get(elder.getId()));
       return response;
     }).toList();
+    applyResponsibleStaffNames(responseRecords);
     Page<ElderResponse> responsePage = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
     responsePage.setRecords(responseRecords);
     return responsePage;
@@ -816,15 +852,22 @@ public class ElderServiceImpl implements ElderService {
   private boolean matchesPageFilters(
       ElderProfile elder,
       Bed bed,
+      com.zhiyangyun.care.elder.entity.Room room,
       String keyword,
       String fullName,
       String idCardNo,
       String bedNo,
-      String careLevel) {
+      String roomNo,
+      String careLevel,
+      String building) {
+    // shortcut: 按房间上冗余的楼栋名匹配；楼栋改名后若房间未同步会漏筛，届时改按 building_id 关联
+    if (building != null && (room == null || !building.equals(room.getBuilding()))) {
+      return false;
+    }
     if (fullName != null && !matchByPinyinOrText(elder, fullName)) {
       return false;
     }
-    if (keyword != null && !matchesSearchKeyword(elder, bed, keyword)) {
+    if (keyword != null && !matchesSearchKeyword(elder, bed, room, keyword)) {
       return false;
     }
     if (idCardNo != null && !containsIgnoreCase(elder.getIdCardNo(), idCardNo)) {
@@ -833,16 +876,30 @@ public class ElderServiceImpl implements ElderService {
     if (bedNo != null && !containsIgnoreCase(bed == null ? null : bed.getBedNo(), bedNo)) {
       return false;
     }
+    if (roomNo != null && !containsIgnoreCase(room == null ? null : room.getRoomNo(), roomNo)) {
+      return false;
+    }
     if (careLevel != null && !containsIgnoreCase(elder.getCareLevel(), careLevel)) {
       return false;
     }
     return true;
   }
 
-  private boolean matchesSearchKeyword(ElderProfile elder, Bed bed, String keyword) {
+  private com.zhiyangyun.care.elder.entity.Room resolveRoomOfBed(
+      Map<Long, com.zhiyangyun.care.elder.entity.Room> roomMap, Bed bed) {
+    if (bed == null || bed.getRoomId() == null) {
+      return null;
+    }
+    return roomMap.get(bed.getRoomId());
+  }
+
+  private boolean matchesSearchKeyword(
+      ElderProfile elder, Bed bed, com.zhiyangyun.care.elder.entity.Room room, String keyword) {
     if (containsIgnoreCase(elder.getIdCardNo(), keyword)
+        || containsIgnoreCase(elder.getElderCode(), keyword)
         || containsIgnoreCase(elder.getCareLevel(), keyword)
-        || containsIgnoreCase(bed == null ? null : bed.getBedNo(), keyword)) {
+        || containsIgnoreCase(bed == null ? null : bed.getBedNo(), keyword)
+        || containsIgnoreCase(room == null ? null : room.getRoomNo(), keyword)) {
       return true;
     }
     return matchByPinyinOrText(elder, keyword);
@@ -1514,6 +1571,7 @@ public class ElderServiceImpl implements ElderService {
     response.setDepartureType(elder.getDepartureType());
     response.setBedId(elder.getBedId());
     response.setCareLevel(elder.getCareLevel());
+    response.setResponsibleStaffId(elder.getResponsibleStaffId());
     response.setRiskPrecommit(elder.getRiskPrecommit());
     response.setRemark(elder.getRemark());
     response.setSourceType(elder.getSourceType());
@@ -1540,6 +1598,31 @@ public class ElderServiceImpl implements ElderService {
       response.setCurrentBed(bedResponse);
     }
     return response;
+  }
+
+  private Long validateResponsibleStaff(Long staffId, Long orgId) {
+    if (staffId == null) {
+      return null;
+    }
+    StaffAccount staff = staffMapper.selectById(staffId);
+    if (staff == null || Integer.valueOf(1).equals(staff.getIsDeleted())
+        || (orgId != null && !orgId.equals(staff.getOrgId()))) {
+      throw new IllegalArgumentException("责任护理员不存在或不属于本机构");
+    }
+    return staffId;
+  }
+
+  private void applyResponsibleStaffNames(List<ElderResponse> responses) {
+    Set<Long> staffIds = responses.stream()
+        .map(ElderResponse::getResponsibleStaffId)
+        .filter(Objects::nonNull)
+        .collect(Collectors.toSet());
+    Map<Long, String> nameMap = staffMapper.selectBatchIdsSafe(staffIds).stream()
+        .filter(item -> !Integer.valueOf(1).equals(item.getIsDeleted()))
+        .collect(Collectors.toMap(StaffAccount::getId,
+            item -> normalizeText(item.getRealName()) == null ? String.valueOf(item.getUsername()) : item.getRealName(),
+            (left, right) -> left));
+    responses.forEach(item -> item.setResponsibleStaffName(nameMap.get(item.getResponsibleStaffId())));
   }
 
   private void applyCaregiverInfo(ElderResponse response, ElderProfile elder) {

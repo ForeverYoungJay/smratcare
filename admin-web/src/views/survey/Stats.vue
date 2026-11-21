@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="问卷统计" subTitle="提交与评分概览">
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline" class="search-bar">
+      <QueryBar :model="query" layout="inline" class="search-bar" @finish="fetchAll">
         <a-form-item label="模板">
           <a-select v-model:value="query.templateId" allow-clear show-search style="width: 220px" @change="fetchAll">
             <a-select-option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ tpl.templateName }}</a-select-option>
@@ -10,13 +10,15 @@
         <a-form-item label="日期">
           <a-range-picker v-model:value="query.dateRange" value-format="YYYY-MM-DD" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="fetchAll">查询</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="fetchAll">查询</a-button>
+              <a-button @click="reset">重置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <div class="summary-cards">
@@ -41,6 +43,7 @@
         <div class="value">{{ Number(summary.averageScore || 0).toFixed(2) }}</div>
       </a-card>
     </div>
+    <a-alert type="info" show-icon style="margin-bottom: 16px" :message="surveyCaliber(summary, query.dateRange)" />
 
     <a-card class="card-elevated" :bordered="false">
       <a-table
@@ -71,9 +74,12 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import { surveyCaliber } from '../oa/center/adminTabs'
 import { getSurveyTemplatePage, getSurveyStatsSummary, getSurveySubmissionPage } from '../../api/survey'
 import type { SurveyTemplate, SurveyStatsSummary, SurveySubmissionItem, PageResult } from '../../types'
 

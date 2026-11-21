@@ -1,6 +1,7 @@
 package com.zhiyangyun.care.bill.controller;
 
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.audit.service.AuditLogService;
 import com.zhiyangyun.care.bill.entity.BillingCareLevelFee;
 import com.zhiyangyun.care.bill.entity.BillingConfigEntry;
 import com.zhiyangyun.care.bill.model.BillingCareLevelFeeRequest;
@@ -19,15 +20,18 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.transaction.annotation.Transactional;
 
 @RestController
 @RequestMapping("/api/admin/billing")
 @PreAuthorize("hasAnyRole('FINANCE_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
 public class BillingAdminController {
   private final BillingConfigService billingConfigService;
+  private final AuditLogService auditLogService;
 
-  public BillingAdminController(BillingConfigService billingConfigService) {
+  public BillingAdminController(BillingConfigService billingConfigService, AuditLogService auditLogService) {
     this.billingConfigService = billingConfigService;
+    this.auditLogService = auditLogService;
   }
 
   @PostMapping("/config")
@@ -56,6 +60,7 @@ public class BillingAdminController {
   }
 
   @PostMapping("/care-level")
+  @Transactional
   public BillingCareLevelFeeResponse upsertCareLevel(@Valid @RequestBody BillingCareLevelFeeRequest request) {
     Long scopedOrgId = AuthContext.resolveAccessibleOrgId(request.getOrgId());
     BillingCareLevelFee fee = new BillingCareLevelFee();
@@ -67,6 +72,10 @@ public class BillingAdminController {
     fee.setRemark(request.getRemark());
 
     BillingCareLevelFee saved = billingConfigService.upsertCareLevelFee(fee);
+    auditLogService.record(scopedOrgId, scopedOrgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "FIN_CARE_LEVEL_FEE_SAVE", "FINANCE_CONFIG", saved.getId(),
+        "护理等级收费: " + saved.getCareLevel() + "@" + saved.getEffectiveMonth()
+            + " 月费=" + saved.getFeeMonthly().toPlainString() + " 状态=" + saved.getStatus());
     return toResponse(saved);
   }
 

@@ -29,6 +29,7 @@ public class FamilyNoticePublisher {
       notice.setPublisherName("系统联动");
       notice.setPublishTime(LocalDateTime.now());
       notice.setStatus("PUBLISHED");
+      notice.setAudience("FAMILY");
       oaNoticeMapper.insert(notice);
     } catch (Exception e) {
       log.warn("family notice publish failed: {}", e.getMessage());

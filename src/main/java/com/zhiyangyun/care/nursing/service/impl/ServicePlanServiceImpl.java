@@ -10,18 +10,24 @@ import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.nursing.entity.CareLevel;
 import com.zhiyangyun.care.nursing.entity.ServicePlan;
 import com.zhiyangyun.care.nursing.mapper.CareLevelMapper;
+import com.zhiyangyun.care.nursing.entity.ServicePlanRevision;
 import com.zhiyangyun.care.nursing.mapper.ServicePlanMapper;
+import com.zhiyangyun.care.nursing.mapper.ServicePlanRevisionMapper;
 import com.zhiyangyun.care.nursing.model.ServicePlanRequest;
 import com.zhiyangyun.care.nursing.model.ServicePlanResponse;
 import com.zhiyangyun.care.nursing.service.ServicePlanService;
 import com.zhiyangyun.care.standard.entity.ServiceItem;
 import com.zhiyangyun.care.standard.mapper.ServiceItemMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ServicePlanServiceImpl implements ServicePlanService {
@@ -30,9 +36,14 @@ public class ServicePlanServiceImpl implements ServicePlanService {
   private final CareLevelMapper careLevelMapper;
   private final ServiceItemMapper serviceItemMapper;
   private final StaffMapper staffMapper;
+  private final ServicePlanRevisionMapper revisionMapper;
+  private final ObjectMapper objectMapper;
 
   public ServicePlanServiceImpl(ServicePlanMapper servicePlanMapper, ElderMapper elderMapper, CareLevelMapper careLevelMapper,
-      ServiceItemMapper serviceItemMapper, StaffMapper staffMapper) {
+      ServiceItemMapper serviceItemMapper, StaffMapper staffMapper, ServicePlanRevisionMapper revisionMapper,
+      ObjectMapper objectMapper) {
+    this.revisionMapper = revisionMapper;
+    this.objectMapper = objectMapper;
     this.servicePlanMapper = servicePlanMapper;
     this.elderMapper = elderMapper;
     this.careLevelMapper = careLevelMapper;
@@ -45,18 +56,43 @@ public class ServicePlanServiceImpl implements ServicePlanService {
     ServicePlan plan = new ServicePlan();
     fillEntity(plan, request);
     plan.setCreatedBy(request.getCreatedBy());
+    plan.setRevision(1);
+    plan.setApprovalStatus("PENDING");
     servicePlanMapper.insert(plan);
     return buildResponse(plan, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
   }
 
   @Override
-  public ServicePlanResponse update(Long id, ServicePlanRequest request) {
+  @Transactional
+  public ServicePlanResponse update(Long id, ServicePlanRequest request, Long operatorId, String operatorName) {
     ServicePlan plan = servicePlanMapper.selectById(id);
     if (plan == null || !request.getTenantId().equals(plan.getTenantId())) {
       return null;
     }
+    if (isPublished(plan)) {
+      ServicePlanRevision revision = new ServicePlanRevision();
+      revision.setTenantId(plan.getTenantId());
+      revision.setPlanId(plan.getId());
+      revision.setRevision(plan.getRevision() == null ? 1 : plan.getRevision());
+      try {
+        revision.setSnapshotJson(objectMapper.writeValueAsString(plan));
+      } catch (JsonProcessingException ex) {
+        throw new IllegalStateException("护理计划快照生成失败", ex);
+      }
+      revision.setChangeReason(request.getChangeReason());
+      revision.setChangedBy(operatorId);
+      revision.setChangedByName(operatorName);
+      revisionMapper.insert(revision);
+      plan.setRevision(revision.getRevision() + 1);
+    }
+    // 任何修改都要重新审核；审核信息只对应当前版本，上一版的审核人见历史版本
+    plan.setApprovalStatus("PENDING");
+    plan.setApprovedBy(null);
+    plan.setApprovedAt(null);
+    plan.setRejectReason(null);
     fillEntity(plan, request);
     servicePlanMapper.updateById(plan);
+    clearReview(plan.getId(), true);
     return buildResponse(plan, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
   }
 
@@ -126,6 +162,66 @@ public class ServicePlanServiceImpl implements ServicePlanService {
   }
 
   @Override
+  public ServicePlanResponse approve(Long id, Long tenantId, Long operatorId) {
+    ServicePlan plan = loadPending(id, tenantId);
+    if (plan == null) {
+      return null;
+    }
+    plan.setApprovalStatus("PUBLISHED");
+    plan.setApprovedBy(operatorId);
+    plan.setApprovedAt(LocalDateTime.now());
+    plan.setRejectReason(null);
+    servicePlanMapper.updateById(plan);
+    clearReview(plan.getId(), false);
+    return get(id, tenantId);
+  }
+
+  @Override
+  public ServicePlanResponse reject(Long id, Long tenantId, String reason) {
+    ServicePlan plan = loadPending(id, tenantId);
+    if (plan == null) {
+      return null;
+    }
+    plan.setApprovalStatus("REJECTED");
+    plan.setRejectReason(reason);
+    servicePlanMapper.updateById(plan);
+    return get(id, tenantId);
+  }
+
+  @Override
+  public List<ServicePlanRevision> revisions(Long id, Long tenantId) {
+    return revisionMapper.selectList(Wrappers.lambdaQuery(ServicePlanRevision.class)
+        .eq(ServicePlanRevision::getTenantId, tenantId)
+        .eq(ServicePlanRevision::getPlanId, id)
+        .orderByDesc(ServicePlanRevision::getRevision)
+        .orderByDesc(ServicePlanRevision::getCreateTime));
+  }
+
+  /** updateById 会跳过 null 字段，清空审核信息要单独写 */
+  private void clearReview(Long id, boolean approval) {
+    var wrapper = Wrappers.lambdaUpdate(ServicePlan.class).eq(ServicePlan::getId, id).set(ServicePlan::getRejectReason, null);
+    if (approval) {
+      wrapper.set(ServicePlan::getApprovedBy, null).set(ServicePlan::getApprovedAt, null);
+    }
+    servicePlanMapper.update(null, wrapper);
+  }
+
+  private ServicePlan loadPending(Long id, Long tenantId) {
+    ServicePlan plan = servicePlanMapper.selectById(id);
+    if (plan == null || tenantId == null || !tenantId.equals(plan.getTenantId())) {
+      return null;
+    }
+    if (!"PENDING".equals(plan.getApprovalStatus())) {
+      throw new IllegalStateException("当前状态不允许该操作");
+    }
+    return plan;
+  }
+
+  private boolean isPublished(ServicePlan plan) {
+    return plan.getApprovalStatus() == null || "PUBLISHED".equals(plan.getApprovalStatus());
+  }
+
+  @Override
   public void delete(Long id, Long tenantId) {
     ServicePlan plan = servicePlanMapper.selectById(id);
     if (plan != null && tenantId != null && tenantId.equals(plan.getTenantId())) {
@@ -172,6 +268,11 @@ public class ServicePlanServiceImpl implements ServicePlanService {
     response.setDefaultStaffId(plan.getDefaultStaffId());
     response.setStatus(plan.getStatus());
     response.setRemark(plan.getRemark());
+    response.setRevision(plan.getRevision());
+    response.setApprovalStatus(plan.getApprovalStatus());
+    response.setApprovedBy(plan.getApprovedBy());
+    response.setApprovedAt(plan.getApprovedAt());
+    response.setRejectReason(plan.getRejectReason());
 
     ElderProfile elder = elderMap.get(plan.getElderId());
     if (elder == null && plan.getElderId() != null) {

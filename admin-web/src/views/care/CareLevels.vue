@@ -32,7 +32,7 @@
       </a-table>
     </a-card>
 
-    <a-modal v-model:open="modalOpen" title="护理等级" :confirm-loading="submitting" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="modalOpen" title="护理等级" :confirm-loading="submitting" @ok="submit">
       <a-form ref="formRef" layout="vertical" :model="form" :rules="rules">
         <a-form-item label="等级编码" name="levelCode" required>
           <a-input v-model:value="form.levelCode" />

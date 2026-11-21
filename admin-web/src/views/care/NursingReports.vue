@@ -42,7 +42,7 @@
         :message="summary.aiCareSummary || '暂无AI护理摘要'"
         :description="summary.familyReadableSummary || '暂无家属可读摘要'"
       />
-      <a-row :gutter="16" class="quality-row">
+      <a-row :gutter="16" class="quality-row business-stat-strip">
         <a-col :span="6">
           <a-statistic title="计划达成率" :value="pct(summary.planAchievementRate)" />
         </a-col>
@@ -56,7 +56,7 @@
           <a-statistic title="可疑执行" :value="summary.suspiciousExecutionCount || 0" />
         </a-col>
       </a-row>
-      <a-row :gutter="16" class="quality-row">
+      <a-row :gutter="16" class="quality-row business-stat-strip">
         <a-col :span="6">
           <a-statistic title="异常任务" :value="summary.exceptionTaskCount || 0" />
         </a-col>
@@ -102,13 +102,19 @@
     </a-row>
 
     <a-card class="card-elevated" :bordered="false">
-      <a-table :data-source="summary.staffWorkloads || []" :columns="columns" row-key="staffId" :pagination="false" />
+      <a-table :data-source="summary.staffWorkloads || []" :columns="columns" row-key="staffId" :pagination="false" >
+        <template #emptyText>
+          <TableEmpty :filtered="listFiltered" @clear-filters="clearListFilters" />
+        </template>
+      </a-table>
     </a-card>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { reactive, computed } from 'vue'
+import TableEmpty from '../../components/TableEmpty.vue'
+import { clearFilters, countActiveFilters } from '../../utils/filterState'
 import dayjs, { type Dayjs } from 'dayjs'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
@@ -213,6 +219,14 @@ function onReset() {
 }
 
 fetchData()
+
+/** 空状态要区分「被筛掉了」和「本来就没有」 */
+const listFiltered = computed(() => (summary.staffWorkloads || []).length === 0 && countActiveFilters(query) > 0)
+
+function clearListFilters() {
+  clearFilters(query)
+  fetchData()
+}
 </script>
 
 <style scoped>

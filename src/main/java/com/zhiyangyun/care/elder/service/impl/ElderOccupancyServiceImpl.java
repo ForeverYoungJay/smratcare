@@ -136,24 +136,14 @@ public class ElderOccupancyServiceImpl implements ElderOccupancyService {
             relationBackedBedIds.contains(bedId),
             wholeRoomLockedBedIds.contains(bedId),
             legacyFallbackBedIds.contains(bedId))) {
-          bed.setElderId(null);
-          bed.setStatus(BedStatus.AVAILABLE);
-          bed.setOccupancySource(null);
-          bed.setOccupancyRefType(null);
-          bed.setOccupancyRefId(null);
-          bed.setLockExpiresAt(null);
-          bed.setOccupancyNote(null);
-          bed.setLastReleaseReason(reason);
-          bed.setLastReleasedAt(releasedAt);
-          bedMapper.updateById(bed);
+          clearBedOccupancy(bed.getId(), reason, releasedAt);
           if (releasedBedId == null) {
             releasedBedId = bed.getId();
           }
         }
       }
       result.setReleasedBedId(releasedBedId);
-      elder.setBedId(null);
-      elderMapper.updateById(elder);
+      clearElderBedProjection(elder.getId());
     } else if (previousBedId != null) {
       Bed bed = bedMapper.selectOne(
           Wrappers.lambdaQuery(Bed.class)
@@ -168,23 +158,37 @@ public class ElderOccupancyServiceImpl implements ElderOccupancyService {
           relationBackedBedIds.contains(previousBedId),
           wholeRoomLockedBedIds.contains(previousBedId),
           legacyFallbackBedIds.contains(previousBedId))) {
-        bed.setElderId(null);
-        bed.setStatus(BedStatus.AVAILABLE);
-        bed.setOccupancySource(null);
-        bed.setOccupancyRefType(null);
-        bed.setOccupancyRefId(null);
-        bed.setLockExpiresAt(null);
-        bed.setOccupancyNote(null);
-        bed.setLastReleaseReason(reason);
-        bed.setLastReleasedAt(LocalDateTime.now());
-        bedMapper.updateById(bed);
+        clearBedOccupancy(bed.getId(), reason, LocalDateTime.now());
         result.setReleasedBedId(bed.getId());
       }
-      elder.setBedId(null);
-      elderMapper.updateById(elder);
+      clearElderBedProjection(elder.getId());
     }
 
     return result;
+  }
+
+  private void clearBedOccupancy(Long bedId, String reason, LocalDateTime releasedAt) {
+    bedMapper.update(
+        null,
+        Wrappers.lambdaUpdate(Bed.class)
+            .eq(Bed::getId, bedId)
+            .set(Bed::getElderId, null)
+            .set(Bed::getStatus, BedStatus.AVAILABLE)
+            .set(Bed::getOccupancySource, null)
+            .set(Bed::getOccupancyRefType, null)
+            .set(Bed::getOccupancyRefId, null)
+            .set(Bed::getLockExpiresAt, null)
+            .set(Bed::getOccupancyNote, null)
+            .set(Bed::getLastReleaseReason, reason)
+            .set(Bed::getLastReleasedAt, releasedAt));
+  }
+
+  private void clearElderBedProjection(Long elderId) {
+    elderMapper.update(
+        null,
+        Wrappers.lambdaUpdate(ElderProfile.class)
+            .eq(ElderProfile::getId, elderId)
+            .set(ElderProfile::getBedId, null));
   }
 
   private boolean shouldReleaseBed(

@@ -56,18 +56,7 @@
       </a-form-item>
     </SearchForm>
 
-    <section class="surface-toolbar">
-      <div class="surface-toolbar-title">
-        <strong>账单生成与收款工作台</strong>
-        <span>先锁定账期和长者，再完成生成、收款登记、异常识别与历史追溯。</span>
-      </div>
-      <a-space wrap>
-        <a-tag color="processing">账期 {{ currentMonthLabel }}</a-tag>
-        <a-tag :color="query.scene ? 'blue' : 'default'">{{ currentSceneLabel }}</a-tag>
-        <a-tag color="gold">欠费 {{ overdueCount }} 笔</a-tag>
-        <a-tag color="green">收款完成率 {{ collectionRate }}%</a-tag>
-      </a-space>
-    </section>
+
 
     <a-alert
       v-if="signedLinkageContext.active"
@@ -86,24 +75,13 @@
     </a-alert>
 
     <section class="card-elevated bill-workspace">
-      <div class="bill-insight-grid">
-        <div class="bill-insight-card">
-          <span>全院风险摘要</span>
-          <strong>{{ riskSummaryText }}</strong>
-          <small>{{ riskSummaryDescription }}</small>
-        </div>
-        <div class="bill-insight-card is-soft">
-          <span>当前页工作提示</span>
-          <strong>{{ total }} 条账单，{{ invalidBillCount }} 条已作废</strong>
-          <small>支持直接查看详情、登记收款、修正最近收款与查看消费明细。</small>
-        </div>
-      </div>
+      <a-alert v-if="summary.warningMessage || Number(summary.totalCount) > 0 || Number(summary.pendingCount) > 0 || Number(summary.exceptionCount) > 0" type="warning" show-icon :message="riskSummaryText" />
 
       <div class="action-toolbar">
         <div class="table-head">
           <div>
             <strong>账单列表</strong>
-            <span>保留原有账单业务逻辑，优化筛选、风险识别和收款操作的工作顺序。</span>
+
           </div>
           <a-space wrap>
             <a-tag color="default">共 {{ total }} 条</a-tag>
@@ -111,6 +89,7 @@
           </a-space>
         </div>
         <div class="action-toolbar-main">
+          <a-button type="link" :aria-expanded="showBillDetails" @click="showBillDetails = !showBillDetails">{{ showBillDetails ? '只看常用信息' : '完整费用构成' }}</a-button>
           <a-button @click="exportCsvData">导出CSV</a-button>
           <a-button type="primary" @click="openGenerate">生成账单</a-button>
         </div>
@@ -127,9 +106,10 @@
           :loading="loading"
           :data="displayRows"
           :column-config="{ resizable: true }"
+          :row-class-name="billRowClassName"
         >
-          <vxe-column field="billMonth" title="账单月份" width="120" />
-          <vxe-column field="elderName" title="老人" min-width="180">
+          <vxe-column field="billMonth" title="账单月份" width="100" />
+          <vxe-column field="elderName" title="老人" min-width="150">
             <template #default="{ row }">
               <div class="bill-person-cell">
                 <strong>{{ row.elderName || '未知老人' }}</strong>
@@ -137,59 +117,64 @@
               </div>
             </template>
           </vxe-column>
-          <vxe-column field="careLevel" title="护理级别" width="120" />
-          <vxe-column field="totalAmount" title="总额" width="120">
+          <vxe-column v-if="showBillDetails" field="careLevel" title="护理级别" width="120" />
+          <vxe-column field="totalAmount" title="总额" width="100">
             <template #default="{ row }">
               <span class="amount-text">{{ formatAmount(row.totalAmount) }}</span>
             </template>
           </vxe-column>
-          <vxe-column field="nursingFee" title="护理费" width="120">
+          <vxe-column v-if="showBillDetails" field="nursingFee" title="护理费" width="120">
             <template #default="{ row }">
               <span class="amount-subtext">{{ formatAmount(row.nursingFee) }}</span>
             </template>
           </vxe-column>
-          <vxe-column field="bedFee" title="床位费" width="120">
+          <vxe-column v-if="showBillDetails" field="bedFee" title="床位费" width="120">
             <template #default="{ row }">
               <span class="amount-subtext">{{ formatAmount(row.bedFee) }}</span>
             </template>
           </vxe-column>
-          <vxe-column field="insuranceFee" title="保险费" width="120">
+          <vxe-column v-if="showBillDetails" field="insuranceFee" title="保险费" width="120">
             <template #default="{ row }">
               <span class="amount-subtext">{{ formatAmount(row.insuranceFee) }}</span>
             </template>
           </vxe-column>
-          <vxe-column field="paidAmount" title="已付" width="120">
+          <vxe-column field="paidAmount" title="已付" width="100">
             <template #default="{ row }">
               <span class="amount-text is-positive">{{ formatAmount(row.paidAmount) }}</span>
             </template>
           </vxe-column>
-          <vxe-column field="outstandingAmount" title="欠费" width="120">
+          <vxe-column field="outstandingAmount" title="欠费" width="100">
             <template #default="{ row }">
               <span class="amount-chip" :class="Number(row.outstandingAmount || 0) > 0 ? 'is-danger' : 'is-safe'">
                 {{ formatAmount(row.outstandingAmount) }}
               </span>
             </template>
           </vxe-column>
-          <vxe-column field="lastPayMethod" title="收款方式" width="130">
+          <vxe-column field="lastPayMethod" title="收款方式" width="100">
             <template #default="{ row }">
               <span class="pay-method-pill">{{ payMethodText(row.lastPayMethod) }}</span>
             </template>
           </vxe-column>
-          <vxe-column field="status" title="状态" width="140">
+          <vxe-column field="status" title="状态" width="100">
             <template #default="{ row }">
               <a-tag :color="statusColor(row.status)">{{ statusText(row.status) }}</a-tag>
             </template>
           </vxe-column>
-          <vxe-column title="操作" width="320" fixed="right">
+          <vxe-column title="操作" width="220" fixed="right">
             <template #default="{ row }">
               <div class="row-action-links">
                 <a-button type="link" size="small" @click="openDetail(row)">查看</a-button>
                 <a-button v-if="row.status !== 9" type="link" size="small" @click="openPay(row)">登记收款</a-button>
-                <a-button v-if="row.status !== 9 && row.lastPaymentId" type="link" size="small" @click="openEditLatestPayment(row)">改最近收款</a-button>
-                <a-button type="link" size="small" @click="openHistory(row)">收款历史</a-button>
-                <a-button type="link" size="small" @click="goConsumption(row)">消费明细</a-button>
+                <a-dropdown :trigger="['click']">
+                  <a-button type="link" size="small">更多</a-button>
+                  <template #overlay><a-menu>
+                    <a-menu-item v-if="row.status !== 9 && row.lastPaymentId" @click="openEditLatestPayment(row)">修改最近收款</a-menu-item>
+                    <a-menu-item @click="openHistory(row)">收款历史</a-menu-item>
+                    <a-menu-item @click="goConsumption(row)">消费明细</a-menu-item>
+                    <a-menu-item v-if="row.status !== 9" danger @click="markInvalid(row)">无效账单</a-menu-item>
+                  </a-menu></template>
+                </a-dropdown>
                 <a-tag v-if="row.status === 9" color="default">已无效</a-tag>
-                <a-button v-else type="link" size="small" danger @click="markInvalid(row)">无效账单</a-button>
               </div>
             </template>
           </vxe-column>
@@ -235,7 +220,7 @@
       </template>
     </a-drawer>
 
-    <a-modal v-model:open="generateOpen" title="生成账单" @ok="submitGenerate" :confirm-loading="generating">
+    <a-modal :mask-closable="false" v-model:open="generateOpen" title="生成账单" @ok="submitGenerate" :confirm-loading="generating">
       <a-form layout="vertical" :model="generateForm">
         <a-form-item label="账单月份">
           <a-date-picker v-model:value="generateForm.month" picker="month" style="width: 100%" />
@@ -243,45 +228,169 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="payOpen" :title="activePaymentId ? '修改收款' : '登记收款'" @ok="submitPay" :confirm-loading="paying">
-      <a-form layout="vertical" :model="payForm" :rules="payRules" ref="payFormRef">
-        <a-form-item label="金额" name="amount">
-          <a-input-number v-model:value="payForm.amount" style="width: 100%" />
-        </a-form-item>
-        <a-form-item label="方式" name="method">
-          <a-select v-model:value="payForm.method">
-            <a-select-option value="CASH">现金</a-select-option>
-            <a-select-option value="CARD">刷卡</a-select-option>
-            <a-select-option value="BANK">转账</a-select-option>
-            <a-select-option value="ALIPAY">支付宝</a-select-option>
-            <a-select-option value="WECHAT">微信</a-select-option>
-            <a-select-option value="WECHAT_OFFLINE">微信线下</a-select-option>
-            <a-select-option value="QR_CODE">扫码</a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="收款时间" name="paidAt">
-          <a-date-picker v-model:value="payForm.paidAt" show-time style="width: 100%" />
-        </a-form-item>
-        <a-form-item label="备注">
-          <a-input v-model:value="payForm.remark" />
-        </a-form-item>
-      </a-form>
+    <a-modal :mask-closable="false"
+      v-model:open="payOpen"
+      :title="activePaymentId ? '修改收款' : '登记收款'"
+      width="720"
+      @ok="submitPay"
+      :confirm-loading="paying"
+    >
+      <a-spin :spinning="deductionLoading">
+        <a-alert
+          v-if="deduction"
+          type="info"
+          show-icon
+          style="margin-bottom: 12px;"
+          :message="`${deduction.elderName || '-'} · ${deduction.billMonth || '-'} 账单应收 ${formatAmount(deduction.totalAmount)} 元`"
+          :description="`本次可抵账上限 ${formatAmount(payableCeiling)} 元${deduction.ltciHint ? '；' + deduction.ltciHint : ''}`"
+        />
+        <a-form layout="vertical" :model="payForm" :rules="payRules" ref="payFormRef">
+          <a-row :gutter="12">
+            <a-col :span="12">
+              <a-form-item name="ltciDeductAmount">
+                <template #label>
+                  长护险抵扣
+                  <a-button
+                    v-if="ltciSuggestion > 0"
+                    type="link"
+                    size="small"
+                    @click="applyLtciSuggestion"
+                  >按建议 {{ formatAmount(ltciSuggestion) }} 填入</a-button>
+                </template>
+                <a-input-number
+                  v-model:value="payForm.ltciDeductAmount"
+                  :min="0"
+                  :max="ltciMax"
+                  :precision="2"
+                  style="width: 100%"
+                  @change="onDeductionChange"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="折扣减免" name="discountAmount">
+                <a-input-number
+                  v-model:value="payForm.discountAmount"
+                  :min="0"
+                  :max="payableCeiling"
+                  :precision="2"
+                  style="width: 100%"
+                  @change="onDeductionChange"
+                />
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-form-item v-if="Number(payForm.discountAmount || 0) > 0" label="减免原因" name="discountReason">
+            <a-input v-model:value="payForm.discountReason" placeholder="必填：写明减免依据，如院方补偿/协议折扣" />
+          </a-form-item>
+
+          <a-form-item label="消费券抵扣">
+            <a-select
+              v-model:value="selectedVoucherIds"
+              mode="multiple"
+              allow-clear
+              placeholder="选择可用消费券"
+              :options="voucherOptions"
+              style="width: 100%"
+              @change="onVoucherSelectionChange"
+            />
+            <div v-if="!voucherOptions.length" class="deduction-empty">该长者当前没有可用消费券</div>
+            <div v-for="use in payForm.voucherUses" :key="String(use.voucherId)" class="voucher-use-row">
+              <span class="voucher-use-row__label">{{ voucherLabel(use.voucherId) }}</span>
+              <a-input-number
+                v-model:value="use.amount"
+                :min="0"
+                :max="voucherBalance(use.voucherId)"
+                :precision="2"
+                style="width: 140px"
+                @change="onDeductionChange"
+              />
+              <span class="voucher-use-row__hint">剩余额度 {{ formatAmount(voucherBalance(use.voucherId)) }} 元</span>
+            </div>
+          </a-form-item>
+
+          <a-row :gutter="12">
+            <a-col :span="12">
+              <a-form-item label="实收现金" name="amount">
+                <a-input-number
+                  v-model:value="payForm.amount"
+                  :min="0"
+                  :precision="2"
+                  style="width: 100%"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="方式" name="method">
+                <a-select v-model:value="payForm.method">
+                  <a-select-option value="CASH">现金</a-select-option>
+                  <a-select-option value="CARD">刷卡</a-select-option>
+                  <a-select-option value="BANK">转账</a-select-option>
+                  <a-select-option value="ALIPAY">支付宝</a-select-option>
+                  <a-select-option value="WECHAT">微信</a-select-option>
+                  <a-select-option value="WECHAT_OFFLINE">微信线下</a-select-option>
+                  <a-select-option value="QR_CODE">扫码</a-select-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-form-item label="收款时间" name="paidAt">
+            <a-date-picker v-model:value="payForm.paidAt" show-time style="width: 100%" />
+          </a-form-item>
+          <a-form-item label="备注">
+            <a-input v-model:value="payForm.remark" />
+          </a-form-item>
+        </a-form>
+
+        <div class="settle-summary">
+          <div class="settle-summary__row">
+            <span>应收余额</span><strong>{{ formatAmount(payableCeiling) }}</strong>
+          </div>
+          <div class="settle-summary__row">
+            <span>抵扣合计</span>
+            <strong>
+              -{{ formatAmount(deductionTotal) }}
+              <small>（长护险 {{ formatAmount(payForm.ltciDeductAmount) }} · 折扣 {{ formatAmount(payForm.discountAmount) }} · 消费券 {{ formatAmount(voucherTotal) }}）</small>
+            </strong>
+          </div>
+          <div class="settle-summary__row">
+            <span>实收现金</span><strong>{{ formatAmount(payForm.amount) }}</strong>
+          </div>
+          <div class="settle-summary__row is-total" :class="{ 'is-error': settleError }">
+            <span>本次抵账合计</span><strong>{{ formatAmount(settleTotal) }}</strong>
+          </div>
+          <div class="settle-summary__row">
+            <span>登记后剩余欠费</span><strong>{{ formatAmount(remainingAfterSettle) }}</strong>
+          </div>
+          <div v-if="settleError" class="settle-summary__error">{{ settleError }}</div>
+        </div>
+      </a-spin>
     </a-modal>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
+import { useCompletionGuide } from '../../composables/useCompletionGuide'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { message } from 'ant-design-vue'
+import { Modal, message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { exportCsv } from '../../utils/export'
-import { getBillPage, generateBill, invalidateBill, payBill } from '../../api/bill'
+import { getBillPage, generateBill, getBillDeductionPreview, invalidateBill, payBill } from '../../api/bill'
 import { getFinanceModuleEntrySummary, getPaymentRecordPage, updatePaymentRecord } from '../../api/finance'
-import type { BillItem, FinanceModuleEntrySummary, Id, PageResult, PaymentRecordItem } from '../../types'
+import type {
+  BillDeductionPreview,
+  BillItem,
+  FinanceModuleEntrySummary,
+  FinanceVoucherItem,
+  Id,
+  PageResult,
+  PaymentRecordItem,
+  PaymentVoucherUse
+} from '../../types'
 import { printTableReport } from '../../utils/print'
 import { confirmAction } from '../../utils/actionConfirm'
 import { normalizeResidentId } from '../../utils/id'
@@ -293,6 +402,7 @@ import {
   type BillCenterScene
 } from '../../utils/billCenterQuery'
 
+const showCompletion = useCompletionGuide()
 const props = withDefaults(defineProps<{
   title?: string
   subTitle?: string
@@ -314,6 +424,7 @@ const router = useRouter()
 const billRouteSignature = ref('')
 const skipNextBillRouteWatch = ref(false)
 
+const showBillDetails = ref(false)
 const loading = ref(false)
 const rows = ref<BillItem[]>([])
 const total = ref(0)
@@ -377,18 +488,140 @@ type PayForm = {
   method: string
   paidAt: any
   remark: string
+  ltciDeductAmount: number
+  discountAmount: number
+  discountReason: string
+  voucherUses: PaymentVoucherUse[]
 }
 
 const payForm = reactive<PayForm>({
   amount: 0,
   method: 'CASH',
   paidAt: dayjs(),
-  remark: ''
+  remark: '',
+  ltciDeductAmount: 0,
+  discountAmount: 0,
+  discountReason: '',
+  voucherUses: []
 })
 const payRules = {
-  amount: [{ required: true, message: '请输入金额' }],
+  amount: [{ required: true, message: '请输入实收金额' }],
   method: [{ required: true, message: '请选择方式' }],
   paidAt: [{ required: true, message: '请选择时间' }]
+}
+
+const deduction = ref<BillDeductionPreview | null>(null)
+const deductionLoading = ref(false)
+const selectedVoucherIds = ref<Id[]>([])
+/** 修改收款时，本次可抵账上限要把该笔记录原有的抵账额加回来 */
+const editingSettledAmount = ref(0)
+
+const usableVouchers = computed<FinanceVoucherItem[]>(() => deduction.value?.usableVouchers || [])
+const voucherOptions = computed(() =>
+  usableVouchers.value.map((item) => ({
+    label: `${item.voucherName}（${item.voucherNo} 余额 ${formatAmount(item.balanceAmount)}元）`,
+    value: item.id
+  }))
+)
+const payableCeiling = computed(() =>
+  round2(Number(deduction.value?.outstandingAmount || 0) + editingSettledAmount.value)
+)
+const voucherTotal = computed(() =>
+  round2(payForm.voucherUses.reduce((sum, item) => sum + Number(item.amount || 0), 0))
+)
+const deductionTotal = computed(() =>
+  round2(Number(payForm.ltciDeductAmount || 0) + Number(payForm.discountAmount || 0) + voucherTotal.value)
+)
+const settleTotal = computed(() => round2(Number(payForm.amount || 0) + deductionTotal.value))
+const remainingAfterSettle = computed(() => round2(payableCeiling.value - settleTotal.value))
+const ltciMax = computed(() => {
+  const available = Number(deduction.value?.ltciAvailableAmount ?? payableCeiling.value)
+  return round2(Math.min(available, payableCeiling.value))
+})
+const ltciSuggestion = computed(() => {
+  const other = round2(Number(payForm.discountAmount || 0) + voucherTotal.value)
+  return round2(Math.max(0, Math.min(ltciMax.value, payableCeiling.value - other)))
+})
+const settleError = computed(() => {
+  if (settleTotal.value <= 0) return '实收金额与抵扣金额不能同时为 0'
+  if (settleTotal.value > payableCeiling.value) {
+    return `实收与抵扣合计 ${formatAmount(settleTotal.value)} 元超过应收余额 ${formatAmount(payableCeiling.value)} 元`
+  }
+  if (Number(payForm.discountAmount || 0) > 0 && !payForm.discountReason.trim()) {
+    return '填写折扣减免金额时必须说明减免原因'
+  }
+  const overdrawn = payForm.voucherUses.find(
+    (item) => Number(item.amount || 0) > voucherBalance(item.voucherId)
+  )
+  if (overdrawn) {
+    return `消费券 ${voucherLabel(overdrawn.voucherId)} 抵扣金额超过剩余额度`
+  }
+  return ''
+})
+
+function round2(value: number) {
+  return Math.round((Number(value) || 0) * 100) / 100
+}
+
+function voucherOf(voucherId: Id) {
+  return usableVouchers.value.find((item) => String(item.id) === String(voucherId))
+}
+
+function voucherBalance(voucherId: Id) {
+  return round2(Number(voucherOf(voucherId)?.balanceAmount || 0))
+}
+
+function voucherLabel(voucherId: Id) {
+  const item = voucherOf(voucherId)
+  return item ? `${item.voucherName}（${item.voucherNo}）` : String(voucherId)
+}
+
+/** 抵扣变化后把实收现金重算为剩余应收，收款员仍可手工改小做部分收款 */
+function onDeductionChange() {
+  payForm.amount = round2(Math.max(0, payableCeiling.value - deductionTotal.value))
+}
+
+function onVoucherSelectionChange() {
+  const selected = selectedVoucherIds.value.map(String)
+  payForm.voucherUses = payForm.voucherUses.filter((item) => selected.includes(String(item.voucherId)))
+  selectedVoucherIds.value.forEach((voucherId) => {
+    if (payForm.voucherUses.some((item) => String(item.voucherId) === String(voucherId))) return
+    const used = round2(
+      Number(payForm.ltciDeductAmount || 0) + Number(payForm.discountAmount || 0) + voucherTotal.value
+    )
+    const room = round2(Math.max(0, payableCeiling.value - used))
+    payForm.voucherUses.push({
+      voucherId,
+      amount: round2(Math.min(voucherBalance(voucherId), room))
+    })
+  })
+  onDeductionChange()
+}
+
+function applyLtciSuggestion() {
+  payForm.ltciDeductAmount = ltciSuggestion.value
+  onDeductionChange()
+}
+
+function resetDeductionState() {
+  deduction.value = null
+  selectedVoucherIds.value = []
+  editingSettledAmount.value = 0
+  payForm.ltciDeductAmount = 0
+  payForm.discountAmount = 0
+  payForm.discountReason = ''
+  payForm.voucherUses = []
+}
+
+async function loadDeductionPreview(billId: Id) {
+  deductionLoading.value = true
+  try {
+    deduction.value = await getBillDeductionPreview(billId)
+  } catch {
+    deduction.value = null
+  } finally {
+    deductionLoading.value = false
+  }
 }
 
 const activeBillId = ref<Id | null>(null)
@@ -417,11 +650,16 @@ const currentSceneLabel = computed(() => {
 })
 const riskSummaryText = computed(() => (
   summary.value.warningMessage
-    || `欠费 ${summary.value.totalCount} 人，低余额 ${summary.value.pendingCount} 人，合同到期风险 ${summary.value.exceptionCount} 人`
+    || `欠费 ${summary.value.totalCount ?? '—'} 人，低余额 ${summary.value.pendingCount ?? '—'} 人，合同到期风险 ${summary.value.exceptionCount ?? '—'} 人`
 ))
 const riskSummaryDescription = computed(() => (
   `今日收款 ${formatAmount(summary.value.todayAmount)} 元，累计欠费 ${formatAmount(summary.value.monthAmount)} 元`
 ))
+
+// 欠费整行标红，让催缴对象在长列表里一眼可见
+function billRowClassName({ row }: { row: BillItem }) {
+  return Number(row?.outstandingAmount || 0) > 0 ? 'is-overdue-row' : ''
+}
 
 function formatAmount(value?: number | string) {
   return Number(value || 0).toFixed(2)
@@ -507,7 +745,7 @@ async function syncQueryToRoute() {
   }
   skipNextBillRouteWatch.value = true
   billRouteSignature.value = buildBillCenterRouteSignature(nextQuery)
-  await router.replace({ path: route.path, query: nextQuery })
+  await router.replace({ path: route.path, query: nextQuery, hash: route.hash })
 }
 
 async function fetchData() {
@@ -623,8 +861,12 @@ async function submitGenerate() {
   }
   generating.value = true
   try {
-    await generateBill(dayjs(generateForm.month).format('YYYY-MM'))
+    const result = await generateBill(dayjs(generateForm.month).format('YYYY-MM'))
     message.success('生成成功')
+    if (result?.warnings?.length) {
+      // 标准缺失时对应费用按 0 计，提醒财务到「计费规则」补齐后重新生成
+      Modal.warning({ title: '计费标准不完整', content: result.warnings.join('；') + '。请到「计费规则」补齐后重新生成本月账单。', width: 520 })
+    }
     generateOpen.value = false
     fetchData()
   } finally {
@@ -632,43 +874,84 @@ async function submitGenerate() {
   }
 }
 
-function openPay(row: BillItem) {
+async function openPay(row: BillItem) {
   activeBillId.value = row.id
   activePaymentId.value = null
+  resetDeductionState()
   payForm.amount = Number(row.outstandingAmount || 0)
   payForm.method = 'CASH'
   originalPayMethod.value = 'CASH'
   payForm.paidAt = dayjs()
   payForm.remark = ''
   payOpen.value = true
+  await loadDeductionPreview(row.id)
+  onDeductionChange()
 }
 
-function openEditLatestPayment(row: BillItem) {
+async function openEditLatestPayment(row: BillItem) {
   if (!row.lastPaymentId) {
     message.warning('未找到最近收款记录')
     return
   }
   activeBillId.value = row.id
   activePaymentId.value = row.lastPaymentId || null
+  resetDeductionState()
   payForm.amount = Number(row.lastPaymentAmount || 0)
   payForm.method = String(row.lastPayMethod || 'CASH').toUpperCase()
   originalPayMethod.value = payForm.method
   payForm.paidAt = row.lastPaidAt ? dayjs(row.lastPaidAt) : dayjs()
   payForm.remark = row.lastPaymentRemark || ''
   payOpen.value = true
+  await loadDeductionPreview(row.id)
+  await prefillEditingDeductions(row.lastPaymentId)
+}
+
+/** 修改收款：把该笔记录原有的抵扣回填，并把额度上限加回来 */
+async function prefillEditingDeductions(paymentId: Id) {
+  if (!activeBillId.value) return
+  try {
+    const res: PageResult<PaymentRecordItem> = await getPaymentRecordPage({
+      pageNo: 1,
+      pageSize: 100,
+      billId: activeBillId.value
+    })
+    const record = (res.list || []).find((item) => String(item.id) === String(paymentId))
+    if (!record) return
+    editingSettledAmount.value = round2(Number(record.settledAmount ?? record.amount ?? 0))
+    payForm.amount = round2(Number(record.amount || 0))
+    payForm.ltciDeductAmount = round2(Number(record.ltciDeductAmount || 0))
+    payForm.discountAmount = round2(Number(record.discountAmount || 0))
+    payForm.discountReason = record.discountReason || ''
+    // 原有券核销明细无法从账单页反查，改为由收款员重新选择需要抵扣的券
+    if (Number(record.voucherAmount || 0) > 0) {
+      message.info('该笔收款原有消费券抵扣，保存时将按当前选择重新核销')
+    }
+  } catch {
+    editingSettledAmount.value = 0
+  }
 }
 
 async function submitPay() {
   if (paying.value) return
   await payFormRef.value?.validate?.()
   if (!activeBillId.value) return
+  if (settleError.value) {
+    message.warning(settleError.value)
+    return
+  }
   paying.value = true
   try {
     const payload = {
-      amount: payForm.amount,
+      amount: round2(payForm.amount),
       method: payForm.method,
       paidAt: dayjs(payForm.paidAt).format('YYYY-MM-DD HH:mm:ss'),
-      remark: payForm.remark
+      remark: payForm.remark,
+      ltciDeductAmount: round2(payForm.ltciDeductAmount),
+      discountAmount: round2(payForm.discountAmount),
+      discountReason: payForm.discountReason.trim() || undefined,
+      voucherUses: payForm.voucherUses
+        .filter((item) => Number(item.amount || 0) > 0)
+        .map((item) => ({ voucherId: item.voucherId, amount: round2(item.amount) }))
     }
     if (activePaymentId.value) {
       await updatePaymentRecord(activePaymentId.value, payload)
@@ -680,9 +963,11 @@ async function submitPay() {
     } else {
       await payBill(activeBillId.value, payload)
       message.success('收款登记成功')
+    showCompletion('收款已登记', [{ label: '查看收款流水', path: '/finance/payments/records' }, { label: '办理票据', path: '/finance/fees/payment-and-invoice' }])
     }
     payOpen.value = false
     activePaymentId.value = null
+    resetDeductionState()
     await fetchData()
     if (historyOpen.value && activeBillId.value) {
       const res: PageResult<PaymentRecordItem> = await getPaymentRecordPage({
@@ -1036,4 +1321,92 @@ onMounted(async () => {
     justify-content: stretch;
   }
 }
+
+.deduction-empty {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-tertiary, #999);
+}
+
+.voucher-use-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.voucher-use-row__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.voucher-use-row__hint {
+  font-size: 12px;
+  color: var(--text-tertiary, #999);
+}
+
+.settle-summary {
+  margin-top: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft, #eee);
+  border-radius: 8px;
+  background: var(--fill-subtle, rgba(0, 0, 0, 0.02));
+}
+
+.settle-summary__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+  font-size: 13px;
+}
+
+.settle-summary__row small {
+  margin-left: 6px;
+  font-weight: 400;
+  color: var(--text-tertiary, #999);
+}
+
+.settle-summary__row.is-total {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-soft, #eee);
+  font-size: 15px;
+}
+
+.settle-summary__row.is-error strong {
+  color: #cf1322;
+}
+
+.settle-summary__error {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #cf1322;
+}
+
+/* 欠费行整行标红：vxe-table 的行类挂在 tr 上，需要覆盖到单元格背景 */
+.finance-vxe-table :deep(.vxe-body--row.is-overdue-row) td,
+.finance-vxe-table :deep(.vxe-body--row.is-overdue-row.row--stripe) td {
+  background-color: rgba(207, 19, 34, 0.08) !important;
+}
+
+.finance-vxe-table :deep(.vxe-body--row.is-overdue-row:hover) td {
+  background-color: rgba(207, 19, 34, 0.14) !important;
+}
+
+.finance-vxe-table :deep(.vxe-body--row.is-overdue-row) td:first-child {
+  box-shadow: inset 3px 0 0 #cf1322;
+}
+
+.bill-overview-grid { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px; width:100%; }
+.overview-card { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:48px; padding:10px 12px; border-radius:7px; }
+.overview-card strong { font-size:22px; margin:0; }
+.overview-card small { display:none; }
+.bill-workspace { padding:12px 0 0; border:0; border-radius:0; box-shadow:none; background:none; }
+@media(max-width:760px) { .bill-overview-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
 </style>

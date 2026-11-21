@@ -1,5 +1,5 @@
 <template>
-  <a-modal
+  <a-modal :mask-closable="false"
     :open="open"
     title="导出二次确认"
     :confirm-loading="submitting"

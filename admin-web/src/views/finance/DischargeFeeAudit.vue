@@ -1,5 +1,9 @@
 <template>
   <PageContainer title="退住费用审核" subTitle="审核通过后自动生成退住结算单">
+    <template #extra>
+      <a-button @click="quickHighRisk">仅看高风险</a-button>
+      <a-button type="primary" @click="openCreate">新建审核单</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="老人">
         <ElderNameAutocomplete v-model:value="query.keyword" allow-clear placeholder="老人姓名(编号)" width="220px" />
@@ -14,20 +18,19 @@
           <a-select-option value="LOW">低风险</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-button @click="quickHighRisk">仅看高风险</a-button>
-        <a-button type="primary" @click="openCreate">新建审核单</a-button>
-      </template>
+
     </SearchForm>
 
-    <a-row :gutter="[12, 12]" style="margin-bottom: 12px;">
+    <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 12px;">
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="审核单数" :value="filteredRows.length" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="待审核" :value="pendingCount" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="高风险单" :value="highRiskCount" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="涉及金额" :value="totalAmount" suffix="元" :precision="2" /></a-card></a-col>
     </a-row>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="filteredRows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData" rowKey="id" :columns="columns" :data-source="filteredRows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
           <a-tag :color="record.status === 'APPROVED' ? 'green' : record.status === 'REJECTED' ? 'red' : 'orange'">{{ record.status }}</a-tag>
@@ -44,7 +47,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="createOpen" title="新建退住费用审核" :confirm-loading="creating" @ok="submitCreate">
+    <a-modal :mask-closable="false" v-model:open="createOpen" title="新建退住费用审核" :confirm-loading="creating" @ok="submitCreate">
       <a-form layout="vertical">
         <a-form-item label="老人" required>
           <a-select v-model:value="createForm.elderId" show-search :filter-option="false" :options="elderOptions" @search="searchElders" @focus="() => !elderOptions.length && searchElders('')" />

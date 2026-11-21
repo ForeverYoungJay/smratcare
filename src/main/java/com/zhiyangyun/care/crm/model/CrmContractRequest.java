@@ -11,6 +11,10 @@ public class CrmContractRequest {
   private String phone;
   private String idCardNo;
   private String homeAddress;
+  private String contractType;
+  private java.math.BigDecimal referenceMonthlyFee;
+  /** yyyy-MM-dd */
+  private String expectedAdmissionDate;
   private String reservationRoomNo;
   private Long reservationBedId;
   private String elderName;

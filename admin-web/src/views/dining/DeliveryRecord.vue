@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="送餐记录" subTitle="记录送餐结果与送达状态">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新增送餐记录</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="日期范围">
         <a-range-picker v-model:value="query.range" />
@@ -10,12 +13,12 @@
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="订单号/区域/送餐人" allow-clear />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openCreate">新增送餐记录</a-button>
-      </template>
+
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
           <a-tag :color="getDiningDeliveryStatusColor(record.status)">
@@ -40,7 +43,7 @@
       </div>
     </a-modal>
 
-    <a-modal v-model:open="editOpen" title="送餐记录" :confirm-loading="saving" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="送餐记录" :confirm-loading="saving" @ok="submit">
       <a-form layout="vertical">
         <a-form-item label="点餐单" required>
           <a-select

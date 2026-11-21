@@ -1,13 +1,13 @@
 <template>
   <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
     <template #extra>
-      <a-space wrap>
+      <ActionToolbar wrap>
         <a-button @click="exportSupervisorAnomalies">导出异常</a-button>
         <a-button :type="showSupervisorAnomaliesOnly ? 'primary' : 'default'" @click="toggleSupervisorAnomalyView">
           监管异常 {{ supervisorAnomalies.length }}
         </a-button>
         <a-button type="primary" v-permission="accountManagerRoles" @click="goToProfileBasicCreate()">新增员工主档</a-button>
-      </a-space>
+      </ActionToolbar>
     </template>
     <template #stats>
       <div class="staff-overview">
@@ -80,6 +80,8 @@
     </section>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="displayRows"
@@ -243,7 +245,7 @@
       </template>
     </a-drawer>
 
-    <a-modal v-model:open="roleOpen" title="分配角色" @ok="submitRole">
+    <a-modal :mask-closable="false" v-model:open="roleOpen" title="分配角色" @ok="submitRole">
       <a-form layout="vertical">
         <a-form-item label="角色" required>
           <a-select v-model:value="roleForm.roleIds" mode="multiple" :options="roleFilterOptions" />
@@ -275,6 +277,8 @@
 </template>
 
 <script setup lang="ts">
+import { useCompletionGuide } from '../composables/useCompletionGuide'
+import ActionToolbar from '../components/ActionToolbar.vue'
 import { computed, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
@@ -291,6 +295,7 @@ import { useLiveSyncRefresh } from '../composables/useLiveSyncRefresh'
 import { openPrintTableReport } from '../utils/print'
 import { canBeDirectLeader, canBeIndirectLeader, ensureSupervisorOrder, mergeRoleCodes } from '../utils/supervisor'
 import type { Id, StaffCredentialItem, StaffItem, RoleItem, PageResult } from '../types'
+const showCompletion = useCompletionGuide()
 const RESERVED_ROLE_CODES = new Set(['SYS_ADMIN'])
 
 const props = withDefaults(defineProps<{ title?: string; subTitle?: string }>(), {
@@ -788,6 +793,7 @@ async function submit() {
   if (!payload.password) delete payload.password
     const saved = await updateStaff(form.id, payload)
     message.success('保存成功')
+    showCompletion('账号资料已保存', [{ label: '维护角色权限', path: '/system/role' }, { label: '查看员工档案', path: '/hr/profile/basic' }])
     drawerOpen.value = false
     await fetchData()
   } catch {

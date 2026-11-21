@@ -31,6 +31,8 @@ import com.zhiyangyun.care.common.file.model.UploadFileResponse;
 import com.zhiyangyun.care.common.file.service.FileStorageService;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
+import com.zhiyangyun.care.nursing.entity.CareLevel;
+import com.zhiyangyun.care.nursing.mapper.CareLevelMapper;
 import jakarta.validation.Valid;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -71,11 +73,12 @@ public class AssessmentRecordController {
   private final CrmContractAttachmentMapper crmContractAttachmentMapper;
   private final AuditLogService auditLogService;
   private final FileStorageService fileStorageService;
+  private final CareLevelMapper careLevelMapper;
 
   public AssessmentRecordController(AssessmentRecordMapper recordMapper, ElderMapper elderMapper, OrgMapper orgMapper,
       AssessmentScoringService scoringService, CrmLeadMapper crmLeadMapper, CrmContractMapper crmContractMapper,
       CrmContractAttachmentMapper crmContractAttachmentMapper,
-      AuditLogService auditLogService, FileStorageService fileStorageService) {
+      AuditLogService auditLogService, FileStorageService fileStorageService, CareLevelMapper careLevelMapper) {
     this.recordMapper = recordMapper;
     this.elderMapper = elderMapper;
     this.orgMapper = orgMapper;
@@ -85,6 +88,7 @@ public class AssessmentRecordController {
     this.crmContractAttachmentMapper = crmContractAttachmentMapper;
     this.auditLogService = auditLogService;
     this.fileStorageService = fileStorageService;
+    this.careLevelMapper = careLevelMapper;
   }
 
   @GetMapping("/page")
@@ -942,6 +946,42 @@ public class AssessmentRecordController {
     return response;
   }
 
+  /** 入住评估完成后把评估等级写入长者档案的护理等级（按护理部字典名称），账单据此取护理费 */
+  private void syncElderCareLevel(AssessmentRecord record, ElderProfile elder) {
+    if (elder == null) {
+      return;
+    }
+    List<CareLevel> levels = careLevelMapper.selectList(Wrappers.lambdaQuery(CareLevel.class)
+        .eq(CareLevel::getIsDeleted, 0)
+        .eq(CareLevel::getOrgId, elder.getOrgId()));
+    String levelName = matchCareLevel(record.getLevelCode(), levels);
+    if (levelName == null || levelName.equals(elder.getCareLevel())) {
+      return;
+    }
+    String before = elder.getCareLevel();
+    elder.setCareLevel(levelName);
+    elderMapper.updateById(elder);
+    recordAudit("ELDER_CARE_LEVEL_FROM_ASSESSMENT", "ELDER", elder.getId(),
+        "入住评估自动更新护理等级：" + (before == null ? "未设置" : before) + " → " + levelName);
+  }
+
+  /** 评估等级（如「2级」）对应字典：等级编码相同、名称相同，或名称以该等级开头（如「2级：中度失能」）；匹配不到返回 null */
+  public static String matchCareLevel(String levelCode, List<CareLevel> levels) {
+    if (levelCode == null || levelCode.isBlank() || levels == null) {
+      return null;
+    }
+    String code = levelCode.trim();
+    return levels.stream()
+        .filter(level -> level.getEnabled() == null || level.getEnabled() != 0)
+        .filter(level -> level.getLevelName() != null && !level.getLevelName().isBlank())
+        .filter(level -> code.equalsIgnoreCase(String.valueOf(level.getLevelCode()).trim())
+            || code.equals(level.getLevelName().trim())
+            || level.getLevelName().trim().startsWith(code))
+        .map(level -> level.getLevelName().trim())
+        .findFirst()
+        .orElse(null);
+  }
+
   private void syncLeadFlowAfterAssessment(AssessmentRecord record) {
     if (record == null) {
       return;
@@ -953,6 +993,7 @@ public class AssessmentRecordController {
       return;
     }
     ElderProfile elder = selectElder(record.getElderId());
+    syncElderCareLevel(record, elder);
     Long tenantId = elder == null ? record.getTenantId() : elder.getTenantId();
     if (tenantId == null) {
       return;

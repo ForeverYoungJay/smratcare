@@ -1,15 +1,17 @@
 <template>
   <PageContainer title="老人账户" subTitle="余额、预警阈值与账户流水">
+    <template #extra>
+      <a-space>
+        <a-button @click="router.push('/finance/prepaid-recharge')">预存充值</a-button>
+        <a-button @click="openWarnings">余额预警</a-button>
+        <a-button type="primary" @click="openAdjust">余额调整</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="老人姓名">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="姓名(编号)" width="220px" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="openWarnings">余额预警</a-button>
-          <a-button type="primary" @click="openAdjust">余额调整</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <a-alert
@@ -21,7 +23,7 @@
       :description="'当前可直接查看余额、押金/预存与账户流水。'"
     />
 
-    <a-row :gutter="[12, 12]" style="margin-bottom: 12px;">
+    <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 12px;">
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="账户总数" :value="rows.length" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="低余额账户" :value="lowBalanceCount" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="账户总余额" :value="totalBalance" suffix="元" :precision="2" /></a-card></a-col>
@@ -40,6 +42,8 @@
     </a-row>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -72,7 +76,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="adjustOpen" title="余额调整" @ok="submitAdjust" :confirm-loading="adjusting">
+    <a-modal :mask-closable="false" v-model:open="adjustOpen" title="余额调整" @ok="submitAdjust" :confirm-loading="adjusting">
       <a-form layout="vertical">
         <a-form-item label="老人姓名" required>
           <a-select
@@ -105,7 +109,7 @@
       <a-table :columns="warningColumns" :data-source="warnings" rowKey="id" :pagination="false" />
     </a-modal>
 
-    <a-modal v-model:open="configOpen" title="账户设置" @ok="submitConfig" :confirm-loading="configSaving">
+    <a-modal :mask-closable="false" v-model:open="configOpen" title="账户设置" @ok="submitConfig" :confirm-loading="configSaving">
       <a-form layout="vertical">
         <a-form-item label="老人姓名">
           <a-input v-model:value="configForm.elderName" disabled />
@@ -124,6 +128,12 @@
         </a-form-item>
       </a-form>
     </a-modal>
+    <a-drawer :open="panel === 'ledger'" title="账户流水" width="min(1100px, 96vw)" destroy-on-close @close="close('elderId')">
+      <AccountLog />
+    </a-drawer>
+    <a-drawer :open="panel === 'recharge'" title="预存充值" width="min(1100px, 96vw)" destroy-on-close @close="close()">
+      <PrepaidRecharge />
+    </a-drawer>
   </PageContainer>
 </template>
 
@@ -140,8 +150,12 @@ import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getElderAccountPage, adjustElderAccount, getElderAccountWarnings, getFinanceModuleEntrySummary, updateElderAccount } from '../../api/finance'
 import type { ElderAccount, FinanceModuleEntrySummary, Id, PageResult } from '../../types'
 import router from '../../router'
+import AccountLog from './AccountLog.vue'
+import PrepaidRecharge from './PrepaidRecharge.vue'
+import { usePanelQuery } from './usePanelQuery'
 
 const route = useRoute()
+const { panel, close } = usePanelQuery()
 const loading = ref(false)
 const rows = ref<ElderAccount[]>([])
 const warnings = ref<ElderAccount[]>([])
@@ -329,7 +343,7 @@ async function submitAdjust() {
 }
 
 function openLogs(record: ElderAccount) {
-  router.push({ name: 'FinanceAccountLog', query: { elderId: record.elderId } })
+  router.push({ path: '/finance/accounts/ledger', query: { elderId: String(record.elderId) } })
 }
 
 function openConfig(record: ElderAccount) {
@@ -385,12 +399,12 @@ applyRouteFilters()
 fetchData()
 
 watch(
-  () => route.query,
+  // 打开/关闭流水、充值抽屉只改 panel/elderId，不重新查账户列表
+  () => { const { panel: _panel, elderId: _elderId, ...rest } = route.query; return JSON.stringify(rest) },
   () => {
     applyRouteFilters()
     fetchData().catch(() => {})
-  },
-  { deep: true }
+  }
 )
 
 useLiveSyncRefresh({

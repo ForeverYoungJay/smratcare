@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="房间打扫" subTitle="保洁计划与完成追踪">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新增打扫任务</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="状态">
         <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 160px" />
@@ -7,12 +10,12 @@
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="房间号/保洁员" allow-clear />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openCreate">新增打扫任务</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -36,7 +39,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" :title="form.id ? '编辑打扫任务' : '新增打扫任务'" @ok="submit" :confirm-loading="saving" width="620px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" :title="form.id ? '编辑打扫任务' : '新增打扫任务'" @ok="submit" :confirm-loading="saving" width="620px">
       <a-form layout="vertical">
         <a-form-item label="房间" required>
           <a-select

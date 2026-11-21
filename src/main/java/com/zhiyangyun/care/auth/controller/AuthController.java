@@ -7,6 +7,7 @@ import com.zhiyangyun.care.auth.entity.StaffAccount;
 import com.zhiyangyun.care.auth.mapper.RoleMapper;
 import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.auth.mapper.OrgMapper;
+import com.zhiyangyun.care.auth.model.InitialPasswordRequest;
 import com.zhiyangyun.care.auth.model.LoginRequest;
 import com.zhiyangyun.care.auth.model.LoginResponse;
 import com.zhiyangyun.care.auth.model.Result;
@@ -75,6 +76,10 @@ public class AuthController {
   private final LoginSecurityService loginSecurityService;
   private final WechatMiniAppAuthService wechatMiniAppAuthService;
   private final FamilyPortalProperties familyPortalProperties;
+
+  /** 默认密码登录时强制改密；测试环境关闭（测试用例统一以默认密码登录） */
+  @org.springframework.beans.factory.annotation.Value("${security.force-default-password-change:true}")
+  private boolean forceDefaultPasswordChange = true;
 
   public AuthController(AuthenticationManager authenticationManager,
       TokenProvider tokenProvider,
@@ -215,7 +220,7 @@ public class AuthController {
   @PostMapping("/login")
   public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request,
       HttpServletRequest httpServletRequest) {
-    String loginId = defaultText(request.getUsername(), "");
+    String loginId = resolveLoginId(defaultText(request.getUsername(), ""));
 
     // 机构安全策略：登录失败锁定（策略读取/校验失败均不阻断登录，见 LoginSecurityService）
     StaffAccount policyStaff = staffMapper.selectOne(
@@ -248,6 +253,56 @@ public class AuthController {
       throw new IllegalArgumentException("账号不存在或已停用");
     }
 
+    // 仍在用默认密码：不签发正式 token，只给改密令牌，设置新密码后才算登录成功
+    if (forceDefaultPasswordChange && AdminStaffController.DEFAULT_INITIAL_PASSWORD.equals(request.getPassword())) {
+      loginSecurityService.record(staff.getOrgId(), staff.getId(), staff.getUsername(),
+          "PASSWORD", false, "DEFAULT_PASSWORD_MUST_CHANGE");
+      LoginResponse changeResponse = new LoginResponse();
+      changeResponse.setMustChangePassword(true);
+      changeResponse.setChallengeToken(tokenProvider.generateChallengeToken(staff.getId(), staff.getUsername(),
+          staff.getOrgId(), TokenProvider.TOKEN_TYPE_PASSWORD_CHANGE));
+      return Result.ok(changeResponse);
+    }
+    return Result.ok(completeLogin(staff, policy, httpServletRequest));
+  }
+
+  /** 首次登录改密：凭改密令牌设置新密码，然后按正常流程登录（含 2FA）。 */
+  @PostMapping("/password/initial")
+  public Result<LoginResponse> setInitialPassword(@Valid @RequestBody InitialPasswordRequest request,
+      HttpServletRequest httpServletRequest) {
+    Claims claims = parseChallengeClaims(request.getChallengeToken(), TokenProvider.TOKEN_TYPE_PASSWORD_CHANGE);
+    StaffAccount staff = loadActiveStaff(claims);
+    String next = MyOfficeController.requireStrongPassword(request.getNewPassword());
+    staffMapper.update(null, Wrappers.lambdaUpdate(StaffAccount.class)
+        .set(StaffAccount::getPasswordHash, passwordEncoder.encode(next))
+        .set(StaffAccount::getPasswordPlaintextSnapshot, null)
+        .set(StaffAccount::getPasswordSnapshotUpdatedAt, java.time.LocalDateTime.now())
+        .eq(StaffAccount::getId, staff.getId()));
+    long ttl = tokenProvider.getExpirationMillis(claims) - System.currentTimeMillis();
+    tokenBlacklistService.blacklist(claims.getId(), Math.max(ttl, 0));
+    loginSecurityService.record(staff.getOrgId(), staff.getId(), staff.getUsername(),
+        "INITIAL_PASSWORD", true, null);
+    StaffAccount refreshed = staffMapper.selectById(staff.getId());
+    return Result.ok(completeLogin(refreshed, securityPolicyService.getEffectivePolicy(refreshed.getOrgId()),
+        httpServletRequest));
+  }
+
+  /** 员工可用账号、工号或手机号登录；手机号只在唯一对应一个在职账号时生效。 */
+  private String resolveLoginId(String loginId) {
+    if (!hasText(loginId) || staffMapper.selectCount(Wrappers.lambdaQuery(StaffAccount.class)
+        .and(w -> w.eq(StaffAccount::getUsername, loginId).or().eq(StaffAccount::getStaffNo, loginId))
+        .eq(StaffAccount::getIsDeleted, 0)) > 0) {
+      return loginId;
+    }
+    List<StaffAccount> byPhone = staffMapper.selectList(Wrappers.lambdaQuery(StaffAccount.class)
+        .eq(StaffAccount::getPhone, loginId)
+        .eq(StaffAccount::getIsDeleted, 0)
+        .last("LIMIT 2"));
+    return byPhone.size() == 1 && hasText(byPhone.get(0).getUsername()) ? byPhone.get(0).getUsername() : loginId;
+  }
+
+  private LoginResponse completeLogin(StaffAccount staff, SecurityPolicyView policy,
+      HttpServletRequest httpServletRequest) {
     // 机构安全策略：密码有效期（password_max_days=0 表示不启用；无密码更新时间时不判定）
     if (policy.getPasswordMaxDays() != null && policy.getPasswordMaxDays() > 0
         && staff.getPasswordSnapshotUpdatedAt() != null
@@ -274,7 +329,7 @@ public class AuthController {
         challengeResponse.setChallengeToken(
             tokenProvider.generateChallengeToken(staff.getId(), staff.getUsername(), staff.getOrgId()));
         challengeResponse.setTwoFactorPhone(DataMaskingUtil.maskPhone(staff.getPhone()));
-        return Result.ok(challengeResponse);
+        return challengeResponse;
       }
       // 未配置手机号时降级为单因子放行（避免管理员被锁死），留痕以便审计
       loginSecurityService.record(staff.getOrgId(), staff.getId(), staff.getUsername(),
@@ -295,7 +350,7 @@ public class AuthController {
     response.setPagePermissions(mergeRoutePermissions(roleEntities));
     response.setStaffInfo(toStaffInfo(staff));
     loginSecurityService.record(staff.getOrgId(), staff.getId(), staff.getUsername(), "PASSWORD", true, null);
-    return Result.ok(response);
+    return response;
   }
 
   /** 2FA 第二步：凭挑战令牌 + 短信验证码换取正式登录令牌。 */
@@ -347,37 +402,44 @@ public class AuthController {
   }
 
   private Claims parseChallengeClaims(String challengeToken) {
+    return parseChallengeClaims(challengeToken, TokenProvider.TOKEN_TYPE_2FA_CHALLENGE);
+  }
+
+  private Claims parseChallengeClaims(String challengeToken, String tokenType) {
     Claims claims;
     try {
       claims = tokenProvider.parseToken(challengeToken);
     } catch (Exception ex) {
-      throw new IllegalArgumentException("二次验证会话已失效，请重新登录");
+      throw new IllegalArgumentException("登录验证已失效，请重新登录");
     }
-    if (!TokenProvider.TOKEN_TYPE_2FA_CHALLENGE.equals(
-        claims.get(TokenProvider.CLAIM_TOKEN_TYPE, String.class))) {
-      throw new IllegalArgumentException("无效的二次验证会话，请重新登录");
+    if (!tokenType.equals(claims.get(TokenProvider.CLAIM_TOKEN_TYPE, String.class))) {
+      throw new IllegalArgumentException("登录验证无效，请重新登录");
     }
     if (tokenBlacklistService.isBlacklisted(claims.getId())) {
-      throw new IllegalArgumentException("二次验证会话已使用，请重新登录");
+      throw new IllegalArgumentException("登录验证已使用，请重新登录");
     }
     return claims;
   }
 
   private StaffAccount resolveChallengeStaff(String challengeToken) {
-    Claims claims = parseChallengeClaims(challengeToken);
+    StaffAccount staff = loadActiveStaff(parseChallengeClaims(challengeToken));
+    if (!hasText(staff.getPhone())) {
+      throw new IllegalArgumentException("账号未配置手机号，无法完成二次验证");
+    }
+    return staff;
+  }
+
+  private StaffAccount loadActiveStaff(Claims claims) {
     Long staffId;
     try {
       staffId = Long.valueOf(claims.getSubject());
     } catch (NumberFormatException ex) {
-      throw new IllegalArgumentException("无效的二次验证会话，请重新登录");
+      throw new IllegalArgumentException("登录验证无效，请重新登录");
     }
     StaffAccount staff = staffMapper.selectById(staffId);
     if (staff == null || !Integer.valueOf(1).equals(staff.getStatus())
         || Integer.valueOf(1).equals(staff.getIsDeleted())) {
       throw new IllegalArgumentException("账号不存在或已停用");
-    }
-    if (!hasText(staff.getPhone())) {
-      throw new IllegalArgumentException("账号未配置手机号，无法完成二次验证");
     }
     return staff;
   }

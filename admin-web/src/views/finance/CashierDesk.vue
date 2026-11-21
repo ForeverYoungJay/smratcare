@@ -1,14 +1,14 @@
 <template>
   <PageContainer title="收银台" subTitle="把收费、票据、修正和交班放进一条顺手的操作链。">
     <div class="cashier-shell">
-      <section class="cashier-top fade-up">
-        <div class="cashier-top__copy">
-          <div class="cashier-kicker">收银流程</div>
-          <h2>一线财务只需要盯住今天这四步。</h2>
+      <section class="cashier-top fade-up business-overview">
+        <details class="business-help">
+          <summary>使用说明</summary>
+          <p class="business-help-title">一线财务只需要盯住今天这四步。</p>
           <p>先收款，再补票据，再复核修正，最后打印交班单。页面不再让你来回找模块。</p>
-        </div>
+        </details>
         <div class="cashier-top__controls">
-          <a-form layout="inline" :model="query" class="search-form">
+          <QueryBar layout="inline" :model="query" class="search-form" @finish="loadData">
             <a-form-item label="业务日期">
               <a-date-picker v-model:value="query.date" />
             </a-form-item>
@@ -19,13 +19,15 @@
                 </a-select-option>
               </a-select>
             </a-form-item>
-            <a-form-item>
-              <a-space>
-                <a-button type="primary" @click="loadData">刷新</a-button>
-                <a-button @click="reset">重置</a-button>
-              </a-space>
-            </a-form-item>
-          </a-form>
+            <template #actions>
+              <ActionToolbar>
+                <a-space>
+                  <a-button type="primary" html-type="submit">刷新</a-button>
+                  <a-button @click="reset">重置</a-button>
+                </a-space>
+              </ActionToolbar>
+            </template>
+          </QueryBar>
           <div class="preset-strip">
             <button
               v-for="preset in datePresets"
@@ -44,6 +46,7 @@
             <a-button type="primary" @click="go('/finance/payments/register?from=cashier_desk')">收费登记</a-button>
             <a-button @click="go('/finance/fees/payment-and-invoice?from=cashier_desk')">票据处理</a-button>
             <a-button @click="go('/finance/payments/refund-reversal?from=cashier_desk')">退款/冲正</a-button>
+            <a-button @click="go('/finance/payments/shift-close')">日结交班</a-button>
             <a-button @click="printShiftSummary">打印交班单</a-button>
           </div>
         </div>
@@ -210,10 +213,18 @@
         </section>
       </StatefulBlock>
     </div>
+    <a-drawer :open="panel === 'records'" title="全部收款流水" width="min(1100px, 96vw)" destroy-on-close @close="close('date', 'method')">
+      <PaymentRecords />
+    </a-drawer>
+    <a-drawer :open="panel === 'shift'" title="日结与交班" width="min(1100px, 96vw)" destroy-on-close @close="close('date')">
+      <ShiftClose />
+    </a-drawer>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
@@ -224,8 +235,12 @@ import StatefulBlock from '../../components/StatefulBlock.vue'
 import { exportFinanceInvoiceReceiptCsv, getFinanceInvoiceReceiptPage, getFinancePaymentAdjustmentPage, getPaymentRecordPage } from '../../api/finance'
 import type { FinanceInvoiceReceiptItem, FinancePaymentAdjustmentItem, PageResult, PaymentRecordItem } from '../../types'
 import { printTableReport } from '../../utils/print'
+import PaymentRecords from './PaymentRecords.vue'
+import ShiftClose from './ShiftClose.vue'
+import { usePanelQuery } from './usePanelQuery'
 
 const router = useRouter()
+const { panel, close } = usePanelQuery()
 const loading = ref(false)
 const errorMessage = ref('')
 const payments = ref<PaymentRecordItem[]>([])

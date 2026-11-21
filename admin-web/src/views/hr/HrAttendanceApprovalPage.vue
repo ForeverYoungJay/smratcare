@@ -1,5 +1,15 @@
 <template>
   <PageContainer :title="pageTitle" :subTitle="`考勤与班组 / ${pageTitle}`">
+    <template #extra>
+      <a-space>
+        <a-button @click="onExportCsv">导出 CSV</a-button>
+        <a-button @click="onExportExcel">导出 Excel</a-button>
+      </a-space>
+    </template>
+    <div class="hr-scene-switch" style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <label :for="'HrAttendanceApprovalPage-scene'">办理事项</label>
+      <a-select id="HrAttendanceApprovalPage-scene" :value="approvalScene" :options="[{ value: 'leave', label: '请假' }, { value: 'shift-change', label: '换班' }, { value: 'overtime', label: '加班' }]" style="width:220px" @change="switchScene" />
+    </div>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="标题/申请人/备注" allow-clear />
@@ -7,14 +17,11 @@
       <a-form-item label="审批状态">
         <a-select v-model:value="query.status" allow-clear style="width: 180px" :options="statusOptions" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="onExportCsv">导出 CSV</a-button>
-          <a-button @click="onExportExcel">导出 Excel</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -28,7 +35,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -37,7 +44,11 @@ import { getHrAttendanceLeavePage, getHrAttendanceOvertimePage, getHrAttendanceS
 import type { HrGenericApprovalItem, PageResult } from '../../types'
 import { HR_APPROVAL_EXPORT_FIELDS, mapByDict } from './hrExportFields'
 
+function switchScene(scene: string) {
+  router.replace({ path: route.path, query: { ...route.query, scene }, hash: route.hash })
+}
 const route = useRoute()
+const router = useRouter()
 
 const query = reactive({
   keyword: undefined as string | undefined,

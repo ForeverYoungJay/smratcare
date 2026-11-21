@@ -2,6 +2,8 @@ package com.zhiyangyun.care.crm.service;
 
 import com.zhiyangyun.care.crm.model.action.CrmContractAttachmentRequest;
 import com.zhiyangyun.care.crm.model.action.CrmContractAttachmentResponse;
+import com.zhiyangyun.care.crm.model.action.CrmContractReminderConfigRequest;
+import com.zhiyangyun.care.crm.model.action.CrmContractReminderConfigResponse;
 import com.zhiyangyun.care.crm.model.action.CrmSmsTaskCreateRequest;
 import com.zhiyangyun.care.crm.model.action.CrmSmsTaskResponse;
 import java.util.List;
@@ -19,4 +21,9 @@ public interface CrmContractActionService {
   List<CrmSmsTaskResponse> listSmsTasks(Long tenantId, Long contractId);
 
   CrmSmsTaskResponse sendSmsTask(Long tenantId, Long taskId);
+
+  CrmContractReminderConfigResponse getReminderConfig(Long tenantId, Long orgId);
+
+  CrmContractReminderConfigResponse saveReminderConfig(
+      Long tenantId, Long orgId, Long staffId, CrmContractReminderConfigRequest request);
 }

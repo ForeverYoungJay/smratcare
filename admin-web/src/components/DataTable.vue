@@ -1,11 +1,16 @@
 <template>
   <section class="table-shell card-elevated">
-    <div class="table-shell-head" v-if="$slots.toolbar">
+    <div class="table-shell-head" v-if="$slots.toolbar || canCollapseColumns">
       <slot name="toolbar" />
+      <a-button v-if="canCollapseColumns" type="link" :aria-expanded="showAllColumns" @click="showAllColumns = !showAllColumns">{{ showAllColumns ? '只看常用信息' : '显示完整信息' }}</a-button>
+    </div>
+    <div v-if="selectionCount" class="business-selection" role="status">
+      <span>已选 {{ selectionCount }} 条</span>
+      <a-button v-if="rowSelection?.onChange" type="link" @click="rowSelection.onChange([], [])">取消选择</a-button>
     </div>
     <a-table
       class="data-table"
-      :columns="columns"
+      :columns="displayColumns"
       :data-source="dataSource"
       :row-key="rowKey"
       :row-class-name="mergedRowClassName"
@@ -21,19 +26,14 @@
         <slot name="bodyCell" v-bind="slotProps" />
       </template>
       <template #emptyText>
-        <div class="empty-wrap">
-          <a-empty :description="null">
-            <template #description>
-              <div class="empty-copy">
-                <strong class="empty-copy__title">{{ emptyTitle || '暂无数据' }}</strong>
-                <span class="empty-copy__description">{{ emptyDescription || '当前还没有可展示的数据，稍后再来看看。' }}</span>
-              </div>
-            </template>
-            <div class="empty-extra" v-if="$slots.emptyExtra">
-              <slot name="emptyExtra" />
-            </div>
-          </a-empty>
-        </div>
+        <TableEmpty
+          :filtered="isFilteredEmpty"
+          :title="emptyTitle"
+          :description="emptyDescription"
+          @clear-filters="onClearFilters"
+        >
+          <slot name="emptyExtra" />
+        </TableEmpty>
       </template>
     </a-table>
   </section>
@@ -41,7 +41,11 @@
 
 <script setup lang="ts">
 import type { TablePaginationConfig } from 'ant-design-vue'
-import { computed } from 'vue'
+import { computed, inject, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import { emphasizeColumns, compactWorkspaceColumns } from '../workspaces/columns'
+import { clearFilters, countActiveFilters } from '../utils/filterState'
+import TableEmpty from './TableEmpty.vue'
 
 const props = defineProps<{
   columns: any[]
@@ -57,7 +61,22 @@ const props = defineProps<{
   emptyTitle?: string
   emptyDescription?: string
   showStriped?: boolean
+  /** 传入页面的查询表单对象后，空状态会区分「被筛掉了」和「本来就没有」 */
+  filterModel?: Record<string, any> | null
 }>()
+
+const embedded = inject('function-workspace-embedded', false)
+const route = useRoute()
+const showAllColumns = ref(false)
+const selectionCount = computed(() => props.rowSelection?.selectedRowKeys?.length || 0)
+const compactColumns = computed(() => embedded ? compactWorkspaceColumns(props.columns, route?.path || '') : props.columns)
+const canCollapseColumns = computed(() => compactColumns.value.length < props.columns.length)
+const displayColumns = computed(() => emphasizeColumns(showAllColumns.value ? props.columns : compactColumns.value))
+
+/** 有筛选条件、且当前结果为空 —— 和「一条数据都还没建」是两件事 */
+const isFilteredEmpty = computed(
+  () => (props.dataSource || []).length === 0 && countActiveFilters(props.filterModel) > 0
+)
 
 const mergedPagination = computed<TablePaginationConfig | false>(() => {
   if (props.pagination === false) return false
@@ -82,14 +101,27 @@ const mergedRowClassName = (record: any, index: number) => {
   return `${striped} ${external}`.trim()
 }
 
-const emit = defineEmits<{ (e: 'change', pagination: TablePaginationConfig, filters: any, sorter: any): void }>()
+const emit = defineEmits<{
+  (e: 'change', pagination: TablePaginationConfig, filters: any, sorter: any): void
+  (e: 'clear-filters'): void
+}>()
 
 function onChange(pagination: TablePaginationConfig, filters: any, sorter: any) {
   emit('change', pagination, filters, sorter)
 }
+
+/**
+ * 先把筛选条件真正清掉，再让页面重新查询。
+ * 不能直接复用页面的「清空」按钮：那个是恢复初始值，而初始值本身常常就是筛选条件。
+ */
+function onClearFilters() {
+  clearFilters(props.filterModel)
+  emit('clear-filters')
+}
 </script>
 
 <style scoped>
+.business-selection { display:flex;align-items:center;gap:12px;padding:6px 12px;border-radius:6px;background:var(--primary-soft);color:var(--primary); }
 .table-shell {
   overflow: hidden;
 }
@@ -106,29 +138,4 @@ function onChange(pagination: TablePaginationConfig, filters: any, sorter: any) 
   background: rgba(247, 251, 254, 0.88);
 }
 
-.empty-wrap {
-  padding: 12px 0;
-}
-
-.empty-copy {
-  display: grid;
-  gap: 6px;
-}
-
-.empty-copy__title {
-  color: #22332e;
-  font-size: 15px;
-}
-
-.empty-copy__description {
-  color: #5c6f69;
-  font-size: 12px;
-  line-height: 1.7;
-}
-
-.empty-extra {
-  display: flex;
-  justify-content: center;
-  margin-top: 14px;
-}
 </style>

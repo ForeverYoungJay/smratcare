@@ -57,7 +57,9 @@
       </div>
     </div>
 
-    <DataTable v-else rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="onSearch" v-else rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'level'">
           <a-tag :color="levelColor(record.level)">{{ levelText(record.level) }}</a-tag>
@@ -86,14 +88,14 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="assignOpen" title="受理并指派" :confirm-loading="saving" @ok="submitAssign">
+    <a-modal :mask-closable="false" v-model:open="assignOpen" title="受理并指派" :confirm-loading="saving" @ok="submitAssign">
       <a-form layout="vertical">
         <a-form-item label="处置人姓名"><a-input v-model:value="assignForm.assigneeName" placeholder="值班护理员" /></a-form-item>
         <a-form-item label="处置人ID"><a-input-number v-model:value="assignForm.assigneeId" style="width: 100%" placeholder="选填" /></a-form-item>
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="handleOpen" title="处置完成" :confirm-loading="saving" @ok="submitHandle">
+    <a-modal :mask-closable="false" v-model:open="handleOpen" title="处置完成" :confirm-loading="saving" @ok="submitHandle">
       <a-form layout="vertical">
         <a-form-item label="处置说明" required><a-textarea v-model:value="actionForm.note" :rows="3" placeholder="现场处置过程与结果" /></a-form-item>
         <a-form-item label="一键生成不良事件">
@@ -106,7 +108,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="reviewOpen" title="复盘关闭" :confirm-loading="saving" @ok="submitReview">
+    <a-modal :mask-closable="false" v-model:open="reviewOpen" title="复盘关闭" :confirm-loading="saving" @ok="submitReview">
       <a-form layout="vertical">
         <a-form-item label="复盘结论" required><a-textarea v-model:value="actionForm.note" :rows="3" placeholder="原因分析、整改建议" /></a-form-item>
       </a-form>

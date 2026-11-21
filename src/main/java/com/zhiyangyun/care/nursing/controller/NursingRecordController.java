@@ -23,7 +23,7 @@ public class NursingRecordController {
     this.nursingRecordService = nursingRecordService;
   }
 
-  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/page")
   public Result<IPage<NursingRecordItem>> page(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -33,8 +33,11 @@ public class NursingRecordController {
       @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) Long staffId,
       @RequestParam(required = false) String keyword) {
-    return Result.ok(nursingRecordService.page(
-        AuthContext.getOrgId(), pageNo, pageSize, parseDateTime(timeFrom), parseDateTime(timeTo), elderId, staffId, keyword));
+    Long effectiveStaffId = AuthContext.hasRole("NURSING_EMPLOYEE") && !AuthContext.isMinisterOrHigher()
+        ? AuthContext.getStaffId()
+        : staffId;
+    return Result.ok(nursingRecordService.page(AuthContext.getOrgId(), pageNo, pageSize,
+        parseDateTime(timeFrom), parseDateTime(timeTo), elderId, effectiveStaffId, keyword));
   }
 
   private LocalDateTime parseDateTime(String value) {

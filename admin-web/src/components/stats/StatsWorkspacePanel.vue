@@ -70,7 +70,7 @@
       </ul>
     </div>
 
-    <a-modal v-model:open="savePresetOpen" title="保存筛选方案" @ok="savePreset" ok-text="保存" cancel-text="取消">
+    <a-modal :mask-closable="false" v-model:open="savePresetOpen" title="保存筛选方案" @ok="savePreset" ok-text="保存" cancel-text="取消">
       <a-form layout="vertical">
         <a-form-item label="方案名称">
           <a-input v-model:value="presetForm.name" placeholder="例如：院长周会版" maxlength="24" />
@@ -81,7 +81,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="targetOpen" title="目标值设置" @ok="saveTargets" ok-text="保存" cancel-text="取消">
+    <a-modal :mask-closable="false" v-model:open="targetOpen" title="目标值设置" @ok="saveTargets" ok-text="保存" cancel-text="取消">
       <a-form layout="vertical">
         <a-form-item v-for="item in localTargetFields" :key="item.key" :label="item.label">
           <a-input-number
@@ -95,7 +95,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="subscriptionOpen" title="订阅计划" @ok="saveSubscription" ok-text="保存" cancel-text="取消">
+    <a-modal :mask-closable="false" v-model:open="subscriptionOpen" title="订阅计划" @ok="saveSubscription" ok-text="保存" cancel-text="取消">
       <a-form layout="vertical">
         <a-form-item label="计划名称">
           <a-input v-model:value="subscriptionForm.name" placeholder="例如：月经营周报" maxlength="24" />

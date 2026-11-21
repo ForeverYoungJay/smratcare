@@ -1,5 +1,19 @@
 <template>
   <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
+    <template #extra>
+      <a-button type="primary" @click="openDrawer()">{{ isPlanScene ? '新增计划' : '新增记录' }}</a-button>
+      <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
+      <a-button v-if="isRecordScene" :disabled="!selectedSingleRecord" @click="openArchiveBySelection">个人培训档案</a-button>
+      <a-button @click="exportCurrentExcel">导出 Excel</a-button>
+      <a-button @click="exportCurrentPdf">导出 PDF</a-button>
+      <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+      <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+      <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
+    </template>
+    <div class="hr-scene-switch" style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <label :for="'Training-scene'">办理事项</label>
+      <a-select id="Training-scene" :value="trainingScene" :options="[{ value: 'records', label: '培训记录' }, { value: 'plans', label: '培训计划' }]" style="width:220px" @change="switchScene" />
+    </div>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="部门">
         <a-select
@@ -38,19 +52,12 @@
       <a-form-item label="时间范围">
         <a-range-picker v-model:value="query.range" />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openDrawer()">{{ isPlanScene ? '新增计划' : '新增记录' }}</a-button>
-        <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
-        <a-button v-if="isRecordScene" :disabled="!selectedSingleRecord" @click="openArchiveBySelection">个人培训档案</a-button>
-        <a-button @click="exportCurrentExcel">导出 Excel</a-button>
-        <a-button @click="exportCurrentPdf">导出 PDF</a-button>
-        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
-        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
-      </template>
+
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :row-selection="rowSelection"
       :columns="columns"
@@ -267,7 +274,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import PageContainer from '../../components/PageContainer.vue'
@@ -286,7 +293,11 @@ import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
 import { exportExcel } from '../../utils/export'
 import type { HrStaffCertificateItem, PageResult, StaffTrainingRecord } from '../../types'
 
+function switchScene(scene: string) {
+  router.replace({ path: route.path, query: { ...route.query, scene }, hash: route.hash })
+}
 const route = useRoute()
+const router = useRouter()
 
 const trainingScene = computed<'plans' | 'records'>(() => {
   const queryScene = String(route.query.scene || '').trim()

@@ -8,12 +8,15 @@ import com.zhiyangyun.care.crm.model.action.CrmCallbackPlanResponse;
 import com.zhiyangyun.care.crm.model.action.CrmContractAttachmentRequest;
 import com.zhiyangyun.care.crm.model.action.CrmContractAttachmentResponse;
 import com.zhiyangyun.care.crm.model.action.CrmLeadBatchDeleteRequest;
+import com.zhiyangyun.care.crm.model.action.CrmLeadFollowupRequest;
 import com.zhiyangyun.care.crm.model.action.CrmLeadBatchStatusRequest;
 import com.zhiyangyun.care.crm.model.action.CrmSmsTaskCreateRequest;
 import com.zhiyangyun.care.crm.model.action.CrmSmsTaskResponse;
 import com.zhiyangyun.care.crm.model.CrmLeadResponse;
 import com.zhiyangyun.care.crm.service.CrmLeadActionService;
+import com.zhiyangyun.care.common.web.ResourceNotFoundException;
 import java.util.List;
+import java.util.Map;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -47,14 +50,21 @@ public class CrmLeadActionController {
 
   @PostMapping("/contract/{contractNo}/handoff-assessment")
   public Result<CrmLeadResponse> handoffAssessment(@PathVariable String contractNo) {
-    return Result.ok(leadActionService.handoffToAssessment(AuthContext.getOrgId(), contractNo));
+    return Result.ok(requireFound(leadActionService.handoffToAssessment(AuthContext.getOrgId(), contractNo), "客户线索"));
   }
 
   @PostMapping("/{leadId}/callback-plans")
   public Result<CrmCallbackPlanResponse> createCallbackPlan(
       @PathVariable Long leadId, @RequestBody CrmCallbackPlanRequest request) {
-    return Result.ok(leadActionService.createCallbackPlan(
-        AuthContext.getOrgId(), AuthContext.getOrgId(), AuthContext.getStaffId(), leadId, request));
+    return Result.ok(requireFound(leadActionService.createCallbackPlan(
+        AuthContext.getOrgId(), AuthContext.getOrgId(), AuthContext.getStaffId(), leadId, request), "客户线索"));
+  }
+
+  @PostMapping("/{leadId}/followups")
+  public Result<CrmCallbackPlanResponse> recordFollowup(
+      @PathVariable Long leadId, @RequestBody CrmLeadFollowupRequest request) {
+    return Result.ok(requireFound(leadActionService.recordFollowup(
+        AuthContext.getOrgId(), AuthContext.getOrgId(), AuthContext.getStaffId(), leadId, request), "客户线索"));
   }
 
   @GetMapping("/{leadId}/callback-plans")
@@ -62,17 +72,23 @@ public class CrmLeadActionController {
     return Result.ok(leadActionService.listCallbackPlan(AuthContext.getOrgId(), leadId));
   }
 
+  @GetMapping("/callback-plans/batch")
+  public Result<Map<Long, List<CrmCallbackPlanResponse>>> listCallbackPlans(
+      @RequestParam List<Long> leadIds) {
+    return Result.ok(leadActionService.listCallbackPlans(AuthContext.getOrgId(), leadIds));
+  }
+
   @PostMapping("/callback-plans/{planId}/execute")
   public Result<CrmCallbackPlanResponse> executeCallbackPlan(
       @PathVariable Long planId, @RequestBody(required = false) CrmCallbackPlanExecuteRequest request) {
-    return Result.ok(leadActionService.executeCallbackPlan(AuthContext.getOrgId(), planId, request));
+    return Result.ok(requireFound(leadActionService.executeCallbackPlan(AuthContext.getOrgId(), planId, request), "回访计划"));
   }
 
   @PostMapping("/{leadId}/attachments")
   public Result<CrmContractAttachmentResponse> createAttachment(
       @PathVariable Long leadId, @RequestBody CrmContractAttachmentRequest request) {
-    return Result.ok(leadActionService.createAttachment(
-        AuthContext.getOrgId(), AuthContext.getOrgId(), AuthContext.getStaffId(), leadId, request));
+    return Result.ok(requireFound(leadActionService.createAttachment(
+        AuthContext.getOrgId(), AuthContext.getOrgId(), AuthContext.getStaffId(), leadId, request), "客户线索"));
   }
 
   @GetMapping("/{leadId}/attachments")
@@ -99,6 +115,13 @@ public class CrmLeadActionController {
 
   @PostMapping("/sms/tasks/{taskId}/send")
   public Result<CrmSmsTaskResponse> sendSmsTask(@PathVariable Long taskId) {
-    return Result.ok(leadActionService.sendSmsTask(AuthContext.getOrgId(), taskId));
+    return Result.ok(requireFound(leadActionService.sendSmsTask(AuthContext.getOrgId(), taskId), "短信任务"));
+  }
+
+  private <T> T requireFound(T value, String resourceName) {
+    if (value == null) {
+      throw new ResourceNotFoundException(resourceName + "不存在或无权访问");
+    }
+    return value;
   }
 }

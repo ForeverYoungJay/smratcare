@@ -1,5 +1,12 @@
 <template>
   <PageContainer title="奖惩管理" subTitle="员工奖惩记录与执行台账">
+    <template #extra>
+      <a-button type="primary" @click="openEdit()">新增记录</a-button>
+      <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
+      <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+      <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+      <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="员工">
         <a-select
@@ -24,16 +31,12 @@
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="标题/原因" allow-clear />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openEdit()">新增记录</a-button>
-        <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
-        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
-        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
-      </template>
+
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :row-selection="rowSelection"
       :columns="columns"
@@ -54,7 +57,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" :title="form.id ? '编辑奖惩' : '新增奖惩'" @ok="submit" :confirm-loading="saving" width="700px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" :title="form.id ? '编辑奖惩' : '新增奖惩'" @ok="submit" :confirm-loading="saving" width="700px">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">

@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="120急救事件" subTitle="一键急救、120呼叫登记、送医与转归全流程闭环，含抢救记录单">
+    <template #extra>
+      <a-button type="primary" danger @click="openCreate">一键急救</a-button>
+    </template>
     <SearchForm :model="query" @search="onSearch" @reset="onReset">
       <a-form-item label="长者">
         <a-select v-model:value="query.elderId" show-search allow-clear :filter-option="false" :options="elderOptions"
@@ -10,12 +13,12 @@
           <a-select-option v-for="s in statusOptions" :key="s.value" :value="s.value">{{ s.label }}</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" danger @click="openCreate">一键急救</a-button>
-      </template>
+
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="onSearch" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'eventTime'">
           {{ formatEventTime(record.eventTime) }}
@@ -44,7 +47,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="createOpen" title="一键急救" :confirm-loading="saving" width="600px" @ok="submitCreate">
+    <a-modal :mask-closable="false" v-model:open="createOpen" title="一键急救" :confirm-loading="saving" width="600px" @ok="submitCreate">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">
@@ -61,7 +64,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="departOpen" title="送医登记" :confirm-loading="saving" width="520px" @ok="submitDepart">
+    <a-modal :mask-closable="false" v-model:open="departOpen" title="送医登记" :confirm-loading="saving" width="520px" @ok="submitDepart">
       <a-form layout="vertical">
         <a-form-item label="送医医院" required><a-input v-model:value="departForm.hospitalName" placeholder="如 市第一人民医院" /></a-form-item>
         <a-form-item label="陪同人"><a-input v-model:value="departForm.escortName" placeholder="陪同人员姓名" /></a-form-item>
@@ -69,7 +72,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="outcomeOpen" title="转归登记" :confirm-loading="saving" width="520px" @ok="submitOutcome">
+    <a-modal :mask-closable="false" v-model:open="outcomeOpen" title="转归登记" :confirm-loading="saving" width="520px" @ok="submitOutcome">
       <a-form layout="vertical">
         <a-form-item label="转归结果" required>
           <a-select v-model:value="outcomeForm.outcome">
@@ -82,7 +85,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="rescueOpen" title="抢救记录单" :confirm-loading="saving" width="720px" @ok="submitRescue">
+    <a-modal :mask-closable="false" v-model:open="rescueOpen" title="抢救记录单" :confirm-loading="saving" width="720px" @ok="submitRescue">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12"><a-form-item label="开始时间"><a-date-picker v-model:value="rescueForm.startTime" show-time value-format="YYYY-MM-DDTHH:mm:ss" style="width:100%" /></a-form-item></a-col>

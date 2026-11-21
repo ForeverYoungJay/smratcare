@@ -4,7 +4,7 @@
       <a-button type="primary" @click="openForm()">新增模板</a-button>
     </template>
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline" class="search-bar">
+      <QueryBar :model="query" layout="inline" class="search-bar" @finish="fetchData">
         <a-form-item label="关键字">
           <a-input v-model:value="query.keyword" placeholder="模板名称/编码" allow-clear />
         </a-form-item>
@@ -19,13 +19,15 @@
             <a-select-option value="SELF_CARE">自理能力</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="fetchData">查询</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="fetchData">查询</a-button>
+              <a-button @click="reset">重置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
@@ -53,7 +55,7 @@
       />
     </a-card>
 
-    <a-modal v-model:open="open" title="量表模板" width="760px" :confirm-loading="saving" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="open" title="量表模板" width="760px" :confirm-loading="saving" @ok="submit">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">
@@ -113,6 +115,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { onMounted, reactive, ref } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'

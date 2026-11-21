@@ -65,6 +65,27 @@ export function getNotice(id: string | number) {
   return request.get<OaNotice>(`/api/oa/notice/${id}`)
 }
 
+export function markNoticeRead(id: string | number) {
+  return request.post<void>(`/api/oa/notice/${id}/read`)
+}
+
+export function getNoticeReads(id: string | number) {
+  return request.get<{ readCount: number; targetCount: number | null; readers: { staffName: string; readAt: string }[] }>(`/api/oa/notice/${id}/reads`)
+}
+
+/** 待办转交（当前负责人或发起人）、催办（发起人，30 分钟一次）、处理历史 */
+export function transferTodo(id: string | number, data: { staffId: string; note?: string }) {
+  return request.put<OaTodo>(`/api/oa/todo/${id}/transfer`, data)
+}
+
+export function urgeTodo(id: string | number) {
+  return request.post<void>(`/api/oa/todo/${id}/urge`)
+}
+
+export function getTodoHistory(id: string | number) {
+  return request.get<{ action: string; actor?: string; detail?: string; time: string }[]>(`/api/oa/todo/${id}/history`)
+}
+
 export function createNotice(data: Partial<OaNotice>) {
   return request.post<OaNotice>('/api/oa/notice', data)
 }
@@ -215,6 +236,19 @@ export function deleteDocumentFolder(id: string | number) {
 
 export function updateDocument(id: string | number, data: Partial<OaDocument>) {
   return request.put<OaDocument>(`/api/oa/document/${id}`, normalizeDocumentPayload(data))
+}
+
+/** 上传新版本（待审核，不覆盖当前版本） */
+export function createDocumentVersion(id: string | number, data: { url: string; name?: string; sizeBytes?: number; remark?: string }) {
+  return request.post<OaDocument>(`/api/oa/document/${id}/versions`, data)
+}
+
+export function getDocumentVersions(id: string | number) {
+  return request.get<OaDocument[]>(`/api/oa/document/${id}/versions`)
+}
+
+export function reviewDocument(id: string | number, data: { pass: boolean; note?: string }) {
+  return request.put<OaDocument>(`/api/oa/document/${id}/review`, data)
 }
 
 export function deleteDocument(id: string | number) {
@@ -453,39 +487,6 @@ export function getOaTaskSummary(params: any) {
   return request.get<OaTaskSummary>('/api/oa/task/summary', { params })
 }
 
-export interface OaQuickChatStatePayload {
-  id?: number
-  orgId?: Id
-  staffId?: Id
-  stateJson?: string
-  updateTime?: string
-}
-
-export function getQuickChatState() {
-  return request.get<OaQuickChatStatePayload>('/api/oa/quick-chat/state')
-}
-
-export function saveQuickChatState(stateJson: string) {
-  return request.put<OaQuickChatStatePayload>('/api/oa/quick-chat/state', { stateJson })
-}
-
-export function fanoutQuickChatState(stateJson: string, targetStaffIds: Array<string | number>) {
-  return request.post<number>('/api/oa/quick-chat/state/fanout', { stateJson, targetStaffIds })
-}
-
-export interface OaQuickChatEventItemPayload {
-  eventType: string
-  roomId?: string
-  room?: Record<string, any>
-  message?: Record<string, any>
-  meta?: Record<string, any>
-  targetStaffIds?: Array<string | number>
-}
-
-export function publishQuickChatEventBatch(events: OaQuickChatEventItemPayload[]) {
-  return request.post<number>('/api/oa/quick-chat/state/event/batch', { events })
-}
-
 export function getOaTaskCalendar(params: any) {
   return request.get<OaTask[]>('/api/oa/task/calendar', { params })
 }
@@ -512,6 +513,16 @@ export function completeOaTask(id: string | number) {
   return request.put<OaTask>(`/api/oa/task/${id}/done`)
 }
 
+/** 执行人提交完成，进入待验收 */
+export function submitOaTask(id: string | number) {
+  return request.put<OaTask>(`/api/oa/task/${id}/submit`)
+}
+
+/** 发起人验收：通过即完成，退回回到执行中 */
+export function acceptOaTask(id: string | number, pass: boolean) {
+  return request.put<OaTask>(`/api/oa/task/${id}/accept`, null, { params: { pass } })
+}
+
 export function batchCompleteOaTask(ids: Array<string | number>) {
   return request.put<number>('/api/oa/task/batch/done', { ids })
 }
@@ -530,6 +541,16 @@ export function exportOaTask(params: any) {
 
 export function getOaWorkReportPage(params: any) {
   return fetchPage<OaWorkReport>('/api/oa/report/page', params)
+}
+
+/** 主管点评（只能点评本部门已提交的、非本人的总结） */
+export function reviewOaWorkReport(id: string | number, data: { comment: string; score?: number }) {
+  return request.put<OaWorkReport>(`/api/oa/report/${id}/review`, data)
+}
+
+/** 本人在某周期的工作数据，用于生成可编辑草稿 */
+export function getOaWorkReportDraftStats(params: { startDate: string; endDate: string }) {
+  return request.get<{ tasksDone: number | string; todosDone: number | string; attendanceDays: number | string }>('/api/oa/report/draft-stats', { params })
 }
 
 export function getOaWorkReportSummary(params: any) {

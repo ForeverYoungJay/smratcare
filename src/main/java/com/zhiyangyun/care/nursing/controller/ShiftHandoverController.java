@@ -10,6 +10,7 @@ import com.zhiyangyun.care.nursing.service.ShiftHandoverService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -72,6 +73,26 @@ public class ShiftHandoverController {
   }
 
   @PreAuthorize(HANDOVER_ACCESS)
+  @PostMapping("/{id}/confirm")
+  public Result<ShiftHandoverResponse> confirm(@PathVariable Long id) {
+    Long tenantId = AuthContext.getOrgId();
+    ShiftHandoverResponse response;
+    try {
+      response = shiftHandoverService.confirm(id, tenantId, AuthContext.getStaffId());
+    } catch (IllegalStateException ex) {
+      return Result.error(400, ex.getMessage());
+    } catch (AccessDeniedException ex) {
+      return Result.error(403, ex.getMessage());
+    }
+    if (response == null) {
+      return Result.error(404, "交接班记录不存在或无权限访问");
+    }
+    auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "CONFIRM", "SHIFT_HANDOVER", id, "接班确认");
+    return Result.ok(response);
+  }
+
+  @PreAuthorize(HANDOVER_ACCESS)
   @GetMapping("/{id}")
   public Result<ShiftHandoverResponse> get(@PathVariable Long id) {
     ShiftHandoverResponse response = shiftHandoverService.get(id, AuthContext.getOrgId());
@@ -110,9 +131,12 @@ public class ShiftHandoverController {
       return Result.error(400, "请求体不能为空");
     }
     String status = request.getStatus() == null ? "DRAFT" : request.getStatus().trim().toUpperCase();
-    boolean needStaff = "HANDED_OVER".equals(status) || "CONFIRMED".equals(status);
+    if ("CONFIRMED".equals(status)) {
+      return Result.error(400, "接班确认须由接班人本人点击确认");
+    }
+    boolean needStaff = "HANDED_OVER".equals(status);
     if (needStaff && (request.getFromStaffId() == null || request.getToStaffId() == null)) {
-      return Result.error(400, "已交接/已确认状态必须选择交班人与接班人");
+      return Result.error(400, "已交接状态必须选择交班人与接班人");
     }
     return null;
   }

@@ -1,0 +1,1 @@
+ALTER TABLE elder ADD COLUMN IF NOT EXISTS responsible_staff_id BIGINT DEFAULT NULL;

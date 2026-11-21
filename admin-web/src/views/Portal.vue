@@ -1,39 +1,8 @@
 <template>
-  <PageContainer title="首页" subTitle="机构经营与安全总览" mode="showcase" kicker="机构总览">
-    <template #meta>
-      <a-space wrap>
-        <StatusTag text="经营总览" tone="pending" />
-        <StatusTag text="安全关注" tone="warning" />
-        <StatusTag :text="`最近刷新 ${refreshedAt}`" tone="offline" />
-      </a-space>
-    </template>
-
+  <PageContainer title="经营总览" subTitle="查看机构运行情况，优先处理风险与待办。">
     <template #extra>
-      <a-space wrap>
-        <a-button @click="router.push('/workbench/overview')">进入工作台</a-button>
-        <a-button type="primary" :loading="loading" @click="loadOverview">刷新首页</a-button>
-      </a-space>
+      <a-button :loading="loading" @click="loadOverview">刷新</a-button>
     </template>
-
-    <section class="portal-entry-strip">
-      <button class="entry-card entry-card--employee" type="button" @click="router.push('/workbench/overview')">
-        <div>
-          <span>员工入口</span>
-          <strong>先进入个人工作台</strong>
-          <small>打卡、待办、审批、日程和岗位任务都从个人视角开始处理。</small>
-        </div>
-        <StatusTag text="个人优先" tone="normal" />
-      </button>
-      <button class="entry-card entry-card--manager" type="button" @click="router.push('/stats/org/monthly-operation')">
-        <div>
-          <span>管理入口</span>
-          <strong>再看机构经营与风险</strong>
-          <small>院长、主管和管理员适合从经营首页或月报继续下钻。</small>
-        </div>
-        <StatusTag text="经营总览" tone="pending" />
-      </button>
-    </section>
-
     <section class="portal-grid portal-grid--metrics">
       <OverviewMetricCard
         v-for="item in primaryMetrics"
@@ -48,18 +17,21 @@
         @click="router.push(item.path)"
       />
     </section>
-
-    <section class="portal-grid portal-grid--command">
+    <div class="portal-compact-grid">
+      <WorkQueuePanel title="今日待办" :items="todayWorkItems" />
+      <SectionPanel title="风险预警"><RiskList :items="riskItems" @select="router.push($event.path)" /></SectionPanel>
+    </div>
+    <details class="portal-more"><summary>查看经营明细、趋势与生日关怀</summary><section class="portal-grid portal-grid--command">
       <SectionPanel
         title="院长运营指挥台"
         description="把经营结果、服务风险、家属体验和现金流放在一个可追责的月度闭环里，先看是否偏离，再点进对应业务处理。"
       >
         <template #extra>
-          <a-space wrap>
-            <StatusTag :text="commandCenterStatus.text" :tone="commandCenterStatus.tone" />
-            <a-button size="small" @click="router.push('/stats/org/monthly-operation')">经营月报</a-button>
-          </a-space>
-        </template>
+            <a-space wrap>
+              <StatusTag :text="commandCenterStatus.text" :tone="commandCenterStatus.tone" />
+              <a-button size="small" @click="router.push('/stats/org/monthly-operation')">经营月报</a-button>
+            </a-space>
+          </template>
 
         <div class="command-scoreboard">
           <button
@@ -99,7 +71,7 @@
 
           <div class="command-column">
             <div class="command-column__head">
-              <strong>今日风险闭环</strong>
+              <strong>风险闭环</strong>
               <span>护理、健康、后勤与审批 SLA</span>
             </div>
             <button
@@ -119,95 +91,79 @@
         </div>
       </SectionPanel>
 
-      <SectionPanel
-        title="业务落地清单"
-        description="按养老机构真实运营顺序串起七个闭环：咨询入住、照护执行、健康用药、安全事件、家属服务、收费合同、后勤人力。"
-      >
-        <template #extra>
-          <a-space wrap>
-            <StatusTag :text="capabilitySummaryText" :tone="capabilitySummaryTone" />
-            <a-button size="small" @click="router.push('/stats/operations?tab=quality')">服务月报</a-button>
-            <a-button size="small" @click="router.push('/workbench/todo')">转为待办</a-button>
-          </a-space>
-        </template>
 
-        <div class="landing-flow">
-          <button
-            v-for="item in businessLandingFlow"
-            :key="item.title"
-            type="button"
-            class="landing-flow-step"
-            @click="router.push(item.path)"
-          >
-            <b>{{ item.index }}</b>
-            <div>
-              <strong>{{ item.title }}</strong>
-              <span>{{ item.desc }}</span>
-            </div>
-            <StatusTag :text="item.tag" :tone="item.tone" />
-          </button>
-        </div>
-
-        <div class="capability-lane">
-          <div class="capability-lane__head">
-            <strong>智能化落地路线</strong>
-            <span>先接入数据和规则，再进入 AI 摘要、IoT 告警、智能排班和家属问答。</span>
-          </div>
-          <a-button size="small" class="capability-lane__entry" @click="router.push('/stats/operations?tab=intelligence')">查看智能化落地</a-button>
-          <button
-            v-for="item in intelligenceRoadmap"
-            :key="item.title"
-            type="button"
-            class="capability-chip"
-            @click="router.push(item.path)"
-          >
-            <strong>{{ item.title }}</strong>
-            <span>{{ item.desc }}</span>
-            <StatusTag :text="item.tag" :tone="item.tone" />
-          </button>
-        </div>
-      </SectionPanel>
     </section>
-
-    <section class="portal-grid portal-grid--main">
+<section v-if="financeHome" class="portal-grid portal-grid--main">
       <SectionPanel
-        title="运营概览"
-        description="把入住、收入、咨询转化和服务完成率放在同一视图里，方便先看经营，再判断需要调度的业务。"
+        title="收费与押金总览"
+        :description="`账期 ${financeHome.billMonth}：在住规模、代养费结清率、押金与电费的未收口径集中在这里。`"
       >
         <div class="portal-grid portal-grid--operating">
           <OverviewMetricCard
             clickable
-            label="床位入住率"
-            :value="percentText(dashboard?.bedOccupancyRate)"
-            helper="在住 / 总床位"
+            label="在住老人数"
+            :value="financeHome.residentCount"
+            suffix="人"
+            :helper="`占用床位 ${financeHome.occupiedBedCount} / ${financeHome.bedTotal}`"
             tone="brand"
-            @click="router.push('/elder/bed-panorama')"
+            @click="router.push('/elder/list')"
           />
           <OverviewMetricCard
             clickable
-            label="新增咨询 / 新增长者"
-            :value="consultationGrowthLabel"
-            helper="营销线索与入住净增"
-            tone="success"
-            @click="router.push('/stats/operations?tab=marketing')"
+            label="代养费结清率"
+            :value="percentText(financeHome.careFeeSettleRate)"
+            :helper="`已结清 ${financeHome.settledBillCount} / ${financeHome.billCount} 单 · 按金额 ${percentText(financeHome.careFeeAmountRate)}`"
+            :tone="financeHome.careFeeSettleRate >= 90 ? 'success' : 'warning'"
+            @click="router.push('/finance/bills/detail-query')"
           />
           <OverviewMetricCard
             clickable
-            label="服务完成率"
-            :value="percentText(serviceCompletionRate)"
-            helper="护理任务完成度"
-            tone="success"
-            @click="router.push('/medical-care/care-task-board')"
+            label="押金预警"
+            :value="financeHome.depositShortfallCount"
+            suffix="人未缴清"
+            :helper="`合计差额 ${financeAmount(financeHome.depositShortfallAmount)} 元 · 在押 ${financeAmount(financeHome.depositTotalBalance)} 元`"
+            :tone="financeHome.depositShortfallCount > 0 ? 'danger' : 'success'"
+            @click="router.push('/finance/deposit-management')"
           />
-          <SectionPanel dense title="本月收入趋势" description="最近 6 个月收费收入走势">
-            <v-chart class="trend-chart" :option="revenueTrendOption" autoresize />
-          </SectionPanel>
+          <OverviewMetricCard
+            clickable
+            label="电费未缴房间"
+            :value="financeHome.electricityUnpaidRoomCount"
+            suffix="间"
+            :helper="`未缴 ${financeAmount(financeHome.electricityUnpaidFee)} 元 · 未登记 ${financeHome.electricityUnrecordedRoomCount} 间`"
+            :tone="financeHome.electricityUnpaidRoomCount > 0 ? 'warning' : 'success'"
+            @click="router.push('/finance/electricity-fee')"
+          />
         </div>
       </SectionPanel>
 
       <SectionPanel
+        title="最近操作记录"
+        description="最近改动过数据的业务操作（不含查询、导出等只读动作），按时间倒序取最近 12 条。"
+      >
+        <div v-if="financeHome.recentOperations.length" class="recent-ops">
+          <div v-for="item in financeHome.recentOperations" :key="String(item.id)" class="recent-ops__row">
+            <div class="recent-ops__main">
+              <strong>{{ item.actionTypeText || item.actionType }}</strong>
+              <span>{{ item.detail }}</span>
+            </div>
+            <div class="recent-ops__meta">
+              <span>{{ item.actorName || '系统' }}</span>
+              <small>{{ item.createTime ? dayjs(item.createTime).format('MM-DD HH:mm') : '-' }}</small>
+            </div>
+          </div>
+        </div>
+        <a-empty v-else description="暂无操作记录" />
+      </SectionPanel>
+    </section>
+<section class="portal-grid portal-grid--main">
+      <SectionPanel title="本月收入趋势" description="最近 6 个月收费收入走势">
+            <v-chart class="trend-chart" :option="revenueTrendOption" autoresize />
+          </SectionPanel>
+
+      <SectionPanel
         title="安全与健康预警"
-        description="高风险长者、异常生命体征和行为预警需要优先闭环，所有缺明细的数据都保持可见占位。"
+        description="体检/巡检未闭环、事故和行为预警需要优先闭环，所有缺明细的数据都保持可见占位。"
       >
         <div class="portal-grid portal-grid--risk-cards">
           <EntitySummaryCard
@@ -227,47 +183,8 @@
         <RiskList :items="riskItems" @select="router.push($event.path)" />
       </SectionPanel>
     </section>
+<section class="portal-grid portal-grid--secondary">
 
-    <section class="portal-grid portal-grid--more">
-      <SectionPanel
-        title="更多机构概览"
-        description="护理执行、人力在岗与设备接入等运行指标，作为二级概览随时下钻。"
-      >
-        <div class="portal-grid portal-grid--more-metrics">
-          <OverviewMetricCard
-            v-for="item in secondaryMetrics"
-            :key="item.label"
-            clickable
-            :helper="item.helper"
-            :label="item.label"
-            :status-text="item.statusText"
-            :status-tone="item.statusTone"
-            :tone="item.tone"
-            :value="item.value"
-            @click="router.push(item.path)"
-          />
-        </div>
-      </SectionPanel>
-    </section>
-
-    <section class="portal-grid portal-grid--secondary">
-      <SectionPanel
-        title="今日工作"
-        description="以今日护理任务、审批、后勤工单和客户回访作为四个工作优先面板。"
-      >
-        <div class="portal-grid portal-grid--work">
-          <OverviewMetricCard
-            v-for="item in todayWorkItems"
-            :key="item.label"
-            clickable
-            :helper="item.helper"
-            :label="item.label"
-            :tone="item.tone"
-            :value="item.value"
-            @click="router.push(item.path)"
-          />
-        </div>
-      </SectionPanel>
 
       <SectionPanel
         title="快捷入口"
@@ -285,118 +202,19 @@
         </div>
       </SectionPanel>
     </section>
+<section class="portal-grid portal-grid--support">
 
-    <section class="portal-grid portal-grid--support">
-      <SectionPanel
-        title="老人生日计划"
-        description="把今日关怀、7 天内提醒和本月名单前置到首页，方便活动准备、物资安排和家属关怀一起闭环。"
-      >
-        <template #extra>
-          <a-space wrap>
-            <a-button size="small" @click="router.push('/oa/life/birthday')">查看全部</a-button>
-            <a-button size="small" @click="router.push('/workbench/schedule')">同步到我的日程</a-button>
-          </a-space>
-        </template>
-
-        <div class="portal-grid portal-grid--birthday-metrics">
-          <OverviewMetricCard
-            clickable
-            label="今日生日"
-            :value="displayNumber(birthdayStats.today)"
-            helper="优先安排祝福、探访与活动"
-            :tone="Number(birthdayStats.today) > 0 ? 'brand' : 'default'"
-            @click="router.push('/oa/life/birthday?scope=today')"
-          />
-          <OverviewMetricCard
-            clickable
-            label="未来 7 天"
-            :value="displayNumber(birthdayStats.next7Days)"
-            helper="提前准备活动与物资"
-            tone="brand"
-            @click="router.push('/oa/life/birthday?scope=next7')"
-          />
-          <OverviewMetricCard
-            clickable
-            label="本月生日"
-            :value="displayNumber(birthdayStats.thisMonth)"
-            helper="适合统筹月度集体庆生"
-            tone="success"
-            @click="router.push('/oa/life/birthday?scope=month')"
-          />
-          <OverviewMetricCard
-            clickable
-            label="80+ / 90+"
-            :value="birthdayAgeBandLabel"
-            helper="高龄长者关怀优先级"
-            tone="default"
-            @click="router.push('/oa/life/birthday')"
-          />
-        </div>
-
-        <div class="birthday-highlight-row">
-          <div class="birthday-highlight-copy">
-            <strong>{{ birthdayHeadline.title }}</strong>
-            <p>{{ birthdayHeadline.description }}</p>
-          </div>
-          <a-space wrap>
-            <StatusTag :text="`今日 ${birthdayStats.today}`" :tone="Number(birthdayStats.today) > 0 ? 'pending' : 'normal'" />
-            <StatusTag :text="`7天内 ${birthdayStats.next7Days}`" tone="pending" />
-            <StatusTag :text="`本月 ${birthdayStats.thisMonth}`" tone="normal" />
-          </a-space>
-        </div>
-
-        <div class="birthday-action-row">
-          <button type="button" class="birthday-action-card" @click="openBirthdayModal('today')">
-            <strong>今日生日弹窗名单</strong>
-            <span>现场确认今天需要祝福、探访和家属联络的长者名单。</span>
-          </button>
-          <button type="button" class="birthday-action-card" @click="launchMonthlyBirthdayActivity">
-            <strong>本月集体庆生快捷发起</strong>
-            <span>自动带入当前月份和预计人数，直接进入活动创建。</span>
-          </button>
-          <button type="button" class="birthday-action-card" @click="openBirthdayMaterialPrep">
-            <strong>生日物资准备快捷入口</strong>
-            <span>直接进入出库/备料场景，减少活动当天临时找物资。</span>
-          </button>
-        </div>
-
-        <div class="birthday-list">
-          <button
-            v-for="item in birthdayPreviewList"
-            :key="`${item.elderId}_${item.nextBirthday}`"
-            type="button"
-            class="birthday-item"
-            @click="router.push(`/oa/life/birthday?elderName=${encodeURIComponent(item.elderName || '')}`)"
-          >
-            <div>
-              <strong>{{ item.elderName }}</strong>
-              <span>{{ birthdayMetaText(item) }}</span>
-            </div>
-            <StatusTag :text="birthdayDueText(item.daysUntil)" :tone="birthdayDueTone(item.daysUntil)" />
-          </button>
-          <a-empty v-if="!birthdayPreviewList.length" description="近期暂无生日提醒" />
-        </div>
-
-        <div class="birthday-footer-actions">
-          <a-space wrap>
-            <a-button size="small" @click="router.push('/oa/life/birthday?minAge=80')">查看 80+ 生日名单</a-button>
-            <a-button size="small" @click="router.push('/oa/life/birthday?minAge=90')">查看 90+ 生日名单</a-button>
-            <a-button size="small" @click="router.push('/workbench/todo?keyword=生日提醒')">生日待办</a-button>
-            <a-button size="small" @click="printBirthdayPreview">打印近期名单</a-button>
-          </a-space>
-        </div>
-      </SectionPanel>
 
       <SectionPanel
         title="协同与待办速览"
         description="首页保留最值得院长和主管第一眼看到的协同信号：待办、审批、今日日程、生日关怀和超时事项。"
       >
         <template #extra>
-          <a-space wrap>
-            <a-button size="small" @click="router.push('/workbench/todo')">待办中心</a-button>
-            <a-button size="small" @click="router.push('/workbench/schedule')">我的日程</a-button>
-          </a-space>
-        </template>
+            <a-space wrap>
+              <a-button size="small" @click="router.push('/workbench/todo')">待办中心</a-button>
+              <a-button size="small" @click="router.push('/workbench/schedule')">我的日程</a-button>
+            </a-space>
+          </template>
 
         <div class="portal-grid portal-grid--collab-metrics">
           <OverviewMetricCard
@@ -428,8 +246,7 @@
           <a-empty v-if="!collaborationFocusList.length" description="暂无需要特别关注的协同事项" />
         </div>
       </SectionPanel>
-    </section>
-
+    </section></details>
     <a-modal
       v-model:open="birthdayModalOpen"
       :title="birthdayModalTitle"
@@ -467,9 +284,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
+import { getFinanceHomeSummary, type FinanceHomeSummary } from '../api/financeHome'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import VChart from 'vue-echarts'
+import WorkQueuePanel from '../components/workbench/WorkQueuePanel.vue'
 import PageContainer from '../components/PageContainer.vue'
 import { getBirthdayAll } from '../api/life'
 import EntitySummaryCard from '../components/smartcare/EntitySummaryCard.vue'
@@ -522,6 +341,22 @@ function displayCurrency(value?: number | null) {
   return `¥${Number(value).toLocaleString('zh-CN')}`
 }
 
+// 首页财务卡：非财务角色调用会被后端拦掉，静默降级为空，整块卡片不渲染
+const financeHome = ref<FinanceHomeSummary | null>(null)
+
+async function loadFinanceHome() {
+  try {
+    financeHome.value = await getFinanceHomeSummary()
+  } catch {
+    financeHome.value = null
+  }
+}
+
+function financeAmount(value?: number | null) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '0.00'
+  return Number(value).toFixed(2)
+}
+
 function percentText(value?: number | null) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '--'
   return `${Math.round(Number(value) * 100) / 100}%`
@@ -539,9 +374,10 @@ function birthdayMonthMatches(item?: BirthdayReminder | null, month = dayjs().mo
   return parsed.isValid() && parsed.month() + 1 === month
 }
 
-const todayAlertCount = computed(() => {
+// 未闭环风险：体检异常/跟进中 + 未闭环事故 + 维修超时工单，口径与「运营统计-安全风险」页一致
+const openRiskCount = computed(() => {
   return numberValue(portal.value?.healthAbnormalCount) +
-    numberValue(portal.value?.elderAbnormalCount) +
+    numberValue(portal.value?.incidentOpenCount) +
     numberValue(logistics.value?.maintenanceOverdueCount)
 })
 
@@ -566,7 +402,7 @@ const occupancyHealth = computed(() => {
 })
 
 const commandCenterStatus = computed(() => {
-  if (todayAlertCount.value > 0 || numberValue(portal.value?.overdueTodoCount) > 0) {
+  if (openRiskCount.value > 0 || numberValue(portal.value?.overdueTodoCount) > 0) {
     return { text: '今日需闭环', tone: 'warning' as const }
   }
   return { text: '运行平稳', tone: 'normal' as const }
@@ -619,10 +455,10 @@ const commandScoreCards = computed(() => ([
   },
   {
     key: 'risk',
-    label: '风险事件',
-    value: displayNumber(todayAlertCount.value),
-    helper: '健康异常、长者异常、逾期工单',
-    tone: todayAlertCount.value > 0 ? 'danger' as const : 'success' as const,
+    label: '未闭环风险',
+    value: displayNumber(openRiskCount.value),
+    helper: '体检异常、未闭环事故、维修超时工单',
+    tone: openRiskCount.value > 0 ? 'danger' as const : 'success' as const,
     path: '/stats/operations?tab=safety'
   }
 ]))
@@ -668,14 +504,14 @@ const riskClosureItems = computed(() => ([
   },
   {
     title: '健康复核',
-    desc: `异常生命体征 ${displayNumber(portal.value?.healthAbnormalCount)} 条，需要医护复核与交班记录。`,
+    desc: `体检异常未闭环 ${displayNumber(portal.value?.healthAbnormalCount)} 条，需要医护复核与交班记录。`,
     tag: numberValue(portal.value?.healthAbnormalCount) > 0 ? '待复核' : '已清空',
     tone: numberValue(portal.value?.healthAbnormalCount) > 0 ? 'warning' as const : 'offline' as const,
     path: '/medical-care/handovers'
   },
   {
     title: '安全事件',
-    desc: `高风险长者 ${displayNumber(portal.value?.elderAbnormalCount)} 位，联动巡房、跌倒、离床和应急处理。`,
+    desc: `体检待跟进长者 ${displayNumber(portal.value?.elderAbnormalCount)} 位，需医护完成巡检或复核。`,
     tag: numberValue(portal.value?.elderAbnormalCount) > 0 ? '高优先' : '平稳',
     tone: numberValue(portal.value?.elderAbnormalCount) > 0 ? 'danger' as const : 'offline' as const,
     path: '/stats/operations?tab=safety'
@@ -694,7 +530,7 @@ const fallbackBusinessLandingFlow = computed(() => ([
   { index: '02', title: '能力评估', desc: 'ADL、认知、自理和持续评估驱动护理等级。', tag: '评估', tone: 'normal' as const, path: '/elder/assessment' },
   { index: '03', title: '护理计划执行', desc: '计划、任务、打卡、异常、质检和交接班闭环。', tag: `${displayNumber(dashboard.value?.careTasksToday)} 项`, tone: 'pending' as const, path: '/medical-care/care-task-board' },
   { index: '04', title: '健康用药', desc: '生命体征、医嘱、发药、漏服提醒和慢病趋势。', tag: `${displayNumber(portal.value?.healthAbnormalCount)} 异常`, tone: numberValue(portal.value?.healthAbnormalCount) > 0 ? 'warning' as const : 'offline' as const, path: '/health/management/data' },
-  { index: '05', title: '安全事件', desc: '跌倒、离床、走失、压疮、感染和应急预案。', tag: `${displayNumber(todayAlertCount.value)} 件`, tone: todayAlertCount.value > 0 ? 'danger' as const : 'offline' as const, path: '/stats/operations?tab=safety' },
+  { index: '05', title: '安全事件', desc: '跌倒、离床、走失、压疮、感染和应急预案。', tag: `${displayNumber(openRiskCount.value)} 件`, tone: openRiskCount.value > 0 ? 'danger' as const : 'offline' as const, path: '/stats/operations?tab=safety' },
   { index: '06', title: '家属连接', desc: '探访、缴费、动态、投诉建议和生日关怀。', tag: `${displayNumber(birthdayStats.value.next7Days)} 生日`, tone: birthdayStats.value.next7Days > 0 ? 'pending' as const : 'offline' as const, path: '/oa/life/birthday' },
   { index: '07', title: '经营复盘', desc: '床位、收入、服务质量、人效和风险月报。', tag: '复盘', tone: 'normal' as const, path: '/stats/org/monthly-operation' }
 ]))
@@ -736,21 +572,33 @@ const pendingTotal = computed(() =>
   numberValue(logistics.value?.maintenancePendingCount)
 )
 
-// 首屏只突出四组最关键的经营与安全指标，其余下沉到「更多机构概览」。
+/**
+ * 待办这个数字在首页出现过四次、四种口径（38 / 28 / 10 / 逾期 7），
+ * 数值本身自洽，但页面从没说明它们的关系，看起来像数据打架。
+ * 这里把构成直接写进副标题。
+ */
+const pendingBreakdownText = computed(() => {
+  const todo = numberValue(portal.value?.openTodoCount)
+  const approval = numberValue(portal.value?.pendingApprovalCount)
+  const maintenance = numberValue(logistics.value?.maintenancePendingCount)
+  return `待办 ${todo} + 审批 ${approval} + 后勤工单 ${maintenance}`
+})
+
+// 首屏只突出四组最关键的经营与安全指标。
 const primaryMetrics = computed(() => ([
   {
-    label: '今日风险',
-    value: displayNumber(todayAlertCount.value),
-    helper: '生命体征异常 · 长者异常 · 逾期工单',
-    tone: todayAlertCount.value > 0 ? 'danger' as const : 'success' as const,
+    label: '未闭环风险',
+    value: displayNumber(openRiskCount.value),
+    helper: '体检异常 · 未闭环事故 · 维修超时工单',
+    tone: openRiskCount.value > 0 ? 'danger' as const : 'success' as const,
     path: '/stats/operations?tab=safety',
-    statusText: todayAlertCount.value > 0 ? '需立即处理' : '平稳',
-    statusTone: todayAlertCount.value > 0 ? 'danger' as const : 'normal' as const
+    statusText: openRiskCount.value > 0 ? '需闭环处理' : '平稳',
+    statusTone: openRiskCount.value > 0 ? 'danger' as const : 'normal' as const
   },
   {
     label: '待处理事项',
     value: displayNumber(pendingTotal.value),
-    helper: '待办 · 审批 · 后勤工单',
+    helper: pendingBreakdownText.value,
     tone: pendingTotal.value > 0 ? 'warning' as const : 'success' as const,
     path: '/workbench/todo',
     statusText: pendingTotal.value > 0 ? '待处理' : '已清空',
@@ -800,7 +648,7 @@ const secondaryMetrics = computed(() => ([
     value: '--',
     helper: '待设备遥测接入',
     tone: 'default' as const,
-    path: '/logistics/equipment',
+    path: '/logistics/maintenance/assets',
     statusText: '待接入',
     statusTone: 'offline' as const
   }
@@ -809,17 +657,17 @@ const secondaryMetrics = computed(() => ([
 const alertFocusCards = computed(() => ([
   {
     avatar: '高',
-    title: '高风险长者',
-    subtitle: '重点关注跌倒、离床、异常波动等高风险对象。',
-    meta: [`当前关注 ${displayNumber(portal.value?.elderAbnormalCount)}`, '名单待具体接口接入'],
+    title: '体检待跟进长者',
+    subtitle: '有未闭环体检异常或待完成巡检的长者。',
+    meta: [`当前关注 ${displayNumber(portal.value?.elderAbnormalCount)}`, '按未闭环体检/巡检涉及长者去重统计'],
     tagText: numberValue(portal.value?.elderAbnormalCount) > 0 ? '高优先级' : '暂平稳',
     tagTone: numberValue(portal.value?.elderAbnormalCount) > 0 ? 'danger' as const : 'normal' as const,
-    path: '/elder/resident-360'
+    path: '/health/inspection?status=OPEN'
   },
   {
     avatar: '体',
-    title: '今日异常生命体征',
-    subtitle: '聚焦今日体温、血压、血氧等异常记录。',
+    title: '体检/巡检未闭环',
+    subtitle: '体检异常与跟进中、待首次巡检的记录。',
     meta: [`异常 ${displayNumber(portal.value?.healthAbnormalCount)}`, '需护理与医生复核'],
     tagText: numberValue(portal.value?.healthAbnormalCount) > 0 ? '待复核' : '正常',
     tagTone: numberValue(portal.value?.healthAbnormalCount) > 0 ? 'warning' as const : 'normal' as const,
@@ -829,9 +677,9 @@ const alertFocusCards = computed(() => ([
     avatar: '护',
     title: '跌倒 / 离床 / 呼叫预警',
     subtitle: '行为类预警统一收束到处置视线，不再散落在不同模块。',
-    meta: [`预警 ${displayNumber(todayAlertCount.value)}`, '缺少名单时保持占位显示'],
-    tagText: todayAlertCount.value > 0 ? '待处置' : '已清空',
-    tagTone: todayAlertCount.value > 0 ? 'danger' as const : 'normal' as const,
+    meta: [`预警 ${displayNumber(openRiskCount.value)}`, '缺少名单时保持占位显示'],
+    tagText: openRiskCount.value > 0 ? '待处置' : '已清空',
+    tagTone: openRiskCount.value > 0 ? 'danger' as const : 'normal' as const,
     path: '/stats/operations?tab=safety'
   }
 ]))
@@ -839,8 +687,8 @@ const alertFocusCards = computed(() => ([
 const riskItems = computed<RiskItemWithPath[]>(() => ([
   {
     key: 'risk-elder',
-    title: '高风险长者',
-    description: '需要重点巡视与连续观察的长者',
+    title: '体检待跟进长者',
+    description: '有未闭环体检异常或待完成巡检的长者',
     levelText: '危险',
     tone: 'danger',
     value: displayNumber(portal.value?.elderAbnormalCount),
@@ -849,8 +697,8 @@ const riskItems = computed<RiskItemWithPath[]>(() => ([
   },
   {
     key: 'risk-health',
-    title: '异常生命体征',
-    description: '今日采集到的异常生命体征记录',
+    title: '体检/巡检未闭环',
+    description: '体检异常、跟进中和待首次巡检的记录',
     levelText: '警告',
     tone: 'warning',
     value: displayNumber(portal.value?.healthAbnormalCount),
@@ -988,11 +836,13 @@ function openBirthdayProfile(record: BirthdayReminder) {
     router.push(`/elder/detail/${record.elderId}`)
     return
   }
-  router.push(`/elder/list?keyword=${encodeURIComponent(record.elderName || '')}`)
+  router.push(`/elder/list?fullName=${encodeURIComponent(record.elderName || '')}`)
 }
 
 function openBirthdayMaterialForRecord(record: BirthdayReminder) {
-  router.push(`/inventory/outbound?scene=birthday&elderName=${encodeURIComponent(record.elderName || '')}`)
+  // 出库页按 elderId 过滤并直接打开出库单（elderName/scene 参数目标页不识别）
+  const elderQuery = record.elderId != null ? `elderId=${record.elderId}&` : ''
+  router.push(`/logistics/storage/outbound?${elderQuery}openCreate=1`)
 }
 
 function openBirthdayActivityForRecord(record: BirthdayReminder) {
@@ -1009,9 +859,9 @@ function launchMonthlyBirthdayActivity() {
 }
 
 function openBirthdayMaterialPrep() {
-  const firstName = birthdayMonthList.value[0]?.elderName || birthdayPreviewList.value[0]?.elderName
-  const query = firstName ? `&elderName=${encodeURIComponent(firstName)}` : ''
-  router.push(`/inventory/outbound?scene=birthday${query}`)
+  const firstElderId = birthdayMonthList.value[0]?.elderId ?? birthdayPreviewList.value[0]?.elderId
+  const query = firstElderId != null ? `?elderId=${firstElderId}` : ''
+  router.push(`/logistics/storage/outbound${query}`)
 }
 
 function printBirthdayRows(title: string, rows: BirthdayReminder[]) {
@@ -1188,10 +1038,16 @@ async function loadOverview() {
 
 onMounted(() => {
   loadOverview()
+  loadFinanceHome()
 })
 </script>
 
 <style scoped>
+.portal-compact-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+.portal-more { margin-top:18px; }
+.portal-more summary { padding:12px 0; cursor:pointer; color:var(--primary, #27785c); font-size:15px; font-weight:600; }
+@media(max-width:900px) { .portal-compact-grid { grid-template-columns:1fr; } }
+
 .portal-entry-strip,
 .portal-grid {
   display: grid;
@@ -1567,5 +1423,51 @@ onMounted(() => {
     align-items: flex-start;
     flex-direction: column;
   }
+}
+
+.recent-ops {
+  display: flex;
+  flex-direction: column;
+}
+
+.recent-ops__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--border-soft, #eee);
+}
+
+.recent-ops__row:last-child {
+  border-bottom: none;
+}
+
+.recent-ops__main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.recent-ops__main strong {
+  font-size: 13px;
+}
+
+.recent-ops__main span {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-ops__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-tertiary, #999);
 }
 </style>

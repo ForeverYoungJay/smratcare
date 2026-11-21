@@ -1,6 +1,6 @@
 <template>
   <PageContainer title="健康风险预测看板" subTitle="跌倒 / 压疮 / 再入院风险评分，高风险自动生成告警">
-    <a-row :gutter="12">
+    <a-row class="business-stat-strip" :gutter="12">
       <a-col :xs="12" :md="6">
         <a-card :bordered="false" class="card-elevated stat-card">
           <a-statistic title="覆盖长者" :value="summary.elderCount" />
@@ -133,7 +133,7 @@
       </template>
     </a-drawer>
 
-    <a-modal v-model:open="modelVisible" title="风险评分模型配置" width="720" :footer="null">
+    <a-modal :mask-closable="false" v-model:open="modelVisible" title="风险评分模型配置" width="720" :footer="null">
       <a-alert
         type="info"
         show-icon

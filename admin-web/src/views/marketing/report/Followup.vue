@@ -2,7 +2,7 @@
   <PageContainer title="营销跟进统计" sub-title="按状态查看跟进推进情况">
     <MarketingQuickNav parent-path="/marketing/reports" />
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline">
+      <QueryBar :model="query" layout="inline" @finish="loadData">
         <a-form-item label="开始日期">
           <a-date-picker v-model:value="query.dateFrom" value-format="YYYY-MM-DD" />
         </a-form-item>
@@ -12,15 +12,17 @@
         <a-form-item label="渠道">
           <a-input v-model:value="query.source" placeholder="渠道" allow-clear />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="loadData">查询</a-button>
-            <a-button @click="exportData">导出CSV</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">查询</a-button>
+              <a-button @click="exportData">导出CSV</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
-    <a-row :gutter="16">
+    <a-row class="business-stat-strip" :gutter="16">
       <a-col :xs="24" :sm="6" v-for="item in cards" :key="item.title">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic :title="item.title" :value="item.value" />
@@ -29,7 +31,7 @@
       </a-col>
     </a-row>
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px">
-      <a-row :gutter="16">
+      <a-row class="business-stat-strip" :gutter="16">
         <a-col :span="8">
           <a-statistic title="缺失渠道" :value="quality.missingSourceCount" />
         </a-col>
@@ -59,6 +61,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../../components/ActionToolbar.vue'
+import QueryBar from '../../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'

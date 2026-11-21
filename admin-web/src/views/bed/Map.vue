@@ -1,7 +1,7 @@
 <template>
   <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline" class="search-bar">
+      <QueryBar :model="query" layout="inline" class="search-bar" @finish="applySearch">
         <a-form-item label="床位号">
           <a-input v-model:value="query.bedNo" placeholder="请输入床位号" allow-clear />
         </a-form-item>
@@ -33,15 +33,17 @@
             <a-select-option v-for="item in bedTypeOptions" :key="item.value" :value="item.value" :label="item.label">{{ item.label }}</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="applySearch">搜索</a-button>
-            <a-button @click="reset">清空</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">搜索</a-button>
+              <a-button @click="reset">清空</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
 
-      <a-row :gutter="[16, 16]" class="overview-cards">
+      <a-row :gutter="[16, 16]" class="overview-cards business-stat-strip">
         <a-col :xs="24" :sm="12" :md="8" :lg="4">
           <a-card size="small"><a-statistic title="楼栋" :value="buildingCount" /></a-card>
         </a-col>
@@ -66,10 +68,11 @@
         <a-space wrap>
           <a-radio-group v-model:value="viewMode" button-style="solid">
             <a-radio-button value="grid">楼栋分层图</a-radio-button>
+            <a-radio-button value="plan">楼层平面图</a-radio-button>
             <a-radio-button value="list">卡片列表</a-radio-button>
           </a-radio-group>
-          <a-button @click="openBedManage">床位管理</a-button>
-          <a-button v-if="!isMarketingMode" type="primary" @click="openElderBedPanorama">后勤房态图入口</a-button>
+          <a-button v-if="!isMarketingMode" @click="openBedManage">床位管理</a-button>
+          <a-button v-if="!isMarketingMode" type="primary" @click="openElderBedPanorama">床态全景</a-button>
         </a-space>
         <a-radio-group v-if="viewMode === 'grid'" v-model:value="matrixQuickFilter" size="small" class="matrix-filter-switch">
           <a-radio-button value="all">全部</a-radio-button>
@@ -158,6 +161,9 @@
         </div>
       </div>
 
+      <!-- 平面图与分层图共用本页筛选与入口，仅布局与着色维度不同 -->
+      <FloorPlanBoard v-else-if="viewMode === 'plan'" />
+
       <template v-else>
         <a-row :gutter="16">
           <a-col v-for="item in pagedListItems" :key="item.key" :xs="24" :sm="12" :md="8" :lg="6" :xl="4">
@@ -227,7 +233,7 @@
       <template #footer>
         <a-space>
           <a-button @click="detailOpen = false">关闭</a-button>
-          <template v-if="current && isIdleBed(current)">
+          <template v-if="current && isIdleBed(current) && !isMarketingMode">
             <a-button @click="goHistoricalAdmissionFromBed(current)">历史补录入住</a-button>
             <a-button type="primary" @click="goContractAdmissionFromBed(current)">合同入住办理</a-button>
           </template>
@@ -243,7 +249,7 @@
         <a-descriptions-item label="总床位">{{ roomCurrent?.totalBeds || 0 }}</a-descriptions-item>
         <a-descriptions-item label="在住人数">{{ roomCurrent?.elderCount || 0 }}</a-descriptions-item>
         <a-descriptions-item label="公开备注" :span="2">{{ resolveVisibleRemark(roomCurrent?.remark) || '-' }}</a-descriptions-item>
-        <a-descriptions-item label="全部备注" :span="2">{{ resolveAllRemark(roomCurrent?.remark) || '-' }}</a-descriptions-item>
+        <a-descriptions-item v-if="!isMarketingMode" label="全部备注" :span="2">{{ resolveAllRemark(roomCurrent?.remark) || '-' }}</a-descriptions-item>
       </a-descriptions>
       <a-table :loading="roomResidentLoading" :data-source="roomResidents" :pagination="false" :row-key="(item:any)=>item.id" size="small">
         <a-table-column title="头像" key="avatar" width="70">
@@ -262,6 +268,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -269,10 +277,12 @@ import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import BedInfoCard from '../../components/bed/BedInfoCard.vue'
+import FloorPlanBoard from './components/FloorPlanBoard.vue'
 import { updateRoomSort } from '../../api/bed'
 import { getElderDetail } from '../../api/elder'
 import { useBedMapDataset } from '../../composables/useBedMapDataset'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
+import { getRoles } from '../../utils/auth'
 import type { BedItem, ElderItem, RoomItem } from '../../types/api'
 
 type RoomScene = {
@@ -328,11 +338,17 @@ const roomDrag = reactive({
   overKey: '',
   saving: false
 })
-const viewMode = ref<'grid' | 'list'>('grid')
+const viewMode = ref<'grid' | 'plan' | 'list'>(
+  ((): 'grid' | 'plan' | 'list' => {
+    const raw = String(route.query.view || '').trim().toLowerCase()
+    return raw === 'plan' || raw === 'list' ? raw : 'grid'
+  })()
+)
 const matrixQuickFilter = ref<'all' | 'idle' | 'occupied'>('all')
 const selectedBuilding = ref('')
 const selectedFloor = ref('')
 const isMarketingMode = computed(() => route.name === 'MarketingRoomPanorama' || route.path.startsWith('/marketing/'))
+const canLoadResidenceConfig = getRoles().some((role) => String(role).toUpperCase().endsWith('_MINISTER') || ['DIRECTOR', 'SYS_ADMIN', 'ADMIN'].includes(String(role).toUpperCase()))
 const pageTitle = computed(() => (isMarketingMode.value ? '房态图' : '房态图'))
 const pageSubTitle = computed(() => (isMarketingMode.value ? '按楼独立展开，楼层不再混排的轻量房态图' : '按楼独立展开，优先保证加载速度与操作清晰度'))
 
@@ -636,9 +652,12 @@ function genderText(gender?: number) {
 
 async function load() {
   try {
-    await Promise.all([ensureBedMapLoaded(false), ensureRoomListLoaded(), ensureResidenceConfigLoaded()])
+    await Promise.all([ensureBedMapLoaded(false), ensureRoomListLoaded()])
   } catch {
     message.warning('房态图数据加载失败')
+  }
+  if (canLoadResidenceConfig) {
+    await ensureResidenceConfigLoaded().catch(() => message.warning('房型筛选配置加载失败，房态仍可查看'))
   }
 }
 
@@ -684,7 +703,7 @@ function clearMatrixSelection() {
 }
 
 function canDragFunctionalRoom(room: RoomScene) {
-  return room.isFunctionalRoom && Boolean(room.roomId) && Boolean(room.floorId) && matrixQuickFilter.value === 'all' && !roomDrag.saving
+  return !isMarketingMode.value && room.isFunctionalRoom && Boolean(room.roomId) && Boolean(room.floorId) && matrixQuickFilter.value === 'all' && !roomDrag.saving
 }
 
 function compareRoomSceneOrder(left: RoomScene, right: RoomScene) {
@@ -1005,13 +1024,13 @@ function openBedManage() {
 }
 
 function openElderBedPanorama() {
-  router.push('/logistics/assets/room-state-map')
+  router.push('/elder/bed-panorama')
 }
 
 useLiveSyncRefresh({
   topics: ['bed', 'elder', 'room'],
   refresh: async () => {
-    await refreshBedMapDataset({ rooms: true, residenceConfig: true })
+    await refreshBedMapDataset({ rooms: true, residenceConfig: canLoadResidenceConfig })
   }
 })
 

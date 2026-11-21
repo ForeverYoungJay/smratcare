@@ -1,4 +1,5 @@
 import type { Id } from './common'
+import type { ElderItem } from './elder'
 
 export interface CaregiverGroupItem {
   id: number
@@ -79,7 +80,7 @@ export interface CareLevelItem {
   remark?: string
 }
 
-export interface ServicePlanItem {
+export interface ServicePlanItem extends ServicePlanApproval {
   id: number
   elderId: Id
   elderName?: string
@@ -169,4 +170,106 @@ export interface NursingReportSummary {
   riskSignals?: string[]
   nextMonthSuggestions?: string[]
   staffWorkloads?: NursingStaffWorkloadItem[]
+}
+
+export interface ServicePlanApproval {
+  revision?: number
+  approvalStatus?: 'PENDING' | 'PUBLISHED' | 'REJECTED' | string
+  approvedBy?: number
+  approvedAt?: string
+  changeReason?: string
+  rejectReason?: string
+}
+
+export interface ServicePlanRevisionItem {
+  id: number
+  planId: number
+  revision: number
+  snapshotJson?: string
+  changeReason?: string
+  changedBy?: number
+  changedByName?: string
+  createTime?: string
+}
+
+export interface CareIncidentItem {
+  id: number
+  incidentNo: string
+  elderId?: Id
+  elderName?: string
+  location?: string
+  incidentType: string
+  severity: string
+  occurredAt: string
+  reporterId?: number
+  reporterName?: string
+  description: string
+  measures?: string
+  notifyTargets?: string
+  ownerId?: number
+  ownerName?: string
+  status: string
+  escalateTo?: string
+  relatedTaskId?: number
+  reviewerName?: string
+  reviewNote?: string
+  closedAt?: string
+  createTime?: string
+  actions?: CareIncidentActionItem[]
+}
+
+export interface CareIncidentActionItem {
+  id: number
+  action: string
+  fromStatus?: string
+  toStatus?: string
+  note?: string
+  operatorName?: string
+  createTime?: string
+}
+
+export interface CareIncidentSummary {
+  // 后端 Long 统一序列化成字符串，做加法前要 Number()
+  monthTotal: number
+  processingCount: number
+  pendingReviewCount: number
+  closedCount: number
+  openHighCount: number
+}
+
+export interface CareIncidentActionRequest {
+  action: string
+  note?: string
+  ownerId?: number
+  ownerName?: string
+  escalateTo?: string
+}
+
+export interface NursingRectificationItem {
+  id: number
+  title: string
+  source?: string
+  ownerId?: number
+  ownerName?: string
+  dueDate: string
+  status: 'OPEN' | 'IN_PROGRESS' | 'PENDING_REVIEW' | 'DONE' | string
+  evidence?: string
+  reviewResult?: string
+  reviewerName?: string
+  closedAt?: string
+  createTime?: string
+}
+
+export interface NursingQualityMetrics {
+  dateFrom: string
+  dateTo: string
+  metrics: { key: string; label: string; numerator: number; denominator: number; rate: number | null }[]
+  workloads: { staffId: number; staffName?: string; taskCount: number; doneCount: number; overdueCount: number }[]
+}
+
+export interface NursingResidentItem {
+  elder: ElderItem
+  latestLevelCode?: string
+  latestAssessmentDate?: string
+  nextAssessmentDate?: string
 }

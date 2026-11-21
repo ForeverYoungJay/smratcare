@@ -129,9 +129,10 @@ class AdminFamilyControllerTest {
     relation.setIsDeleted(0);
     when(elderFamilyMapper.selectById(777L)).thenReturn(relation);
 
-    controller.removeRelation(777L);
+    controller.removeRelation(777L, null);
 
     verify(elderFamilyMapper).updateById(relation);
     assertEquals(1, relation.getIsDeleted());
+    assertEquals("解除绑定", relation.getRevokeReason());
   }
 }

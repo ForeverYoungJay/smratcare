@@ -16,7 +16,16 @@ public class PaymentRecord {
   private Long id;
   private Long orgId;
   private Long billMonthlyId;
+  /** 实收现金，不含任何抵扣。 */
   private BigDecimal amount;
+  /** 登记时的应收余额快照。 */
+  private BigDecimal payableAmount;
+  private BigDecimal ltciDeductAmount;
+  private BigDecimal discountAmount;
+  private String discountReason;
+  private BigDecimal voucherAmount;
+  /** 本次抵账合计 = 实收 + 长护险 + 折扣 + 消费券。 */
+  private BigDecimal settledAmount;
   private String payMethod;
   private String externalTxnId;
   private LocalDateTime paidAt;

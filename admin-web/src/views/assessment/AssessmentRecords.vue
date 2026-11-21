@@ -1,7 +1,7 @@
 <template>
   <PageContainer :title="title" :subTitle="subTitle">
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline" class="search-bar">
+      <QueryBar :model="query" layout="inline" class="search-bar" @finish="onSearch">
         <a-form-item :label="pageConfig.keywordLabel">
           <ElderNameAutocomplete
             v-if="useElderKeywordSelect"
@@ -46,13 +46,15 @@
         <a-form-item v-if="pageConfig.showDateFilter" :label="pageConfig.dateLabel">
           <a-range-picker v-model:value="query.dateRange" value-format="YYYY-MM-DD" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="onSearch">搜索</a-button>
-            <a-button @click="reset">清空</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="onSearch">搜索</a-button>
+              <a-button @click="reset">清空</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-alert
@@ -71,7 +73,7 @@
       </template>
     </a-alert>
 
-    <a-row v-if="!isAdmissionAssessment" :gutter="[12, 12]" style="margin-top: 16px">
+    <a-row class="business-stat-strip" v-if="!isAdmissionAssessment" :gutter="[12, 12]" style="margin-top: 16px">
       <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="总记录" :value="summary.totalCount || 0" /></a-card></a-col>
       <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="草稿" :value="summary.draftCount || 0" /></a-card></a-col>
       <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已完成" :value="summary.completedCount || 0" /></a-card></a-col>
@@ -158,37 +160,11 @@
           : '提示：上方合同表用于“新建入住评估”，下方记录表用于“批量处理/导出/查看历史”。'"
       />
       <div class="table-actions">
-        <a-space wrap size="small">
+        <ActionToolbar wrap size="small">
           <a-button v-if="pageConfig.showCreateButton && !isAdmissionAssessment" type="primary" @click="openForm()">
             {{ pageConfig.createButtonText }}
           </a-button>
-          <a-dropdown
-            v-if="pageConfig.actions.includes('view') || pageConfig.actions.includes('edit')"
-            trigger="click"
-          >
-            <a-button>单条操作</a-button>
-            <template #overlay>
-              <a-menu @click="onSingleActionMenuClick">
-                <a-menu-item key="view" :disabled="!pageConfig.actions.includes('view') || selectedRowKeys.length !== 1">
-                  查看勾选
-                </a-menu-item>
-                <a-menu-item
-                  v-if="props.assessmentType !== 'ARCHIVE'"
-                  key="edit"
-                  :disabled="!pageConfig.actions.includes('edit') || selectedRowKeys.length !== 1"
-                >
-                  编辑勾选
-                </a-menu-item>
-                <a-menu-item
-                  v-if="props.assessmentType === 'ARCHIVE'"
-                  key="print"
-                  :disabled="selectedRowKeys.length !== 1"
-                >
-                  打印报告
-                </a-menu-item>
-              </a-menu>
-            </template>
-          </a-dropdown>
+
           <a-dropdown trigger="click">
             <a-button :disabled="selectedRowKeys.length === 0">批量处理</a-button>
             <template #overlay>
@@ -212,7 +188,7 @@
             <a-button>勾选管理</a-button>
             <template #overlay>
               <a-menu @click="onSelectionActionMenuClick">
-                <a-menu-item key="select-filter">按筛选全选(<=2000)</a-menu-item>
+                <a-menu-item key="select-filter">按筛选全选(&lt;=2000)</a-menu-item>
                 <a-menu-item key="toggle-page" :disabled="rows.length === 0">
                   {{ selectedRowKeys.length === rows.length && rows.length > 0 ? '取消全选当前页' : '全选当前页' }}
                 </a-menu-item>
@@ -236,7 +212,7 @@
           <a-button :disabled="!selectedSingleRecord" @click="goSelectedInHospitalOverview">在院总览</a-button>
           <a-button :disabled="!selectedSingleRecord" @click="goSelectedContractsInvoices">合同票据</a-button>
           <a-button :disabled="!selectedSingleRecord" @click="goSelectedAdmissionProcessing">入住办理</a-button>
-        </a-space>
+        </ActionToolbar>
         <a-tag color="blue">
           已勾选 {{ selectedRowKeys.length }} 条{{ selectedByFilter ? '（含跨页筛选）' : '' }}
         </a-tag>
@@ -255,6 +231,18 @@
         show-icon
         :message="lastBatchAction"
       />
+      <a-alert
+        v-if="loadError"
+        style="margin-bottom: 12px"
+        type="error"
+        show-icon
+        :message="loadError"
+        description="列表已清空，避免把上一次的数据当成最新数据。请检查网络后重试。"
+      >
+        <template #action>
+          <a-button size="small" @click="fetchData">重新加载</a-button>
+        </template>
+      </a-alert>
       <a-table
         :data-source="rows"
         :columns="tableColumns"
@@ -344,7 +332,7 @@
       />
     </a-card>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="open"
       :title="formReadonly ? title + '查看' : title + '登记'"
       width="680px"
@@ -447,28 +435,20 @@
                 <a-card v-for="item in group.items" :key="item.id" size="small">
                   <div style="font-weight: 600; margin-bottom: 6px;">{{ item.id }}. {{ item.title }}</div>
                   <div style="color: var(--muted); margin-bottom: 8px;">指标说明：{{ item.description }}</div>
-                  <a-select
-                    :data-admission-item-id="item.id"
-                    v-model:value="admissionScores[item.id]"
-                    :options="admissionOptionSelectOptions(item)"
-                    :disabled="formReadonly"
-                    allow-clear
-                    style="width: 100%; margin-bottom: 8px;"
-                    placeholder="请选择分值及对应能力描述"
-                    @change="onAdmissionScoreFilled(item.id, $event)"
-                  />
+                  <!-- 每项原本同时给了下拉和数字输入框、且绑定同一个值：
+                       52 个控件干 26 件事，改一个另一个跟着跳。只保留带能力描述的下拉。 -->
                   <div :id="`admission-score-input-wrap-${item.id}`">
-                    <a-input-number
+                    <a-select
+                      :data-admission-item-id="item.id"
                       v-model:value="admissionScores[item.id]"
-                      :min="admissionItemMin(item)"
-                      :max="admissionItemMax(item)"
-                      :precision="0"
+                      :options="admissionOptionSelectOptions(item)"
                       :disabled="formReadonly"
+                      allow-clear
+                      show-search
+                      option-filter-prop="label"
                       style="width: 100%; margin-bottom: 8px;"
-                      :placeholder="`请输入分值(${admissionItemMin(item)}~${admissionItemMax(item)})`"
+                      placeholder="请选择分值及对应能力描述"
                       @change="onAdmissionScoreFilled(item.id, $event)"
-                      @update:value="onAdmissionScoreFilled(item.id, $event)"
-                      @pressEnter="onAdmissionScoreFilled(item.id, admissionScores[item.id])"
                     />
                   </div>
                   <div style="color: var(--muted); font-size: 12px;">
@@ -546,11 +526,16 @@
         <a-form-item label="护理建议">
           <a-textarea v-model:value="form.suggestion" :rows="3" placeholder="后续护理建议" :disabled="formReadonly" />
         </a-form-item>
-        <a-form-item v-if="!isAdmissionAssessment" label="量表明细(JSON)">
+        <a-form-item
+          v-if="!isAdmissionAssessment"
+          label="量表明细"
+          :validate-status="detailJsonError ? 'error' : ''"
+          :help="detailJsonError || '每项一行：题目代号和分值。可以直接上传导出的明细文件，不必手写。'"
+        >
           <a-textarea
             v-model:value="form.detailJson"
             :rows="4"
-            placeholder='如 {"orientation":6,"registration":5}'
+            placeholder='例如：{"orientation":6,"registration":5}'
             :disabled="formReadonly"
           />
           <div style="margin-top: 8px;">
@@ -565,7 +550,7 @@
         </a-form-item>
       </a-form>
     </a-modal>
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="batchAssignOpen"
       title="批量指派评估人"
       :confirm-loading="batchAssignSubmitting"
@@ -588,7 +573,7 @@
         />
       </a-form>
     </a-modal>
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="batchNextDateOpen"
       title="批量设置复评日期"
       :confirm-loading="batchNextDateSubmitting"
@@ -615,6 +600,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
@@ -695,6 +682,31 @@ const ASSESSMENT_ROUTE_LEGACY_KEYS = ['archiveType', 'contentKeyword', 'dateFrom
 const ASSESSMENT_ROUTE_OBSERVE_KEYS = ['residentId', 'elderId', 'elderName'] as const
 
 const loading = ref(false)
+const loadError = ref('')
+
+/**
+ * 明细原本要求用户手写 JSON，写错了也没有任何反馈。
+ * 这里做即时语法检查，并用人话说明错在哪。
+ */
+const detailJsonError = computed(() => {
+  const raw = String(form.detailJson || '').trim()
+  if (!raw) return ''
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return '格式不正确：需要以 { 开头、} 结尾，每项写成 "题目代号": 分值，各项之间用英文逗号分隔。'
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return '格式不正确：应该是一组“题目代号: 分值”，例如 {"orientation":6,"registration":5}。'
+  }
+  const badEntry = Object.entries(parsed as Record<string, unknown>)
+    .find(([, value]) => typeof value !== 'number' || Number.isNaN(value))
+  if (badEntry) {
+    return `「${badEntry[0]}」的分值不是数字，请填写数字分值。`
+  }
+  return ''
+})
 const rows = ref<AssessmentRecord[]>([])
 const total = ref(0)
 const summary = reactive<AssessmentRecordSummary>({
@@ -1742,6 +1754,7 @@ function pendingAdmissionCustomRow(record: CrmContractItem) {
 
 async function fetchData() {
   loading.value = true
+  loadError.value = ''
   try {
     const params = {
       pageNo: query.pageNo,
@@ -1758,6 +1771,11 @@ async function fetchData() {
     if (isAdmissionAssessment.value) {
       await loadPendingAdmissionContracts()
     }
+  } catch (error: any) {
+    // 失败时清空：留着上一次的记录会让人误以为是最新数据
+    loadError.value = error?.message || '评估记录加载失败，请稍后重试'
+    rows.value = []
+    total.value = 0
   } finally {
     loading.value = false
   }
@@ -2123,7 +2141,11 @@ async function submit() {
       return
     }
     if (!form.detailJson) {
-      message.warning('自动评分开启时必须填写量表明细JSON')
+      message.warning('开启了自动评分，需要先填写或上传量表明细，否则算不出分数')
+      return
+    }
+    if (detailJsonError.value) {
+      message.warning(detailJsonError.value)
       return
     }
   }
@@ -2161,8 +2183,19 @@ async function submit() {
       form.archiveNo = admissionContractNo
     }
     if (admissionCloseLoopEnabled.value && form.status === 'DRAFT') {
+      // 以前这里静默把“草稿”改成“已完成”，用户以为存的是草稿，实际已经归档提交
+      const confirmed = await new Promise<boolean>((resolve) => {
+        Modal.confirm({
+          title: '这份评估将按“已完成”提交',
+          content: '当前是入住评估闭环模式，不支持保存草稿。继续将把状态改为“已完成”并回流到入住办理，提交后不能再当草稿修改。',
+          okText: '确认提交',
+          cancelText: '返回修改',
+          onOk: () => resolve(true),
+          onCancel: () => resolve(false)
+        })
+      })
+      if (!confirmed) return
       form.status = 'COMPLETED'
-      message.info('闭环模式已自动将评估状态改为“已完成”')
     }
   }
   if (submitting.value) return
@@ -2207,6 +2240,9 @@ async function submit() {
       return
     }
     fetchData()
+  } catch (error: any) {
+    // 以前失败时弹窗不关也不提示，新人会反复点“确定”，每点一次都在后端建一条记录
+    message.error(error?.message || '保存失败，请检查填写内容后重试；请勿重复点击提交')
   } finally {
     submitting.value = false
   }
@@ -2354,9 +2390,13 @@ function remove(id: number | string) {
   Modal.confirm({
     title: '确认删除该评估记录？',
     onOk: async () => {
-      await deleteAssessmentRecord(id)
-      message.success('删除成功')
-      fetchData()
+      try {
+        await deleteAssessmentRecord(id)
+        message.success('删除成功')
+        fetchData()
+      } catch (error: any) {
+        message.error(error?.message || '删除失败，请稍后重试')
+      }
     }
   })
 }
@@ -2375,26 +2415,34 @@ function removeBatch() {
         message.warning('勾选记录ID无效，请刷新后重试')
         return
       }
-      const result = await batchDeleteAssessmentRecord(ids)
-      handleBatchResultFeedback(result, '批量删除评估记录')
-      fetchData()
+      try {
+        const result = await batchDeleteAssessmentRecord(ids)
+        handleBatchResultFeedback(result, '批量删除评估记录')
+        fetchData()
+      } catch (error: any) {
+        message.error(error?.message || '批量删除失败，请稍后重试')
+      }
     }
   })
 }
 
 async function exportCsv() {
-  const blob = await exportAssessmentRecord({
-    ...buildQueryParams()
-  })
-  const link = document.createElement('a')
-  const url = URL.createObjectURL(new Blob([blob], { type: 'text/csv;charset=utf-8;' }))
-  link.href = url
-  link.download = `${title}_${new Date().toISOString().slice(0, 10)}.csv`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
-  message.success('导出成功')
+  try {
+    const blob = await exportAssessmentRecord({
+      ...buildQueryParams()
+    })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(new Blob([blob], { type: 'text/csv;charset=utf-8;' }))
+    link.href = url
+    link.download = `${title}_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    message.success('导出成功')
+  } catch (error: any) {
+    message.error(error?.message || '导出失败，请稍后重试')
+  }
 }
 
 function getSelectedRows() {
@@ -2698,51 +2746,6 @@ function exportSelectedPdf() {
   popup.document.close()
   popup.focus()
   popup.print()
-}
-
-function viewSelected() {
-  if (selectedRowKeys.value.length !== 1) {
-    message.warning('请勾选一条记录后查看')
-    return
-  }
-  const selected = getSelectedRows()[0]
-  if (!selected) {
-    message.warning('当前页未找到勾选记录，请刷新后重试')
-    return
-  }
-  openForm(selected, true)
-}
-
-function editSelected() {
-  if (selectedRowKeys.value.length !== 1) {
-    message.warning('请勾选一条记录后编辑')
-    return
-  }
-  const selected = getSelectedRows()[0]
-  if (!selected) {
-    message.warning('当前页未找到勾选记录，请刷新后重试')
-    return
-  }
-  openForm(selected)
-}
-
-function onSingleActionMenuClick({ key }: { key: string }) {
-  if (key === 'view') {
-    viewSelected()
-    return
-  }
-  if (key === 'print') {
-    const selected = getSelectedRows()[0]
-    if (!selected) {
-      message.warning('当前页未找到勾选记录，请刷新后重试')
-      return
-    }
-    printReport(selected)
-    return
-  }
-  if (key === 'edit') {
-    editSelected()
-  }
 }
 
 function onBatchActionMenuClick({ key }: { key: string }) {

@@ -5,12 +5,14 @@ import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.audit.service.AuditLogService;
 import com.zhiyangyun.care.crm.model.CrmLeadAssignRequest;
+import com.zhiyangyun.care.crm.model.CrmLeadDuplicateResponse;
 import com.zhiyangyun.care.crm.model.CrmLeadRequest;
 import com.zhiyangyun.care.crm.model.CrmLeadResponse;
 import com.zhiyangyun.care.crm.model.trace.CrmLeadAssignLogResponse;
 import com.zhiyangyun.care.crm.model.trace.CrmStageTransitionLogResponse;
 import com.zhiyangyun.care.crm.service.CrmLeadService;
 import com.zhiyangyun.care.crm.service.CrmTraceService;
+import com.zhiyangyun.care.common.web.ResourceNotFoundException;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -69,7 +71,7 @@ public class CrmLeadController {
     request.setOrgId(tenantId);
     Long currentStaffId = AuthContext.getStaffId();
     boolean adminView = AuthContext.isMinisterOrHigher();
-    CrmLeadResponse response = leadService.update(id, request, currentStaffId, adminView);
+    CrmLeadResponse response = requireLead(leadService.update(id, request, currentStaffId, adminView));
     auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "UPDATE", "CRM_LEAD", id, "更新CRM线索");
     return Result.ok(response);
@@ -81,10 +83,21 @@ public class CrmLeadController {
     Long tenantId = AuthContext.getOrgId();
     Long operatorId = AuthContext.getStaffId();
     boolean adminView = AuthContext.isMinisterOrHigher();
-    CrmLeadResponse response = leadService.assign(id, tenantId, operatorId, adminView, request);
+    CrmLeadResponse response = requireLead(leadService.assign(id, tenantId, operatorId, adminView, request));
     auditLogService.record(tenantId, tenantId, operatorId, AuthContext.getUsername(),
         "ASSIGN", "CRM_LEAD", id, "分配CRM线索负责人");
     return Result.ok(response);
+  }
+
+  @PreAuthorize(CRM_LEAD_READ)
+  @GetMapping("/duplicates")
+  public Result<List<CrmLeadDuplicateResponse>> duplicates(
+      @RequestParam(required = false) String name,
+      @RequestParam(required = false) String phone,
+      @RequestParam(required = false) String idCardNo,
+      @RequestParam(required = false) Long excludeId) {
+    return Result.ok(leadService.findDuplicates(AuthContext.getOrgId(), AuthContext.getStaffId(),
+        AuthContext.isMinisterOrHigher(), name, phone, idCardNo, excludeId));
   }
 
   @PreAuthorize(CRM_LEAD_READ)
@@ -92,7 +105,7 @@ public class CrmLeadController {
   public Result<CrmLeadResponse> get(@PathVariable Long id) {
     Long currentStaffId = AuthContext.getStaffId();
     boolean adminView = AuthContext.isMinisterOrHigher();
-    return Result.ok(leadService.get(id, AuthContext.getOrgId(), currentStaffId, adminView));
+    return Result.ok(requireLead(leadService.get(id, AuthContext.getOrgId(), currentStaffId, adminView)));
   }
 
   @PreAuthorize(CRM_LEAD_READ)
@@ -124,7 +137,8 @@ public class CrmLeadController {
       @RequestParam(required = false) String callbackType,
       @RequestParam(required = false) String followupDateFrom,
       @RequestParam(required = false) String followupDateTo,
-      @RequestParam(required = false) Boolean followupDueOnly) {
+      @RequestParam(required = false) Boolean followupDueOnly,
+      @RequestParam(required = false) String scenario) {
     Long tenantId = AuthContext.getOrgId();
     Long currentStaffId = AuthContext.getStaffId();
     boolean adminView = AuthContext.isMinisterOrHigher();
@@ -134,7 +148,7 @@ public class CrmLeadController {
         consultDateFrom, consultDateTo, consultType, mediaChannel,
         infoSource, marketerName, followupStatus, reservationChannel,
         contractNo, contractStatus, flowStage, currentOwnerDept, mode, callbackType,
-        followupDateFrom, followupDateTo, followupDueOnly));
+        followupDateFrom, followupDateTo, followupDueOnly, scenario));
   }
 
   @PreAuthorize(CRM_LEAD_READ)
@@ -145,7 +159,7 @@ public class CrmLeadController {
     Long tenantId = AuthContext.getOrgId();
     Long currentStaffId = AuthContext.getStaffId();
     boolean adminView = AuthContext.isMinisterOrHigher();
-    leadService.get(id, tenantId, currentStaffId, adminView);
+    requireLead(leadService.get(id, tenantId, currentStaffId, adminView));
     return Result.ok(crmTraceService.listLeadAssignments(tenantId, id, limit));
   }
 
@@ -157,7 +171,7 @@ public class CrmLeadController {
     Long tenantId = AuthContext.getOrgId();
     Long currentStaffId = AuthContext.getStaffId();
     boolean adminView = AuthContext.isMinisterOrHigher();
-    leadService.get(id, tenantId, currentStaffId, adminView);
+    requireLead(leadService.get(id, tenantId, currentStaffId, adminView));
     return Result.ok(crmTraceService.listLeadStageTransitions(tenantId, id, limit));
   }
 
@@ -175,5 +189,12 @@ public class CrmLeadController {
     auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "DELETE", "CRM_LEAD", id, "删除CRM线索");
     return Result.ok(null);
+  }
+
+  private CrmLeadResponse requireLead(CrmLeadResponse response) {
+    if (response == null) {
+      throw new ResourceNotFoundException("客户线索不存在或无权访问");
+    }
+    return response;
   }
 }

@@ -7,7 +7,7 @@
       </a-space>
     </template>
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline" class="search-form">
+      <QueryBar :model="query" layout="inline" class="search-form" @finish="fetchData">
         <a-form-item label="姓名">
           <a-input v-model:value="query.realName" placeholder="姓名" allow-clear />
         </a-form-item>
@@ -28,13 +28,15 @@
             <a-select-option :value="0">停用</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="fetchData">搜索</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="fetchData">搜索</a-button>
+              <a-button @click="reset">重置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <section class="summary-grid">
@@ -107,7 +109,7 @@
       />
     </a-card>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="bindOpen"
       title="绑定老人"
       width="420px"
@@ -137,7 +139,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="userEditorOpen"
       :title="userForm.id ? '编辑家属账号' : '新增家属账号'"
       width="460px"
@@ -186,30 +188,54 @@
             </div>
             <a-tag :color="Number(item.isPrimary) === 1 ? 'green' : 'default'">{{ Number(item.isPrimary) === 1 ? '主联系人' : '普通联系人' }}</a-tag>
           </div>
+          <div class="linked-scope" :class="`linked-scope--${scopeOf(item).tone}`">授权：{{ scopeOf(item).text }}</div>
           <div class="linked-actions">
+            <a-button size="small" type="primary" ghost @click="openAuth(item)">授权</a-button>
             <a-button size="small" @click="go(`/elder/detail/${item.elderId}?tab=family`)">老人详情</a-button>
             <a-button size="small" @click="go('/oa/work-execution/family-communication')">沟通</a-button>
-            <a-button size="small" danger @click="unbindFromLinked(item)">解除绑定</a-button>
+            <a-button size="small" danger @click="openRevoke(item)">撤销绑定</a-button>
           </div>
         </div>
       </div>
     </a-drawer>
+
+    <a-modal v-model:open="authOpen" :title="`逐项授权 · ${authTarget?.elderName || ''}`" :confirm-loading="authSaving" @ok="submitAuth">
+      <a-alert type="warning" show-icon style="margin-bottom: 12px"
+        message="请先核验亲属关系和授权材料；不能仅凭手机号授予健康、费用等敏感信息权限。" />
+      <a-form layout="vertical">
+        <a-form-item label="授权项">
+          <a-checkbox-group v-model:value="authForm.scopes" :options="FAMILY_SCOPES" />
+        </a-form-item>
+        <a-form-item label="有效期至（不填为长期）">
+          <a-date-picker v-model:value="authForm.validUntil" value-format="YYYY-MM-DD" style="width: 200px" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <a-modal v-model:open="revokeOpen" title="撤销绑定" ok-text="确认撤销" :ok-button-props="{ danger: true }" @ok="submitRevoke">
+      <p>撤销后 {{ linkedFamilyName }} 立即无法查看 {{ revokeTarget?.elderName || '该长者' }} 的任何信息，撤销人和原因会留档。</p>
+      <a-textarea v-model:value="revokeReason" :rows="2" placeholder="撤销原因（如：长者本人要求、关系变更）" />
+    </a-modal>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'ant-design-vue'
-import { message, Modal } from 'ant-design-vue'
+import { message } from 'ant-design-vue'
 import { DownOutlined } from '@ant-design/icons-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
-import { getFamilyLinkedElders, getFamilyRelations, getFamilyUserPage, removeFamilyRelation, upsertFamilyUser } from '../../api/family'
+import { authorizeFamilyRelation, getFamilyLinkedElders, getFamilyUserPage, removeFamilyRelation, upsertFamilyUser } from '../../api/family'
+import { FAMILY_SCOPES, familyScopeSummary } from '../oa/center/adminTabs'
+import dayjs from 'dayjs'
 import { bindFamily } from '../../api/elder'
-import type { FamilyBindRequest, FamilyElderItem, FamilyRelationItem, FamilyUserItem, Id, PageResult } from '../../types/api'
+import type { FamilyBindRequest, FamilyElderItem, FamilyUserItem, Id, PageResult } from '../../types/api'
 import { residentStatusText as elderStatusText } from '../../utils/elderStatus'
 
 const router = useRouter()
@@ -393,29 +419,57 @@ async function submitBind() {
   }
 }
 
-function unbindFromLinked(item: FamilyElderItem) {
-  if (!linkedFamilyId.value || !item.elderId) return
-  Modal.confirm({
-    title: '确认解除绑定',
-    content: `将解除 ${linkedFamilyName.value} 与 ${item.elderName || `老人 #${item.elderId}`} 的关联关系，是否继续？`,
-    okText: '确认解除',
-    cancelText: '取消',
-    async onOk() {
-      try {
-        const relations: FamilyRelationItem[] = await getFamilyRelations(item.elderId)
-        const matched = relations.find((relation) => String(relation.familyUserId) === String(linkedFamilyId.value))
-        if (!matched?.id) {
-          throw new Error('未找到对应绑定关系')
-        }
-        await removeFamilyRelation(matched.id)
-        message.success('已解除绑定')
-        linkedElders.value = await getFamilyLinkedElders(linkedFamilyId.value)
-        await fetchData()
-      } catch (error: any) {
-        message.error(error?.message || '解除绑定失败')
-      }
-    }
-  })
+const today = dayjs().format('YYYY-MM-DD')
+const scopeOf = (item: FamilyElderItem) => familyScopeSummary(item.authScopes, item.validUntil, today)
+const authOpen = ref(false)
+const authSaving = ref(false)
+const authTarget = ref<FamilyElderItem>()
+const authForm = reactive({ scopes: [] as string[], validUntil: undefined as string | undefined })
+const revokeOpen = ref(false)
+const revokeTarget = ref<FamilyElderItem>()
+const revokeReason = ref('')
+
+async function reloadLinked() {
+  if (linkedFamilyId.value) linkedElders.value = await getFamilyLinkedElders(linkedFamilyId.value)
+}
+
+function openAuth(item: FamilyElderItem) {
+  authTarget.value = item
+  authForm.scopes = item.authScopes == null ? FAMILY_SCOPES.map((s) => s.value) : item.authScopes.split(',').filter(Boolean)
+  authForm.validUntil = item.validUntil || undefined
+  authOpen.value = true
+}
+
+async function submitAuth() {
+  if (!authTarget.value?.relationId) return
+  authSaving.value = true
+  try {
+    await authorizeFamilyRelation(authTarget.value.relationId, { scopes: authForm.scopes, validUntil: authForm.validUntil || null })
+    message.success('授权已保存')
+    authOpen.value = false
+    await reloadLinked()
+  } finally {
+    authSaving.value = false
+  }
+}
+
+function openRevoke(item: FamilyElderItem) {
+  revokeTarget.value = item
+  revokeReason.value = ''
+  revokeOpen.value = true
+}
+
+async function submitRevoke() {
+  if (!revokeTarget.value?.relationId) return
+  if (!revokeReason.value.trim()) {
+    message.warning('请填写撤销原因')
+    return
+  }
+  await removeFamilyRelation(revokeTarget.value.relationId, revokeReason.value.trim())
+  message.success('已撤销绑定')
+  revokeOpen.value = false
+  await reloadLinked()
+  await fetchData()
 }
 
 function go(path?: string) {
@@ -506,6 +560,10 @@ useLiveSyncRefresh({
   margin-top: 8px;
 }
 
+.linked-scope { margin: 8px 0 4px; font-size: 12px; }
+.linked-scope--info { color: #1f6f55; }
+.linked-scope--warning { color: #b7791f; }
+.linked-scope--danger { color: #c0392b; }
 .linked-actions {
   display: flex;
   flex-wrap: wrap;

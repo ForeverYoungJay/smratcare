@@ -32,13 +32,13 @@ public class GuardVisitController {
     this.visitService = visitService;
   }
 
-  @PreAuthorize("hasAnyRole('GUARD','STAFF','ADMIN')")
+  @PreAuthorize("hasAnyRole('GUARD','STAFF','ADMIN','LOGISTICS_EMPLOYEE','LOGISTICS_MINISTER')")
   @GetMapping("/today")
   public Result<List<VisitBookingResponse>> today() {
     return Result.ok(visitService.todayList(AuthContext.getOrgId()));
   }
 
-  @PreAuthorize("hasAnyRole('GUARD','STAFF','ADMIN')")
+  @PreAuthorize("hasAnyRole('GUARD','STAFF','ADMIN','LOGISTICS_EMPLOYEE','LOGISTICS_MINISTER')")
   @GetMapping
   public Result<List<VisitBookingResponse>> list(
       @RequestParam(required = false) Long elderId,
@@ -48,7 +48,7 @@ public class GuardVisitController {
     return Result.ok(visitService.listBookings(AuthContext.getOrgId(), elderId, status, fromDate, toDate));
   }
 
-  @PreAuthorize("hasAnyRole('GUARD','STAFF','ADMIN')")
+  @PreAuthorize("hasAnyRole('GUARD','STAFF','ADMIN','LOGISTICS_EMPLOYEE','LOGISTICS_MINISTER')")
   @PostMapping("/checkin")
   public Result<VisitCheckInResponse> checkin(@Valid @RequestBody VisitCheckInRequest request) {
     Long staffId = AuthContext.getStaffId();
@@ -56,28 +56,28 @@ public class GuardVisitController {
     return Result.ok(visitService.checkIn(request, staffId));
   }
 
-  @PreAuthorize("hasAnyRole('STAFF','ADMIN')")
+  @PreAuthorize("hasAnyRole('STAFF','ADMIN','LOGISTICS_EMPLOYEE','LOGISTICS_MINISTER')")
   @PostMapping("/book")
   public Result<VisitBookingResponse> book(@Valid @RequestBody VisitBookRequest request) {
     request.setOrgId(AuthContext.getOrgId());
     return Result.ok(visitService.book(request));
   }
 
-  @PreAuthorize("hasAnyRole('STAFF','ADMIN')")
+  @PreAuthorize("hasAnyRole('STAFF','ADMIN','LOGISTICS_EMPLOYEE','LOGISTICS_MINISTER')")
   @PutMapping("/{id}")
   public Result<VisitBookingResponse> update(@PathVariable Long id, @Valid @RequestBody VisitBookRequest request) {
     request.setOrgId(AuthContext.getOrgId());
     return Result.ok(visitService.updateBooking(AuthContext.getOrgId(), id, request));
   }
 
-  @PreAuthorize("hasAnyRole('STAFF','ADMIN')")
+  @PreAuthorize("hasAnyRole('STAFF','ADMIN','LOGISTICS_EMPLOYEE','LOGISTICS_MINISTER')")
   @DeleteMapping("/{id}")
   public Result<Boolean> delete(@PathVariable Long id) {
     visitService.deleteBooking(AuthContext.getOrgId(), id);
     return Result.ok(true);
   }
 
-  @PreAuthorize("hasAnyRole('GUARD','STAFF','ADMIN')")
+  @PreAuthorize("hasAnyRole('GUARD','STAFF','ADMIN','LOGISTICS_EMPLOYEE','LOGISTICS_MINISTER')")
   @GetMapping("/{id}/print-ticket")
   public Result<VisitPrintTicketResponse> printTicket(@PathVariable Long id) {
     return Result.ok(visitService.buildPrintTicket(AuthContext.getOrgId(), id));

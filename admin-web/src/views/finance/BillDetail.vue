@@ -7,11 +7,11 @@
         :sub-title="loadError"
       >
         <template #extra>
-          <a-space wrap>
+          <ActionToolbar wrap>
             <a-button type="primary" @click="router.push('/finance/bills/detail-query')">返回账单详情查询</a-button>
             <a-button @click="router.push('/finance/bills/in-resident')">前往在住账单</a-button>
             <a-button v-if="lastValidBillId" @click="router.push(`/finance/bill/${lastValidBillId}`)">返回最近账单</a-button>
-          </a-space>
+          </ActionToolbar>
         </template>
       </a-result>
       <a-divider />
@@ -49,7 +49,7 @@
           </a-space>
         </template>
       </a-alert>
-      <a-row :gutter="16">
+      <a-row class="business-stat-strip" :gutter="16">
         <a-col :span="6">
           <a-statistic title="老人" :value="resolvedElderName" />
         </a-col>
@@ -87,12 +87,12 @@
       </a-space>
 
       <div style="margin-top: 16px;">
-        <a-space>
+        <ActionToolbar>
           <a-button v-if="detail?.status !== 9" type="primary" @click="openPay">登记收款</a-button>
           <a-button @click="goConsumption">消费明细</a-button>
           <a-button @click="refresh">刷新</a-button>
           <a-button v-if="detail?.status !== 9" danger @click="markInvalid">无效账单</a-button>
-        </a-space>
+        </ActionToolbar>
       </div>
     </a-card>
 
@@ -189,7 +189,7 @@
       </vxe-table>
     </a-card>
 
-    <a-modal v-model:open="payOpen" :title="activePaymentId ? '修改收款' : '登记收款'" @ok="submitPay" :confirm-loading="paying">
+    <a-modal :mask-closable="false" v-model:open="payOpen" :title="activePaymentId ? '修改收款' : '登记收款'" @ok="submitPay" :confirm-loading="paying">
       <a-form layout="vertical" :model="payForm" :rules="payRules" ref="payFormRef">
         <a-form-item label="金额" name="amount">
           <a-input-number v-model:value="payForm.amount" style="width: 100%" />
@@ -218,6 +218,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'

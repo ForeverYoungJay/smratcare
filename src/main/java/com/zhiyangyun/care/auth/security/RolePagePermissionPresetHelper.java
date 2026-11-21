@@ -1,56 +1,18 @@
 package com.zhiyangyun.care.auth.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.zhiyangyun.care.auth.entity.Role;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
 public final class RolePagePermissionPresetHelper {
-  private static final List<String> COMMON_PERSONAL_PATHS = List.of(
-      "/portal",
-      "/workbench",
-      "/workbench/overview",
-      "/workbench/todo",
-      "/workbench/my-info",
-      "/workbench/attendance",
-      "/workbench/reports",
-      "/workbench/approvals");
+  private static final String PRESET_RESOURCE = "security/role-page-presets.json";
+  private static volatile Map<String, RolePagePreset> rolePagePresets;
 
-  private static final List<String> ADMIN_MANAGEMENT_PATHS = List.of(
-      "/elder",
-      "/medical-care",
-      "/care",
-      "/finance",
-      "/logistics",
-      "/marketing",
-      "/hr",
-      "/oa",
-      "/stats",
-      "/system",
-      "/base-config");
-
-  private static final Map<String, List<String>> ROLE_PAGE_PRESETS = Map.ofEntries(
-      // 护理岗的今日任务/交接/照护看板在 /care 前缀下，缺少该前缀会导致护理人员登录后无法进入任何护理页面
-      Map.entry("NURSING_MINISTER", concat(COMMON_PERSONAL_PATHS, "/care", "/medical-care", "/elder", "/oa/approval", "/base-config")),
-      Map.entry("NURSING_EMPLOYEE", concat(COMMON_PERSONAL_PATHS, "/care", "/medical-care", "/oa/approval")),
-      Map.entry("HR_MINISTER", concat(COMMON_PERSONAL_PATHS, "/hr", "/oa", "/stats", "/system/site-config", "/system/role", "/base-config")),
-      Map.entry("HR_EMPLOYEE", concat(COMMON_PERSONAL_PATHS, "/hr", "/oa", "/stats", "/base-config")),
-      Map.entry("LOGISTICS_MINISTER", concat(COMMON_PERSONAL_PATHS, "/logistics", "/fire")),
-      Map.entry("LOGISTICS_EMPLOYEE", concat(COMMON_PERSONAL_PATHS, "/logistics")),
-      Map.entry("GUARD", concat(COMMON_PERSONAL_PATHS, "/fire")),
-      Map.entry("MEDICAL_MINISTER", concat(COMMON_PERSONAL_PATHS, "/medical-care", "/elder", "/oa/approval")),
-      Map.entry("MEDICAL_EMPLOYEE", concat(COMMON_PERSONAL_PATHS, "/medical-care", "/elder")),
-      Map.entry("FINANCE_MINISTER", concat(COMMON_PERSONAL_PATHS, "/finance", "/oa/approval", "/stats")),
-      Map.entry("FINANCE_EMPLOYEE", concat(COMMON_PERSONAL_PATHS, "/finance", "/oa/approval")),
-      Map.entry("MARKETING_MINISTER", concat(COMMON_PERSONAL_PATHS, "/marketing", "/stats")),
-      Map.entry("MARKETING_EMPLOYEE", concat(COMMON_PERSONAL_PATHS, "/marketing")),
-      Map.entry("ADMIN", concat(COMMON_PERSONAL_PATHS, ADMIN_MANAGEMENT_PATHS)),
-      Map.entry("DIRECTOR", concat(COMMON_PERSONAL_PATHS, ADMIN_MANAGEMENT_PATHS)),
-      Map.entry("SYS_ADMIN", concat(COMMON_PERSONAL_PATHS, ADMIN_MANAGEMENT_PATHS))
-  );
+  private record RolePagePreset(String label, String description, List<String> paths) {}
 
   private RolePagePermissionPresetHelper() {
   }
@@ -68,11 +30,26 @@ public final class RolePagePermissionPresetHelper {
 
   public static List<String> getRecommendedPaths(String roleCode, String roleName) {
     String normalizedCode = normalizeRoleCode(roleCode, roleName);
-    List<String> preset = ROLE_PAGE_PRESETS.get(normalizedCode);
-    if (preset == null || preset.isEmpty()) {
+    RolePagePreset preset = loadPresets().get(normalizedCode);
+    if (preset == null || preset.paths() == null || preset.paths().isEmpty()) {
       return List.of();
     }
-    return PagePermissionPathHelper.normalizePaths(preset);
+    return PagePermissionPathHelper.normalizePaths(preset.paths());
+  }
+
+  private static Map<String, RolePagePreset> loadPresets() {
+    Map<String, RolePagePreset> current = rolePagePresets;
+    if (current != null) return current;
+    synchronized (RolePagePermissionPresetHelper.class) {
+      if (rolePagePresets != null) return rolePagePresets;
+      try (InputStream input = RolePagePermissionPresetHelper.class.getClassLoader().getResourceAsStream(PRESET_RESOURCE)) {
+        if (input == null) return rolePagePresets = Map.of();
+        rolePagePresets = new ObjectMapper().readValue(input, new TypeReference<Map<String, RolePagePreset>>() {});
+      } catch (Exception ignored) {
+        rolePagePresets = Map.of();
+      }
+      return rolePagePresets;
+    }
   }
 
   private static String normalizeRoleCode(String roleCode, String roleName) {
@@ -99,27 +76,4 @@ public final class RolePagePermissionPresetHelper {
     return "";
   }
 
-  private static List<String> concat(List<String> base, String... extra) {
-    LinkedHashSet<String> merged = new LinkedHashSet<>(base);
-    if (extra != null) {
-      for (String item : extra) {
-        if (item != null && !item.isBlank()) {
-          merged.add(item);
-        }
-      }
-    }
-    return new ArrayList<>(merged);
-  }
-
-  private static List<String> concat(List<String> base, List<String> extra) {
-    LinkedHashSet<String> merged = new LinkedHashSet<>(base);
-    if (extra != null) {
-      for (String item : extra) {
-        if (item != null && !item.isBlank()) {
-          merged.add(item);
-        }
-      }
-    }
-    return new ArrayList<>(merged);
-  }
 }

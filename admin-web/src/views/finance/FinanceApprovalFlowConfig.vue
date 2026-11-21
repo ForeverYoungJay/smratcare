@@ -1,20 +1,28 @@
 <template>
   <PageContainer title="权限与审批流配置" subTitle="减免/退款/冲正审批流与审批角色配置">
     <a-card class="card-elevated" :bordered="false">
-      <a-space wrap>
-        <a-date-picker v-model:value="query.month" picker="month" style="width: 150px" />
-        <a-input v-model:value="query.printRemark" allow-clear placeholder="打印备注" style="width: 180px" />
-        <a-button type="primary" @click="loadData">刷新</a-button>
-        <a-button @click="exportData">导出</a-button>
-        <a-button @click="printCurrent">打印当前</a-button>
-        <a-button @click="triggerImport">导入CSV</a-button>
-        <a-button @click="go('/finance/config/change-log')">查看变更记录</a-button>
-      </a-space>
+      <QueryBar :model="query" @finish="loadData">
+        <a-form-item label="月份">
+          <a-date-picker v-model:value="query.month" picker="month" style="width: 150px" />
+        </a-form-item>
+        <a-form-item label="打印备注">
+          <a-input v-model:value="query.printRemark" allow-clear placeholder="打印备注" style="width: 180px" />
+        </a-form-item>
+        <template #actions>
+          <ActionToolbar>
+            <a-button type="primary" html-type="submit">刷新</a-button>
+            <a-button @click="exportData">导出</a-button>
+            <a-button @click="printCurrent">打印当前</a-button>
+            <a-button @click="triggerImport">导入CSV</a-button>
+            <a-button @click="go('/finance/config/change-log')">查看变更记录</a-button>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
     <input ref="importInputRef" type="file" accept=".csv,text/csv" style="display: none" @change="onImportFileChange" />
 
     <StatefulBlock style="margin-top: 16px;" :loading="loading" :error="errorMessage" @retry="loadData">
-      <a-row :gutter="[16, 16]">
+      <a-row class="business-stat-strip" :gutter="[16, 16]">
         <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="审批待办总数" :value="summary.totalCount" /></a-card></a-col>
         <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="待处理事项" :value="summary.pendingCount" /></a-card></a-col>
         <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="今日关联金额" :value="summary.todayAmount" suffix="元" :precision="2" /></a-card></a-col>
@@ -68,12 +76,12 @@
         </a-col>
         <a-col :xs="24" :xl="8">
           <a-card class="card-elevated" :bordered="false" title="审批联动">
-            <a-space direction="vertical" style="width: 100%">
+            <ActionToolbar direction="vertical" style="width: 100%">
               <a-button @click="go('/oa/approval?module=finance&status=pending')">审批中心（财务）</a-button>
               <a-button @click="go('/finance/reconcile/exception')">对账异常处理</a-button>
               <a-button @click="go('/finance/config/change-log')">查看配置变更记录</a-button>
               <a-button @click="go('/finance/workbench')">返回财务工作台</a-button>
-            </a-space>
+            </ActionToolbar>
           </a-card>
         </a-col>
       </a-row>
@@ -81,11 +89,11 @@
       <a-row :gutter="[16, 16]" style="margin-top: 16px;">
         <a-col :xs="24" :xl="12">
           <a-card class="card-elevated" :bordered="false" title="审批流模板推荐">
-            <a-space wrap>
+            <ActionToolbar wrap>
               <a-button :loading="saving" @click="applyRecommendedTemplate('STANDARD')">标准模板（推荐）</a-button>
               <a-button :loading="saving" @click="applyRecommendedTemplate('STRICT')">严格模板</a-button>
               <a-button :loading="saving" @click="applyRecommendedTemplate('FAST')">快速模板</a-button>
-            </a-space>
+            </ActionToolbar>
             <a-divider />
             <a-descriptions :column="1" size="small" bordered>
               <a-descriptions-item label="标准模板">减免2级 / 退款2级 / 冲正2级，角色：财务经理+管理员</a-descriptions-item>
@@ -134,6 +142,8 @@
 </template>
 
 <script setup lang="ts">
+import QueryBar from '../../components/QueryBar.vue'
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

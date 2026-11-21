@@ -58,8 +58,14 @@ services:
       APP_FILE_STORAGE_BASE_DIR: ${APP_FILE_STORAGE_BASE_DIR:-/app/uploads}
       APP_FILE_STORAGE_URL_PREFIX: ${APP_FILE_STORAGE_URL_PREFIX:-/uploads}
       APP_FILE_STORAGE_PUBLIC_BASE_URL: ${APP_FILE_STORAGE_PUBLIC_BASE_URL:-}
+      VIDEO_LOCAL_ROOT: /app/video-private
+      VIDEO_OSS_ENDPOINT: ${VIDEO_OSS_ENDPOINT:-}
+      VIDEO_OSS_BUCKET: ${VIDEO_OSS_BUCKET:-}
+      VIDEO_OSS_ACCESS_KEY_ID: ${VIDEO_OSS_ACCESS_KEY_ID:-}
+      VIDEO_OSS_ACCESS_KEY_SECRET: ${VIDEO_OSS_ACCESS_KEY_SECRET:-}
     volumes:
       - ./output/uploads:/app/uploads
+      - ./output/video-private:/app/video-private
     ports:
       - "8080:8080"
     depends_on:
@@ -70,8 +76,8 @@ services:
 
   frontend:
     build:
-      context: ./admin-web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: admin-web/Dockerfile
     container_name: smartcare-frontend
     restart: unless-stopped
     ports:

@@ -13,11 +13,11 @@
     </template>
 
     <template #extra>
-      <a-space wrap>
+      <ActionToolbar wrap>
         <a-button :loading="loading" @click="loadData">刷新</a-button>
         <a-button @click="openPath('/medical-care/smart-alerts')">智慧设备告警</a-button>
         <a-button type="primary" @click="openPath('/medical-care/ai-reports')">AI健康报告</a-button>
-      </a-space>
+      </ActionToolbar>
     </template>
 
     <section class="metric-grid">
@@ -107,6 +107,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'

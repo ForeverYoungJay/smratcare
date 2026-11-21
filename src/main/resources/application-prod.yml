@@ -149,6 +149,14 @@ app:
       access-key-secret: ${OSS_ACCESS_KEY_SECRET:}
       base-path: ${OSS_BASE_PATH:smartcare}
   logistics:
+    video:
+      local-root: ${VIDEO_LOCAL_ROOT:/app/video-private}
+      max-segment-bytes: ${VIDEO_MAX_SEGMENT_BYTES:10485760}
+      oss-endpoint: ${VIDEO_OSS_ENDPOINT:}
+      oss-bucket: ${VIDEO_OSS_BUCKET:}
+      oss-access-key-id: ${VIDEO_OSS_ACCESS_KEY_ID:}
+      oss-access-key-secret: ${VIDEO_OSS_ACCESS_KEY_SECRET:}
+      cleanup-cron: "0 * * * * ?"
     maintenance-todo:
       enabled: true
       cron: "0 0 8 * * ?"

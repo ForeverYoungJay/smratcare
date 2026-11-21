@@ -15,4 +15,8 @@ public class FamilyRelationItem {
   private String idCardNo;
   private String relation;
   private Integer isPrimary;
+  private String authScopes;
+  private java.time.LocalDate validUntil;
+  private String authorizedByName;
+  private java.time.LocalDateTime authorizedAt;
 }

@@ -46,13 +46,45 @@ import type {
   CrmContractItem,
   CrmContractStageSummary,
   CrmContractPayload,
-  ContractBatchDeleteRequest
+  ContractBatchDeleteRequest,
+  CrmVisitAppointmentItem,
+  CrmVisitAppointmentPayload,
+  CrmLeadDuplicateItem,
+  CrmContractReminderConfig
 } from '../types'
 
 export { createCrmLead, updateCrmLead, deleteCrmLead }
 
 export function getLeadPage(params: CrmLeadPageQuery, config?: Record<string, any>) {
   return getCrmLeadPage(params, config)
+}
+
+export function getLeadDuplicates(params: { name?: string; phone?: string; idCardNo?: string; excludeId?: Id }) {
+  return request.get<CrmLeadDuplicateItem[]>('/api/crm/leads/duplicates', { params })
+}
+
+export function getVisitAppointmentPage(params: Record<string, any>, config?: Record<string, any>) {
+  return fetchPage<CrmVisitAppointmentItem>('/api/crm/visit-appointments/page', params, config)
+}
+
+export function createVisitAppointment(data: CrmVisitAppointmentPayload) {
+  return request.post<CrmVisitAppointmentItem>('/api/crm/visit-appointments', data)
+}
+
+export function updateVisitAppointment(id: Id, data: CrmVisitAppointmentPayload) {
+  return request.put<CrmVisitAppointmentItem>(`/api/crm/visit-appointments/${id}`, data)
+}
+
+export function arriveVisitAppointment(id: Id) {
+  return request.post<CrmVisitAppointmentItem>(`/api/crm/visit-appointments/${id}/arrive`)
+}
+
+export function completeVisitAppointment(id: Id, data: { visitResult: string; nextFollowDate?: string; remark?: string }) {
+  return request.post<CrmVisitAppointmentItem>(`/api/crm/visit-appointments/${id}/complete`, data)
+}
+
+export function cancelVisitAppointment(id: Id, cancelReason: string) {
+  return request.post<CrmVisitAppointmentItem>(`/api/crm/visit-appointments/${id}/cancel`, { cancelReason })
 }
 
 export function assignCrmLead(id: Id, data: CrmLeadAssignRequest) {
@@ -73,6 +105,14 @@ export function getContractPage(params: CrmContractPageQuery, config?: Record<st
 
 export function getContractStageSummary(params?: { currentOwnerDept?: string }) {
   return request.get<CrmContractStageSummary>('/api/crm/contracts/stage-summary', { params })
+}
+
+export function getContractReminderConfig() {
+  return request.get<CrmContractReminderConfig>('/api/crm/contracts/reminder-config')
+}
+
+export function saveContractReminderConfig(data: CrmContractReminderConfig) {
+  return request.put<CrmContractReminderConfig>('/api/crm/contracts/reminder-config', data)
 }
 
 export function getCrmContract(id: Id) {
@@ -161,6 +201,17 @@ export function createLeadCallbackPlan(leadId: Id, data: CallbackPlanCreateReque
 
 export function getLeadCallbackPlans(leadId: Id) {
   return request.get<CallbackPlanItem[]>(`/api/crm/leads/${leadId}/callback-plans`)
+}
+
+export function getLeadCallbackPlansBatch(leadIds: Id[]) {
+  return request.get<Record<string, CallbackPlanItem[]>>('/api/crm/leads/callback-plans/batch', {
+    params: { leadIds: leadIds.map(String).join(',') }
+  })
+}
+
+/** 记录一次已完成的跟进；带 nextFollowTime 时后端同时创建下次回访计划 */
+export function recordLeadFollowup(leadId: Id, data: { method: string; followupResult?: string; followupContent?: string; nextFollowTime?: string }) {
+  return request.post<CallbackPlanItem>(`/api/crm/leads/${leadId}/followups`, data)
 }
 
 export function executeCallbackPlan(planId: Id, data: CallbackExecuteRequest) {
@@ -283,6 +334,19 @@ export function getMarketingFollowupReport(params?: MarketingReportQuery) {
 
 export function getMarketingCallbackReport(params?: { pageNo?: number; pageSize?: number } & MarketingReportQuery) {
   return request.get<MarketingCallbackReport>('/api/marketing/report/callback', { params })
+}
+
+export interface MarketingStaffActivity {
+  /** 实际到访预约次数 */
+  arrivedVisitCount: number
+  /** 实际到访去重客户数（漏斗、到访率用这个） */
+  arrivedLeadCount: number
+  staff: Array<{ name: string; leads: number; visits: number; contracts: number; overdue: number }>
+}
+
+/** 人员协作与到访汇总（后端全量统计） */
+export function getMarketingStaffActivity(params: { dateFrom?: string; dateTo?: string }, config?: Record<string, any>) {
+  return request.get<MarketingStaffActivity>('/api/marketing/report/staff-activity', { params, ...config })
 }
 
 export function getMarketingDataQualityReport() {

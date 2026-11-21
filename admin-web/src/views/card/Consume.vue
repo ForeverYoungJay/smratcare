@@ -1,15 +1,18 @@
 <template>
   <PageContainer title="消费记录" subTitle="一卡通消费扣费记录">
+    <template #extra>
+      <a-button type="primary" @click="openConsume">登记消费</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openConsume">登记消费</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -18,7 +21,7 @@
       @change="handleTableChange"
     />
 
-    <a-modal v-model:open="open" title="一卡通消费" @ok="submit" :confirm-loading="saving" width="560px">
+    <a-modal :mask-closable="false" v-model:open="open" title="一卡通消费" @ok="submit" :confirm-loading="saving" width="560px">
       <a-form layout="vertical">
         <a-form-item label="卡账户" required>
           <a-select

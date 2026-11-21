@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 经营驾驶舱接口。仅管理层可见（DIRECTOR/SYS_ADMIN 及各部门部长）。
  */
 @RestController
-@RequestMapping("/stats/executive")
+@RequestMapping("/api/stats/executive")
 public class ExecutiveCockpitController {
 
   private final CockpitMetricService cockpitMetricService;

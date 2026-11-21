@@ -1,11 +1,11 @@
 <template>
   <PageContainer title="长护险待遇管理" subTitle="参保登记 · 待遇核定 · 护理服务记录 · 服务包">
     <template #extra>
-      <a-space>
+      <ActionToolbar>
         <a-button @click="openInsured">参保登记</a-button>
         <a-button @click="openBenefit">待遇核定</a-button>
         <a-button type="primary" @click="openRecord">录入服务记录</a-button>
-      </a-space>
+      </ActionToolbar>
     </template>
 
     <a-card title="护理服务包" size="small">
@@ -20,7 +20,7 @@
     </a-card>
 
     <!-- 参保登记 -->
-    <a-modal v-model:open="insuredOpen" title="参保登记" :confirm-loading="saving" @ok="submitInsured">
+    <a-modal :mask-closable="false" v-model:open="insuredOpen" title="参保登记" :confirm-loading="saving" @ok="submitInsured">
       <a-form layout="vertical">
         <a-form-item label="长者" required>
           <a-select v-model:value="insuredForm.elderId" show-search :filter-option="false" :options="elderOptions"
@@ -42,7 +42,7 @@
     </a-modal>
 
     <!-- 待遇核定 -->
-    <a-modal v-model:open="benefitOpen" title="待遇核定" :confirm-loading="saving" @ok="submitBenefit" width="640px">
+    <a-modal :mask-closable="false" v-model:open="benefitOpen" title="待遇核定" :confirm-loading="saving" @ok="submitBenefit" width="640px">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">
@@ -98,7 +98,7 @@
     </a-modal>
 
     <!-- 服务记录 -->
-    <a-modal v-model:open="recordOpen" title="录入护理服务记录" :confirm-loading="saving" @ok="submitRecord" width="600px">
+    <a-modal :mask-closable="false" v-model:open="recordOpen" title="录入护理服务记录" :confirm-loading="saving" @ok="submitRecord" width="600px">
       <a-form layout="vertical">
         <a-form-item label="长者" required>
           <a-select v-model:value="recordForm.elderId" show-search :filter-option="false" :options="elderOptions"
@@ -133,6 +133,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

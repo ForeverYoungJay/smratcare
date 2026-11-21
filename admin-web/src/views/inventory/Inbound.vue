@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="入库管理" subTitle="新增入库单与入库记录">
     <a-card class="card-elevated" :bordered="false">
-      <a-form layout="inline" :model="query" class="search-form">
+      <QueryBar layout="inline" :model="query" class="search-form">
         <a-form-item label="商品">
           <a-select
             v-model:value="query.productId"
@@ -15,22 +15,24 @@
         <a-form-item label="日期">
           <a-range-picker v-model:value="query.range" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="handleSearch">搜索</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="handleSearch">搜索</a-button>
+              <a-button @click="reset">重置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <div class="table-actions">
-        <a-space>
+        <ActionToolbar>
           <a-button type="primary" @click="openInbound">新增入库单</a-button>
           <a-button @click="exportTemplate">导出入库模板</a-button>
           <a-button @click="exportCsvData">导出CSV</a-button>
-        </a-space>
+        </ActionToolbar>
       </div>
 
       <vxe-toolbar custom export></vxe-toolbar>
@@ -100,6 +102,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

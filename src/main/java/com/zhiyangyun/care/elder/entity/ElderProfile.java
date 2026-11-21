@@ -50,6 +50,8 @@ public class ElderProfile {
 
   private String careLevel;
 
+  private Long responsibleStaffId;
+
   private String riskPrecommit;
 
   private String remark;

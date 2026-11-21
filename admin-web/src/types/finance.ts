@@ -3,7 +3,18 @@ import type { Id } from './common'
 export interface PaymentRecordItem {
   id: Id
   billMonthlyId: Id
+  elderId?: Id
+  elderName?: string
+  billMonth?: string
+  /** 实收现金 */
   amount: number
+  payableAmount?: number
+  ltciDeductAmount?: number
+  discountAmount?: number
+  discountReason?: string
+  voucherAmount?: number
+  /** 抵账合计 = 实收 + 三项抵扣 */
+  settledAmount?: number
   payMethod: 'CASH' | 'CARD' | 'BANK' | 'WECHAT_OFFLINE' | 'ALIPAY' | 'WECHAT' | 'QR_CODE'
   paidAt: string
   operatorStaffId?: number
@@ -71,6 +82,13 @@ export interface FinanceReportMonthlyItem {
   receivedAmount?: number
   refundAmount?: number
   netAmount?: number
+}
+
+export interface FinanceArrearsAgingItem {
+  key: 'CURRENT' | 'D30' | 'D60' | 'D90' | 'D90_PLUS'
+  label: string
+  amount: number
+  billCount: number
 }
 
 export interface FinanceArrearsItem {
@@ -790,6 +808,16 @@ export interface FinanceConfigImpactPreview {
 export interface FinanceConfigImpactPreviewRequest {
   month?: string
   configKeys: string[]
+}
+
+export interface BillingCareLevelFee {
+  id?: Id
+  orgId: Id
+  careLevel: string
+  feeMonthly: number
+  effectiveMonth: string
+  status: number
+  remark?: string
 }
 
 export interface FinanceBillingConfigEntry {

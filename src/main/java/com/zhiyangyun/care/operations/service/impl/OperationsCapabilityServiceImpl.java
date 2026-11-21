@@ -388,6 +388,16 @@ public class OperationsCapabilityServiceImpl implements OperationsCapabilityServ
         .ne(FireSafetyRecord::getStatus, "CLOSED")
         .isNotNull(FireSafetyRecord::getCheckTime)
         .lt(FireSafetyRecord::getCheckTime, now.minusHours(12)));
+    // 与首页「未闭环风险」卡片同口径：体检异常/跟进中 + 维修超时工单
+    long inspectionOpenCount = healthInspectionMapper.selectCount(Wrappers.lambdaQuery(HealthInspection.class)
+        .eq(HealthInspection::getIsDeleted, 0)
+        .eq(orgId != null, HealthInspection::getOrgId, orgId)
+        .in(HealthInspection::getStatus, List.of("ABNORMAL", "FOLLOWING")));
+    long maintenanceOverdueCount = maintenanceRequestMapper.selectCount(Wrappers.lambdaQuery(MaintenanceRequest.class)
+        .eq(MaintenanceRequest::getIsDeleted, 0)
+        .eq(orgId != null, MaintenanceRequest::getOrgId, orgId)
+        .in(MaintenanceRequest::getStatus, List.of("OPEN", "PROCESSING"))
+        .lt(MaintenanceRequest::getReportedAt, now.minusDays(2)));
 
     int riskIndex = (int) Math.min(100,
         openIncidentCount * 12
@@ -396,7 +406,9 @@ public class OperationsCapabilityServiceImpl implements OperationsCapabilityServ
             + openAlertCount * 6
             + criticalAlertCount * 18
             + nightPatrolOpenCount * 8
-            + overdueFireCount * 10);
+            + overdueFireCount * 10
+            + inspectionOpenCount * 6
+            + maintenanceOverdueCount * 8);
 
     OperationsSafetyRiskResponse response = new OperationsSafetyRiskResponse();
     response.setGeneratedAt(now.format(DATETIME_FMT));
@@ -409,7 +421,9 @@ public class OperationsCapabilityServiceImpl implements OperationsCapabilityServ
         safetyMetric("smart_alert", "设备未闭环告警", openAlertCount + " 条", "呼叫器、床垫、定位/门禁等设备告警", openAlertCount > 0 ? "danger" : "normal", "/medical-care/smart-alerts?status=OPEN"),
         safetyMetric("critical_alert", "紧急设备告警", criticalAlertCount + " 条", "需要优先确认和处置的紧急告警", criticalAlertCount > 0 ? "danger" : "normal", "/medical-care/smart-alerts?level=CRITICAL"),
         safetyMetric("night_patrol", "夜间巡查未闭环", nightPatrolOpenCount + " 项", "消防夜间巡查、交接和扫码记录", nightPatrolOpenCount > 0 ? "warning" : "normal", "/fire/night-patrol?status=OPEN"),
-        safetyMetric("fire_open", "消防安全待办", fireOpenCount + " 项", "设施、巡查、维护、故障处理未闭环", fireOpenCount > 0 ? "warning" : "normal", "/fire/data-stats")
+        safetyMetric("fire_open", "消防安全待办", fireOpenCount + " 项", "设施、巡查、维护、故障处理未闭环", fireOpenCount > 0 ? "warning" : "normal", "/fire/data-stats"),
+        safetyMetric("inspection_abnormal", "体检异常未闭环", inspectionOpenCount + " 条", "健康巡检异常与跟进中记录，需医护复核闭环", inspectionOpenCount > 0 ? "danger" : "normal", "/health/inspection?status=OPEN"),
+        safetyMetric("maintenance_overdue", "维修超时工单", maintenanceOverdueCount + " 单", "报修超过 2 天未完成的后勤工单", maintenanceOverdueCount > 0 ? "warning" : "normal", "/logistics/assets/maintenance-record")
     ));
     response.setRiskSources(buildSafetyRiskSources(openIncidentCount, majorIncidentCount, openAlertCount, criticalAlertCount, nightPatrolOpenCount, fireOpenCount));
     response.setEmergencyFlows(buildEmergencyFlows());
@@ -2171,7 +2185,7 @@ public class OperationsCapabilityServiceImpl implements OperationsCapabilityServ
     return List.of(
         emergencyFlow("fall", "跌倒/坠床应急", "设备跌倒告警、护理巡房发现、家属反馈", "/life/incident?incidentType=跌倒",
             List.of("启动应急预案", "现场评估意识和疼痛", "通知护士/医生/家属", "必要时转诊", "登记事故报告并复盘防跌倒措施")),
-        emergencyFlow("lost", "走失/电子围栏应急", "门禁、定位手环或巡房未见", "/medical-care/smart-alerts?alertType=GEOFENCE",
+        emergencyFlow("lost", "走失/电子围栏应急", "门禁、定位手环或巡房未见", "/medical-care/smart-alerts?status=OPEN",
             List.of("门岗锁定出入口", "调取定位/监控", "分区搜寻", "通知家属与管理层", "形成走失复盘")),
         emergencyFlow("choking", "噎食/窒息应急", "餐厅/护理员发现异常", "/life/incident?incidentType=噎食",
             List.of("立即海姆立克/呼叫医护", "记录餐食与体征", "必要时急救转运", "通知家属", "复盘餐饮风险并登记监管上报情况")),
@@ -2394,7 +2408,7 @@ public class OperationsCapabilityServiceImpl implements OperationsCapabilityServ
 
   private List<FamilyVisibleData> buildFamilyVisibleData() {
     return List.of(
-        visibleData("dynamic", "老人动态", "READY", "/api/family/dashboard/home", "/oa/activity-center/albums",
+        visibleData("dynamic", "老人动态", "READY", "/api/family/dashboard/home", "/oa/activity-center/records",
             List.of("动态摘要", "近期活动", "机构通知", "重点事件")),
         visibleData("care", "护理记录", "READY", "/api/family/care-logs", "/medical-care/care-task-board",
             List.of("护理项目", "执行时间", "护理员", "备注", "照片")),
@@ -2406,7 +2420,7 @@ public class OperationsCapabilityServiceImpl implements OperationsCapabilityServ
             List.of("就医记录", "诊断", "建议", "用药")),
         visibleData("payment", "费用与缴费", "READY", "/api/family/payment/summary", "/finance/bills/in-resident",
             List.of("账单", "已缴", "欠费", "余额", "缴费历史")),
-        visibleData("album", "照片视频", "READY", "/api/family/activity-albums", "/oa/activity-center/albums",
+        visibleData("album", "照片视频", "READY", "/api/family/activity-albums", "/oa/activity-center/records",
             List.of("活动相册", "评论", "点赞", "可见范围"))
     );
   }

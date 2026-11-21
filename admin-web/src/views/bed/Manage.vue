@@ -1,5 +1,8 @@
 <template>
   <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
+    <template v-if="canEditTypes" #extra>
+      <a-button @click="router.push('/logistics/assets/bed-type-config')">床位/房间类型与区域设置</a-button>
+    </template>
     <div class="bed-management-page">
       <a-row :gutter="20" class="workspace-grid">
         <a-col :xs="24" :xl="6">
@@ -78,23 +81,25 @@
                   </div>
                   <a-button type="link" @click="resetBuildings">清空筛选</a-button>
                 </div>
-                <a-form :model="buildingQuery" layout="inline" class="search-bar">
+                <QueryBar :model="buildingQuery" layout="inline" class="search-bar" @finish="searchBuildings">
                   <a-form-item label="关键字">
                     <a-input v-model:value="buildingQuery.keyword" placeholder="楼栋名称/编码" allow-clear />
                   </a-form-item>
-                <a-form-item label="状态">
-                  <a-select v-model:value="buildingQuery.status" allow-clear style="min-width: 140px">
-                    <a-select-option :value="1">启用</a-select-option>
-                    <a-select-option :value="0">停用</a-select-option>
-                  </a-select>
-                </a-form-item>
-                  <a-form-item>
-                    <a-space>
-                      <a-button type="primary" @click="searchBuildings">查询</a-button>
-                      <a-button @click="resetBuildings">重置</a-button>
-                    </a-space>
+                  <a-form-item label="状态">
+                    <a-select v-model:value="buildingQuery.status" allow-clear style="min-width: 140px">
+                      <a-select-option :value="1">启用</a-select-option>
+                      <a-select-option :value="0">停用</a-select-option>
+                    </a-select>
                   </a-form-item>
-                </a-form>
+                  <template #actions>
+                    <ActionToolbar>
+                      <a-space>
+                        <a-button type="primary" @click="searchBuildings">查询</a-button>
+                        <a-button @click="resetBuildings">重置</a-button>
+                      </a-space>
+                    </ActionToolbar>
+                  </template>
+                </QueryBar>
               </a-card>
 
               <a-card class="section-card action-card" :bordered="false">
@@ -189,28 +194,30 @@
                   </div>
                   <a-button type="link" @click="resetFloors">清空筛选</a-button>
                 </div>
-                <a-form :model="floorQuery" layout="inline" class="search-bar">
-                <a-form-item label="楼栋">
-                  <a-select v-model:value="floorQuery.buildingId" allow-clear style="min-width: 160px">
-                    <a-select-option v-for="b in buildingList" :key="b.id" :value="b.id">{{ b.name }}</a-select-option>
-                  </a-select>
-                </a-form-item>
-                <a-form-item label="关键字">
-                  <a-input v-model:value="floorQuery.keyword" placeholder="楼层/名称" allow-clear />
-                </a-form-item>
-                <a-form-item label="状态">
-                  <a-select v-model:value="floorQuery.status" allow-clear style="min-width: 140px">
-                    <a-select-option :value="1">启用</a-select-option>
-                    <a-select-option :value="0">停用</a-select-option>
-                  </a-select>
-                </a-form-item>
-                <a-form-item>
-                  <a-space>
-                    <a-button type="primary" @click="searchFloors">查询</a-button>
-                    <a-button @click="resetFloors">重置</a-button>
-                  </a-space>
-                </a-form-item>
-              </a-form>
+                <QueryBar :model="floorQuery" layout="inline" class="search-bar" @finish="searchFloors">
+                  <a-form-item label="楼栋">
+                    <a-select v-model:value="floorQuery.buildingId" allow-clear style="min-width: 160px">
+                      <a-select-option v-for="b in buildingList" :key="b.id" :value="b.id">{{ b.name }}</a-select-option>
+                    </a-select>
+                  </a-form-item>
+                  <a-form-item label="关键字">
+                    <a-input v-model:value="floorQuery.keyword" placeholder="楼层/名称" allow-clear />
+                  </a-form-item>
+                  <a-form-item label="状态">
+                    <a-select v-model:value="floorQuery.status" allow-clear style="min-width: 140px">
+                      <a-select-option :value="1">启用</a-select-option>
+                      <a-select-option :value="0">停用</a-select-option>
+                    </a-select>
+                  </a-form-item>
+                  <template #actions>
+                    <ActionToolbar>
+                      <a-space>
+                        <a-button type="primary" @click="searchFloors">查询</a-button>
+                        <a-button @click="resetFloors">重置</a-button>
+                      </a-space>
+                    </ActionToolbar>
+                  </template>
+                </QueryBar>
               </a-card>
 
               <a-card class="section-card action-card" :bordered="false">
@@ -304,40 +311,42 @@
                   </div>
                   <a-button type="link" @click="resetRooms">清空筛选</a-button>
                 </div>
-                <a-form :model="roomQuery" layout="inline" class="search-bar">
-                <a-form-item label="房间号">
-                  <a-input v-model:value="roomQuery.roomNo" placeholder="如 A101" allow-clear />
-                </a-form-item>
-                <a-form-item label="楼栋">
-                  <a-select v-model:value="roomQuery.buildingId" allow-clear style="min-width: 140px">
-                    <a-select-option v-for="b in buildingList" :key="b.id" :value="b.id">{{ b.name }}</a-select-option>
-                  </a-select>
-                </a-form-item>
-                <a-form-item label="楼层">
-                  <a-select v-model:value="roomQuery.floorId" allow-clear style="min-width: 140px">
-                    <a-select-option v-for="f in roomFilterFloorOptions" :key="f.id" :value="f.id">
-                      {{ buildingNameMap[f.buildingId] || '未命名楼栋' }} / {{ f.floorNo }}
-                    </a-select-option>
-                  </a-select>
-                </a-form-item>
-                <a-form-item label="状态">
-                  <a-select v-model:value="roomQuery.status" allow-clear style="min-width: 140px">
-                    <a-select-option :value="1">可用</a-select-option>
-                    <a-select-option :value="0">停用</a-select-option>
-                  </a-select>
-                </a-form-item>
-                <a-form-item label="房型">
-                  <a-select v-model:value="roomQuery.roomType" allow-clear style="min-width: 160px" placeholder="全部房型">
-                    <a-select-option v-for="item in roomTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
-                  </a-select>
-                </a-form-item>
-                <a-form-item>
-                  <a-space>
-                    <a-button type="primary" @click="searchRooms">查询</a-button>
-                    <a-button @click="resetRooms">重置</a-button>
-                  </a-space>
-                </a-form-item>
-              </a-form>
+                <QueryBar :model="roomQuery" layout="inline" class="search-bar" @finish="searchRooms">
+                  <a-form-item label="房间号">
+                    <a-input v-model:value="roomQuery.roomNo" placeholder="如 A101" allow-clear />
+                  </a-form-item>
+                  <a-form-item label="楼栋">
+                    <a-select v-model:value="roomQuery.buildingId" allow-clear style="min-width: 140px">
+                      <a-select-option v-for="b in buildingList" :key="b.id" :value="b.id">{{ b.name }}</a-select-option>
+                    </a-select>
+                  </a-form-item>
+                  <a-form-item label="楼层">
+                    <a-select v-model:value="roomQuery.floorId" allow-clear style="min-width: 140px">
+                      <a-select-option v-for="f in roomFilterFloorOptions" :key="f.id" :value="f.id">
+                        {{ buildingNameMap[f.buildingId] || '未命名楼栋' }} / {{ f.floorNo }}
+                      </a-select-option>
+                    </a-select>
+                  </a-form-item>
+                  <a-form-item label="状态">
+                    <a-select v-model:value="roomQuery.status" allow-clear style="min-width: 140px">
+                      <a-select-option :value="1">可用</a-select-option>
+                      <a-select-option :value="0">停用</a-select-option>
+                    </a-select>
+                  </a-form-item>
+                  <a-form-item label="房型">
+                    <a-select v-model:value="roomQuery.roomType" allow-clear style="min-width: 160px" placeholder="全部房型">
+                      <a-select-option v-for="item in roomTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
+                    </a-select>
+                  </a-form-item>
+                  <template #actions>
+                    <ActionToolbar>
+                      <a-space>
+                        <a-button type="primary" @click="searchRooms">查询</a-button>
+                        <a-button @click="resetRooms">重置</a-button>
+                      </a-space>
+                    </ActionToolbar>
+                  </template>
+                </QueryBar>
               </a-card>
 
               <a-card class="section-card action-card" :bordered="false">
@@ -460,41 +469,43 @@
                   </div>
                   <a-button type="link" @click="resetBeds">清空筛选</a-button>
                 </div>
-                <a-form :model="bedQuery" layout="inline" class="search-bar">
-                <a-form-item label="床位号">
-                  <a-input v-model:value="bedQuery.bedNo" placeholder="如 01" allow-clear />
-                </a-form-item>
-                <a-form-item label="房间号">
-                  <a-input v-model:value="bedQuery.roomNo" placeholder="如 A101" allow-clear />
-                </a-form-item>
-                <a-form-item label="老人">
-                  <a-input v-model:value="bedQuery.elderName" placeholder="姓名" allow-clear />
-                </a-form-item>
-                <a-form-item label="状态">
-                  <a-select v-model:value="bedQuery.status" allow-clear style="min-width: 140px">
-                    <a-select-option :value="1">空床</a-select-option>
-                    <a-select-option :value="2">入住</a-select-option>
-                    <a-select-option :value="3">维护</a-select-option>
-                    <a-select-option :value="0">停用</a-select-option>
-                  </a-select>
-                </a-form-item>
-                <a-form-item label="房型">
-                  <a-select v-model:value="bedQuery.roomType" allow-clear style="min-width: 160px" placeholder="全部房型">
-                    <a-select-option v-for="item in roomTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
-                  </a-select>
-                </a-form-item>
-                <a-form-item label="床型">
-                  <a-select v-model:value="bedQuery.bedType" allow-clear style="min-width: 160px" placeholder="全部床型">
-                    <a-select-option v-for="item in bedTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
-                  </a-select>
-                </a-form-item>
-                <a-form-item>
-                  <a-space>
-                    <a-button type="primary" @click="searchBeds">查询</a-button>
-                    <a-button @click="resetBeds">重置</a-button>
-                  </a-space>
-                </a-form-item>
-              </a-form>
+                <QueryBar :model="bedQuery" layout="inline" class="search-bar" @finish="searchBeds">
+                  <a-form-item label="床位号">
+                    <a-input v-model:value="bedQuery.bedNo" placeholder="如 01" allow-clear />
+                  </a-form-item>
+                  <a-form-item label="房间号">
+                    <a-input v-model:value="bedQuery.roomNo" placeholder="如 A101" allow-clear />
+                  </a-form-item>
+                  <a-form-item label="老人">
+                    <a-input v-model:value="bedQuery.elderName" placeholder="姓名" allow-clear />
+                  </a-form-item>
+                  <a-form-item label="状态">
+                    <a-select v-model:value="bedQuery.status" allow-clear style="min-width: 140px">
+                      <a-select-option :value="1">空床</a-select-option>
+                      <a-select-option :value="2">入住</a-select-option>
+                      <a-select-option :value="3">维护</a-select-option>
+                      <a-select-option :value="0">停用</a-select-option>
+                    </a-select>
+                  </a-form-item>
+                  <a-form-item label="房型">
+                    <a-select v-model:value="bedQuery.roomType" allow-clear style="min-width: 160px" placeholder="全部房型">
+                      <a-select-option v-for="item in roomTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
+                    </a-select>
+                  </a-form-item>
+                  <a-form-item label="床型">
+                    <a-select v-model:value="bedQuery.bedType" allow-clear style="min-width: 160px" placeholder="全部床型">
+                      <a-select-option v-for="item in bedTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
+                    </a-select>
+                  </a-form-item>
+                  <template #actions>
+                    <ActionToolbar>
+                      <a-space>
+                        <a-button type="primary" @click="searchBeds">查询</a-button>
+                        <a-button @click="resetBeds">重置</a-button>
+                      </a-space>
+                    </ActionToolbar>
+                  </template>
+                </QueryBar>
               </a-card>
 
               <a-card class="section-card action-card" :bordered="false">
@@ -800,7 +811,7 @@
       </div>
     </a-modal>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="bootstrapOpen"
       title="结构生成向导"
       width="520px"
@@ -877,7 +888,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="generateOpen"
       :title="generateWizardTitle"
       width="560px"
@@ -969,6 +980,9 @@
 </template>
 
 <script setup lang="ts">
+import { useUserStore } from '../../stores/user'
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
@@ -1031,6 +1045,8 @@ type DrawerMode = 'create' | 'edit' | 'view'
 type WorkspaceMode = 'manage' | 'map' | 'panorama'
 
 const router = useRouter()
+// 类型与区域字典只有管理员维护（在「基础数据 → 长者与床位」）
+const canEditTypes = (useUserStore().roles || []).includes('ADMIN')
 const rooms = ref<RoomItem[]>([])
 const beds = ref<BedItem[]>([])
 const roomList = ref<RoomItem[]>([])

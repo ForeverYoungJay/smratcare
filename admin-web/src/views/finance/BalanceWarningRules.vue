@@ -1,18 +1,24 @@
 <template>
   <PageContainer title="余额预警规则" subTitle="押金/预存阈值、通知对象与催缴策略配置">
     <a-card class="card-elevated" :bordered="false">
-      <a-space wrap>
-        <a-date-picker v-model:value="query.month" picker="month" style="width: 150px" />
-        <a-button type="primary" @click="loadData">刷新</a-button>
-        <a-button @click="exportData">导出</a-button>
-        <a-button @click="triggerImport">导入CSV</a-button>
-        <a-button @click="go('/finance/config/change-log')">查看变更记录</a-button>
-      </a-space>
+      <QueryBar :model="query" @finish="loadData">
+        <a-form-item label="月份">
+          <a-date-picker v-model:value="query.month" picker="month" style="width: 150px" />
+        </a-form-item>
+        <template #actions>
+          <ActionToolbar>
+            <a-button type="primary" html-type="submit">刷新</a-button>
+            <a-button @click="exportData">导出</a-button>
+            <a-button @click="triggerImport">导入CSV</a-button>
+            <a-button @click="go('/finance/config/change-log')">查看变更记录</a-button>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
     <input ref="importInputRef" type="file" accept=".csv,text/csv" style="display: none" @change="onImportFileChange" />
 
     <StatefulBlock style="margin-top: 16px;" :loading="loading" :error="errorMessage" @retry="loadData">
-      <a-row :gutter="[16, 16]">
+      <a-row class="business-stat-strip" :gutter="[16, 16]">
         <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="欠费长者" :value="summary.totalCount" /></a-card></a-col>
         <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="待充值预警" :value="summary.pendingCount" /></a-card></a-col>
         <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="到期合同风险" :value="summary.exceptionCount" /></a-card></a-col>
@@ -59,11 +65,11 @@
         </a-col>
         <a-col :xs="24" :xl="8">
           <a-card class="card-elevated" :bordered="false" title="联动入口">
-            <a-space direction="vertical" style="width: 100%">
+            <ActionToolbar direction="vertical" style="width: 100%">
               <a-button @click="go('/finance/accounts/list?filter=low_balance')">低余额账户</a-button>
               <a-button @click="go('/finance/bills/auto-deduct?filter=active')">自动催缴管理</a-button>
               <a-button @click="go('/finance/workbench')">返回财务工作台</a-button>
-            </a-space>
+            </ActionToolbar>
           </a-card>
         </a-col>
       </a-row>
@@ -86,6 +92,8 @@
 </template>
 
 <script setup lang="ts">
+import QueryBar from '../../components/QueryBar.vue'
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

@@ -1,5 +1,11 @@
 <template>
   <PageContainer title="月分摊费" subTitle="按月份建立分摊项目（自动确认）">
+    <template #extra>
+      <a-button @click="exportCurrent">导出当前</a-button>
+      <a-button @click="printCurrent">打印当前</a-button>
+      <a-button @click="openMeterValidate">抄表校验</a-button>
+      <a-button type="primary" @click="openCreate">新建分摊</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="月份">
         <a-date-picker v-model:value="query.month" picker="month" allow-clear />
@@ -23,12 +29,7 @@
       <a-form-item label="打印备注">
         <a-input v-model:value="query.printRemark" allow-clear placeholder="例如：月度电费分摊核对" style="width: 220px" />
       </a-form-item>
-      <template #extra>
-        <a-button @click="exportCurrent">导出当前</a-button>
-        <a-button @click="printCurrent">打印当前</a-button>
-        <a-button @click="openMeterValidate">抄表校验</a-button>
-        <a-button type="primary" @click="openCreate">新建分摊</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable
@@ -60,7 +61,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="createOpen" title="新建月分摊" :confirm-loading="creating" @ok="submitCreate">
+    <a-modal :mask-closable="false" v-model:open="createOpen" title="新建月分摊" :confirm-loading="creating" @ok="submitCreate">
       <a-form layout="vertical">
         <a-form-item label="分摊月份" required>
           <a-date-picker v-model:value="createForm.allocationMonth" picker="month" style="width: 100%" />
@@ -160,7 +161,7 @@
       </vxe-table>
     </a-modal>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="meterOpen"
       title="月抄表数据校验"
       :confirm-loading="meterLoading"

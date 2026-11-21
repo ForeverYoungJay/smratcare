@@ -30,6 +30,7 @@ public class ElderCreateRequest {
   private String lifecycleStatus;
   private String departureType;
   private String careLevel;
+  private Long responsibleStaffId;
   private String riskPrecommit;
   private String remark;
   private String sourceType;

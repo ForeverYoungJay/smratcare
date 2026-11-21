@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="老人出入报表" subTitle="老人入院/离院明细查询">
     <template #extra>
-      <a-space>
+      <ActionToolbar>
         <a-button type="primary" @click="search">查询</a-button>
         <a-button @click="exportCsvReport">导出报表</a-button>
         <a-dropdown>
@@ -16,7 +16,7 @@
             </a-menu>
           </template>
         </a-dropdown>
-      </a-space>
+      </ActionToolbar>
     </template>
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline">
@@ -100,7 +100,7 @@
       @apply-template="applyReportTemplate"
     />
 
-    <a-row :gutter="16" style="margin-top: 16px;">
+    <a-row class="business-stat-strip" :gutter="16" style="margin-top: 16px;">
       <a-col :span="8">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic title="匹配总记录" :value="summary.total" />
@@ -177,6 +177,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, nextTick, onMounted, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'

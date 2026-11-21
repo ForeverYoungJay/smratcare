@@ -4,10 +4,12 @@ import type { MedicalUnifiedTaskQuery } from '../types'
 const SORT_BY_OPTIONS = new Set(['PLANNED_TIME', 'PRIORITY', 'RISK_SCORE'])
 const SORT_DIRECTION_OPTIONS = new Set(['ASC', 'DESC'])
 
-export const MEDICAL_UNIFIED_TASK_QUERY_DEFAULTS: Required<Pick<
-  MedicalUnifiedTaskQuery,
-  'overdueHours' | 'onlyOverdue' | 'sortBy' | 'sortDirection'
->> = {
+export const MEDICAL_UNIFIED_TASK_QUERY_DEFAULTS: {
+  overdueHours: number
+  onlyOverdue: boolean
+  sortBy: string
+  sortDirection: string
+} = {
   overdueHours: 12,
   onlyOverdue: false,
   sortBy: 'RISK_SCORE',
@@ -82,7 +84,7 @@ function normalizeSortDirection(value: unknown, fallback = MEDICAL_UNIFIED_TASK_
 }
 
 export function normalizeMedicalUnifiedTaskQuery(
-  query?: Partial<MedicalUnifiedTaskQuery> | null
+  query?: { [K in keyof MedicalUnifiedTaskQuery]?: unknown } | null
 ): MedicalUnifiedTaskQuery {
   const normalized: MedicalUnifiedTaskQuery = {
     overdueHours: normalizeOverdueHours(query?.overdueHours),
@@ -106,7 +108,7 @@ export function normalizeMedicalUnifiedTaskQuery(
   if (status) {
     normalized.status = status
   }
-  const elderId = normalizePageValue(query?.elderId)
+  const elderId = normalizeText(query?.elderId)
   if (elderId) {
     normalized.elderId = elderId
   }

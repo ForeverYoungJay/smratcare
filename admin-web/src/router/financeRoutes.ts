@@ -1,0 +1,557 @@
+import type { RouteRecordRaw } from 'vue-router'
+
+// 财务规则配置（计费、分摊、渠道、审批、预警）只给主管/管理员
+const FINANCE_ADMINS = ['FINANCE_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
+
+export const financeRoutes: RouteRecordRaw[] = [
+  {
+        path: 'finance',
+        name: 'Finance',
+        meta: { title: '财务运营中心', icon: 'AccountBookOutlined', navSection: 'operations', navOrder: 60, navPinned: true, roles: ['FINANCE_EMPLOYEE', 'FINANCE_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
+        children: [
+          {
+            path: '',
+            name: 'FinanceHub',
+            component: () => import('../views/ModuleHub.vue'),
+            meta: { title: '财务导航', hidden: true }
+          },
+          {
+            path: 'workbench',
+            name: 'FinanceWorkbench',
+            component: () => import('../views/finance/FinanceWorkbench.vue'),
+            meta: { title: '财务工作台' }
+          },
+          {
+            path: 'search',
+            name: 'FinanceSearch',
+            component: () => import('../views/finance/FinanceSearch.vue'),
+            meta: { title: '财务搜索', hidden: true }
+          },
+          {
+            path: 'payments',
+            name: 'FinancePayments',
+            redirect: '/finance/payments/cashier-desk',
+            meta: { title: '收费与收款' },
+            children: [
+              {
+                path: 'cashier-desk',
+                name: 'FinancePaymentsCashierDesk',
+                component: () => import('../views/finance/CashierDesk.vue'),
+                meta: { title: '收银台' }
+              },
+              {
+                path: 'register',
+                name: 'FinancePaymentsRegister',
+                redirect: '/finance/bills/detail-query?billScene=RESIDENT',
+                meta: { title: '收费登记（已合并）' }
+              },
+              {
+                path: 'records',
+                name: 'FinancePaymentsRecords',
+                redirect: '/finance/payments/cashier-desk?panel=records',
+                meta: { title: '收款流水（已合并）' }
+              },
+              {
+                path: '/finance/fees/payment-and-invoice',
+                name: 'FinancePaymentsInvoice',
+                component: () => import('../views/finance/InvoiceReceiptManagement.vue'),
+                meta: { title: '发票与收据' }
+              },
+              {
+                path: '/finance/payments/refund-reversal',
+                name: 'FinancePaymentsRefundReversal',
+                component: () => import('../views/finance/PaymentRefundReversal.vue'),
+                meta: { title: '退款与冲正' }
+              },
+              {
+                path: '/finance/payments/shift-close',
+                name: 'FinancePaymentsShiftClose',
+                redirect: '/finance/payments/cashier-desk?panel=shift',
+                meta: { title: '日结与交班（已合并）' }
+              }
+            ]
+          },
+          {
+            path: 'billing',
+            name: 'FinanceBilling',
+            redirect: '/finance/bills/in-resident',
+            meta: { title: '账单与账户' },
+            children: [
+              {
+                path: '/finance/bills/in-admission',
+                name: 'FinanceBillsInAdmission',
+                redirect: '/finance/bills/detail-query?billScene=ADMISSION',
+                meta: { title: '入住账单（已合并）' }
+              },
+              {
+                path: '/finance/bills/in-resident',
+                name: 'FinanceBillsInResident',
+                redirect: '/finance/bills/detail-query?billScene=RESIDENT',
+                meta: { title: '在住周期账单（已合并）' }
+              },
+              {
+                path: '/finance/bills/detail-query',
+                name: 'FinanceBillsDetailQuery',
+                component: () => import('../views/finance/BillCenter.vue'),
+                meta: { title: '账单查询' },
+                props: {
+                  title: '账单详情查询',
+                  subTitle: '按老人、月份检索账单后进入详情页',
+                  defaultCurrentMonth: true
+                }
+              },
+              {
+                path: '/finance/accounts/list',
+                name: 'FinanceAccountsList',
+                component: () => import('../views/finance/Account.vue'),
+                meta: { title: '长者账户列表' }
+              },
+              {
+                path: '/finance/accounts/ledger',
+                name: 'FinanceAccountsLedger',
+                redirect: '/finance/accounts/list?panel=ledger',
+                meta: { title: '账户流水（已合并）' }
+              },
+              {
+                path: '/finance/prepaid-recharge',
+                name: 'FinancePrepaidRecharge',
+                redirect: '/finance/accounts/list?panel=recharge',
+                meta: { title: '预存充值（已合并）' }
+              },
+              {
+                path: '/finance/consumer-voucher',
+                name: 'FinanceConsumerVoucher',
+                component: () => import('../views/finance/ConsumerVoucher.vue'),
+                meta: { title: '消费券管理' }
+              },
+              {
+                path: '/finance/electricity-fee',
+                name: 'FinanceElectricityFee',
+                component: () => import('../views/finance/ElectricityFee.vue'),
+                meta: { title: '电费管理' }
+              },
+              {
+                path: '/finance/deposit-management',
+                name: 'FinanceDepositManagement',
+                component: () => import('../views/finance/DepositManagement.vue'),
+                meta: { title: '押金管理' }
+              },
+              {
+                // 提醒中心已与催缴跟进合并为「欠费与提醒中心」，旧入口保留为重定向
+                path: '/finance/reminder-center',
+                name: 'FinanceReminderCenter',
+                redirect: { path: '/finance/bills/follow-up', query: { tab: 'reminder' } },
+                meta: { title: '财务提醒中心（已并入欠费与提醒中心）', hidden: true }
+              },
+              {
+                // Excel 报表已并入经营分析的标签导航，旧入口保留为重定向
+                path: '/finance/excel-reports',
+                name: 'FinanceExcelReports',
+                redirect: '/finance/reports/excel',
+                meta: { title: 'Excel 报表（已并入经营分析）', hidden: true }
+              },
+              {
+                path: '/finance/accounts/warning-rules',
+                name: 'FinanceAccountsWarningRules',
+                component: () => import('../views/finance/BalanceWarningRules.vue'),
+                meta: { title: '余额预警规则', roles: FINANCE_ADMINS }
+              },
+              {
+                path: '/finance/admission-fee-audit',
+                name: 'FinanceAdmissionFeeAudit',
+                component: () => import('../views/finance/AdmissionFeeAudit.vue'),
+                meta: { title: '入住费用审核' }
+              }
+            ]
+          },
+          {
+            path: 'sources',
+            name: 'FinanceSources',
+            redirect: '/finance/flows/consumption',
+            meta: { title: '消费与分摊' },
+            children: [
+              {
+                path: '/finance/flows/consumption',
+                name: 'FinanceFlowsConsumption',
+                component: () => import('../views/finance/ConsumptionRegister.vue'),
+                meta: { title: '消费登记' }
+              },
+              {
+                path: '/finance/flows/medical',
+                name: 'FinanceFlowsMedical',
+                redirect: '/finance/flows/consumption?moduleKey=MEDICAL_FLOW',
+                meta: { title: '医护费用流水（已合并）' }
+              },
+              {
+                path: '/finance/flows/medical-errors',
+                name: 'FinanceFlowsMedicalErrors',
+                redirect: '/finance/flows/consumption?moduleKey=MEDICAL_ERRORS',
+                meta: { title: '医护费用异常（已合并）' }
+              },
+              {
+                path: '/finance/flows/dining',
+                name: 'FinanceFlowsDining',
+                redirect: '/finance/flows/consumption?moduleKey=DINING_FLOW',
+                meta: { title: '餐饮扣费流水（已合并）' }
+              },
+              {
+                path: '/finance/flows/logistics',
+                name: 'FinanceFlowsLogistics',
+                redirect: '/finance/flows/consumption?moduleKey=LOGISTICS_FLOW',
+                meta: { title: '物资/后勤收费流水（已合并）' }
+              },
+              {
+                path: '/finance/flows/adjustments',
+                name: 'FinanceFlowsAdjustments',
+                component: () => import('../views/finance/FlowCenter.vue'),
+                meta: { title: '费用调整单' },
+                props: {
+                  moduleKey: 'ADJUSTMENTS',
+                  moduleName: '费用调整单',
+                  description: '减免、补录、改价调整申请与审批跟踪',
+                  links: [
+                    { label: '查看审批中心', to: '/oa/approval?module=finance&status=pending' },
+                    { label: '查看退住审核', to: '/finance/discharge/review?status=pending' }
+                  ]
+                }
+              },
+              {
+                path: '/finance/allocation/public-cost',
+                name: 'FinanceAllocationPublicCost',
+                component: () => import('../views/finance/MonthlyAllocation.vue'),
+                meta: { title: '公共费用计算' }
+              },
+              {
+                path: '/finance/allocation/tasks',
+                name: 'FinanceAllocationTasks',
+                component: () => import('../views/finance/MonthlyAllocation.vue'),
+                meta: { title: '分摊入账任务' }
+              }
+            ]
+          },
+          {
+            path: 'risk',
+            name: 'FinanceRisk',
+            redirect: '/finance/bills/follow-up',
+            meta: { title: '欠费与异常' },
+            children: [
+              {
+                path: '/finance/bills/follow-up',
+                name: 'FinanceBillsFollowUp',
+                component: () => import('../views/finance/CollectionCenter.vue'),
+                meta: { title: '欠费与提醒中心' }
+              },
+              {
+                path: '/finance/bills/auto-deduct',
+                name: 'FinanceBillsAutoDeduct',
+                component: () => import('../views/finance/AutoDebitManagement.vue'),
+                meta: { title: '自动扣费与催缴' }
+              },
+              {
+                path: '/finance/bills/auto-deduct-errors',
+                name: 'FinanceBillsAutoDeductErrors',
+                redirect: '/finance/reconcile/issue-center?sourceModule=AUTO_DEBIT',
+                meta: { title: '自动扣费异常（已合并）' }
+              },
+              {
+                path: '/finance/reconcile/exception',
+                name: 'FinanceReconcileException',
+                redirect: '/finance/reconcile/issue-center?sourceModule=RECONCILE',
+                meta: { title: '对账异常处理（已合并）' }
+              },
+              {
+                path: '/finance/reconcile/ledger-health',
+                name: 'FinanceReconcileLedgerHealth',
+                redirect: '/finance/reconcile/issue-center?sourceModule=LEDGER',
+                meta: { title: '财务一致性巡检（已合并）' }
+              },
+              {
+                path: '/finance/reconcile/issue-center',
+                name: 'FinanceReconcileIssueCenter',
+                component: () => import('../views/finance/FinanceIssueCenter.vue'),
+                meta: { title: '异常修复中心' }
+              }
+            ]
+          },
+          {
+            path: 'discharge',
+            name: 'FinanceDischarge',
+            redirect: '/finance/discharge/review',
+            meta: { title: '结算与月结' },
+            children: [
+              {
+                path: 'review',
+                name: 'FinanceDischargeReview',
+                redirect: '/finance/discharge/settlement?step=review',
+                meta: { title: '退住审核（已合并）' }
+              },
+              {
+                path: 'settlement',
+                name: 'FinanceDischargeSettlementCenter',
+                component: () => import('../views/finance/DischargeFlow.vue'),
+                meta: { title: '退住结算' }
+              },
+              {
+                path: 'print-sign',
+                name: 'FinanceDischargePrintSign',
+                component: () => import('../views/finance/DischargeSettlement.vue'),
+                meta: { title: '结算单打印' }
+              },
+              {
+                path: 'status-sync',
+                name: 'FinanceDischargeStatusSync',
+                redirect: '/finance/discharge/settlement?step=sync',
+                meta: { title: '结算状态回写（已合并）' }
+              },
+              {
+                path: '/finance/reconcile/center',
+                name: 'FinanceReconcileCenter',
+                component: () => import('../views/finance/Reconcile.vue'),
+                meta: { title: '对账中心' }
+              },
+              {
+                path: '/finance/reconcile/invoice',
+                name: 'FinanceReconcileInvoice',
+                component: () => import('../views/finance/ReconcileInvoice.vue'),
+                meta: { title: '发票对账' }
+              },
+              {
+                path: '/finance/reconcile/month-close',
+                name: 'FinanceReconcileMonthClose',
+                component: () => import('../views/finance/FinanceMonthClose.vue'),
+                meta: { title: '月结进度' }
+              },
+              {
+                // 人事审核通过的工资批次，由财务复核、提交银行并凭回执登记付款
+                path: '/finance/payroll',
+                name: 'FinancePayroll',
+                component: () => import('../views/hr/HrPayroll.vue'),
+                meta: { title: '工资付款', roles: ['FINANCE_EMPLOYEE', 'FINANCE_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
+              }
+            ]
+          },
+          {
+            path: 'reports',
+            name: 'FinanceReports',
+            redirect: '/finance/reports/overall',
+            meta: { title: '经营分析' },
+            children: [
+              {
+                path: 'overall',
+                name: 'FinanceReportsOverall',
+                component: () => import('../views/finance/Report.vue'),
+                meta: { title: '总收支' }
+              },
+              {
+                path: 'revenue-structure',
+                name: 'FinanceReportsRevenueStructure',
+                component: () => import('../views/finance/Report.vue'),
+                meta: { title: '营收结构' }
+              },
+              {
+                path: 'floor-room-profit',
+                name: 'FinanceReportsFloorRoom',
+                component: () => import('../views/finance/Report.vue'),
+                meta: { title: '楼层房间收支' }
+              },
+              {
+                path: 'occupancy-consumption',
+                name: 'FinanceReportsOccupancyConsumption',
+                component: () => import('../views/finance/Report.vue'),
+                meta: { title: '入住与消费' }
+              },
+              {
+                path: 'excel',
+                name: 'FinanceReportsExcel',
+                component: () => import('../views/finance/Report.vue'),
+                meta: { title: 'Excel 报表' }
+              },
+              {
+                path: 'monthly-ops',
+                name: 'FinanceReportsMonthlyOps',
+                component: () => import('../views/finance/Report.vue'),
+                meta: { title: '机构月运营' }
+              }
+            ]
+          },
+          {
+            path: 'config',
+            name: 'FinanceConfig',
+            redirect: '/finance/config/master-data',
+            meta: { title: '规则与配置', roles: FINANCE_ADMINS },
+            children: [
+              {
+                path: 'master-data',
+                name: 'FinanceConfigMasterData',
+                component: () => import('../views/finance/FinanceMasterData.vue'),
+                meta: { title: '主数据配置中心' }
+              },
+              {
+                path: '/finance/allocation/subjects',
+                name: 'FinanceConfigFeeSubjects',
+                component: () => import('../views/finance/FeeSubjectDictionary.vue'),
+                meta: { title: '费用科目' }
+              },
+              {
+                path: '/finance/bills/rules',
+                name: 'FinanceBillsRules',
+                component: () => import('../views/finance/BillingRulesConfig.vue'),
+                meta: { title: '计费规则' }
+              },
+              {
+                path: '/finance/allocation/rules',
+                name: 'FinanceAllocationRules',
+                component: () => import('../views/finance/AllocationRules.vue'),
+                meta: { title: '分摊规则' }
+              },
+              {
+                path: 'payment-channels',
+                name: 'FinanceConfigPaymentChannels',
+                component: () => import('../views/finance/PaymentChannelConfig.vue'),
+                meta: { title: '支付渠道' }
+              },
+              {
+                path: 'approval-flow',
+                name: 'FinanceConfigApprovalFlow',
+                component: () => import('../views/finance/FinanceApprovalFlowConfig.vue'),
+                meta: { title: '审批与权限' }
+              },
+              {
+                path: 'change-log',
+                name: 'FinanceConfigChangeLog',
+                component: () => import('../views/finance/FinanceConfigChangeLog.vue'),
+                meta: { title: '配置变更记录' }
+              }
+            ]
+          },
+          {
+            path: 'accounts',
+            name: 'FinanceAccountsCompat',
+            redirect: '/finance/accounts/list',
+            meta: { title: '账户与预存（兼容）', hidden: true }
+          },
+          {
+            path: 'bills',
+            name: 'FinanceBillsCompat',
+            redirect: '/finance/bills/in-resident',
+            meta: { title: '账单与账户（兼容）', hidden: true }
+          },
+          {
+            path: 'flows',
+            name: 'FinanceFlowsCompat',
+            redirect: '/finance/flows/consumption',
+            meta: { title: '消费与分摊（兼容）', hidden: true }
+          },
+          {
+            path: 'fees',
+            name: 'FinanceFeesCompat',
+            redirect: '/finance/fees/payment-and-invoice',
+            meta: { title: '收费与票据（兼容）', hidden: true }
+          },
+          {
+            path: 'allocation',
+            name: 'FinanceAllocationCompat',
+            redirect: '/finance/allocation/public-cost',
+            meta: { title: '公共费用分摊（兼容）', hidden: true }
+          },
+          {
+            path: 'reconcile',
+            name: 'FinanceReconcileCompat',
+            redirect: '/finance/reconcile/center',
+            meta: { title: '欠费与异常（兼容）', hidden: true }
+          },
+          {
+            path: 'admission-bill-payment',
+            name: 'FinanceAdmissionBillPayment',
+            redirect: '/finance/bills/in-admission',
+            meta: { title: '入住账单缴费（兼容）', hidden: true }
+          },
+          {
+            path: 'resident-bill-payment',
+            name: 'FinanceResidentBillPayment',
+            redirect: '/finance/bills/in-resident',
+            meta: { title: '在住账单缴费（兼容）', hidden: true }
+          },
+          {
+            path: 'monthly-allocation',
+            name: 'FinanceMonthlyAllocation',
+            redirect: '/finance/allocation/public-cost',
+            meta: { title: '月分摊费（兼容）', hidden: true }
+          },
+          {
+            path: 'discharge-fee-audit',
+            name: 'FinanceDischargeFeeAudit',
+            redirect: '/finance/discharge/review',
+            meta: { title: '退住费用审核（兼容）', hidden: true }
+          },
+          {
+            path: 'finance-settlement',
+            name: 'FinanceSettlement',
+            redirect: '/finance/reconcile/center',
+            meta: { title: '财务结算（兼容）', hidden: true }
+          },
+          {
+            path: 'discharge-settlement',
+            name: 'FinanceDischargeSettlement',
+            redirect: '/finance/discharge/settlement',
+            meta: { title: '退住结算（兼容）', hidden: true }
+          },
+          {
+            path: 'medical-care-ledger',
+            name: 'FinanceMedicalCareLedger',
+            redirect: '/finance/flows/medical',
+            meta: { title: '医护费用流水（兼容）', hidden: true }
+          },
+          {
+            path: 'consumption-register',
+            name: 'FinanceConsumptionRegister',
+            redirect: '/finance/flows/consumption',
+            meta: { title: '消费登记（兼容）', hidden: true }
+          },
+          {
+            path: 'bill/:billId',
+            name: 'FinanceBillDetail',
+            component: () => import('../views/finance/BillDetail.vue'),
+            meta: { title: '账单详情', hidden: true }
+          },
+          {
+            path: 'report',
+            name: 'FinanceReport',
+            redirect: '/finance/reports/overall',
+            meta: { title: '财务报表（兼容）', hidden: true }
+          },
+          {
+            path: 'account',
+            name: 'FinanceAccount',
+            redirect: '/finance/accounts/list',
+            meta: { title: '老人账户（兼容）', hidden: true }
+          },
+          {
+            path: 'account-log',
+            name: 'FinanceAccountLog',
+            redirect: '/finance/accounts/ledger',
+            meta: { title: '账户流水（兼容）', hidden: true }
+          },
+          {
+            path: 'bill',
+            redirect: '/finance/bills/in-resident',
+            meta: { hidden: true }
+          },
+          {
+            path: 'reconcile-center',
+            redirect: '/finance/reconcile/center',
+            meta: { hidden: true }
+          },
+          {
+            path: 'reconcile-invoice',
+            redirect: '/finance/reconcile/invoice',
+            meta: { hidden: true }
+          },
+          {
+            path: 'reconcile-exception',
+            redirect: '/finance/reconcile/exception',
+            meta: { hidden: true }
+          }
+        ]
+      }
+]

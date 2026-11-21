@@ -2,19 +2,21 @@
   <PageContainer title="渠道贡献排名" sub-title="按签约贡献与转化率进行渠道排行">
     <MarketingQuickNav parent-path="/marketing/reports" />
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline">
+      <QueryBar :model="query" layout="inline" @finish="loadData">
         <a-form-item label="开始日期">
           <a-date-picker v-model:value="query.dateFrom" value-format="YYYY-MM-DD" />
         </a-form-item>
         <a-form-item label="结束日期">
           <a-date-picker v-model:value="query.dateTo" value-format="YYYY-MM-DD" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="loadData">查询</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">查询</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px">
@@ -32,6 +34,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../../components/ActionToolbar.vue'
+import QueryBar from '../../../components/QueryBar.vue'
 import { onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../../components/PageContainer.vue'

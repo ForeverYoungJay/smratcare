@@ -1,15 +1,18 @@
 <template>
   <PageContainer title="机构信息" subTitle="维护机构基础资料">
+    <template #extra>
+      <a-button type="primary" @click="openDrawer()">新增机构</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="机构名称/编码" allow-clear />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openDrawer()">新增机构</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"

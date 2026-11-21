@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="点餐" subTitle="创建老人点餐并在下单前执行风险预检">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新增点餐</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="日期范围">
         <a-range-picker v-model:value="query.range" />
@@ -13,12 +16,12 @@
       <a-form-item label="关键词">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openCreate">新增点餐</a-button>
-      </template>
+
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'mealType'">
           {{ getDiningMealTypeLabel(record.mealType) }}
@@ -43,7 +46,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" title="点餐信息" :confirm-loading="saving" @ok="submit" width="760px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="点餐信息" :confirm-loading="saving" @ok="submit" width="760px">
       <a-form layout="vertical">
         <a-row :gutter="12">
           <a-col :span="12">

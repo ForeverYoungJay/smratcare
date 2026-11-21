@@ -1,6 +1,6 @@
 <template>
-  <div class="page-container page-shell" :class="[`page-shell--${mode}`]">
-    <section class="page-head" :class="{ 'page-head--showcase': mode === 'showcase' }">
+  <div class="page-container page-shell" :class="[`page-shell--${mode}`, { 'business-page': businessLayout }]">
+    <section v-if="!embedded && mode !== 'content'" class="page-head" :class="{ 'page-head--showcase': mode === 'showcase', 'page-head--scenic': mode === 'scenic' }" :style="mode === 'scenic' ? { '--page-scenic-image': `url(${visualAssets.scenicMountain.url})` } : undefined">
       <div class="page-head-accent"></div>
       <div class="page-head-glow" v-if="mode === 'showcase'"></div>
       <div class="page-head-main">
@@ -15,7 +15,7 @@
           <p class="page-subtitle" v-if="subTitle || subTitleAlias">{{ subTitle || subTitleAlias }}</p>
         </div>
         <div class="page-head-extra" v-if="$slots.extra">
-          <slot name="extra" />
+          <ActionToolbar v-if="businessLayout"><slot name="extra" /></ActionToolbar><slot v-else name="extra" />
         </div>
       </div>
       <div class="page-head-foot" v-if="$slots.meta || $slots.stats">
@@ -28,13 +28,23 @@
       </div>
     </section>
     <section class="page-body">
+      <Teleport v-if="(embedded || mode === 'content') && $slots.extra" :to="workspaceActions || 'body'" :disabled="!embedded || !workspaceActions"><div class="page-content-actions"><ActionToolbar v-if="businessLayout"><slot name="extra" /></ActionToolbar><slot v-else name="extra" /></div></Teleport>
+      <div v-if="embedded && ($slots.meta || $slots.stats)" class="page-embedded-meta"><slot name="meta" /><slot name="stats" /></div>
       <slot />
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-const props = withDefaults(defineProps<{ title: string; subTitle?: string; subTitleAlias?: string; mode?: 'workspace' | 'showcase'; kicker?: string }>(), {
+import { inject, provide, ref, type Ref } from 'vue'
+import ActionToolbar from './ActionToolbar.vue'
+import { visualAssets } from '../config/visualAssets'
+
+const embedded = inject('function-workspace-embedded', false)
+const businessLayout = inject('business-page-layout', embedded)
+const workspaceActions = inject<Ref<HTMLElement | null>>('workspace-actions', ref(null))
+provide('business-page-layout', businessLayout)
+const props = withDefaults(defineProps<{ title: string; subTitle?: string; subTitleAlias?: string; mode?: 'workspace' | 'showcase' | 'scenic' | 'content'; kicker?: string }>(), {
   mode: 'workspace'
 })
 const subTitleAlias = props.subTitleAlias
@@ -43,6 +53,7 @@ const kicker = props.kicker
 </script>
 
 <style scoped>
+.page-embedded-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .page-shell {
   gap: 18px;
 }
@@ -56,6 +67,20 @@ const kicker = props.kicker
   box-shadow: var(--shadow-xs);
   overflow: hidden;
 }
+
+.page-head--scenic {
+  min-height: 174px;
+  padding: 30px 32px;
+  border-color: #e7e5dc;
+  background: linear-gradient(90deg, rgba(255, 253, 247, .97) 0%, rgba(255, 253, 247, .89) 36%, rgba(255, 253, 247, .28) 100%), var(--page-scenic-image) center 48% / cover;
+}
+
+.page-head--scenic .page-head-accent { display: none; }
+.page-head--scenic .page-title { color: #172921; font: 700 clamp(28px, 2.4vw, 38px)/1.3 "Noto Serif SC", "Songti SC", serif; }
+.page-head--scenic .page-subtitle { max-width: 720px; color: #42534a; }
+.page-head--scenic .page-head-main { align-items: flex-start; }
+.page-head--scenic .page-head-foot { border-color: rgba(35, 93, 69, .17); }
+.page-head--scenic .page-head-extra :deep(.ant-btn) { background: rgba(255, 255, 255, .88); }
 
 .page-head-accent {
   position: absolute;
@@ -210,6 +235,8 @@ const kicker = props.kicker
   gap: 18px;
 }
 
+.page-content-actions { display: flex; justify-content: flex-end; }
+
 .page-shell--workspace .page-title {
   font-size: 24px;
 }
@@ -246,6 +273,8 @@ const kicker = props.kicker
   .page-head {
     padding: 18px;
   }
+
+  .page-head--scenic { min-height: 0; background-position: center; }
 
   .page-head-main {
     flex-direction: column;

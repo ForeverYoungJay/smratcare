@@ -50,7 +50,7 @@
       </div>
     </div>
 
-    <a-modal v-model:open="templateOpen" title="报表模板" @ok="saveTemplate" ok-text="保存模板" cancel-text="关闭">
+    <a-modal :mask-closable="false" v-model:open="templateOpen" title="报表模板" @ok="saveTemplate" ok-text="保存模板" cancel-text="关闭">
       <a-form layout="vertical">
         <a-form-item label="模板名称">
           <a-input v-model:value="templateForm.name" maxlength="24" placeholder="例如：院长周会打印版" />
@@ -92,7 +92,7 @@
       </a-checkbox-group>
     </a-modal>
 
-    <a-modal v-model:open="feedbackOpen" title="数据纠错" @ok="saveFeedback" ok-text="提交" cancel-text="取消">
+    <a-modal :mask-closable="false" v-model:open="feedbackOpen" title="数据纠错" @ok="saveFeedback" ok-text="提交" cancel-text="取消">
       <a-form layout="vertical">
         <a-form-item label="问题标题">
           <a-input v-model:value="feedbackForm.title" maxlength="40" placeholder="例如：某机构月收入异常偏低" />

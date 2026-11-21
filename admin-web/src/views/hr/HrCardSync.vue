@@ -1,5 +1,11 @@
 <template>
   <PageContainer title="一卡通数据对接" subTitle="考勤与班组 / 一卡通数据对接">
+    <template #extra>
+      <a-space>
+        <a-button @click="onExportCsv">导出 CSV</a-button>
+        <a-button @click="onExportExcel">导出 Excel</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="长者姓名(编号)" width="220px" />
@@ -7,15 +13,12 @@
       <a-form-item label="卡状态">
         <a-input v-model:value="query.status" placeholder="如 ACTIVE/INACTIVE" allow-clear />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="onExportCsv">导出 CSV</a-button>
-          <a-button @click="onExportExcel">导出 Excel</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
-    <DataTable rowKey="cardAccountId" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" :row-class-name="rowClassName" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData" rowKey="cardAccountId" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" :row-class-name="rowClassName" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'syncStatus'">
           <a-tag :color="record.syncStatus === 'SYNCED' ? 'green' : record.syncStatus === 'CARD_LOST' ? 'red' : 'orange'">

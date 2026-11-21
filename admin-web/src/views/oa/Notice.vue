@@ -1,5 +1,15 @@
 <template>
   <PageContainer title="公告管理" subTitle="公告发布与维护">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新增公告</a-button>
+      <a-button :disabled="!selectedSingleRecord || !isSelectedSingleDraft" @click="editSelected">编辑</a-button>
+      <a-button :disabled="!selectedSingleRecord || !isSelectedSingleDraft" @click="publishSelected">发布</a-button>
+      <a-button :disabled="selectedDraftCount === 0" @click="batchPublish">批量发布</a-button>
+      <a-button @click="downloadExport">导出CSV</a-button>
+      <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+      <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+      <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，批量发布仅对“草稿”生效</span>
+    </template>
     <template #meta>
       <span class="soft-pill">当前列表 {{ rows.length }} 条</span>
       <span class="soft-pill">已勾选 {{ selectedRowKeys.length }} 条</span>
@@ -16,7 +26,7 @@
         <div class="metric-card metric-card--success">
           <span class="metric-card__label">已发布</span>
           <strong class="metric-card__value">{{ publishedCount }}</strong>
-          <span class="metric-card__hint">面向员工可见的正式公告</span>
+          <span class="metric-card__hint">按接收对象发送的正式公告</span>
         </div>
         <div class="metric-card metric-card--warning">
           <span class="metric-card__label">草稿</span>
@@ -38,19 +48,12 @@
       <a-form-item label="状态">
         <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 160px" />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openCreate">新增公告</a-button>
-        <a-button :disabled="!selectedSingleRecord || !isSelectedSingleDraft" @click="editSelected">编辑</a-button>
-        <a-button :disabled="!selectedSingleRecord || !isSelectedSingleDraft" @click="publishSelected">发布</a-button>
-        <a-button :disabled="selectedDraftCount === 0" @click="batchPublish">批量发布</a-button>
-        <a-button @click="downloadExport">导出CSV</a-button>
-        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
-        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，批量发布仅对“草稿”生效</span>
-      </template>
+
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :row-selection="rowSelection"
       :columns="columns"
@@ -71,6 +74,12 @@
         <template v-if="column.key === 'publishTime'">
           {{ formatPublishTime(record.publishTime) }}
         </template>
+        <template v-else-if="column.key === 'title'">
+          <a @click="openDetail(record)">{{ record.title }}</a>
+          <a-tag v-if="record.status === 'PUBLISHED' && !record.readByMe && record.audience !== 'FAMILY'" color="red" style="margin-left: 6px">未读</a-tag>
+        </template>
+        <template v-else-if="column.key === 'audience'">{{ AUDIENCE_LABEL[record.audience || 'ALL'] }}</template>
+        <template v-else-if="column.key === 'reads'">{{ record.status === 'PUBLISHED' && record.audience !== 'FAMILY' ? `${record.readCount || 0} 人已读` : '—' }}</template>
         <template v-else-if="column.key === 'status'">
           <a-tag :color="record.status === 'PUBLISHED' ? 'green' : 'orange'">
             {{ record.status === 'PUBLISHED' ? '已发布' : '草稿' }}
@@ -79,7 +88,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" title="公告" @ok="submit" :confirm-loading="saving" width="640px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="公告" @ok="submit" :confirm-loading="saving" width="640px">
       <a-form layout="vertical">
         <a-form-item label="标题" required>
           <a-input v-model:value="form.title" />
@@ -87,11 +96,31 @@
         <a-form-item label="内容" required>
           <a-textarea v-model:value="form.content" :rows="4" />
         </a-form-item>
+        <a-form-item label="接收对象" extra="员工公告与家属通知分开发送；不得公开长者健康状况、身份证、手机号及财务信息">
+          <a-radio-group v-model:value="form.audience">
+            <a-radio value="STAFF">员工</a-radio>
+            <a-radio value="FAMILY">家属</a-radio>
+            <a-radio value="ALL">员工和家属</a-radio>
+          </a-radio-group>
+        </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="form.status" :options="statusOptions" />
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <a-drawer v-model:open="detailOpen" :title="detail?.title" width="560">
+      <p style="white-space: pre-wrap">{{ detail?.content }}</p>
+      <a-divider />
+      <template v-if="detail?.status === 'PUBLISHED' && detail?.audience !== 'FAMILY'">
+        <b>阅读回执：{{ reads.readCount }}{{ reads.targetCount != null ? ` / ${reads.targetCount} 人` : ' 人' }}</b>
+        <a-progress v-if="reads.targetCount" :percent="Math.round((reads.readCount / reads.targetCount) * 100)" size="small" />
+        <a-list size="small" :data-source="reads.readers" style="margin-top: 8px">
+          <template #renderItem="{ item }"><a-list-item>{{ item.staffName }} · {{ item.readAt }}</a-list-item></template>
+        </a-list>
+      </template>
+      <span v-else class="selection-tip">{{ detail?.audience === 'FAMILY' ? '家属通知的阅读情况在家属端统计' : '草稿未发布，暂无阅读回执' }}</span>
+    </a-drawer>
   </PageContainer>
 </template>
 
@@ -104,6 +133,8 @@ import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import {
   getNoticePage,
+  getNoticeReads,
+  markNoticeRead,
   createNotice,
   updateNotice,
   publishNotice,
@@ -124,12 +155,31 @@ const columns = [
   { title: '标题', dataIndex: 'title', key: 'title', width: 240 },
   { title: '发布人', dataIndex: 'publisherName', key: 'publisherName', width: 120 },
   { title: '发布时间', dataIndex: 'publishTime', key: 'publishTime', width: 160 },
+  { title: '接收对象', key: 'audience', width: 110 },
+  { title: '阅读', key: 'reads', width: 100 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 100 }
 ]
+const AUDIENCE_LABEL: Record<string, string> = { STAFF: '员工', FAMILY: '家属', ALL: '员工和家属' }
+const detailOpen = ref(false)
+const detail = ref<OaNotice>()
+const reads = ref<{ readCount: number; targetCount: number | null; readers: { staffName: string; readAt: string }[] }>({ readCount: 0, targetCount: null, readers: [] })
+
+async function openDetail(record: OaNotice) {
+  detail.value = record
+  detailOpen.value = true
+  reads.value = { readCount: 0, targetCount: null, readers: [] }
+  if (record.status !== 'PUBLISHED' || record.audience === 'FAMILY') return
+  if (!record.readByMe) {
+    await markNoticeRead(record.id)
+    record.readByMe = true
+  }
+  reads.value = await getNoticeReads(record.id)
+  record.readCount = reads.value.readCount
+}
 
 const editOpen = ref(false)
 const saving = ref(false)
-const form = reactive({ id: undefined as string | undefined, title: '', content: '', status: 'DRAFT' })
+const form = reactive({ id: undefined as string | undefined, title: '', content: '', status: 'DRAFT', audience: 'STAFF' })
 const statusOptions = [
   { label: '草稿', value: 'DRAFT' },
   { label: '已发布', value: 'PUBLISHED' }
@@ -204,6 +254,7 @@ function openCreate() {
   form.title = ''
   form.content = ''
   form.status = 'DRAFT'
+  form.audience = 'STAFF'
   editOpen.value = true
 }
 
@@ -212,6 +263,7 @@ function openEdit(record: OaNotice) {
   form.title = record.title
   form.content = record.content
   form.status = record.status || 'DRAFT'
+  form.audience = record.audience || 'ALL'
   editOpen.value = true
 }
 
@@ -224,7 +276,7 @@ async function submit() {
     message.warning('请填写公告内容')
     return
   }
-  const payload = { title: form.title, content: form.content, status: form.status }
+  const payload = { title: form.title, content: form.content, status: form.status, audience: form.audience }
   if (saving.value) return
   saving.value = true
   try {

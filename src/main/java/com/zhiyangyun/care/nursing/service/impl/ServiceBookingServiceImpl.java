@@ -1,5 +1,12 @@
 package com.zhiyangyun.care.nursing.service.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zhiyangyun.care.nursing.entity.ServicePlanRevision;
+import com.zhiyangyun.care.nursing.mapper.ServicePlanRevisionMapper;
+import java.util.ArrayList;
+import java.util.List;
+
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -33,9 +40,14 @@ public class ServiceBookingServiceImpl implements ServiceBookingService {
   private final ServicePlanMapper servicePlanMapper;
   private final ServiceItemMapper serviceItemMapper;
   private final StaffMapper staffMapper;
+  private final ServicePlanRevisionMapper revisionMapper;
+  private final ObjectMapper objectMapper;
 
   public ServiceBookingServiceImpl(ServiceBookingMapper serviceBookingMapper, ElderMapper elderMapper,
-      ServicePlanMapper servicePlanMapper, ServiceItemMapper serviceItemMapper, StaffMapper staffMapper) {
+      ServicePlanMapper servicePlanMapper, ServiceItemMapper serviceItemMapper, StaffMapper staffMapper,
+      ServicePlanRevisionMapper revisionMapper, ObjectMapper objectMapper) {
+    this.revisionMapper = revisionMapper;
+    this.objectMapper = objectMapper;
     this.serviceBookingMapper = serviceBookingMapper;
     this.elderMapper = elderMapper;
     this.servicePlanMapper = servicePlanMapper;
@@ -115,18 +127,51 @@ public class ServiceBookingServiceImpl implements ServiceBookingService {
     return resp;
   }
 
+  /**
+   * 当天生效的已发布计划。修改后待重新审核的计划（revision>1 且未发布）按上一次发布时的快照生成，
+   * 审核通过前不使用修改后的内容；从未发布过的新计划不生成。
+   */
+  List<ServicePlan> publishedPlansOn(Long tenantId, LocalDate date) {
+    List<ServicePlan> result = new ArrayList<>(servicePlanMapper.selectList(Wrappers.lambdaQuery(ServicePlan.class)
+        .eq(ServicePlan::getIsDeleted, 0)
+        .eq(tenantId != null, ServicePlan::getTenantId, tenantId)
+        .eq(ServicePlan::getApprovalStatus, "PUBLISHED")));
+    List<ServicePlan> revised = servicePlanMapper.selectList(Wrappers.lambdaQuery(ServicePlan.class)
+        .eq(ServicePlan::getIsDeleted, 0)
+        .eq(tenantId != null, ServicePlan::getTenantId, tenantId)
+        .ne(ServicePlan::getApprovalStatus, "PUBLISHED")
+        .gt(ServicePlan::getRevision, 1));
+    for (ServicePlan plan : revised) {
+      ServicePlanRevision last = revisionMapper.selectOne(Wrappers.lambdaQuery(ServicePlanRevision.class)
+          .eq(ServicePlanRevision::getPlanId, plan.getId())
+          .orderByDesc(ServicePlanRevision::getRevision)
+          .last("LIMIT 1"));
+      if (last == null || last.getSnapshotJson() == null) {
+        continue;
+      }
+      try {
+        ServicePlan snapshot = objectMapper.readValue(last.getSnapshotJson(), ServicePlan.class);
+        snapshot.setId(plan.getId());
+        snapshot.setTenantId(plan.getTenantId());
+        snapshot.setOrgId(plan.getOrgId());
+        result.add(snapshot);
+      } catch (JsonProcessingException ex) {
+        // 快照读不出来就跳过这条计划，不能拿未审核的内容替代
+      }
+    }
+    return result.stream()
+        .filter(p -> "ACTIVE".equals(p.getStatus()))
+        .filter(p -> p.getStartDate() != null && !p.getStartDate().isAfter(date))
+        .filter(p -> p.getEndDate() == null || !p.getEndDate().isBefore(date))
+        .toList();
+  }
+
   @Override
   public int generateFromPlans(Long tenantId, LocalDate date, boolean force) {
     if (date == null) {
       return 0;
     }
-    var wrapper = Wrappers.lambdaQuery(ServicePlan.class)
-        .eq(ServicePlan::getIsDeleted, 0)
-        .eq(tenantId != null, ServicePlan::getTenantId, tenantId)
-        .eq(ServicePlan::getStatus, "ACTIVE")
-        .le(ServicePlan::getStartDate, date)
-        .and(w -> w.isNull(ServicePlan::getEndDate).or().ge(ServicePlan::getEndDate, date));
-    var plans = servicePlanMapper.selectList(wrapper);
+    var plans = publishedPlansOn(tenantId, date);
 
     int created = 0;
     for (ServicePlan plan : plans) {

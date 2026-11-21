@@ -13,14 +13,16 @@
       <div style="display: flex; justify-content: flex-end; margin-bottom: 12px">
         <a-button type="primary" :loading="optionsLoading && createOpen" @click="openCreate">新增送餐计划</a-button>
       </div>
-      <a-row :gutter="12">
+      <a-row class="business-stat-strip" :gutter="12">
         <a-col :span="8"><a-statistic title="总任务" :value="summary.total" /></a-col>
         <a-col :span="8"><a-statistic title="已送达" :value="summary.delivered" /></a-col>
         <a-col :span="8"><a-statistic title="未送达" :value="summary.undelivered" /></a-col>
       </a-row>
     </a-card>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
           <a-tag :color="record.status === 'DELIVERED' ? 'green' : record.status === 'FAILED' ? 'red' : 'gold'">
@@ -40,7 +42,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="failOpen" title="标记送达失败" :confirm-loading="saving" @ok="submitFail">
+    <a-modal :mask-closable="false" v-model:open="failOpen" title="标记送达失败" :confirm-loading="saving" @ok="submitFail">
       <a-form layout="vertical">
         <a-form-item label="未送达原因" required>
           <a-textarea v-model:value="failForm.failureReason" :rows="3" maxlength="255" />
@@ -51,7 +53,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="redispatchOpen" title="重派送餐任务" :confirm-loading="saving" @ok="submitRedispatch">
+    <a-modal :mask-closable="false" v-model:open="redispatchOpen" title="重派送餐任务" :confirm-loading="saving" @ok="submitRedispatch">
       <a-form layout="vertical">
         <a-form-item label="重派时间">
           <a-date-picker v-model:value="redispatchForm.redispatchAt" show-time value-format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
@@ -65,7 +67,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="createOpen" title="新增送餐计划" :confirm-loading="creating" @ok="submitCreate">
+    <a-modal :mask-closable="false" v-model:open="createOpen" title="新增送餐计划" :confirm-loading="creating" @ok="submitCreate">
       <a-form layout="vertical">
         <a-alert
           v-if="!optionsLoading && mealOrders.length === 0"
@@ -112,6 +114,7 @@
 </template>
 
 <script setup lang="ts">
+import { useCompletionGuide } from '../../composables/useCompletionGuide'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
@@ -128,6 +131,7 @@ import {
 } from '../../api/dining'
 import type { DiningDeliveryArea, DiningDeliveryRecord, DiningMealOrder, PageResult } from '../../types'
 
+const showCompletion = useCompletionGuide()
 const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
@@ -404,6 +408,7 @@ async function submitCreate() {
     })
     createOpen.value = false
     message.success('送餐计划已创建')
+    showCompletion('送餐计划已创建', [{ label: '查看送餐任务', path: '/logistics/dining/delivery-plan' }])
     await fetchData()
   } catch (error: any) {
     message.error(error?.message || '新增送餐计划失败')

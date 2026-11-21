@@ -22,6 +22,7 @@ import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderChangeLogMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeApplyMapper;
+import com.zhiyangyun.care.elder.model.lifecycle.DischargeProgressRules;
 import com.zhiyangyun.care.elder.model.lifecycle.ResidenceLifecycleConstants;
 import com.zhiyangyun.care.elder.service.ElderLifecycleStateService;
 import com.zhiyangyun.care.elder.service.ElderOccupancyReadService;
@@ -390,6 +391,18 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     if (!Integer.valueOf(1).equals(current.getFrontdeskApproved())
         || !Integer.valueOf(1).equals(current.getNursingApproved())) {
       throw new IllegalStateException("需前台与护理部审核签字后，方可财务退款");
+    }
+    if (current.getDischargeApplyId() != null) {
+      DischargeProgressRules.assertReadyForRelease(elderDischargeApplyMapper.selectById(current.getDischargeApplyId()));
+    }
+    // 与直接办理出院同一规则：月账单未结清时不能退押金、释放床位
+    if (billMonthlyMapper.selectCount(Wrappers.lambdaQuery(BillMonthly.class)
+        .eq(BillMonthly::getIsDeleted, 0)
+        .eq(BillMonthly::getOrgId, orgId)
+        .eq(BillMonthly::getElderId, current.getElderId())
+        .ne(BillMonthly::getStatus, 9)
+        .gt(BillMonthly::getOutstandingAmount, BigDecimal.ZERO)) > 0) {
+      throw new IllegalStateException("存在未结清账单，请先收款后再办理退住退款");
     }
 
     int claimed = dischargeSettlementMapper.update(

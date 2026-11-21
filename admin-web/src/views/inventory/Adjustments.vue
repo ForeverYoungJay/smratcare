@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="盘点调整记录" subTitle="盘盈盘亏历史记录">
     <a-card class="card-elevated" :bordered="false">
-      <a-form layout="inline" :model="query" class="search-form">
+      <QueryBar layout="inline" :model="query" class="search-form" @finish="searchAll">
         <a-form-item label="商品">
           <a-select
             v-model:value="query.productId"
@@ -34,13 +34,15 @@
         <a-form-item label="日期">
           <a-range-picker v-model:value="query.range" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="searchAll">搜索</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" @click="searchAll">搜索</a-button>
+              <a-button @click="reset">重置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
@@ -100,7 +102,7 @@
       />
     </a-card>
 
-    <a-modal
+    <a-modal :mask-closable="false"
       v-model:open="createOpen"
       title="新增盘点记录"
       :confirm-loading="saving"
@@ -250,6 +252,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

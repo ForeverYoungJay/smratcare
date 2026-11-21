@@ -41,6 +41,11 @@ public class OaWorkReport {
   private String status;
 
   private Long reporterId;
+  private Long reviewerId;
+  private String reviewerName;
+  private String reviewComment;
+  private Integer reviewScore;
+  private java.time.LocalDateTime reviewedAt;
 
   private String reporterName;
 

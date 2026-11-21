@@ -1,627 +1,318 @@
 <template>
-  <PageContainer title="在院服务总览" subTitle="护理/膳食/医疗/活动/费用一体化视图">
+  <PageContainer
+    class="rm-page"
+    kicker="RESIDENT MANAGEMENT / 01"
+    title="长者工作台"
+    subTitle="全院在住动态、待办事项和一键办理入口"
+  >
     <template #extra>
       <a-space wrap>
-        <a-select
-          v-model:value="residentId"
-          style="width: 220px"
-          placeholder="选择长者"
-          show-search
-          :filter-option="false"
-          :options="residentOptions"
-          :loading="residentLoading"
-          @search="searchResidentOptions"
-          @focus="() => !residentOptions.length && searchResidentOptions('')"
-          @change="onResidentChange"
-        />
-        <a-switch v-model:checked="dutyMode" checked-children="值班模式" un-checked-children="普通模式" />
-        <a-switch v-model:checked="showWarningOnly" checked-children="仅预警" un-checked-children="全部" />
-        <a-switch v-model:checked="autoRefresh" checked-children="自动刷新" un-checked-children="手动刷新" />
-        <a-tag v-if="dutyMode" color="red">值班中：30秒自动刷新 + 仅预警</a-tag>
-        <a-tag v-if="lastLoadedAt" color="blue">更新于 {{ lastLoadedAt }}</a-tag>
-        <a-button @click="loadModules">立即刷新</a-button>
+        <span v-if="lastLoadedAt" class="rm-card__sub">更新于 {{ lastLoadedAt }}</span>
+        <a-button :loading="loading" @click="loadAll">刷新</a-button>
+        <a-button type="primary" @click="go('/elder/create')"><PlusOutlined />新增长者</a-button>
       </a-space>
     </template>
-    <template #stats>
-      <a-row :gutter="12">
-        <a-col :xs="8" :sm="8" :md="8"><a-statistic title="卡片总数" :value="baseModules.length" /></a-col>
-        <a-col :xs="8" :sm="8" :md="8"><a-statistic title="预警卡片" :value="alertCardCount" /></a-col>
-        <a-col :xs="8" :sm="8" :md="8"><a-statistic title="预警总量" :value="alertTotalCount" /></a-col>
-      </a-row>
-    </template>
-    <a-alert
-      v-if="lifecycleContext.active"
-      type="info"
-      show-icon
-      style="margin-bottom: 12px"
-      :message="lifecycleContext.message"
-    >
-      <template #description>
-        <a-space wrap>
-          <a-tag color="blue">场景：入住状态变更联动</a-tag>
-          <a-button size="small" type="link" @click="go('/elder/status-change')">返回状态变更中心</a-button>
-          <a-button size="small" type="link" @click="go('/oa/work-execution/task?source=lifecycle&scene=status-change&quick=overdue')">查看超时任务</a-button>
-        </a-space>
-      </template>
-    </a-alert>
-    <StatefulBlock :loading="loading" :error="errorMessage" :empty="!modules.length" empty-text="暂无在院服务数据" @retry="loadModules">
-      <a-row :gutter="16">
-        <a-col v-for="item in modules" :key="item.title" :xs="24" :sm="24" :lg="12" :xl="12" style="margin-bottom: 12px">
-          <a-card :title="item.title" :class="['card-elevated', { 'alert-card': item.alertCount > 0 }]" :bordered="false">
-            <template #extra>
-              <a-space size="small">
-                <a-tag :color="item.alertCount > 0 ? 'red' : item.tagColor">{{ item.tag }}</a-tag>
-                <a-badge v-if="item.dangerCount > 0" status="error" :text="`严重 ${item.dangerCount}`" />
-                <a-badge v-if="item.warningCount > 0" status="warning" :text="`一般 ${item.warningCount}`" />
-              </a-space>
-            </template>
-            <div class="desc">{{ item.desc }}</div>
-            <div
-              v-for="line in visibleLines(item)"
-              :key="`${item.key}-${line}`"
-              :class="['line-item', lineTypeClass(line), { clickable: !!resolveLinePath(item.key, line) }]"
-              @click="onLineClick(item.key, line)"
-            >
-              {{ line }}
+
+    <div class="rm-kpis">
+      <button type="button" class="rm-kpi" @click="go('/elder/list?lifecycleStatus=IN_HOSPITAL')">
+        <span class="rm-kpi__icon"><TeamOutlined /></span>
+        <span class="rm-kpi__label">当前在住</span>
+        <span class="rm-kpi__value">{{ show(summary?.inHospitalCount) }}<small>人</small></span>
+        <span class="rm-kpi__hint">今日入住 {{ show(admissionSummary?.todayAdmissionCount) }} 人</span>
+      </button>
+      <button type="button" class="rm-kpi" @click="go('/elder/admission-processing')">
+        <span class="rm-kpi__icon rm-kpi__icon--warning"><SolutionOutlined /></span>
+        <span class="rm-kpi__label">待办理入住</span>
+        <span class="rm-kpi__value">{{ show(admissionContractTotal) }}<small>人</small></span>
+        <span class="rm-kpi__hint">合同已到选床入住环节</span>
+      </button>
+      <button type="button" class="rm-kpi" @click="go('/elder/bed-panorama')">
+        <span class="rm-kpi__icon rm-kpi__icon--info"><HomeOutlined /></span>
+        <span class="rm-kpi__label">可用空床</span>
+        <span class="rm-kpi__value">{{ beds ? idleBeds : '--' }}<small>张</small></span>
+        <span class="rm-kpi__hint">共 {{ beds ? beds.length : '--' }} 张床位</span>
+      </button>
+      <div class="rm-kpi">
+        <span class="rm-kpi__icon rm-kpi__icon--danger"><AlertOutlined /></span>
+        <span class="rm-kpi__label">待处理提醒</span>
+        <span class="rm-kpi__value">{{ todosFailed ? '--' : todos.length }}<small>项</small></span>
+        <span class="rm-kpi__hint">其中紧急 {{ urgentCount }} 项</span>
+      </div>
+    </div>
+
+    <div class="rm-split">
+      <section class="rm-card">
+        <div class="rm-card__head">
+          <h3 class="rm-card__title">今日重点待办</h3>
+          <a-radio-group v-model:value="todoScope" size="small" button-style="solid" class="rm-card__extra">
+            <a-radio-button value="mine">我负责的 {{ mineCount }}</a-radio-button>
+            <a-radio-button value="all">全部 {{ allTodos.length }}</a-radio-button>
+          </a-radio-group>
+        </div>
+        <a-spin :spinning="loading">
+          <div v-for="item in todos.slice(0, TODO_LIMIT)" :key="item.id" class="rm-row">
+            <span :class="['todo-icon', `todo-icon--${TODO_LEVEL_META[item.level].tone}`]"><AlertOutlined /></span>
+            <div class="rm-row__main">
+              <span class="rm-row__title">{{ item.elderName || '--' }} · {{ item.title }}</span>
+              <span class="rm-row__meta">{{ todoMeta(item) }}</span>
             </div>
-            <div v-if="item.lines.length > 2" class="expand-link" @click="toggleExpand(item.key)">
-              {{ expandedCardKeys.includes(item.key) ? '收起详情' : `展开详情（+${item.lines.length - 2}）` }}
+            <span :class="['rm-pill', `rm-pill--${TODO_LEVEL_META[item.level].tone}`]">{{ TODO_LEVEL_META[item.level].text }}</span>
+            <button type="button" class="rm-link" @click="go(item.path)">去办理 →</button>
+          </div>
+          <a-empty v-if="!todos.length" :description="todosFailed ? '待办加载失败，请刷新重试' : '暂无待办'" />
+          <div v-if="todos.length > TODO_LIMIT" class="rm-card__sub todo-more">另有 {{ todos.length - TODO_LIMIT }} 项，请进入对应页面查看</div>
+        </a-spin>
+      </section>
+
+      <section class="rm-card">
+        <div class="rm-card__head">
+          <h3 class="rm-card__title">常用快捷操作</h3>
+        </div>
+        <div class="rm-actions">
+          <button v-for="action in quickActions" :key="action.label" type="button" class="rm-action" @click="go(action.path)">
+            <component :is="action.icon" />{{ action.label }}
+          </button>
+        </div>
+        <h4 class="rm-section-title status-title">长者在院状态</h4>
+        <div v-for="row in statusRows" :key="row.label" class="status-row" @click="go(row.path)">
+          <span :class="['status-dot', `status-dot--${row.tone}`]" />
+          <span class="status-label">{{ row.label }}</span>
+          <strong>{{ show(row.value) }} 人</strong>
+        </div>
+      </section>
+    </div>
+
+    <div class="rm-split rm-split--even">
+      <section class="rm-card">
+        <div class="rm-card__head">
+          <h3 class="rm-card__title">楼栋入住情况</h3>
+          <button type="button" class="rm-link rm-card__extra" @click="go('/elder/bed-panorama')">进入床位管理 →</button>
+        </div>
+        <div v-for="row in buildings" :key="row.building" class="building-row">
+          <div class="building-row__head">
+            <span><strong>{{ row.building }}</strong> <span class="rm-card__sub">{{ row.occupied }} / {{ row.total }} 床</span></span>
+            <strong class="building-row__rate">{{ row.rate }}%</strong>
+          </div>
+          <a-progress :percent="row.rate" :show-info="false" stroke-color="#21705f" />
+        </div>
+        <a-empty v-if="!buildings.length" :description="beds ? '暂无床位数据' : '床位数据不可用'" />
+      </section>
+
+      <section class="rm-card">
+        <div class="rm-card__head">
+          <h3 class="rm-card__title">最近办理记录</h3>
+          <button type="button" class="rm-link rm-card__extra" @click="go('/elder/change-log')">查看全部 →</button>
+        </div>
+        <a-timeline v-if="changeLogs.length">
+          <a-timeline-item v-for="log in changeLogs" :key="log.id" color="#21705f">
+            <div class="log-row">
+              <span class="rm-row__title">{{ log.elderName || '--' }} · {{ changeTypeText(log.changeType) }}</span>
+              <span class="rm-card__sub">{{ formatChineseDateTime(log.createTime, '--') }}</span>
             </div>
-            <a-space wrap style="margin-top: 12px">
-              <a-button v-for="action in item.actions" :key="action.label" :type="action.primary ? 'primary' : 'default'" @click="go(action.path)">
-                {{ action.label }}
-              </a-button>
-            </a-space>
-          </a-card>
-        </a-col>
-      </a-row>
-    </StatefulBlock>
+            <div class="rm-row__meta">{{ changeDetail(log) }}</div>
+          </a-timeline-item>
+        </a-timeline>
+        <a-empty v-else description="暂无办理记录" />
+      </section>
+    </div>
+
+    <div class="rm-note">数据与护理、医务、财务部门共享，按角色显示可操作范围；无权限的模块不显示数据。</div>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { message } from 'ant-design-vue'
+import {
+  AlertOutlined,
+  AuditOutlined,
+  HomeOutlined,
+  LogoutOutlined,
+  PlusOutlined,
+  SolutionOutlined,
+  SwapOutlined,
+  TeamOutlined
+} from '@ant-design/icons-vue'
 import PageContainer from '../../../components/PageContainer.vue'
-import StatefulBlock from '../../../components/StatefulBlock.vue'
-import { getElderDetail } from '../../../api/elder'
-import { getResidentOverview } from '../../../api/medicalCare'
-import { getContractLinkageByElder } from '../../../api/marketing'
-import { useElderOptions } from '../../../composables/useElderOptions'
+import { getElderWorkbenchTodos, getResidenceStatusSummary } from '../../../api/elderResidence'
+import { getAdmissionRecordSummary, getChangeLogs } from '../../../api/elderLifecycle'
+import { getBedMap } from '../../../api/bed'
+import { getContractPage } from '../../../api/marketing'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
 import { formatChineseDateTime } from '../../../utils/dateLocale'
-import type { ContractLinkageSummary, ElderItem, MedicalResidentOverview } from '../../../types'
+import type {
+  AdmissionRecordSummary,
+  BedItem,
+  ChangeLogItem,
+  ElderWorkbenchTodoItem,
+  ResidenceStatusSummary
+} from '../../../types'
+import {
+  TODO_LEVEL_META,
+  buildingOccupancy,
+  defaultTodoScope,
+  idleBedCount,
+  todosInScope,
+  type TodoScope
+} from './residentWorkbenchModel'
+import '../residentUi.css'
+
+const TODO_LIMIT = 8
 
 const router = useRouter()
 const route = useRoute()
-const residentId = ref('')
 const loading = ref(false)
-const errorMessage = ref('')
-const overview = ref<MedicalResidentOverview>()
-const contractLinkage = ref<ContractLinkageSummary>()
-const residentProfile = ref<ElderItem | null>(null)
-const expandedCardKeys = ref<string[]>([])
-const showWarningOnly = ref(false)
-const autoRefresh = ref(true)
-const dutyMode = ref(false)
 const lastLoadedAt = ref('')
-const { elderOptions: residentOptionPool, elderLoading: residentLoading, searchElders, ensureSelectedElder } = useElderOptions({
-  pageSize: 600,
-  preloadSize: 600,
-  inHospitalOnly: false,
-  signedOnly: false,
-  loadAll: true,
-  resultLimit: 0
-})
-const residentOptions = computed(() => {
-  const map = new Map<string, { label: string; value: string }>()
-  residentOptionPool.value.forEach((item) => {
-    const value = String(item.value || '').trim()
-    if (!value) return
-    const nextOption = {
-      label: String(item.label || '').trim(),
-      value
-    }
-    const current = map.get(value)
-    if (!current) {
-      map.set(value, nextOption)
-      return
-    }
-    const currentHasCode = /\([^)]*\)/.test(current.label)
-    const nextHasCode = /\([^)]*\)/.test(nextOption.label)
-    if (!currentHasCode && nextHasCode) {
-      map.set(value, nextOption)
-      return
-    }
-    if (nextOption.label.length > current.label.length) {
-      map.set(value, nextOption)
-    }
-  })
-  let options = Array.from(map.values())
-  const codedNameSet = new Set<string>()
-  options.forEach((option) => {
-    const nameKey = String(option.label || '').replace(/\s*\([^)]*\)\s*$/, '').trim()
-    if (!nameKey) return
-    if (/\([^)]*\)/.test(option.label)) {
-      codedNameSet.add(nameKey)
-    }
-  })
-  return options.filter((option) => {
-    const hasCode = /\([^)]*\)/.test(option.label)
-    if (hasCode) return true
-    const nameKey = String(option.label || '').replace(/\s*\([^)]*\)\s*$/, '').trim()
-    if (!nameKey) return true
-    return !codedNameSet.has(nameKey)
-  })
-})
-const selectedResidentOption = computed(() =>
-  residentOptions.value.find((item) => item.value === String(residentId.value || '').trim())
-)
-const selectedResidentName = computed(() => {
-  const option = selectedResidentOption.value
-  if (!option) return ''
-  return String(option.label || '').replace(/\s*\([^)]*\)\s*$/, '').trim()
-})
-const selectedResidentSourceLabel = computed(() => {
-  const sourceType = String(residentProfile.value?.sourceType || '').trim()
-  if (sourceType === 'HISTORICAL_IMPORT') return '历史补录'
-  if (sourceType === 'MARKETING_CONTRACT') return '合同流程'
-  return ''
-})
-const selectedResidentSourceColor = computed(() => {
-  if (selectedResidentSourceLabel.value === '历史补录') return 'gold'
-  if (selectedResidentSourceLabel.value === '合同流程') return 'blue'
-  return 'default'
-})
-const lifecycleContext = computed(() => {
-  const source = String(route.query.source || '').trim().toLowerCase()
-  const scene = String(route.query.scene || '').trim().toLowerCase()
-  const active = source === 'lifecycle' || scene === 'status-change'
-  return {
-    active,
-    message: active ? '当前总览由状态变更中心联动进入，可优先处理跨部门预警事项。' : ''
-  }
-})
-let refreshTimer: number | null = null
+const summary = ref<ResidenceStatusSummary>()
+const admissionSummary = ref<AdmissionRecordSummary>()
+const beds = ref<BedItem[]>()
+const changeLogs = ref<ChangeLogItem[]>([])
+const allTodos = ref<ElderWorkbenchTodoItem[]>([])
+const todosFailed = ref(false)
+const todoScope = ref<TodoScope>()
+const admissionContractTotal = ref<number>()
 
-const cardKeyOrder = [
-  'status-event',
-  'risk-level',
-  'care-execution',
-  'handover-communication',
-  'admission-contract',
-  'finance-account',
-  'medical-summary',
-  'service-package',
-  'dining-order',
-  'activity-album',
-  'family-feedback',
-  'docs-attachments'
+const todos = computed(() => todosInScope(allTodos.value, todoScope.value || 'all'))
+const mineCount = computed(() => allTodos.value.filter((item) => item.mine).length)
+const urgentCount = computed(() => todos.value.filter((item) => item.level === 'urgent').length)
+const idleBeds = computed(() => idleBedCount(beds.value || []))
+const buildings = computed(() => buildingOccupancy(beds.value || []))
+
+const quickActions = [
+  { label: '入住办理', icon: SolutionOutlined, path: '/elder/admission-processing' },
+  { label: '调床', icon: SwapOutlined, path: '/elder/bed-panorama' },
+  { label: '请假/住院', icon: LogoutOutlined, path: '/elder/bed-panorama' },
+  { label: '费用/退住', icon: AuditOutlined, path: '/elder/status-change/discharge-settlement' }
 ]
-const keyPriorityMap = cardKeyOrder.reduce<Record<string, number>>((acc, key, idx) => {
-  acc[key] = idx
-  return acc
-}, {})
 
-const baseModules = computed(() =>
-  [...(overview.value?.cards || [])]
-    .sort((a, b) => (keyPriorityMap[a.key] ?? 999) - (keyPriorityMap[b.key] ?? 999))
-    .map((card) => {
-      const lines = card.lines || []
-      const dangerCount = card.dangerCount ?? calcSeverityCount(lines, 'danger')
-      const warningCount = card.warningCount ?? calcSeverityCount(lines, 'warning')
-      return {
-        key: card.key,
-        title: card.title.replace(/^卡片\d+：/, ''),
-        desc: card.description || lines[0] || '暂无说明',
-        lines,
-        tag: card.tag,
-        tagColor: card.tagColor || 'blue',
-        actions: card.actions || [],
-        dangerCount,
-        warningCount,
-        alertCount: card.alertCount ?? dangerCount + warningCount
-      }
-    })
-)
-const modules = computed(() => {
-  if (!effectiveShowWarningOnly.value) return baseModules.value
-  return [...baseModules.value]
-    .filter((item) => item.alertCount > 0)
-    .sort((a, b) => {
-      if (b.dangerCount !== a.dangerCount) return b.dangerCount - a.dangerCount
-      if (b.warningCount !== a.warningCount) return b.warningCount - a.warningCount
-      if (b.alertCount !== a.alertCount) return b.alertCount - a.alertCount
-      return (keyPriorityMap[a.key] ?? 999) - (keyPriorityMap[b.key] ?? 999)
-    })
-})
-const alertCardCount = computed(() => baseModules.value.filter((item) => item.alertCount > 0).length)
-const alertTotalCount = computed(() => baseModules.value.reduce((sum, item) => sum + item.alertCount, 0))
-const effectiveShowWarningOnly = computed(() => dutyMode.value || showWarningOnly.value)
-const effectiveAutoRefresh = computed(() => dutyMode.value || autoRefresh.value)
-const refreshIntervalMs = computed(() => (dutyMode.value ? 30000 : 60000))
+const statusRows = computed(() => [
+  { label: '在院', value: summary.value?.inHospitalCount, tone: 'success', path: '/elder/list?lifecycleStatus=IN_HOSPITAL' },
+  { label: '外出请假', value: summary.value?.outingCount, tone: 'warning', path: '/elder/list?lifecycleStatus=OUTING' },
+  { label: '外出就医', value: summary.value?.medicalOutingCount, tone: 'info', path: '/elder/list?lifecycleStatus=MEDICAL_OUTING' },
+  { label: '待退住', value: summary.value?.dischargePendingCount, tone: 'danger', path: '/elder/list?lifecycleStatus=DISCHARGE_PENDING' },
+  { label: '试住', value: summary.value?.trialCount, tone: 'muted', path: '/elder/list?lifecycleStatus=TRIAL' }
+])
+
+const CHANGE_TYPE_TEXT: Record<string, string> = {
+  ADMISSION: '入住办理',
+  DISCHARGE: '退住办理',
+  BED_CHANGE: '床位变更',
+  STATUS_CHANGE: '状态变更',
+  ADMISSION_DATE_CHANGE: '入院日期变更',
+  CARE_LEVEL_CHANGE: '护理等级变更',
+  SOURCE_TYPE_CHANGE: '档案来源变更',
+  HISTORICAL_CONTRACT_FILE_CHANGE: '历史合同附件变更'
+}
+
+function changeTypeText(value?: string) {
+  return CHANGE_TYPE_TEXT[value || ''] || value || '--'
+}
+
+function changeDetail(log: ChangeLogItem) {
+  const diff = log.beforeValue || log.afterValue ? `${log.beforeValue || '--'} → ${log.afterValue || '--'}` : ''
+  return [diff, log.reason].filter(Boolean).join(' · ') || '--'
+}
+
+function todoMeta(item: ElderWorkbenchTodoItem) {
+  return [
+    item.departmentName && `责任部门 ${item.departmentName}`,
+    item.dueTime && `截止 ${formatChineseDateTime(item.dueTime, '--')}`,
+    item.ownerName && `负责人 ${item.ownerName}`,
+    item.detail
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
+
+function show(value?: number) {
+  return value ?? '--'
+}
+
 function go(path: string) {
-  const targetPath = appendResidentId(path)
-  forceScrollTop()
-  router.push(targetPath)
+  router.push(path)
 }
 
-function appendResidentId(path: string) {
-  const currentResidentId = String(residentId.value || '').trim()
-  const currentResidentName = selectedResidentName.value
-  let nextPath = path
-  if (currentResidentId && !/([?&])(residentId|elderId)=/.test(nextPath)) {
-    nextPath = nextPath.includes('?')
-      ? `${nextPath}&residentId=${encodeURIComponent(currentResidentId)}`
-      : `${nextPath}?residentId=${encodeURIComponent(currentResidentId)}`
-  }
-  if (currentResidentId && !/([?&])elderId=/.test(nextPath)) {
-    nextPath = nextPath.includes('?')
-      ? `${nextPath}&elderId=${encodeURIComponent(currentResidentId)}`
-      : `${nextPath}?elderId=${encodeURIComponent(currentResidentId)}`
-  }
-  if (currentResidentId && !/([?&])assessElderId=/.test(nextPath)) {
-    nextPath = nextPath.includes('?')
-      ? `${nextPath}&assessElderId=${encodeURIComponent(currentResidentId)}`
-      : `${nextPath}?assessElderId=${encodeURIComponent(currentResidentId)}`
-  }
-  if (currentResidentName && !/([?&])elderName=/.test(nextPath)) {
-    nextPath = nextPath.includes('?')
-      ? `${nextPath}&elderName=${encodeURIComponent(currentResidentName)}`
-      : `${nextPath}?elderName=${encodeURIComponent(currentResidentName)}`
-  }
-  return nextPath
-}
-
-function openResidentProfile() {
-  const currentResidentId = String(residentId.value || '').trim()
-  if (!currentResidentId) {
-    message.warning('请先选择长者')
-    return
-  }
-  forceScrollTop()
-  router.push(`/elder/detail/${encodeURIComponent(currentResidentId)}`)
-}
-
-function forceScrollTop() {
-  window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
-  const content = document.querySelector('.app-content') as HTMLElement | null
-  if (content) content.scrollTo({ top: 0, left: 0, behavior: 'auto' })
-}
-
-function lineTypeClass(line: string) {
-  if (/(待处理|未闭环|超时|欠费|缺失|异常|红色|预警)/.test(line)) return 'line-danger'
-  if (/(提醒|复评|建议|倒计时)/.test(line)) return 'line-warning'
-  return 'line-normal'
-}
-
-function parseLineCount(line: string) {
-  const nums = line.match(/\d+/g)
-  if (!nums) return 1
-  return nums.map((n) => Number(n)).reduce((sum, item) => sum + item, 0)
-}
-
-function calcSeverityCount(lines: string[], severity: 'danger' | 'warning') {
-  return lines.reduce((sum, line) => {
-    const isDanger = /(待处理|未闭环|超时|欠费|缺失|异常|红色|预警)/.test(line)
-    const isWarning = /(提醒|复评|建议|倒计时)/.test(line)
-    if (severity === 'danger' && isDanger) return sum + parseLineCount(line)
-    if (severity === 'warning' && isWarning && !isDanger) return sum + parseLineCount(line)
-    return sum
-  }, 0)
-}
-
-function visibleLines(item: { key: string; lines: string[] }) {
-  if (expandedCardKeys.value.includes(item.key)) return item.lines
-  return item.lines.slice(0, 2)
-}
-
-function toggleExpand(key: string) {
-  if (expandedCardKeys.value.includes(key)) {
-    expandedCardKeys.value = expandedCardKeys.value.filter((k) => k !== key)
-    return
-  }
-  expandedCardKeys.value = [...expandedCardKeys.value, key]
-}
-
-function resolveLinePath(cardKey: string, line: string) {
-  if (!residentId.value) return ''
-  if (cardKey === 'status-event' && line.startsWith('最近一次事件')) {
-    return `/elder/change-log?residentId=${residentId.value}&filter=latest`
-  }
-  if (cardKey === 'status-event' && line.startsWith('本月事件')) {
-    return `/elder/change-log?residentId=${residentId.value}&filter=this_month`
-  }
-  if (cardKey === 'status-event' && line.includes('外出超时')) {
-    return `/elder/change-log?residentId=${residentId.value}&filter=overdue`
-  }
-  if (cardKey === 'docs-attachments' && line.includes('缺失提醒')) {
-    return `/elder/contracts-invoices?residentId=${residentId.value}&tab=attachments`
-  }
-  if (cardKey === 'admission-contract' && line.includes('到期倒计时')) {
-    return `/elder/contracts-invoices?residentId=${residentId.value}`
-  }
-  return ''
-}
-
-function onLineClick(cardKey: string, line: string) {
-  const path = resolveLinePath(cardKey, line)
-  if (!path) return
-  go(path)
-}
-
-async function resolveResidentId() {
-  const fromRoute = String(route.query.residentId || route.query.elderId || '').trim()
-  const fromRouteName = String(route.query.elderName || '').trim()
-  if (fromRoute) {
-    residentId.value = fromRoute
-    ensureSelectedElder(fromRoute, fromRouteName || undefined)
-    return
-  }
-  if (residentOptions.value.length > 0) {
-    residentId.value = residentOptions.value[0].value
-    return
-  }
-  await searchResidentOptions('')
-  residentId.value = residentOptions.value[0]?.value || ''
-}
-
-async function searchResidentOptions(keyword = '') {
-  await searchElders(keyword)
-}
-
-function syncResidentToRoute() {
-  const nextQuery = buildResidentRouteQuery()
-  if (hasSameRouteQuery(nextQuery)) return
-  router.replace({
-    path: route.path,
-    query: nextQuery
-  })
-}
-
-function buildResidentRouteQuery() {
-  const nextResident = residentId.value.trim()
-  const nextResidentName = selectedResidentName.value
-  const nextWarning = showWarningOnly.value ? '1' : ''
-  const nextDuty = dutyMode.value ? '1' : ''
-  const nextAuto = autoRefresh.value ? '1' : '0'
-  const nextQuery: Record<string, any> = { ...route.query }
-  if (nextResident) nextQuery.residentId = nextResident
-  else delete nextQuery.residentId
-  delete nextQuery.elderId
-  if (nextResidentName) nextQuery.elderName = nextResidentName
-  else delete nextQuery.elderName
-  if (nextWarning) nextQuery.warning = nextWarning
-  else delete nextQuery.warning
-  if (nextDuty) nextQuery.duty = nextDuty
-  else delete nextQuery.duty
-  nextQuery.auto = nextAuto
-  return nextQuery
-}
-
-function flattenRouteQuery(source: Record<string, unknown>) {
-  return Object.entries(source || {}).reduce<Record<string, string>>((acc, [key, value]) => {
-    const text = Array.isArray(value) ? String(value[0] || '').trim() : String(value || '').trim()
-    if (!text) return acc
-    acc[key] = text
-    return acc
-  }, {})
-}
-
-function hasSameRouteQuery(nextQuery: Record<string, any>) {
-  const currentQuery = flattenRouteQuery(route.query as Record<string, unknown>)
-  const nextFlatten = flattenRouteQuery(nextQuery)
-  const currentKeys = Object.keys(currentQuery)
-  const nextKeys = Object.keys(nextFlatten)
-  if (currentKeys.length !== nextKeys.length) return false
-  return nextKeys.every((key) => currentQuery[key] === nextFlatten[key])
-}
-
-function onResidentChange() {
-  syncResidentToRoute()
-  loadModules()
-}
-
-function setupAutoRefresh() {
-  clearAutoRefresh()
-  if (!effectiveAutoRefresh.value) return
-  refreshTimer = window.setInterval(() => {
-    if (!loading.value && document.visibilityState === 'visible') loadModules()
-  }, refreshIntervalMs.value)
-}
-
-function clearAutoRefresh() {
-  if (refreshTimer !== null) {
-    window.clearInterval(refreshTimer)
-    refreshTimer = null
-  }
-}
-
-async function loadModules() {
+async function loadAll() {
   loading.value = true
-  errorMessage.value = ''
-  try {
-    await resolveResidentId()
-    const availableResidentIds = new Set((residentOptions.value || []).map((item) => String(item.value || '').trim()).filter(Boolean))
-    if (residentId.value.trim() && availableResidentIds.size > 0 && !availableResidentIds.has(residentId.value.trim())) {
-      residentId.value = residentOptions.value[0]?.value || ''
-      syncResidentToRoute()
-    }
-    if (!residentId.value.trim()) {
-      overview.value = undefined
-      contractLinkage.value = undefined
-      residentProfile.value = null
-      errorMessage.value = "暂无可用长者，请先创建长者档案"
-      return
-    }
-    const [overviewData, contractData, profileData] = await Promise.all([
-      getResidentOverview(residentId.value),
-      safeContractLinkageByElder(residentId.value),
-      safeElderDetail(residentId.value)
-    ])
-    overview.value = overviewData
-    contractLinkage.value = contractData
-    residentProfile.value = profileData
-    const generatedAt = String(overview.value?.generatedAt || '').trim()
-    lastLoadedAt.value = generatedAt ? formatChineseDateTime(generatedAt) : formatChineseDateTime(new Date())
-    expandedCardKeys.value = []
-  } catch (error: any) {
-    errorMessage.value = error?.message || '加载在院服务总览失败'
-    message.error(errorMessage.value)
-  } finally {
-    loading.value = false
-  }
+  // allSettled：某个接口无权限或失败时，其余卡片照常显示，失败的显示 --
+  // 一次取全部待办（含 mine 标记），「我负责的 / 全部」在页面切换，免得来回请求
+  const [summaryRes, admissionRes, bedRes, logRes, todoRes, contractRes] = await Promise.allSettled([
+    getResidenceStatusSummary(),
+    getAdmissionRecordSummary({}),
+    getBedMap(),
+    getChangeLogs({ pageNo: 1, pageSize: 6 }),
+    getElderWorkbenchTodos('all'),
+    getContractPage({ pageNo: 1, pageSize: 1, flowStage: 'PENDING_BED_SELECT' })
+  ])
+  summary.value = summaryRes.status === 'fulfilled' ? summaryRes.value : undefined
+  admissionSummary.value = admissionRes.status === 'fulfilled' ? admissionRes.value : undefined
+  beds.value = bedRes.status === 'fulfilled' ? bedRes.value || [] : undefined
+  changeLogs.value = logRes.status === 'fulfilled' ? logRes.value.list || [] : []
+  todosFailed.value = todoRes.status === 'rejected'
+  allTodos.value = todoRes.status === 'fulfilled' ? todoRes.value.items || [] : []
+  if (!todoScope.value && !todosFailed.value) todoScope.value = defaultTodoScope(allTodos.value)
+  admissionContractTotal.value = contractRes.status === 'fulfilled' ? contractRes.value.total : undefined
+  lastLoadedAt.value = formatChineseDateTime(new Date())
+  loading.value = false
 }
 
-async function safeContractLinkageByElder(elderId: string) {
-  try {
-    return await getContractLinkageByElder(elderId)
-  } catch {
-    return undefined
+onMounted(() => {
+  // 旧链接 ?residentId= 指向单个长者，转到一体化详情
+  const residentId = String(route.query.residentId || route.query.elderId || '').trim()
+  if (residentId) {
+    router.replace(`/elder/detail/${encodeURIComponent(residentId)}`)
+    return
   }
-}
-
-async function safeElderDetail(elderId: string) {
-  try {
-    return await getElderDetail(elderId)
-  } catch {
-    return null
-  }
-}
-
-onMounted(async () => {
-  try {
-    dutyMode.value = String(route.query.duty || '').trim() === '1'
-    showWarningOnly.value = String(route.query.warning || '').trim() === '1'
-    autoRefresh.value = String(route.query.auto || '').trim() !== '0'
-    const routeResident = String(route.query.residentId || route.query.elderId || '').trim()
-    if (routeResident) {
-      residentId.value = routeResident
-      const routeResidentName = String(route.query.elderName || '').trim()
-      ensureSelectedElder(routeResident, routeResidentName || undefined)
-    }
-    await searchResidentOptions('')
-    if (!residentId.value && residentOptions.value.length > 0) {
-      residentId.value = residentOptions.value[0].value
-      syncResidentToRoute()
-    }
-  } catch {
-    // ignore resident option init error
-  }
-  await loadModules()
-  syncResidentToRoute()
-  setupAutoRefresh()
+  loadAll()
 })
-
-watch(autoRefresh, () => {
-  syncResidentToRoute()
-  setupAutoRefresh()
-})
-watch(showWarningOnly, () => syncResidentToRoute())
-watch(dutyMode, (enabled) => {
-  if (enabled) {
-    showWarningOnly.value = true
-    autoRefresh.value = true
-  }
-  syncResidentToRoute()
-  setupAutoRefresh()
-})
-watch(
-  () => String(route.query.residentId || route.query.elderId || '').trim(),
-  (nextResident) => {
-    if (!nextResident || nextResident === residentId.value) return
-    residentId.value = nextResident
-    const nextResidentName = String(route.query.elderName || '').trim()
-    ensureSelectedElder(nextResident, nextResidentName || undefined)
-    loadModules()
-  }
-)
-watch(
-  () => String(route.query.warning || '').trim(),
-  (nextWarning) => {
-    const enabled = nextWarning === '1'
-    if (enabled === showWarningOnly.value) return
-    showWarningOnly.value = enabled
-  }
-)
-watch(
-  () => String(route.query.duty || '').trim(),
-  (nextDuty) => {
-    const enabled = nextDuty === '1'
-    if (enabled === dutyMode.value) return
-    dutyMode.value = enabled
-  }
-)
-watch(
-  () => String(route.query.auto || '').trim(),
-  (nextAuto) => {
-    const enabled = nextAuto === '0' ? false : true
-    if (enabled === autoRefresh.value) return
-    autoRefresh.value = enabled
-  }
-)
-onBeforeUnmount(() => clearAutoRefresh())
 
 useLiveSyncRefresh({
-  topics: ['elder', 'lifecycle', 'bed', 'care', 'health', 'dining', 'finance'],
+  topics: ['elder', 'lifecycle', 'bed'],
   refresh: () => {
-    if (!effectiveAutoRefresh.value || loading.value) return
-    loadModules().catch(() => {})
+    if (!loading.value) loadAll()
   },
   debounceMs: 1000
 })
 </script>
 
 <style scoped>
-.desc {
-  color: var(--muted);
-  line-height: 1.65;
-  min-height: 30px;
-  font-size: 13px;
-}
+.rm-split + .rm-split { margin-top: 16px; }
+.rm-split--even { grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); }
 
-.line-item {
-  margin-top: 6px;
-  line-height: 1.65;
-  font-size: 13px;
-  word-break: break-all;
-}
-
-.line-normal {
-  color: var(--ink-soft);
-}
-
-.line-warning {
-  color: var(--warning);
-}
-
-.line-danger {
-  color: var(--danger);
-  font-weight: 600;
-}
-
-.clickable {
-  cursor: pointer;
-  text-decoration: underline;
-  text-decoration-style: dashed;
-  text-underline-offset: 2px;
-}
-
-.expand-link {
-  margin-top: 8px;
-  color: var(--info);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-:deep(.alert-card .ant-card-head-title) {
-  color: var(--danger);
-}
-
-:deep(.alert-card .ant-card-body) {
-  border: 1px solid rgba(var(--danger-rgb), 0.4);
+.todo-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
   border-radius: 8px;
-  background: linear-gradient(180deg, rgba(var(--danger-rgb), 0.08) 0%, #fff 56%);
+  background: var(--rm-green-soft);
+  color: var(--rm-green);
 }
+.todo-icon--danger { background: #fff1f0; color: var(--rm-danger); }
+.todo-icon--warning { background: #fff5e1; color: var(--rm-warning); }
+.todo-icon--info { background: #e8f0fc; color: var(--rm-info); }
+.todo-more { padding-top: 10px; }
+
+.status-title { margin-top: 20px; }
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  cursor: pointer;
+}
+.status-row:hover .status-label { color: var(--rm-green); }
+.status-label { flex: 1; color: var(--rm-muted); }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #c4ccc9; }
+.status-dot--success { background: var(--rm-green); }
+.status-dot--warning { background: var(--rm-warning); }
+.status-dot--info { background: var(--rm-info); }
+.status-dot--danger { background: var(--rm-danger); }
+
+.building-row + .building-row { margin-top: 10px; }
+.building-row__head { display: flex; justify-content: space-between; align-items: baseline; }
+.building-row__rate { color: var(--rm-green-dark); }
+
+.log-row { display: flex; justify-content: space-between; gap: 12px; }
 </style>

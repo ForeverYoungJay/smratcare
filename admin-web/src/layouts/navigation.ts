@@ -5,51 +5,34 @@ import {
   ApartmentOutlined,
   AccountBookOutlined,
   AlertOutlined,
+  AuditOutlined,
   BarChartOutlined,
+  CheckSquareOutlined,
   DatabaseOutlined,
   FireOutlined,
+  GlobalOutlined,
   HomeOutlined,
   MedicineBoxOutlined,
+  ScheduleOutlined,
   SafetyCertificateOutlined,
   SettingOutlined,
   TeamOutlined,
-  ToolOutlined
+  ToolOutlined,
+  UserOutlined
 } from '@ant-design/icons-vue'
 import type { MenuItem } from './menu'
 
-export type NavSectionKey = 'entry' | 'care' | 'operations' | 'compliance' | 'support' | 'system'
+export type NavSectionKey = 'command' | 'entry' | 'care' | 'operations' | 'compliance' | 'support' | 'system'
 
+/** 分区顺序即侧栏顺序：运营中心（数字孪生大屏）置顶，其次个人办公（我的工作台、待办、考勤等），业务在后 */
 export const NAV_SECTION_LABELS: Record<NavSectionKey, string> = {
-  entry: '工作入口',
+  command: '运营中心',
+  entry: '个人办公',
   care: '长者服务',
   operations: '经营运营',
-  compliance: '安全与监管',
   support: '行政后勤',
+  compliance: '安全与监管',
   system: '系统配置'
-}
-
-type NavMeta = {
-  section: NavSectionKey
-  order: number
-  pinned?: boolean
-}
-
-export const routeNavMeta: Record<string, NavMeta> = {
-  '/portal': { section: 'entry', order: 10, pinned: true },
-  '/function-map': { section: 'entry', order: 15, pinned: true },
-  '/workbench': { section: 'entry', order: 20, pinned: true },
-  '/elder': { section: 'care', order: 30, pinned: true },
-  '/medical-care': { section: 'care', order: 40, pinned: true },
-  '/marketing': { section: 'operations', order: 50, pinned: true },
-  '/finance': { section: 'operations', order: 60, pinned: true },
-  '/stats': { section: 'operations', order: 70, pinned: true },
-  '/fire': { section: 'compliance', order: 80, pinned: true },
-  '/ltci': { section: 'compliance', order: 85, pinned: true },
-  '/logistics': { section: 'support', order: 90, pinned: true },
-  '/oa': { section: 'support', order: 100, pinned: true },
-  '/hr': { section: 'support', order: 110, pinned: true },
-  '/base-config': { section: 'system', order: 120, pinned: true },
-  '/system': { section: 'system', order: 130, pinned: true }
 }
 
 const iconRegistry = {
@@ -59,22 +42,20 @@ const iconRegistry = {
   MedicineBoxOutlined,
   AccountBookOutlined,
   BarChartOutlined,
+  CheckSquareOutlined,
+  AuditOutlined,
+  ScheduleOutlined,
+  UserOutlined,
+  AlertOutlined,
   ApartmentOutlined,
   ToolOutlined,
   DatabaseOutlined,
   SettingOutlined,
   SafetyCertificateOutlined,
+  GlobalOutlined,
   SafetyOutlined: FireOutlined,
   FundProjectionScreenOutlined: AlertOutlined
 } as const
-
-function normalizeMenuPath(item: MenuItem) {
-  if (item.path) return item.path
-  if (item.children?.length) {
-    return normalizeMenuPath(item.children[0])
-  }
-  return item.key
-}
 
 function resolveIconNode(iconName?: string) {
   if (!iconName) return undefined
@@ -98,14 +79,11 @@ export function buildGroupedMenuItems(items: MenuItem[]): ItemType[] {
   ;(Object.keys(NAV_SECTION_LABELS) as NavSectionKey[]).forEach((key) => grouped.set(key, []))
 
   const sortedItems = [...items].sort((left, right) => {
-    const leftMeta = routeNavMeta[normalizeMenuPath(left)] || { section: 'support' as NavSectionKey, order: 999 }
-    const rightMeta = routeNavMeta[normalizeMenuPath(right)] || { section: 'support' as NavSectionKey, order: 999 }
-    return leftMeta.order - rightMeta.order
+    return (left.navOrder ?? 999) - (right.navOrder ?? 999)
   })
 
   sortedItems.forEach((item) => {
-    const meta = routeNavMeta[normalizeMenuPath(item)] || { section: 'support' as NavSectionKey, order: 999 }
-    grouped.get(meta.section)?.push(item)
+    grouped.get(item.navSection || 'support')?.push(item)
   })
 
   return (Object.keys(NAV_SECTION_LABELS) as NavSectionKey[])
@@ -121,4 +99,3 @@ export function buildGroupedMenuItems(items: MenuItem[]): ItemType[] {
     })
     .filter(Boolean) as ItemType[]
 }
-

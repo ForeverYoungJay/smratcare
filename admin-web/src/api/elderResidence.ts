@@ -132,3 +132,11 @@ export function exportDischargeApply(params: DischargeApplyQuery) {
 export function getResidenceStatusSummary(config?: Record<string, any>) {
   return request.get<ResidenceStatusSummary>('/api/elder/lifecycle/status-summary', config)
 }
+
+export function completeDischargeStep(id: Id, step: import('../types').DischargeProgressStep) {
+  return request.put<DischargeApplyItem>(`/api/elder/lifecycle/discharge-apply/${id}/progress`, { step })
+}
+
+export function getElderWorkbenchTodos(scope: 'mine' | 'all') {
+  return request.get<import('../types').ElderWorkbenchTodoSummary>('/api/elder/workbench/todos', { params: { scope } })
+}

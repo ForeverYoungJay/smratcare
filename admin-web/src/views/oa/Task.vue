@@ -1,5 +1,23 @@
 <template>
   <PageContainer title="日程与任务" subTitle="任务列表与日历视图联动">
+    <template #extra>
+      <a-space wrap>
+        <a-button type="primary" @click="openCreate">新增任务</a-button>
+        <a-button @click="openCalendarView">查看日历</a-button>
+        <a-button @click="downloadExport">导出CSV</a-button>
+        <a-divider type="vertical" />
+        <span class="action-group-title">单条操作</span>
+        <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="editSelected">编辑</a-button>
+        <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="doneSelected">完成</a-button>
+        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+        <a-divider type="vertical" />
+        <span class="action-group-title">批量操作</span>
+        <a-button :disabled="selectedOpenCount === 0" @click="batchDone">批量完成</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+        <a-tag color="blue">已勾选 {{ selectedRowKeys.length }} 条</a-tag>
+        <span class="selection-tip">批量完成仅对进行中生效</span>
+      </a-space>
+    </template>
     <a-tabs v-model:activeKey="activeKey">
       <a-tab-pane key="list" tab="任务列表">
         <SearchForm :model="query" @search="fetchData" @reset="onReset">
@@ -12,24 +30,7 @@
           <a-form-item label="自动刷新">
             <a-switch v-model:checked="autoRefresh" />
           </a-form-item>
-          <template #extra>
-            <a-space wrap>
-              <a-button type="primary" @click="openCreate">新增任务</a-button>
-              <a-button @click="openCalendarView">查看日历</a-button>
-              <a-button @click="downloadExport">导出CSV</a-button>
-              <a-divider type="vertical" />
-              <span class="action-group-title">单条操作</span>
-              <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="editSelected">编辑</a-button>
-              <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="doneSelected">完成</a-button>
-              <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
-              <a-divider type="vertical" />
-              <span class="action-group-title">批量操作</span>
-              <a-button :disabled="selectedOpenCount === 0" @click="batchDone">批量完成</a-button>
-              <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
-              <a-tag color="blue">已勾选 {{ selectedRowKeys.length }} 条</a-tag>
-              <span class="selection-tip">批量完成仅对进行中生效</span>
-            </a-space>
-          </template>
+
         </SearchForm>
 
         <a-alert
@@ -49,7 +50,7 @@
         </a-alert>
 
         <StatefulBlock :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
-          <a-row :gutter="[12, 12]" style="margin-bottom: 12px">
+          <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 12px">
             <a-col :xs="12" :lg="4">
               <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'total' }" :bordered="false" size="small" @click="applySummaryFilter('total')">
                 <a-statistic title="总任务" :value="summary.totalCount || 0" />
@@ -97,6 +98,8 @@
 
         <StatefulBlock :loading="loading" :error="tableError" :empty="!loading && !tableError && rows.length === 0" empty-text="暂无任务记录" @retry="fetchData">
           <DataTable
+            :filter-model="query"
+            @clear-filters="fetchData"
             rowKey="id"
             :row-selection="rowSelection"
             :columns="columns"
@@ -107,8 +110,8 @@
           >
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'status'">
-                <a-tag :color="record.status === 'DONE' ? 'green' : 'orange'">
-                  {{ record.status === 'DONE' ? '已完成' : '进行中' }}
+                <a-tag :color="record.status === 'DONE' ? 'green' : record.status === 'SUBMITTED' ? 'blue' : 'orange'">
+                  {{ record.status === 'DONE' ? '已完成' : record.status === 'SUBMITTED' ? '待验收' : '进行中' }}
                 </a-tag>
               </template>
               <template v-else-if="column.key === 'priority'">
@@ -131,6 +134,9 @@
           </DataTable>
         </StatefulBlock>
       </a-tab-pane>
+      <a-tab-pane key="kanban" tab="任务看板">
+        <TaskKanban v-if="activeKey === 'kanban'" @edit="openEdit" @changed="fetchData" />
+      </a-tab-pane>
       <a-tab-pane key="calendar" tab="日历视图">
         <a-card class="card-elevated" :bordered="false">
           <div class="calendar-toolbar">
@@ -145,7 +151,7 @@
       </a-tab-pane>
     </a-tabs>
 
-    <a-modal v-model:open="editOpen" title="任务" @ok="submit" :confirm-loading="saving" width="760px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="任务" @ok="submit" :confirm-loading="saving" width="760px">
       <a-form layout="vertical">
         <a-form-item label="任务标题" required>
           <a-input v-model:value="form.title" placeholder="请输入任务标题" />
@@ -261,6 +267,7 @@
 </template>
 
 <script setup lang="ts">
+import TaskKanban from './TaskKanban.vue'
 import { reactive, ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
@@ -354,6 +361,7 @@ const form = reactive({
 
 const statusOptions = [
   { label: '进行中', value: 'OPEN' },
+  { label: '待验收', value: 'SUBMITTED' },
   { label: '已完成', value: 'DONE' }
 ]
 const editableStatusOptions = [{ label: '进行中', value: 'OPEN' }]
@@ -590,7 +598,7 @@ function resolveRouteQuickFilter(routeQuick: string, routeCategory: string) {
 
 function applyRoutePreset() {
   const status = firstRouteQueryText(route.query.status).toUpperCase()
-  query.status = status === 'OPEN' || status === 'DONE' ? status : undefined
+  query.status = status === 'OPEN' || status === 'SUBMITTED' || status === 'DONE' ? status : undefined
   query.keyword = firstRouteQueryText(route.query.keyword)
   const auto = firstRouteQueryText(route.query.auto).toLowerCase()
   if (auto === '0' || auto === 'false') autoRefresh.value = false

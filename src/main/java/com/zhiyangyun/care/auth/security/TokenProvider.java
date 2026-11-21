@@ -16,6 +16,8 @@ public class TokenProvider {
   /** 令牌类型声明：2FA 挑战令牌（不可作为正式访问令牌使用）。 */
   public static final String CLAIM_TOKEN_TYPE = "tokenType";
   public static final String TOKEN_TYPE_2FA_CHALLENGE = "2FA_CHALLENGE";
+  /** 使用默认密码登录后签发：只能用于设置新密码，不能访问业务接口。 */
+  public static final String TOKEN_TYPE_PASSWORD_CHANGE = "PASSWORD_CHANGE";
   /** 2FA 挑战令牌有效期（分钟）。 */
   public static final long TWO_FACTOR_CHALLENGE_MINUTES = 5;
 
@@ -62,6 +64,10 @@ public class TokenProvider {
 
   /** 生成 2FA 挑战令牌：仅用于换取短信验证码校验，不能作为访问令牌（JwtAuthenticationFilter 会拒绝）。 */
   public String generateChallengeToken(Long staffId, String username, Long orgId) {
+    return generateChallengeToken(staffId, username, orgId, TOKEN_TYPE_2FA_CHALLENGE);
+  }
+
+  public String generateChallengeToken(Long staffId, String username, Long orgId, String tokenType) {
     long now = System.currentTimeMillis();
     long expMillis = now + TWO_FACTOR_CHALLENGE_MINUTES * 60 * 1000;
     return Jwts.builder()
@@ -69,7 +75,7 @@ public class TokenProvider {
         .setId(UUID.randomUUID().toString())
         .claim("username", username)
         .claim("orgId", orgId)
-        .claim(CLAIM_TOKEN_TYPE, TOKEN_TYPE_2FA_CHALLENGE)
+        .claim(CLAIM_TOKEN_TYPE, tokenType)
         .setIssuedAt(new Date(now))
         .setExpiration(new Date(expMillis))
         .signWith(key, SignatureAlgorithm.HS256)

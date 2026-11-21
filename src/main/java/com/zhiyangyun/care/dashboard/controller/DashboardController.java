@@ -17,7 +17,6 @@ import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeMapper;
-import com.zhiyangyun.care.elder.model.ElderLifecycleStatus;
 import com.zhiyangyun.care.elder.service.ElderOccupancyReadService;
 import com.zhiyangyun.care.entity.CareTaskDaily;
 import com.zhiyangyun.care.mapper.CareTaskDailyMapper;
@@ -225,7 +224,8 @@ public class DashboardController {
                 .select(ElderProfile::getId)
                 .eq(ElderProfile::getIsDeleted, 0)
                 .eq(orgId != null, ElderProfile::getOrgId, orgId)
-                .eq(ElderProfile::getLifecycleStatus, ElderLifecycleStatus.IN_HOSPITAL))
+                // 与在住人数同口径：待退住、外出等仍占床，只看 status=1
+                .eq(ElderProfile::getStatus, 1))
         .stream()
         .map(ElderProfile::getId)
         .filter(java.util.Objects::nonNull)

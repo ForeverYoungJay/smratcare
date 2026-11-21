@@ -420,9 +420,10 @@ public class OaApprovalController {
         && !"MATERIAL_APPLY".equals(normalized)
         && !"OFFICIAL_SEAL".equals(normalized)
         && !"SHIFT_CHANGE".equals(normalized)
+        && !"PROFILE_CHANGE".equals(normalized)
         && !"MARKETING_PLAN".equals(normalized)) {
       throw new IllegalArgumentException(
-          "approvalType 仅支持 LEAVE/OVERTIME/REIMBURSE/PURCHASE/INCOME_PROOF/BANK_CARD/POINTS_CASH/MATERIAL_APPLY/OFFICIAL_SEAL/SHIFT_CHANGE/MARKETING_PLAN");
+          "approvalType 仅支持 LEAVE/OVERTIME/REIMBURSE/PURCHASE/INCOME_PROOF/BANK_CARD/POINTS_CASH/MATERIAL_APPLY/OFFICIAL_SEAL/SHIFT_CHANGE/PROFILE_CHANGE/MARKETING_PLAN");
     }
     return normalized;
   }
@@ -465,6 +466,13 @@ public class OaApprovalController {
 
   private String safe(Object value) {
     return value == null ? "" : String.valueOf(value);
+  }
+
+  private String boundedText(String value, int maxLength) {
+    if (value == null || value.length() <= maxLength) {
+      return value;
+    }
+    return value.substring(0, maxLength);
   }
 
   private String formatDateTime(LocalDateTime value) {
@@ -928,7 +936,7 @@ public class OaApprovalController {
     todo.setStatus("OPEN");
     todo.setDueTime(resolveApprovalTodoDueTime(approval));
     todo.setAssigneeId(assigneeId);
-    todo.setAssigneeName(approverName);
+    todo.setAssigneeName(boundedText(approverName, 64));
     if (todo.getId() == null) {
       todoMapper.insert(todo);
     } else {

@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="待办事项" subTitle="个人待办管理">
+  <PageContainer title="我的待办" subTitle="个人待办、待我审批与我发起的申请；超时事项优先处理">
     <template #meta>
       <span class="soft-pill">总待办 {{ summary.totalCount || 0 }}</span>
       <span class="selection-pill">已勾选 {{ selectedRowKeys.length }} 条</span>
@@ -7,6 +7,7 @@
       <span v-for="tag in activeFilterTags" :key="tag" class="selection-pill">{{ tag }}</span>
     </template>
 
+    <TodoOverviewPanel :summary="summary" :refresh-key="refreshKey" @filter="applyStatusFilter" @create="openCreate" />
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="标题/内容/负责人" allow-clear style="width: 240px" />
@@ -29,6 +30,9 @@
           <span class="action-group-title">单条操作</span>
           <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="editSelected">编辑</a-button>
           <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="doneSelected">完成</a-button>
+          <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="followUp?.openTransfer(selectedSingleRecord!)">转交</a-button>
+          <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="followUp?.urge(selectedSingleRecord!)">催办</a-button>
+          <a-button :disabled="!selectedSingleRecord" @click="followUp?.openHistory(selectedSingleRecord!)">处理历史</a-button>
           <a-select v-model:value="snoozeDays" style="width: 110px">
             <a-select-option :value="1">延后1天</a-select-option>
             <a-select-option :value="3">延后3天</a-select-option>
@@ -113,7 +117,7 @@
           普通待办
         </a-tag>
       </a-space>
-      <a-row :gutter="[12, 12]" style="margin-bottom: 12px">
+      <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 12px">
         <a-col :xs="12" :lg="3">
           <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'total' }" :bordered="false" size="small" @click="applySummaryFilter('total')">
             <a-statistic title="总待办" :value="summary.totalCount || 0" />
@@ -171,6 +175,8 @@
 
     <StatefulBlock :loading="loading" :error="tableError" :empty="!loading && !tableError && rows.length === 0" empty-text="暂无待办记录" @retry="fetchData">
       <DataTable
+        :filter-model="query"
+        @clear-filters="fetchData"
         rowKey="id"
         :row-selection="rowSelection"
         :columns="columns"
@@ -195,17 +201,18 @@
           </template>
           <template v-else-if="column.key === 'sourceType'">
             <a-space size="small">
-              <a-tag v-if="isApprovalTodo(record)" color="blue">审批流</a-tag>
+              <a-tag v-if="todoSource(record)" :color="todoSource(record)?.color">{{ todoSource(record)?.label }}</a-tag>
               <a-tag v-else-if="isBirthdayReminder(record)" color="magenta">生日提醒</a-tag>
               <a-tag v-else color="default">普通待办</a-tag>
-              <a-button v-if="isApprovalTodo(record)" type="link" size="small" @click="openApprovalFromTodo(record)">查看审批</a-button>
+              <span v-if="todoSource(record)" class="source-no">{{ todoSource(record)?.sourceNo }}</span>
+              <a-button v-if="todoSource(record)" type="link" size="small" @click="openTodoSource(record)">查看来源</a-button>
             </a-space>
           </template>
         </template>
       </DataTable>
     </StatefulBlock>
 
-    <a-modal v-model:open="editOpen" title="待办" @ok="submit" :confirm-loading="saving" width="760px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="待办" @ok="submit" :confirm-loading="saving" width="760px">
       <a-form layout="vertical">
         <a-form-item label="标题" required>
           <a-input v-model:value="form.title" placeholder="请输入待办标题" />
@@ -286,10 +293,13 @@
         </a-form-item>
       </a-form>
     </a-modal>
+    <TodoFollowUp ref="followUp" @changed="fetchData" />
   </PageContainer>
 </template>
 
 <script setup lang="ts">
+import TodoOverviewPanel from './TodoOverviewPanel.vue'
+import TodoFollowUp from './TodoFollowUp.vue'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
@@ -318,6 +328,7 @@ import {
 } from '../../api/oa'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { useUserStore } from '../../stores/user'
+import { resolveTodoSource } from '../../utils/todoSource'
 import type { OaTodo, OaTodoSummary, PageResult } from '../../types'
 import type { SelectProps } from 'ant-design-vue'
 
@@ -338,6 +349,14 @@ const query = reactive({
   pageSize: 10
 })
 const autoRefresh = ref(true)
+const refreshKey = ref(0)
+
+/** 顶部数字卡片点击：切换列表的状态筛选（全部 / 待处理 / 已完成） */
+function applyStatusFilter(status: string) {
+  query.status = status || undefined
+  query.pageNo = 1
+  fetchData()
+}
 const AUTO_REFRESH_INTERVAL_MS = 60 * 1000
 let autoRefreshTimer: number | undefined
 const activeSummaryFilter = ref<'total' | 'open' | 'done' | 'approval' | 'birthday' | 'normal' | 'dueToday' | 'overdue' | 'unassigned'>('total')
@@ -464,6 +483,7 @@ const rowSelection = computed(() => ({
   }
 }))
 const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.id))))
+const followUp = ref<InstanceType<typeof TodoFollowUp>>()
 const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
 const isSelectedSingleOpen = computed(() => selectedSingleRecord.value?.status === 'OPEN')
 const isSelectedBirthdayReminder = computed(() => {
@@ -501,6 +521,7 @@ const policyForm = reactive({
 })
 
 async function fetchData() {
+  refreshKey.value += 1
   loading.value = true
   summaryLoading.value = true
   tableError.value = ''
@@ -773,14 +794,8 @@ function isBirthdayReminder(todo: OaTodo) {
   return String(todo?.content || '').includes('[BIRTHDAY_REMINDER:')
 }
 
-function isApprovalTodo(todo: OaTodo) {
-  return String(todo?.content || '').includes('[APPROVAL_FLOW:')
-}
-
-function parseApprovalIdFromTodo(todo: OaTodo) {
-  const content = String(todo?.content || '')
-  const match = content.match(/\[APPROVAL_FLOW:([0-9]+)\]/)
-  return match ? match[1] : ''
+function todoSource(todo: OaTodo) {
+  return resolveTodoSource(todo?.content)
 }
 
 function isOverdueTodo(todo: OaTodo) {
@@ -851,13 +866,9 @@ function decodeTodoMeta(rawContent: string) {
   }
 }
 
-function openApprovalFromTodo(todo: OaTodo) {
-  const approvalId = parseApprovalIdFromTodo(todo)
-  if (!approvalId) {
-    message.warning('未识别审批单ID')
-    return
-  }
-  router.push({ path: '/oa/approval', query: { focusId: approvalId } })
+function openTodoSource(todo: OaTodo) {
+  const source = todoSource(todo)
+  if (source) router.push({ path: source.path, query: source.query })
 }
 
 function openEdit(record: OaTodo) {

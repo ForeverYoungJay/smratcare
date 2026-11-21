@@ -1,12 +1,12 @@
-import type { RouteLocationRaw } from 'vue-router'
+import type { LocationQueryRaw, RouteLocationRaw } from 'vue-router'
 
-function compactQuery(input: Record<string, unknown>) {
+function compactQuery(input: Record<string, unknown>): LocationQueryRaw {
   return Object.fromEntries(
     Object.entries(input).filter(([, value]) => value !== undefined && value !== null && String(value) !== '')
-  )
+  ) as LocationQueryRaw
 }
 
-export function getReportCacheQuery(cacheKey: string): Record<string, unknown> {
+export function getReportCacheQuery(cacheKey: string): LocationQueryRaw {
   try {
     const raw = localStorage.getItem(`marketing-report:${cacheKey}`)
     if (!raw) return {}

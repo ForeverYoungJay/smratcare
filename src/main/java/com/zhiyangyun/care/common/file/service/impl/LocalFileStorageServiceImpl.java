@@ -10,6 +10,10 @@ import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import java.util.HexFormat;
+import java.util.Optional;
+import java.security.MessageDigest;
+import java.io.InputStream;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -143,6 +147,28 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         || normalized.contains("executable")) {
       throw new IllegalArgumentException("文件内容类型不支持");
     }
+  }
+
+  @Override
+  public Optional<String> sha256(String fileUrl) {
+    if (fileUrl == null || fileUrl.isBlank()) return Optional.empty();
+    String url = fileUrl.trim();
+    String publicBase = properties.getPublicBaseUrl();
+    for (String prefix : new String[] {publicBase == null ? null : publicBase.trim().replaceAll("/+$", ""), normalizePrefix(properties.getUrlPrefix())}) {
+      if (prefix == null || prefix.isBlank() || !url.startsWith(prefix + "/")) continue;
+      Path baseDir = Paths.get(properties.getBaseDir()).toAbsolutePath().normalize();
+      Path target = baseDir.resolve(url.substring(prefix.length() + 1)).normalize();
+      if (!target.startsWith(baseDir) || !Files.isRegularFile(target)) return Optional.empty();
+      try (InputStream in = Files.newInputStream(target)) {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] buffer = new byte[8192];
+        for (int read; (read = in.read(buffer)) > 0; ) digest.update(buffer, 0, read);
+        return Optional.of(HexFormat.of().formatHex(digest.digest()));
+      } catch (Exception ex) {
+        return Optional.empty();
+      }
+    }
+    return Optional.empty();
   }
 
   private void ensureSafePath(Path baseDir, Path target) {

@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="不明渠道统计" sub-title="渠道缺失与非标准来源监控">
     <MarketingQuickNav parent-path="/marketing/reports" />
-    <a-row :gutter="16">
+    <a-row class="business-stat-strip" :gutter="16">
       <a-col :xs="24" :sm="8">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic title="缺失来源线索数" :value="quality.missingSourceCount" />
@@ -21,11 +21,11 @@
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px">
       <MarketingListToolbar :tip="`不明渠道共 ${quality.missingSourceCount} 条`">
-        <a-space>
+        <ActionToolbar>
           <a-button type="primary" @click="loadData">刷新</a-button>
           <a-button @click="goUnknownLeads">去渠道不明客户池</a-button>
           <a-button @click="goChannelReport">去渠道评估</a-button>
-        </a-space>
+        </ActionToolbar>
       </MarketingListToolbar>
       <a-table :columns="columns" :data-source="rows" :pagination="false" row-key="source">
         <template #bodyCell="{ column, record }">
@@ -41,6 +41,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from "../../../components/ActionToolbar.vue"
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../../components/PageContainer.vue'

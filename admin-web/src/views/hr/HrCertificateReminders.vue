@@ -1,5 +1,11 @@
 <template>
   <PageContainer title="证书到期提醒" subTitle="培训与发展 / 证书到期提醒">
+    <template #extra>
+      <a-space>
+        <a-button @click="onExportCsv">导出 CSV</a-button>
+        <a-button @click="onExportExcel">导出 Excel</a-button>
+      </a-space>
+    </template>
     <template #stats>
       <div class="certificate-summary">
         <div class="summary-card summary-card--danger">
@@ -35,15 +41,12 @@
       <a-form-item label="包含已过期">
         <a-switch v-model:checked="query.includeExpired" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="onExportCsv">导出 CSV</a-button>
-          <a-button @click="onExportExcel">导出 Excel</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"

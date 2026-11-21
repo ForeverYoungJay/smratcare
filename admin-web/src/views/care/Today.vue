@@ -3,7 +3,7 @@
     <template #extra>
       <a-space wrap>
         <a-button @click="exportCsvData">导出CSV</a-button>
-        <a-button type="primary" @click="openAction">新增/派发任务</a-button>
+        <a-button v-if="canManage" type="primary" @click="openAction">新增/派发任务</a-button>
       </a-space>
     </template>
 
@@ -11,7 +11,7 @@
       <a-form-item label="日期范围">
         <a-range-picker v-model:value="query.range" />
       </a-form-item>
-      <a-form-item label="护工">
+      <a-form-item v-if="canManage" label="护工">
         <a-select
           v-model:value="query.staffId"
           show-search
@@ -65,7 +65,8 @@
         </button>
         <div class="metric-chip metric-chip--static">
           <span class="metric-chip__label">完成率</span>
-          <strong class="metric-chip__value">{{ pct(summary.completionRate) }}</strong>
+          <!-- 没有任务时完成率不是 0%，而是“无从谈起”，显示 0% 会被误读成全员失职 -->
+          <strong class="metric-chip__value">{{ summary.totalCount ? pct(summary.completionRate) : '—' }}</strong>
         </div>
         <div class="metric-strip__hint">
           <a-tag v-if="activeMetric !== 'total'" color="processing" closable @close.prevent="clearMetricFilter">
@@ -74,6 +75,19 @@
           <span v-else>统计基于当前查询条件，点击指标可快速过滤任务列表</span>
         </div>
       </div>
+
+      <a-alert
+        v-if="loadError"
+        class="care-load-error"
+        type="error"
+        show-icon
+        :message="loadError"
+        description="列表已清空，避免把上一次的数据当成最新数据。请检查网络后重试。"
+      >
+        <template #action>
+          <a-button size="small" @click="search">重新加载</a-button>
+        </template>
+      </a-alert>
 
       <vxe-table
         border
@@ -106,12 +120,13 @@
             </a-space>
           </template>
         </vxe-column>
-        <vxe-column title="操作" width="200" fixed="right">
+        <vxe-column title="操作" width="240" fixed="right">
           <template #default="{ row }">
             <div class="row-action-links">
               <a-button type="link" size="small" @click="openDetail(row)">详情</a-button>
-              <a-button type="link" size="small" @click="openAssign(row)">派发</a-button>
-              <a-button type="link" size="small" @click="openReview(row)">评价</a-button>
+              <a-button v-if="row.status !== 'DONE'" type="link" size="small" @click="openExecute(row)">执行</a-button>
+              <a-button v-if="canManage" type="link" size="small" @click="openAssign(row)">派发</a-button>
+              <a-button v-if="canManage" type="link" size="small" @click="openReview(row)">评价</a-button>
             </div>
           </template>
         </vxe-column>
@@ -153,7 +168,7 @@
         :data-source="filteredExecuteLogs"
         :columns="logColumns"
         :loading="logsLoading"
-        :locale="{ emptyText: '暂无执行日志' }"
+        :locale="{ emptyText: logsError || '暂无执行日志' }"
         row-key="id"
         size="small"
         :pagination="false"
@@ -177,7 +192,9 @@
       </a-table>
     </a-drawer>
 
-    <a-modal v-model:open="assignOpen" title="派发任务" @ok="submitAssign" :confirm-loading="assigning">
+    <TaskExecuteDrawer v-model:open="executeOpen" :task="executeTarget" @done="search" />
+
+    <a-modal :mask-closable="false" v-model:open="assignOpen" title="派发任务" @ok="submitAssign" :confirm-loading="assigning">
       <a-form layout="vertical" ref="assignFormRef" :model="assignForm" :rules="assignRules">
         <a-form-item label="任务" name="taskDailyId">
           <a-input v-model:value="assignForm.taskDailyId" disabled />
@@ -193,11 +210,16 @@
         </a-form-item>
         <a-form-item label="覆盖已分配">
           <a-switch v-model:checked="assignForm.force" />
+          <div class="hint-text">
+            {{ assignForm.force
+              ? '开启后：该任务若已分配给其他护工，会被改派到上面选中的人。'
+              : '关闭时：该任务若已分配给其他护工，本次派发不会覆盖。' }}
+          </div>
         </a-form-item>
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="reviewOpen" title="任务评价" @ok="submitReview" :confirm-loading="reviewing">
+    <a-modal :mask-closable="false" v-model:open="reviewOpen" title="任务评价" @ok="submitReview" :confirm-loading="reviewing">
       <a-form layout="vertical" ref="reviewFormRef" :model="reviewForm" :rules="reviewRules">
         <a-form-item label="任务" name="taskDailyId">
           <a-input v-model:value="reviewForm.taskDailyId" disabled />
@@ -226,7 +248,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="actionOpen" title="新增/派发任务" :width="720" @ok="submitAction" :confirm-loading="actionLoading">
+    <a-modal :mask-closable="false" v-model:open="actionOpen" title="新增/派发任务" :width="720" @ok="submitAction" :confirm-loading="actionLoading">
       <a-steps :current="actionStep" size="small" class="stepbar">
         <a-step title="选择方式" />
         <a-step title="填写条件" />
@@ -344,6 +366,11 @@
           </a-form-item>
           <a-form-item label="覆盖已分配">
             <a-switch v-model:checked="batchForm.force" />
+            <div class="hint-text">
+              {{ batchForm.force
+                ? '开启后：命中条件的任务即使已分配给其他护工，也会被改派。'
+                : '关闭时：只派发尚未分配的任务，已有负责人的任务保持不变。' }}
+            </div>
           </a-form-item>
         </a-form>
       </div>
@@ -424,6 +451,7 @@ import {
 } from '../../api/care'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { useStaffOptions } from '../../composables/useStaffOptions'
+import { useUserStore } from '../../stores/user'
 import type {
   CareTaskItem,
   CareExecuteLogItem,
@@ -436,19 +464,25 @@ import type {
 } from '../../types'
 import { exportCsv } from '../../utils/export'
 import { resolveCareError } from './careError'
+import TaskExecuteDrawer from './center/TaskExecuteDrawer.vue'
 import { careTodayLogExportColumns, careTodayTaskExportColumns, mapCareExportRows } from '../../constants/careExport'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const tasks = ref<CareTaskItem[]>([])
 const loading = ref(false)
+const loadError = ref('')
 const detailOpen = ref(false)
 const current = ref<CareTaskItem | null>(null)
 const executeLogs = ref<CareExecuteLogItem[]>([])
 const logsLoading = ref(false)
+const logsError = ref('')
 const logResultFilter = ref<'ALL' | 'SUCCESS' | 'FAIL'>('ALL')
 const assignOpen = ref(false)
 const reviewOpen = ref(false)
+const executeOpen = ref(false)
+const executeTarget = ref<CareTaskItem | null>(null)
 const assigning = ref(false)
 const reviewing = ref(false)
 const assignFormRef = ref()
@@ -456,7 +490,8 @@ const reviewFormRef = ref()
 const batchFormRef = ref()
 const generateFormRef = ref()
 const createFormRef = ref()
-const templateOptions = ref<{ label: string; value: number }[]>([])
+// 模板 id 是超过 JS 安全整数的雪花 id，全程按字符串处理，不能 Number()
+const templateOptions = ref<{ label: string; value: string }[]>([])
 const actionOpen = ref(false)
 const actionStep = ref(0)
 const actionMode = ref<'generate' | 'create' | 'batch'>('generate')
@@ -483,9 +518,13 @@ const summary = reactive<CareTaskSummary>({
   exceptionRate: 0
 })
 const activeMetric = ref<'total' | 'pending' | 'done' | 'exception' | 'overdue'>('total')
+const canManage = computed(() => (userStore.roles || []).some((role) =>
+  ['NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'].includes(String(role || '').toUpperCase())))
 
 const query = reactive({
-  range: [dayjs().subtract(1, 'day'), dayjs().add(1, 'day')] as any,
+  // 页面叫「今日护理任务」，默认范围就得是今日；
+  // 原来默认昨天到明天，标题和实际口径对不上
+  range: [dayjs(), dayjs()] as any,
   staffId: undefined as number | undefined,
   elderId: undefined as number | undefined,
   roomNo: '',
@@ -525,13 +564,14 @@ const reviewerOptions = [
   { label: '老人', value: 'ELDER' }
 ]
 
-const assignForm = reactive<CareTaskAssignRequest>({ taskDailyId: 0, staffId: 0, force: true })
+// force 默认关闭：默认开启会让新人在改派时静默抢走别人已接下的任务
+const assignForm = reactive<CareTaskAssignRequest>({ taskDailyId: 0, staffId: 0, force: false })
 const batchForm = reactive<CareTaskBatchAssignRequest>({
   staffId: 0,
   range: [dayjs(), dayjs()] as any,
   elderId: undefined as any,
   taskKeyword: '',
-  force: true
+  force: false
 } as any)
 const reviewForm = reactive<CareTaskReviewRequest>({
   taskDailyId: 0,
@@ -543,7 +583,7 @@ const reviewForm = reactive<CareTaskReviewRequest>({
 const generateForm = reactive({ date: dayjs(), force: false })
 const createForm = reactive<any>({
   elderId: '' as Id | '',
-  templateId: 0,
+  templateId: undefined as string | undefined,
   taskName: '',
   custom: false,
   multiDay: false,
@@ -607,7 +647,7 @@ const actionModeLabel = computed(() => {
 })
 
 const templateLabel = computed(() => {
-  const current = templateOptions.value.find((t) => t.value === Number(createForm.templateId))
+  const current = templateOptions.value.find((t) => t.value === String(createForm.templateId))
   return current?.label || '未选择模板'
 })
 
@@ -646,8 +686,22 @@ function statusColor(status?: string) {
   }
 }
 
+const EMPTY_SUMMARY = {
+  totalCount: 0,
+  pendingCount: 0,
+  doneCount: 0,
+  exceptionCount: 0,
+  overdueCount: 0,
+  suspiciousCount: 0,
+  assignedCount: 0,
+  unassignedCount: 0,
+  completionRate: 0,
+  exceptionRate: 0
+}
+
 async function search() {
   loading.value = true
+  loadError.value = ''
   try {
     const trimmedKeyword = query.keyword?.trim() || ''
     const trimmedRoomNo = query.roomNo?.trim() || ''
@@ -684,21 +738,21 @@ async function search() {
       return acc
     }, {} as Record<number, string>)
     staffMap.value = { ...staffMap.value, ...taskStaffMap }
-    Object.assign(summary, {
-      totalCount: 0,
-      pendingCount: 0,
-      doneCount: 0,
-      exceptionCount: 0,
-      overdueCount: 0,
-      suspiciousCount: 0,
-      assignedCount: 0,
-      unassignedCount: 0,
-      completionRate: 0,
-      exceptionRate: 0
-    }, summaryRes || {})
+    // 后端把计数字段返回成字符串（"totalCount":"0"），直接判真假会把 "0" 当成有数据。
+    // 在入口处统一转成数字，页面里就不用每处都记得转。
+    const numericSummary = Object.fromEntries(
+      Object.entries(summaryRes || {}).map(([key, value]) => [key, Number(value) || 0])
+    )
+    Object.assign(summary, EMPTY_SUMMARY, numericSummary)
     query.keyword = trimmedKeyword
     query.roomNo = trimmedRoomNo
     query.careLevel = trimmedCareLevel
+  } catch (error: any) {
+    // 加载失败必须清空：留着上一次的任务和指标，护工会以为那就是今天的任务
+    loadError.value = error?.message || '任务列表加载失败，请稍后重试'
+    tasks.value = []
+    page.total = 0
+    Object.assign(summary, EMPTY_SUMMARY)
   } finally {
     loading.value = false
   }
@@ -880,18 +934,27 @@ async function loadExecuteLogs(taskDailyId?: number) {
     return
   }
   executeLogs.value = []
+  logsError.value = ''
   logsLoading.value = true
   try {
     executeLogs.value = await getTaskExecuteLogs(taskDailyId)
+  } catch (error: any) {
+    // 加载失败以前会显示成“暂无执行日志”，把故障伪装成没数据
+    logsError.value = error?.message || '执行日志加载失败，请稍后重试'
   } finally {
     logsLoading.value = false
   }
 }
 
+function openExecute(row: CareTaskItem) {
+  executeTarget.value = row
+  executeOpen.value = true
+}
+
 function openAssign(row: CareTaskItem) {
   assignForm.taskDailyId = row.taskDailyId
   assignForm.staffId = row.staffId || 0
-  assignForm.force = true
+  assignForm.force = false
   assignOpen.value = true
 }
 
@@ -907,7 +970,7 @@ function openReview(row: CareTaskItem) {
 
 function openCreate() {
   createForm.elderId = ''
-  createForm.templateId = 0
+  createForm.templateId = undefined
   createForm.taskName = ''
   createForm.custom = false
   createForm.multiDay = false
@@ -931,7 +994,7 @@ function openBatchAssign() {
   batchForm.building = ''
   batchForm.careLevel = ''
   batchForm.status = undefined
-  batchForm.force = true
+  batchForm.force = false
 }
 
 function openAction() {
@@ -1030,7 +1093,7 @@ async function submitAction() {
       for (const targetDate of createDates) {
         await createTask({
           elderId: createForm.elderId as Id,
-          templateId: createForm.custom ? undefined : Number(createForm.templateId),
+          templateId: createForm.custom ? undefined : createForm.templateId,
           taskName: createForm.custom ? createForm.taskName : undefined,
           planTime: buildPlanTimeForDate(targetDate),
           staffId: createForm.staffId ? Number(createForm.staffId) : undefined
@@ -1068,7 +1131,7 @@ async function submitAction() {
 async function loadTemplates() {
   try {
     const res = await getTemplatePage({ pageNo: 1, pageSize: 200 })
-    templateOptions.value = res.list.map((t) => ({ label: t.taskName, value: t.id }))
+    templateOptions.value = res.list.map((t) => ({ label: t.taskName, value: String(t.id) }))
   } catch (error) {
     message.error(resolveCareError(error, '加载模板失败'))
     templateOptions.value = []

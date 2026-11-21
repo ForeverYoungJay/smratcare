@@ -1,12 +1,12 @@
 <template>
   <PageContainer title="员工宿舍房态图" subTitle="宿舍楼栋分层图 / 员工床位占用、空床补齐与待分配可视化">
     <div class="map-shell">
-      <section class="hero-panel">
-        <div>
-          <p class="eyebrow">宿舍全景</p>
-          <h2>把宿舍基础配置和员工入住信息合并成完整房态图</h2>
+      <section class="hero-panel business-overview">
+        <details class="business-help">
+          <summary>使用说明</summary>
+          <p class="business-help-title">把宿舍基础配置和员工入住信息合并成完整房态图</p>
           <p class="hero-copy">已配置的宿舍房间会完整展示标准床位，未住满的房间自动补齐空床位；待分配、冲突和超配房间也会在同一张图上高亮显示。</p>
-        </div>
+        </details>
         <div class="hero-actions">
           <a-button type="primary" size="large" @click="router.push('/hr/expense/dormitory')">返回宿舍台账</a-button>
           <a-button size="large" @click="openDrawer()">新增住宿安排</a-button>
@@ -55,7 +55,7 @@
         </template>
       </SearchForm>
 
-      <a-row :gutter="[12, 12]" class="overview-cards">
+      <a-row :gutter="[12, 12]" class="overview-cards business-stat-strip">
         <a-col :xs="12" :md="6">
           <a-card size="small"><a-statistic title="楼栋" :value="buildingCount" /></a-card>
         </a-col>

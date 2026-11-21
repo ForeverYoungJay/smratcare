@@ -517,7 +517,7 @@ public class MedicalCareWorkbenchController {
           "order-pending",
           "推进待执行医嘱",
           "聚焦未执行医嘱，减少医嘱滞后和用药延迟。",
-          "/medical-care/orders?status=PENDING",
+          "/medical-care/order-risk-overview?status=PENDING",
           "HIGH",
           medicationPending);
     }
@@ -950,7 +950,7 @@ public class MedicalCareWorkbenchController {
   private String buildUnifiedTaskRoute(String module, Long residentId, Long sourceId, String status) {
     String route;
     if ("ORDER".equalsIgnoreCase(module)) {
-      route = "/medical-care/orders?filter=to_execute";
+      route = "/medical-care/order-risk-overview?filter=to_execute";
       route = appendQueryParam(route, "elderId", residentId);
       return route;
     }

@@ -1,5 +1,15 @@
 <template>
   <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
+    <template #extra>
+      <a-space>
+        <a-button type="primary" @click="openRedeem">积分兑现金</a-button>
+        <a-button @click="fetchData">刷新</a-button>
+      </a-space>
+    </template>
+    <div class="hr-scene-switch" style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <label :for="'Performance-scene'">办理事项</label>
+      <a-select id="Performance-scene" :value="performanceScene" :options="[{ value: 'reports', label: '全部绩效' }, { value: 'nursing', label: '护理绩效' }, { value: 'sales', label: '销售绩效' }, { value: 'admin', label: '行政绩效' }, { value: 'generation', label: '绩效生成' }]" style="width:220px" @change="switchScene" />
+    </div>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="员工">
         <a-select
@@ -24,16 +34,11 @@
       <a-form-item label="排序">
         <a-select v-model:value="query.sortBy" :options="sortOptions" style="width: 150px" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button type="primary" @click="openRedeem">积分兑现金</a-button>
-          <a-button @click="fetchData">刷新</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <a-card :bordered="false" class="card-elevated" style="margin-bottom: 16px">
-      <a-row :gutter="16">
+      <a-row class="business-stat-strip" :gutter="16">
         <a-col :xs="12" :lg="3"><a-statistic title="任务量" :value="summary.taskCount" /></a-col>
         <a-col :xs="12" :lg="3"><a-statistic title="完成" :value="summary.successCount" /></a-col>
         <a-col :xs="12" :lg="3"><a-statistic title="失败" :value="summary.failCount" /></a-col>
@@ -69,7 +74,9 @@
       </a-col>
     </a-row>
 
-    <DataTable rowKey="rankNo" :columns="columns" :data-source="ranks" :loading="loading" :pagination="false">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData" rowKey="rankNo" :columns="columns" :data-source="ranks" :loading="loading" :pagination="false">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'rankNo'">
           <a-tag :color="record.rankNo <= 3 ? 'gold' : 'default'">#{{ record.rankNo }}</a-tag>
@@ -102,7 +109,7 @@
       </a-table>
     </a-card>
 
-    <a-modal v-model:open="redeemOpen" title="积分兑现金申请" @ok="submitRedeem" :confirm-loading="redeeming" width="520px">
+    <a-modal :mask-closable="false" v-model:open="redeemOpen" title="积分兑现金申请" @ok="submitRedeem" :confirm-loading="redeeming" width="520px">
       <a-form layout="vertical">
         <a-alert
           show-icon
@@ -140,7 +147,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import type { Dayjs } from 'dayjs'
 import { message } from 'ant-design-vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -151,7 +158,11 @@ import { useUserStore } from '../../stores/user'
 import type { StaffPerformanceRankItem, StaffPerformanceSummary, PageResult } from '../../types'
 
 const userStore = useUserStore()
+function switchScene(scene: string) {
+  router.replace({ path: route.path, query: { ...route.query, scene }, hash: route.hash })
+}
 const route = useRoute()
+const router = useRouter()
 
 const performanceScene = computed<'nursing' | 'sales' | 'admin' | 'generation' | 'reports'>(() => {
   const queryScene = String(route.query.scene || '').trim()

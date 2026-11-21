@@ -2,7 +2,7 @@
   <PageContainer :title="title" :subTitle="description">
     <a-card :bordered="false" class="card-elevated">
       <StatefulBlock :loading="loading" :error="errorMessage" @retry="loadSummary">
-        <a-row :gutter="[12, 12]">
+        <a-row class="business-stat-strip" :gutter="[12, 12]">
           <a-col :xs="12" :lg="6">
             <a-statistic title="待办总量" :value="summary.openTodoCount || 0" />
           </a-col>
@@ -17,18 +17,19 @@
           </a-col>
         </a-row>
         <a-divider />
-        <a-space wrap>
+        <ActionToolbar wrap>
           <a-button type="primary" @click="go('/workbench')">返回工作台</a-button>
           <a-button @click="go('/workbench/todo')">查看待办</a-button>
           <a-button @click="go('/oa/approval')">查看审批</a-button>
           <a-button @click="go('/dashboard')">查看看板</a-button>
-        </a-space>
+        </ActionToolbar>
       </StatefulBlock>
     </a-card>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from "../../components/ActionToolbar.vue"
 import { onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'

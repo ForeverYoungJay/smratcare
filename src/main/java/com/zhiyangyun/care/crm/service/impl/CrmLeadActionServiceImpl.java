@@ -18,6 +18,7 @@ import com.zhiyangyun.care.crm.model.action.CrmCallbackPlanResponse;
 import com.zhiyangyun.care.crm.model.action.CrmContractAttachmentRequest;
 import com.zhiyangyun.care.crm.model.action.CrmContractAttachmentResponse;
 import com.zhiyangyun.care.crm.model.action.CrmLeadBatchDeleteRequest;
+import com.zhiyangyun.care.crm.model.action.CrmLeadFollowupRequest;
 import com.zhiyangyun.care.crm.model.action.CrmLeadBatchStatusRequest;
 import com.zhiyangyun.care.crm.model.action.CrmSmsTaskCreateRequest;
 import com.zhiyangyun.care.crm.model.action.CrmSmsTaskResponse;
@@ -32,6 +33,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -221,6 +224,22 @@ public class CrmLeadActionServiceImpl implements CrmLeadActionService {
   }
 
   @Override
+  public Map<Long, List<CrmCallbackPlanResponse>> listCallbackPlans(Long tenantId, List<Long> leadIds) {
+    if (leadIds == null || leadIds.isEmpty()) return Map.of();
+    List<Long> normalizedIds = leadIds.stream().filter(java.util.Objects::nonNull).distinct().limit(200).toList();
+    if (normalizedIds.isEmpty()) return Map.of();
+    Map<Long, List<CrmCallbackPlanResponse>> result = new LinkedHashMap<>();
+    normalizedIds.forEach(id -> result.put(id, new ArrayList<>()));
+    callbackPlanMapper.selectList(Wrappers.lambdaQuery(CrmCallbackPlan.class)
+            .eq(CrmCallbackPlan::getIsDeleted, 0)
+            .eq(CrmCallbackPlan::getTenantId, tenantId)
+            .in(CrmCallbackPlan::getLeadId, normalizedIds)
+            .orderByDesc(CrmCallbackPlan::getPlanExecuteTime))
+        .forEach(plan -> result.computeIfAbsent(plan.getLeadId(), ignored -> new ArrayList<>()).add(toResponse(plan)));
+    return result;
+  }
+
+  @Override
   @Transactional
   public CrmCallbackPlanResponse executeCallbackPlan(Long tenantId, Long planId, CrmCallbackPlanExecuteRequest request) {
     CrmCallbackPlan plan = callbackPlanMapper.selectById(planId);
@@ -254,6 +273,54 @@ public class CrmLeadActionServiceImpl implements CrmLeadActionService {
           java.util.Map.of("planId", plan.getId(), "callbackType", plan.getCallbackType(), "nextFollowDate", nextDate));
     }
     return toResponse(plan);
+  }
+
+  @Override
+  @Transactional
+  public CrmCallbackPlanResponse recordFollowup(
+      Long tenantId, Long orgId, Long staffId, Long leadId, CrmLeadFollowupRequest request) {
+    CrmLead lead = leadMapper.selectById(leadId);
+    if (!isOwnedLead(lead, tenantId) || request == null) {
+      return null;
+    }
+    LocalDateTime now = LocalDateTime.now();
+    String callbackType = resolveCallbackType(request.getCallbackType(), lead);
+    CrmCallbackPlan done = new CrmCallbackPlan();
+    done.setTenantId(tenantId);
+    done.setOrgId(orgId);
+    done.setLeadId(leadId);
+    done.setTitle(blankToDefault(request.getMethod(), "跟进"));
+    done.setFollowupContent(blankToNull(request.getFollowupContent()));
+    done.setFollowupResult(blankToNull(request.getFollowupResult()));
+    done.setPlanExecuteTime(now);
+    done.setExecutedTime(now);
+    done.setCallbackType(callbackType);
+    done.setStatus("DONE");
+    done.setCreatedBy(staffId);
+    callbackPlanMapper.insert(done);
+
+    LocalDateTime next = parseDateTime(request.getNextFollowTime());
+    if (next != null) {
+      CrmCallbackPlan plan = new CrmCallbackPlan();
+      plan.setTenantId(tenantId);
+      plan.setOrgId(orgId);
+      plan.setLeadId(leadId);
+      plan.setTitle(blankToDefault(request.getMethod(), "回访"));
+      plan.setFollowupContent("上次跟进：" + blankToDefault(request.getFollowupResult(), "已沟通"));
+      plan.setPlanExecuteTime(next);
+      plan.setCallbackType(callbackType);
+      plan.setStatus("PENDING");
+      plan.setCreatedBy(staffId);
+      callbackPlanMapper.insert(plan);
+    }
+
+    CrmLead before = cloneLead(lead);
+    lead.setNextFollowDate(next == null ? null : next.toLocalDate());
+    lead.setFollowupStatus(next == null ? "已回访" : "待回访");
+    leadMapper.updateById(lead);
+    auditLeadMutation("RECORD_FOLLOWUP", "记录跟进", before, lead,
+        java.util.Map.of("planId", done.getId() == null ? 0L : done.getId(), "nextFollowTime", next == null ? "" : next.toString()));
+    return toResponse(done);
   }
 
   @Override

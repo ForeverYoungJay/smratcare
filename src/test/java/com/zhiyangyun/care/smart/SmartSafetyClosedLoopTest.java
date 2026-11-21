@@ -27,6 +27,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * IoT 安全预警闭环集成测试（H2）：
@@ -34,6 +36,8 @@ import org.springframework.test.context.ActiveProfiles;
  */
 @SpringBootTest
 @ActiveProfiles("test")
+@Transactional
+@Sql(statements = "UPDATE staff_schedule SET duty_date = CURRENT_DATE, status = 1 WHERE id = 9001")
 class SmartSafetyClosedLoopTest {
 
   private static final Long ORG_ID = 1L;

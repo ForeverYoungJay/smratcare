@@ -4,6 +4,7 @@ import type { Id } from '../types'
 import type {
   FinanceBillDetail,
   FinanceReportMonthlyItem,
+  FinanceArrearsAgingItem,
   FinanceArrearsItem,
   FinanceStoreSalesItem,
   ElderAccount,
@@ -42,6 +43,7 @@ import type {
   FinanceConfigImpactPreview,
   FinanceConfigImpactPreviewRequest,
   FinanceBillingConfigEntry,
+  BillingCareLevelFee,
   FinanceBillingConfigUpsertRequest,
   FinanceBillingConfigBatchUpsertRequest,
   FinanceConfigChangeLogItem,
@@ -80,6 +82,10 @@ export function getFinanceMonthlyRevenue(params?: { from?: string; to?: string; 
   return request.get<FinanceReportMonthlyItem[]>('/api/finance/report/monthly-revenue', { params })
 }
 
+export function getFinanceArrearsAging(config?: Record<string, any>) {
+  return request.get<FinanceArrearsAgingItem[]>('/api/finance/report/arrears-aging', config)
+}
+
 export function getFinanceArrearsTop(params?: { limit?: number }) {
   return request.get<FinanceArrearsItem[]>('/api/finance/report/arrears-top', { params })
 }
@@ -92,8 +98,8 @@ export function getElderAccountPage(params: any) {
   return fetchPage<ElderAccount>('/api/finance/account/page', params)
 }
 
-export function getElderAccountLogPage(params: any) {
-  return fetchPage<ElderAccountLog>('/api/finance/account/log/page', params)
+export function getElderAccountLogPage(params: any, config?: Record<string, any>) {
+  return fetchPage<ElderAccountLog>('/api/finance/account/log/page', params, config)
 }
 
 export function printElderAccountLogPdf(params: { elderId: Id; accountId?: Id; keyword?: string }) {
@@ -108,8 +114,8 @@ export function updateElderAccount(data: ElderAccountUpdateRequest) {
   return request.post<ElderAccount>('/api/finance/account/update', data)
 }
 
-export function getElderAccountWarnings() {
-  return request.get<ElderAccount[]>('/api/finance/account/warnings')
+export function getElderAccountWarnings(config?: Record<string, any>) {
+  return request.get<ElderAccount[]>('/api/finance/account/warnings', config)
 }
 
 export function getFinanceWorkbenchOverview(config?: Record<string, any>) {
@@ -135,7 +141,7 @@ export function executeFinanceDischargeStatusSync(data: FinanceDischargeStatusSy
 export async function exportFinanceLedgerHealthCsv(params?: { limit?: number }) {
   const url = new URL('/api/finance/workbench/ledger/health/export', window.location.origin)
   Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
+    if (value !== undefined && value !== null) {
       url.searchParams.set(key, String(value))
     }
   })
@@ -515,6 +521,18 @@ export function getFinanceBillingConfig(params?: { month?: string; keyPrefix?: s
 
 export function upsertFinanceBillingConfig(data: FinanceBillingConfigUpsertRequest) {
   return request.post<FinanceBillingConfigEntry>('/api/finance/workbench/billing-config', data)
+}
+
+export function getBillingCareLevelFees(orgId: Id) {
+  return request.get<BillingCareLevelFee[]>('/api/admin/billing/care-level', { params: { orgId } })
+}
+
+export function getBillingFeeHistory(orgId: Id) {
+  return request.get<FinanceBillingConfigEntry[]>('/api/admin/billing/config', { params: { orgId } })
+}
+
+export function upsertBillingCareLevelFee(data: BillingCareLevelFee) {
+  return request.post<BillingCareLevelFee>('/api/admin/billing/care-level', data)
 }
 
 export function batchUpsertFinanceBillingConfig(data: FinanceBillingConfigBatchUpsertRequest) {

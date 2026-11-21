@@ -1,5 +1,13 @@
 <template>
   <PageContainer title="智慧设备告警" subTitle="设备接入、事件上报、实时风险确认与处置闭环">
+    <template #extra>
+      <a-space>
+        <a-button @click="openDeviceModal()">新增设备</a-button>
+        <a-button @click="openEventModal()">上报事件</a-button>
+        <a-button :loading="refreshingDerived" @click="refreshDerivedAlerts">刷新趋势预警</a-button>
+        <a-button type="primary" :loading="loading" @click="fetchAll">刷新</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="alertQuery" @search="fetchAll" @reset="onReset">
       <a-form-item label="告警状态">
         <a-select v-model:value="alertQuery.status" allow-clear style="width: 150px">
@@ -18,18 +26,11 @@
       <a-form-item label="关键词">
         <a-input v-model:value="alertQuery.keyword" allow-clear placeholder="标题/位置/内容" style="width: 220px" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="openDeviceModal()">新增设备</a-button>
-          <a-button @click="openEventModal()">上报事件</a-button>
-          <a-button :loading="refreshingDerived" @click="refreshDerivedAlerts">刷新趋势预警</a-button>
-          <a-button type="primary" :loading="loading" @click="fetchAll">刷新</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <StatefulBlock :loading="loading" :error="errorMessage" @retry="fetchAll">
-      <a-row :gutter="[12, 12]" style="margin-bottom: 16px">
+      <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 16px">
         <a-col :xs="12" :lg="4"><a-card><a-statistic title="设备总数" :value="summary.totalDeviceCount" /></a-card></a-col>
         <a-col :xs="12" :lg="4"><a-card><a-statistic title="在线设备" :value="summary.onlineDeviceCount" /></a-card></a-col>
         <a-col :xs="12" :lg="4"><a-card><a-statistic title="离线设备" :value="summary.offlineDeviceCount" /></a-card></a-col>
@@ -97,7 +98,7 @@
       </a-row>
     </StatefulBlock>
 
-    <a-modal v-model:open="deviceModalOpen" :title="deviceForm.id ? '编辑设备' : '新增设备'" @ok="submitDevice" :confirm-loading="saving" width="720px">
+    <a-modal :mask-closable="false" v-model:open="deviceModalOpen" :title="deviceForm.id ? '编辑设备' : '新增设备'" @ok="submitDevice" :confirm-loading="saving" width="720px">
       <a-form layout="vertical">
         <a-row :gutter="12">
           <a-col :span="12"><a-form-item label="设备编码" required><a-input v-model:value="deviceForm.deviceCode" /></a-form-item></a-col>
@@ -113,7 +114,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="eventModalOpen" title="设备事件上报" @ok="submitEvent" :confirm-loading="saving" width="720px">
+    <a-modal :mask-closable="false" v-model:open="eventModalOpen" title="设备事件上报" @ok="submitEvent" :confirm-loading="saving" width="720px">
       <a-form layout="vertical">
         <a-row :gutter="12">
           <a-col :span="12"><a-form-item label="设备编码" required><a-input v-model:value="eventForm.deviceCode" /></a-form-item></a-col>
@@ -125,7 +126,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="resolveModalOpen" title="处置告警" @ok="submitResolve" :confirm-loading="saving">
+    <a-modal :mask-closable="false" v-model:open="resolveModalOpen" title="处置告警" @ok="submitResolve" :confirm-loading="saving">
       <a-form layout="vertical">
         <a-form-item label="处置说明">
           <a-textarea v-model:value="resolveForm.resolutionNote" :rows="4" placeholder="填写到场情况、处理结果、后续观察要求" />
@@ -138,6 +139,7 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
@@ -395,6 +397,17 @@ function statusText(status: string) {
 
 function statusColor(status: string) {
   return ({ OPEN: 'red', ACKNOWLEDGED: 'blue', RESOLVED: 'green' } as Record<string, string>)[status] || 'default'
+}
+
+// 支持从安全风险页带 ?status= / ?level= 直达对应筛选
+const route = useRoute()
+const initialAlertStatus = String(route.query.status || '').toUpperCase()
+if (['OPEN', 'ACKNOWLEDGED', 'RESOLVED'].includes(initialAlertStatus)) {
+  alertQuery.status = initialAlertStatus
+}
+const initialAlertLevel = String(route.query.level || '').toUpperCase()
+if (['CRITICAL', 'HIGH', 'WARNING'].includes(initialAlertLevel)) {
+  alertQuery.level = initialAlertLevel
 }
 
 onMounted(fetchAll)

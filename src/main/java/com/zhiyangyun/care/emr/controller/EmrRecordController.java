@@ -57,7 +57,11 @@ public class EmrRecordController {
   @GetMapping("/{id}")
   @PreAuthorize(VIEWER)
   public Result<EmrRecord> get(@PathVariable("id") Long id) {
-    return Result.ok(emrMapper.selectById(id));
+    Long orgId = AuthContext.getOrgId();
+    return Result.ok(emrMapper.selectOne(Wrappers.lambdaQuery(EmrRecord.class)
+        .eq(EmrRecord::getId, id)
+        .eq(EmrRecord::getIsDeleted, 0)
+        .eq(orgId != null, EmrRecord::getOrgId, orgId)));
   }
 
   @PostMapping

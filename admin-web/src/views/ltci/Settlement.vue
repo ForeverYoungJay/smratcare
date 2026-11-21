@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="长护险结算" subTitle="月度结算单：统筹支付 / 个人自付 / 超限额（金额单位：元）">
+    <template #extra>
+      <a-button type="primary" @click="openGenerate">生成结算草稿</a-button>
+    </template>
     <SearchForm :model="query" @search="onSearch" @reset="onReset">
       <a-form-item label="长者">
         <a-select v-model:value="query.elderId" show-search allow-clear :filter-option="false" :options="elderOptions"
@@ -16,12 +19,12 @@
           <a-select-option value="REJECTED">已驳回</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openGenerate">生成结算草稿</a-button>
-      </template>
+
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="onSearch" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'totalFee'">{{ yuan(record.totalFee) }}</template>
         <template v-else-if="column.key === 'fundPay'">{{ yuan(record.fundPay) }}</template>
@@ -44,7 +47,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="genOpen" title="生成结算草稿" :confirm-loading="saving" @ok="submitGenerate">
+    <a-modal :mask-closable="false" v-model:open="genOpen" title="生成结算草稿" :confirm-loading="saving" @ok="submitGenerate">
       <a-form layout="vertical">
         <a-form-item label="长者" required>
           <a-select v-model:value="genForm.elderId" show-search :filter-option="false" :options="elderOptions"

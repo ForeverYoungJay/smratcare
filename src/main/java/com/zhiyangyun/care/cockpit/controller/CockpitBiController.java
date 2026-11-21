@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 仅院长/超管可见；机构对比跨机构下钻仅 SYS_ADMIN。
  */
 @RestController
-@RequestMapping("/stats/executive/bi")
+@RequestMapping("/api/stats/executive/bi")
 public class CockpitBiController {
 
   private final CockpitBiService cockpitBiService;

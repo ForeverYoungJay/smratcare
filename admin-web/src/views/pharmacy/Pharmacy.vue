@@ -55,7 +55,7 @@
       </a-tab-pane>
     </a-tabs>
 
-    <a-modal v-model:open="inboundOpen" :title="`入库 - ${currentDrug?.drugName || ''}`" :confirm-loading="saving" @ok="submitInbound">
+    <a-modal :mask-closable="false" v-model:open="inboundOpen" :title="`入库 - ${currentDrug?.drugName || ''}`" :confirm-loading="saving" @ok="submitInbound">
       <a-form layout="vertical">
         <a-form-item label="批号" required><a-input v-model:value="inboundForm.batchNo" /></a-form-item>
         <a-row :gutter="16">
@@ -68,7 +68,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="dispenseOpen" :title="`发药 - ${currentDrug?.drugName || ''}`" :confirm-loading="saving" @ok="submitDispense">
+    <a-modal :mask-closable="false" v-model:open="dispenseOpen" :title="`发药 - ${currentDrug?.drugName || ''}`" :confirm-loading="saving" @ok="submitDispense">
       <a-alert type="info" show-icon message="系统将按 FEFO（先过期先出）自动选择批次扣减" style="margin-bottom:12px" />
       <a-form layout="vertical">
         <a-form-item label="发药数量" required><a-input-number v-model:value="dispenseForm.quantity" :min="1" style="width:100%" /></a-form-item>

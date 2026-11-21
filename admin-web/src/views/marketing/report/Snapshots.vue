@@ -2,7 +2,7 @@
   <PageContainer title="经营快照" sub-title="查看销售工作台与报表快照，便于复盘和口径回放">
     <MarketingQuickNav parent-path="/marketing/reports" />
     <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline">
+      <QueryBar :model="query" layout="inline" @finish="loadData">
         <a-form-item label="快照类型">
           <a-select v-model:value="query.snapshotType" style="width: 220px" allow-clear>
             <a-select-option
@@ -17,13 +17,15 @@
         <a-form-item label="最近条数">
           <a-input-number v-model:value="query.limit" :min="1" :max="50" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="loadData">查询</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">查询</a-button>
+              <a-button @click="reset">重置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px">
@@ -55,6 +57,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../../components/ActionToolbar.vue'
+import QueryBar from '../../../components/QueryBar.vue'
 import { onMounted, reactive, ref } from 'vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import MarketingQuickNav from '../components/MarketingQuickNav.vue'

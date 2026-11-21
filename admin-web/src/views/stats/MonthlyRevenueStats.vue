@@ -1,12 +1,12 @@
 <template>
   <PageContainer title="月运营收入统计" subTitle="按月份查看运营收入">
     <template #extra>
-      <a-space wrap>
+      <ActionToolbar wrap>
         <a-button @click="exportTrend">导出趋势</a-button>
         <a-button @click="printReport">打印报告</a-button>
         <a-button @click="reset">重置</a-button>
         <a-button type="primary" @click="loadData">刷新</a-button>
-      </a-space>
+      </ActionToolbar>
     </template>
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline">
@@ -25,7 +25,7 @@
       </a-form>
     </a-card>
 
-    <a-row :gutter="16" style="margin-top: 16px;">
+    <a-row class="business-stat-strip" :gutter="16" style="margin-top: 16px;">
       <a-col :span="8">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic title="期间总收入" :value="stats.totalRevenue || 0" :precision="2" />
@@ -98,6 +98,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useRouter } from 'vue-router'

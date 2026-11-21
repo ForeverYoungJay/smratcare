@@ -704,7 +704,7 @@ const pageMaintainer = computed(() => {
 })
 
 const consultRecords = computed(() => {
-  consultVersion.value
+  void consultVersion.value
   const raw = localStorage.getItem(CONSULT_RECORD_STORAGE_KEY)
   if (!raw) return []
   try {

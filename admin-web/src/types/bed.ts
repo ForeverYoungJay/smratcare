@@ -8,6 +8,8 @@ export interface RoomItem {
   building?: string
   floorNo?: string
   roomType?: string
+  /** 朝向 SOUTH / NORTH / EAST / WEST */
+  orientation?: string
   sortNo?: number
   capacity?: number
   status?: number
@@ -38,8 +40,10 @@ export interface BedItem {
   lastReleasedAt?: string
   elderName?: string
   elderGender?: number
+  elderBirthDate?: string
   elderLifecycleStatus?: string
   careLevel?: string
+  responsibleStaffName?: string
   roomNo?: string
   building?: string
   buildingRemark?: string

@@ -16,7 +16,13 @@
     </div>
 
     <div class="global-header__right">
-      <button type="button" class="global-header__search" @click="$emit('open-search')">
+      <button
+        type="button"
+        class="global-header__search"
+        aria-label="搜索页面"
+        title="搜索页面"
+        @click="$emit('open-search')"
+      >
         <SearchOutlined class="global-header__search-icon" />
         <span class="global-header__search-label">{{ searchPlaceholder }}</span>
         <span class="global-header__search-shortcut">/</span>
@@ -24,7 +30,7 @@
 
       <a-dropdown trigger="click">
         <a-badge :count="notificationCount" size="small">
-          <a-button size="small" class="global-header__icon-btn" title="消息通知">
+          <a-button size="small" class="global-header__icon-btn" title="消息通知" aria-label="消息通知">
             <BellOutlined />
           </a-button>
         </a-badge>
@@ -34,7 +40,7 @@
       </a-dropdown>
       <a-dropdown trigger="click">
         <a-badge :count="todoCount" size="small">
-          <a-button size="small" class="global-header__icon-btn" title="待办事项">
+          <a-button size="small" class="global-header__icon-btn" title="待办事项" aria-label="待办事项">
             <CheckSquareOutlined />
           </a-button>
         </a-badge>
@@ -88,7 +94,8 @@ defineEmits<{
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 56px;
+  min-height: 52px;
+  height: auto;
   padding: 0 16px;
   border-bottom: 1px solid var(--border-soft);
   background: rgba(255, 255, 255, 0.95);
@@ -293,5 +300,39 @@ defineEmits<{
     gap: 8px;
     flex-wrap: wrap;
   }
+}
+
+@media (max-width: 480px) {
+  .global-header__right {
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+  }
+
+  .global-header__search {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .global-header__search-label,
+  .global-header__search-shortcut,
+  .global-header__user strong {
+    display: none;
+  }
+
+  .global-header__user {
+    padding: 2px;
+  }
+}
+@media (max-width: 768px) {
+  .global-header { flex-direction:row;align-items:center;gap:8px;min-height:52px;padding:6px 10px; }
+  .global-header__left { flex:1;min-width:0; }
+  .global-header__title-block { min-width:0; }
+  .global-header__page-title { white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+  .global-header__right { flex:0 0 auto;flex-wrap:nowrap;gap:4px; }
+  .global-header__search { flex:none;min-width:0;width:36px;padding:0;justify-content:center; }
+  .global-header__search-label,.global-header__search-shortcut,.global-header__user strong { display:none; }
 }
 </style>

@@ -1,0 +1,16 @@
+-- H2 测试库缺 care_level（生产库在 V17 建表）；运营大屏按护理等级字典把编码换成名称时要用
+CREATE TABLE IF NOT EXISTS care_level (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL,
+  org_id BIGINT NOT NULL,
+  level_code VARCHAR(32) NOT NULL,
+  level_name VARCHAR(64) NOT NULL,
+  severity INT NOT NULL DEFAULT 1,
+  monthly_fee DECIMAL(12,2) DEFAULT NULL,
+  enabled TINYINT NOT NULL DEFAULT 1,
+  remark VARCHAR(255) DEFAULT NULL,
+  created_by BIGINT DEFAULT NULL,
+  create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0
+);

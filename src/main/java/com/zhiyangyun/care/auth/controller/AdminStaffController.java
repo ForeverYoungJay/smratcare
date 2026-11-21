@@ -39,7 +39,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/staff")
 public class AdminStaffController {
-  private static final String DEFAULT_INITIAL_PASSWORD = "123456";
+  public static final String DEFAULT_INITIAL_PASSWORD = "123456";
   private static final String RESERVED_SYS_ADMIN_CODE = "SYS_ADMIN";
   private static final String HIDDEN_PLATFORM_USERNAME = "sysadmin_root";
   private final StaffMapper staffMapper;
@@ -248,10 +248,12 @@ public class AdminStaffController {
       @RequestParam(defaultValue = "1") long page,
       @RequestParam(defaultValue = "200") long size,
       @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) Long departmentId,
       @RequestParam(required = false, defaultValue = "true") boolean activeOnly) {
     Long orgId = AuthContext.getOrgId();
     var wrapper = Wrappers.lambdaQuery(StaffAccount.class)
         .eq(StaffAccount::getIsDeleted, 0)
+        .eq(departmentId != null, StaffAccount::getDepartmentId, departmentId)
         .eq(orgId != null, StaffAccount::getOrgId, orgId)
         .ne(StaffAccount::getUsername, HIDDEN_PLATFORM_USERNAME)
         .eq(activeOnly, StaffAccount::getStatus, 1);

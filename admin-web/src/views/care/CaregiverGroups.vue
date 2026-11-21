@@ -1,12 +1,12 @@
 <template>
   <PageContainer title="护工小组" subTitle="编组管理、成员速编与快捷打印一页完成">
     <div class="group-shell">
-      <section class="group-hero">
-        <div>
-          <p class="eyebrow">护理班组台账</p>
-          <h2>弋阳龟峰颐养中心护工小组明细表</h2>
+      <section class="group-hero business-overview">
+        <details class="business-help">
+          <summary>使用说明</summary>
+          <p class="business-help-title">弋阳龟峰颐养中心护工小组明细表</p>
           <p class="hero-text">为班组长准备的现场工具页。这里既能管理编组，也能临时维护护工优点、特长，并按需要生成带照片或电话的打印版台账。</p>
-        </div>
+        </details>
         <div class="hero-actions">
           <a-button type="primary" @click="openModal()">新增小组</a-button>
           <a-button @click="openPrintDrawer(rows[0])" :disabled="rows.length === 0">快捷打印</a-button>
@@ -14,20 +14,18 @@
       </section>
 
       <a-card :bordered="false" class="group-query-card">
-        <a-form layout="inline" @submit.prevent>
+        <QueryBar :model="query" @finish="search">
           <a-form-item label="关键字">
             <a-input v-model:value="query.keyword" placeholder="小组名称" allow-clear />
           </a-form-item>
           <a-form-item label="状态">
             <a-select v-model:value="query.enabled" :options="enabledOptions" allow-clear style="width: 140px" />
           </a-form-item>
-          <a-form-item>
-            <a-space>
-              <a-button type="primary" @click="search">查询</a-button>
-              <a-button @click="reset">重置</a-button>
-            </a-space>
-          </a-form-item>
-        </a-form>
+          <template #actions>
+            <a-button type="primary" html-type="submit">查询</a-button>
+            <a-button @click="reset">重置</a-button>
+          </template>
+        </QueryBar>
       </a-card>
 
       <div class="group-grid">
@@ -86,7 +84,7 @@
       </div>
     </div>
 
-    <a-modal v-model:open="modalOpen" title="护工小组" :confirm-loading="submitting" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="modalOpen" title="护工小组" :confirm-loading="submitting" @ok="submit">
       <a-form ref="formRef" layout="vertical" :model="form" :rules="rules">
         <a-form-item label="小组名称" name="name" required>
           <a-input v-model:value="form.name" />
@@ -203,6 +201,7 @@
 </template>
 
 <script setup lang="ts">
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance } from 'ant-design-vue'

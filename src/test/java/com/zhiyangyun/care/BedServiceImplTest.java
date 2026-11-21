@@ -3,10 +3,12 @@ package com.zhiyangyun.care;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.zhiyangyun.care.asset.mapper.BuildingMapper;
+import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.asset.mapper.FloorMapper;
 import com.zhiyangyun.care.assessment.mapper.AssessmentRecordMapper;
 import com.zhiyangyun.care.crm.entity.CrmContract;
@@ -54,6 +56,8 @@ class BedServiceImplTest {
   private CrmLeadMapper crmLeadMapper;
   @Mock
   private CrmContractMapper crmContractMapper;
+  @Mock
+  private StaffMapper staffMapper;
 
   private BedServiceImpl service;
 
@@ -69,7 +73,8 @@ class BedServiceImplTest {
         assessmentRecordMapper,
         healthDataRecordMapper,
         crmLeadMapper,
-        crmContractMapper);
+        crmContractMapper,
+        staffMapper);
   }
 
   @Test
@@ -122,6 +127,13 @@ class BedServiceImplTest {
     elder.setFullName("关系占床长者");
     elder.setLifecycleStatus("IN_HOSPITAL");
 
+    com.zhiyangyun.care.elder.entity.Room room = new com.zhiyangyun.care.elder.entity.Room();
+    room.setId(22L);
+    room.setTenantId(1L);
+    room.setOrgId(1L);
+    room.setCapacity(2);
+    room.setIsDeleted(0);
+
     BedRequest request = new BedRequest();
     request.setTenantId(1L);
     request.setOrgId(1L);
@@ -131,11 +143,11 @@ class BedServiceImplTest {
     request.setStatus(BedStatus.OCCUPIED);
 
     when(bedMapper.selectById(12L)).thenReturn(bed);
+    when(roomMapper.selectById(22L)).thenReturn(room);
+    when(bedMapper.selectCount(any())).thenReturn(0L);
     when(relationMapper.selectList(any())).thenReturn(List.of(relation), List.of(relation));
     when(roomMapper.selectList(any())).thenReturn(List.of());
     when(elderMapper.selectBatchIds(any())).thenReturn(List.of(elder));
-    when(crmContractMapper.selectList(any())).thenReturn(List.of());
-    when(crmLeadMapper.selectList(any())).thenReturn(List.of());
 
     BedResponse response = service.update(12L, request);
 
@@ -146,5 +158,8 @@ class BedServiceImplTest {
     assertEquals(32L, response.getOccupancyRefId());
     assertEquals("关系占床长者", response.getElderName());
     verify(bedMapper).updateById(any(Bed.class));
+    // 已有长者关系占床的床位不是预订候选，不应再查 CRM 预订
+    verify(crmContractMapper, never()).selectList(any());
+    verify(crmLeadMapper, never()).selectList(any());
   }
 }

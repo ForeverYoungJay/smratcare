@@ -46,7 +46,7 @@
       </a-descriptions>
     </a-drawer>
 
-    <a-modal v-model:open="resolveOpen" title="异常任务处理闭环" :confirm-loading="resolving" @ok="submitResolve">
+    <a-modal :mask-closable="false" v-model:open="resolveOpen" title="异常任务处理闭环" :confirm-loading="resolving" @ok="submitResolve">
       <a-form layout="vertical">
         <a-form-item label="任务">
           <a-input :value="resolveTarget?.taskName || '-'" disabled />

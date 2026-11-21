@@ -1,15 +1,18 @@
 <template>
   <PageContainer title="基础健康记录" subTitle="身高体重、血压等基础指标">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新增记录</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="老人姓名">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="姓名(编号)" width="220px" />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openCreate">新增记录</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -27,7 +30,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" title="健康记录" @ok="submit" :confirm-loading="saving" width="640px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="健康记录" @ok="submit" :confirm-loading="saving" width="640px">
       <a-form layout="vertical">
         <a-form-item label="老人" required>
           <a-select

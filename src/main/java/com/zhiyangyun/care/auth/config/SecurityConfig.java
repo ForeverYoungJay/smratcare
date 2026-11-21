@@ -93,7 +93,7 @@ public class SecurityConfig {
             .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
             .requestMatchers("/uploads/**").permitAll()
             // 2FA 第二步：凭 challengeToken + 短信验证码换取正式令牌（challengeToken 在请求体中校验）
-            .requestMatchers("/api/auth/2fa/verify", "/api/auth/2fa/resend").permitAll()
+            .requestMatchers("/api/auth/2fa/verify", "/api/auth/2fa/resend", "/api/auth/password/initial").permitAll()
             .requestMatchers("/api/auth/login",
                 "/api/auth/family/bootstrap",
                 "/api/auth/family/login",
@@ -112,9 +112,11 @@ public class SecurityConfig {
             .requestMatchers("/api/admin/hr/**").hasAnyRole(STAFF_ROLES)
             // Shared option pools are used by quick chat and multiple staff pickers.
             .requestMatchers("/api/admin/staff/options", "/api/admin/departments/options").hasAnyRole(STAFF_ROLES)
+            .requestMatchers("/api/digital-twin/admin/**").hasAnyRole("ADMIN", "SYS_ADMIN")
             .requestMatchers("/api/admin/**").hasAnyRole(MINISTER_OR_HIGHER_ROLES)
             .requestMatchers("/api/base-config/**").hasAnyRole(MINISTER_OR_HIGHER_ROLES)
-            .requestMatchers("/api/medical-care/**", "/api/health/**", "/api/vital/**").hasAnyRole(MEDICAL_AND_NURSING_ROLES)
+            .requestMatchers("/api/care/**", "/api/nursing/**").hasAnyRole(MEDICAL_AND_NURSING_ROLES)
+            .requestMatchers("/api/medical-care/**", "/api/medical/**", "/api/health/**", "/api/vital/**", "/api/pharmacy/**").hasAnyRole(MEDICAL_AND_NURSING_ROLES)
             .requestMatchers(
                 "/api/asset/**",
                 "/api/material/**",
@@ -124,6 +126,8 @@ public class SecurityConfig {
                 "/api/logistics/**",
                 "/api/life/dining/**").hasAnyRole(LOGISTICS_ROLES)
             .requestMatchers("/api/marketing/**").hasAnyRole(MARKETING_ROLES)
+            // 经营驾驶舱：角色由控制器 @PreAuthorize 决定（含医务、护理部长，不在 STATS_ROLES 里）
+            .requestMatchers("/api/stats/executive/**").authenticated()
             .requestMatchers("/api/stats/**").hasAnyRole(STATS_ROLES)
             .requestMatchers("/api/survey/**").hasAnyRole(SURVEY_ROLES)
             .requestMatchers("/api/oa/**").hasAnyRole(
@@ -139,7 +143,8 @@ public class SecurityConfig {
                 "GUARD",
                 "LOGISTICS_EMPLOYEE", "LOGISTICS_MINISTER",
                 "DIRECTOR", "SYS_ADMIN", "ADMIN")
-            .requestMatchers("/api/guard/**").hasAnyRole("GUARD", "ADMIN")
+            // 来访登记由门卫和后勤（前台）办理
+            .requestMatchers("/api/guard/**").hasAnyRole("GUARD", "LOGISTICS_EMPLOYEE", "LOGISTICS_MINISTER", "ADMIN")
             .requestMatchers("/api/family/**").hasRole("FAMILY")
             .requestMatchers("/api/**").hasAnyRole(STAFF_ROLES)
             .anyRequest().authenticated())

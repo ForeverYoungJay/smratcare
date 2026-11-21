@@ -1,0 +1,94 @@
+/* Shared layout for the four business audiences; clinical/logistics screens keep their own scope. */
+.page-container.business-page {
+  min-width: 0;
+  .page-head { padding: 16px 20px; box-shadow: none; }
+  .page-title { font-size: 23px; line-height: 1.4; }
+  .page-subtitle { margin-top: 6px; font-size: 13px; }
+  .page-content-actions { display:flex; justify-content:flex-end; margin-bottom:12px; }
+  .page-body { min-width:0; }
+  .business-query { box-shadow:none; }
+}
+.page-container.business-page {
+  .ant-table-thead > tr > th, .vxe-header--column { white-space:nowrap; font-weight:600; background:var(--surface-3); }
+  .ant-table-tbody > tr > td, .vxe-body--column { font-size:14px; }
+  .ant-btn:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+  :is(.table-head, .action-toolbar, .surface-toolbar, .list-toolbar) { gap:10px; min-height:36px; margin-block:10px; }
+  :is(.metric-grid, .metrics-grid, .summary-strip, .bill-overview-grid, .metric-strip) { display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px; }
+  :is(.metric-card, .metric-tile, .summary-strip-card, .overview-card) { min-height:52px; padding:10px 12px; border-radius:7px; box-shadow:none; }
+  :is(.metric-card, .metric-tile, .summary-strip-card, .overview-card) strong { font-size:22px; line-height:1.3; }
+  .business-stat-strip { gap:8px; align-items:stretch; margin-block:10px; }
+  .business-stat-strip > .ant-col { flex:1 1 150px; max-width:none; }
+  .business-stat-strip > .ant-col-24 { flex-basis:100%; }
+  .business-stat-strip .ant-card { height:100%; border:1px solid var(--border-soft); border-radius:7px; box-shadow:none; background:var(--surface-3); }
+  .business-stat-strip .ant-card-body { padding:10px 12px; }
+  .business-stat-strip .ant-statistic { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .business-stat-strip .ant-statistic-title { margin:0; color:var(--muted);font-size:13px; }
+  .business-stat-strip .ant-statistic-content { font-size:22px; }
+  .ant-card:has(> .ant-card-body > .business-query) { box-shadow:none; border:0; }
+  .ant-card-body:has(> .business-query) { padding:0; }
+  .business-query .business-query__fields { align-items:center; }
+  .business-query .business-query__form { border:0; border-radius:0; box-shadow:none; background:none; }
+}
+@media(max-width:700px) {
+  .business-page .page-head { padding:14px; }
+  .page-container.business-page .business-stat-strip > .ant-col { flex-basis:calc(50% - 8px); }
+  .page-container.business-page .business-stat-strip > .ant-col-24 { flex-basis:100%; }
+  .page-container.business-page :is(.metric-grid, .metrics-grid, .summary-strip, .bill-overview-grid, .metric-strip) { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .business-page .ant-btn { min-height:36px; }
+}
+.page-container.business-page {
+  .business-overview { display:grid;grid-template-columns:minmax(0,1fr);gap:10px;min-height:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none; }
+  .business-overview > .ant-card-body { display:grid;gap:10px;padding:0; }
+  .business-help { min-width:0;color:var(--muted);font-size:13px; }
+  .business-help summary { cursor:pointer;width:fit-content;padding:4px 0;color:var(--primary); }
+  .business-help p { margin:6px 0;line-height:1.6; }
+  .business-help .business-help-title { font-size:14px;font-weight:600; }
+  .business-intro { display:grid;gap:8px; }
+  .business-overview :is(.hero-metrics,.conversion-hero-side) { width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px; }
+  .business-overview .hero-stat { gap:4px;padding:10px 12px;border-radius:7px; }
+  .business-overview .hero-stat strong { font-size:22px; }
+  :is(.summary-tile,.summary-card) { min-height:0;padding:10px 12px;border-radius:7px;box-shadow:none; }
+  .summary-tile strong,.summary-value { font-size:22px; }
+  .summary-card .ant-card-body { padding:10px 12px; }
+  .conversion-stat-card { min-height:0; }
+  .conversion-stat-card .ant-card-body { padding:10px 12px; }
+  .conversion-stat-value { font-size:22px; }
+}
+.page-container.business-page .approval-overview-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px; }
+.page-container.business-page {
+  :is(.metric-card,.metric-tile,.summary-strip-card,.overview-card,.summary-tile,.hero-stat) { color:var(--ink);background:var(--surface-3);backdrop-filter:none; }
+  :is(.metric-card,.metric-tile,.summary-strip-card,.overview-card,.summary-tile,.hero-stat) :is(span,small) { color:var(--muted); }
+  :is(.metric-card,.metric-tile,.summary-strip-card,.overview-card,.summary-tile,.hero-stat) strong { margin:4px 0;color:var(--ink); }
+  .business-stat-strip .ant-statistic-content { color:var(--ink); }
+  .business-help p { color:var(--muted); }
+}
+.page-container.business-page .business-stat-strip {
+  .ant-statistic { display:block;min-width:0; }
+  .ant-statistic-title { margin-bottom:4px; }
+  .ant-statistic-content { max-width:100%;white-space:nowrap;overflow-x:auto;font-variant-numeric:tabular-nums; }
+  .ant-statistic-content-suffix { font-size:13px; }
+}
+/* A short shared shell leaves the first screen to the task itself. */
+.page-container.business-page {
+  gap:12px;
+  .page-head { padding:12px 16px; }
+  .page-title-wrap { gap:3px; }
+  .page-title { font-size:22px; }
+  .page-subtitle { margin:3px 0 0;line-height:1.5; }
+  .page-head-foot { margin-top:10px;padding-top:10px; }
+  .page-content-actions { margin:0; }
+  .business-column--identity { font-weight:600;color:var(--ink); }
+  .business-column--money { font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap; }
+  .business-column--state { font-weight:500; }
+}
+.function-workspace { padding:12px 16px; }
+.function-workspace__header { margin-bottom:8px; }
+.function-workspace__header .page-content-actions { margin:0; }
+@media(max-width:700px) {
+  .business-query .business-query__fields { gap:8px; }
+  .business-query .ant-form-item-label { padding-bottom:2px; }
+  .function-workspace__actions { flex-basis:100%; }
+  .business-actions .ant-btn { min-height:40px; }
+}
+.page-container.business-page.page-shell .page-head--scenic { min-height:0; }
+.page-container.business-page.page-shell .page-head--scenic .page-title { font-size:22px;line-height:1.4;font-family:inherit; }

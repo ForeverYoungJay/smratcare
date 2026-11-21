@@ -1,31 +1,45 @@
 <template>
   <PageContainer title="自动扣费/催缴管理" subTitle="自动扣费运行态势、筛选与异常处理">
     <a-card class="card-elevated" :bordered="false">
-      <a-space wrap>
-        <a-date-picker v-model:value="query.date" />
-        <a-select v-model:value="query.reasonCode" allow-clear placeholder="失败原因筛选" style="width: 180px">
-          <a-select-option value="INSUFFICIENT_BALANCE">余额不足</a-select-option>
-          <a-select-option value="ELDER_STATUS_OUT">外出暂停</a-select-option>
-          <a-select-option value="RULE_MISSING">规则缺失</a-select-option>
-        </a-select>
-        <a-select v-model:value="query.severity" allow-clear placeholder="风险等级" style="width: 140px">
-          <a-select-option value="HIGH">高风险</a-select-option>
-          <a-select-option value="MEDIUM">中风险</a-select-option>
-          <a-select-option value="LOW">低风险</a-select-option>
-        </a-select>
-        <a-input-number v-model:value="query.minOutstanding" :min="0" :precision="2" placeholder="最小应扣金额" style="width: 160px" />
-        <a-input v-model:value="query.printRemark" allow-clear placeholder="打印备注" style="width: 180px" />
-        <a-button type="primary" @click="loadData">刷新</a-button>
-        <a-button @click="exportCsvReport">导出CSV</a-button>
-        <a-button @click="printCurrent">打印当前结果</a-button>
-        <a-button @click="go('/finance/accounts/list?filter=low_balance')">低余额账户</a-button>
-        <a-button @click="go('/finance/reconcile/center?filter=unmatched')">对账异常</a-button>
-        <a-button @click="go('/finance/reconcile/ledger-health')">一致性巡检</a-button>
-      </a-space>
+      <QueryBar :model="query" @finish="loadData">
+        <a-form-item label="日期">
+          <a-date-picker v-model:value="query.date" />
+        </a-form-item>
+        <a-form-item label="失败原因">
+          <a-select v-model:value="query.reasonCode" allow-clear placeholder="失败原因筛选" style="width: 180px">
+            <a-select-option value="INSUFFICIENT_BALANCE">余额不足</a-select-option>
+            <a-select-option value="ELDER_STATUS_OUT">外出暂停</a-select-option>
+            <a-select-option value="RULE_MISSING">规则缺失</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="风险等级">
+          <a-select v-model:value="query.severity" allow-clear placeholder="风险等级" style="width: 140px">
+            <a-select-option value="HIGH">高风险</a-select-option>
+            <a-select-option value="MEDIUM">中风险</a-select-option>
+            <a-select-option value="LOW">低风险</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="最小应扣金额">
+          <a-input-number v-model:value="query.minOutstanding" :min="0" :precision="2" placeholder="最小应扣金额" style="width: 160px" />
+        </a-form-item>
+        <a-form-item label="打印备注">
+          <a-input v-model:value="query.printRemark" allow-clear placeholder="打印备注" style="width: 180px" />
+        </a-form-item>
+        <template #actions>
+          <ActionToolbar>
+            <a-button type="primary" html-type="submit">刷新</a-button>
+            <a-button @click="exportCsvReport">导出CSV</a-button>
+            <a-button @click="printCurrent">打印当前结果</a-button>
+            <a-button @click="go('/finance/accounts/list?filter=low_balance')">低余额账户</a-button>
+            <a-button @click="go('/finance/reconcile/center?filter=unmatched')">对账异常</a-button>
+            <a-button @click="go('/finance/reconcile/ledger-health')">一致性巡检</a-button>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <StatefulBlock style="margin-top: 16px;" :loading="loading" :error="errorMessage" @retry="loadData">
-      <a-row :gutter="[16, 16]">
+      <a-row class="business-stat-strip" :gutter="[16, 16]">
         <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="今日应扣费" :value="summary?.shouldDeductCount || 0" /></a-card></a-col>
         <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="成功" :value="summary?.successCount || 0" /></a-card></a-col>
         <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="失败" :value="summary?.failedCount || 0" /></a-card></a-col>
@@ -77,6 +91,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

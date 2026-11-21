@@ -19,6 +19,14 @@ public class ElderFamily {
   private String relation;
   private Integer isPrimary;
   private String remark;
+  /** HEALTH,BILLING,PHOTO,PROXY,EMERGENCY；null = 历史绑定，沿用全量可见 */
+  private String authScopes;
+  private java.time.LocalDate validUntil;
+  private String authorizedByName;
+  private LocalDateTime authorizedAt;
+  private String revokedByName;
+  private LocalDateTime revokedAt;
+  private String revokeReason;
   @TableField(value = "create_time", fill = FieldFill.INSERT)
   private LocalDateTime createTime;
   @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE)

@@ -2,12 +2,12 @@
   <PageContainer title="我的待办中心" subTitle="先处理最重要的协同事项，再下钻公告、审批与高频入口">
     <StatefulBlock :loading="loading" :error="errorText" :empty="false" @retry="load">
       <div class="portal-toolbar">
-        <a-space wrap>
+        <ActionToolbar wrap>
           <a-tag color="blue">{{ scopeDescription }}</a-tag>
           <a-button size="small" type="primary" @click="openPath('/workbench/todo')">进入待办</a-button>
           <a-button size="small" @click="openPath('/workbench/approvals')">进入审批</a-button>
           <a-button size="small" @click="openPath('/workbench/reports')">写工作总结</a-button>
-        </a-space>
+        </ActionToolbar>
       </div>
       <section class="portal-hero">
         <div class="hero-main">
@@ -132,6 +132,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from "../../components/ActionToolbar.vue"
 import { computed, reactive, h, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'

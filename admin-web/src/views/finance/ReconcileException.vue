@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="对账异常处理" subTitle="短款/多款/重复/跨期等异常明细与处理建议">
     <a-card class="card-elevated" :bordered="false">
-      <a-form layout="inline" :model="query">
+      <QueryBar layout="inline" :model="query" @finish="loadData">
         <a-form-item label="日期">
           <a-date-picker v-model:value="query.date" style="width: 150px" />
         </a-form-item>
@@ -19,23 +19,25 @@
             <a-select-option value="LOW">低风险</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="loadData">查询</a-button>
-            <a-button @click="quickType('DUPLICATED_PAYMENT')">仅看重复收款</a-button>
-            <a-button @click="quickType('INVOICE_UNLINKED')">仅看发票未关联</a-button>
-            <a-button @click="exportCsvReport">导出CSV</a-button>
-            <a-button @click="printCurrent">打印当前</a-button>
-            <a-input v-model:value="query.printRemark" allow-clear placeholder="打印备注" style="width: 180px" />
-            <a-button @click="go('/finance/reconcile/ledger-health')">财务一致性巡检</a-button>
-            <a-button @click="go('/finance/reconcile/center')">返回对账中心</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">查询</a-button>
+              <a-button @click="quickType('DUPLICATED_PAYMENT')">仅看重复收款</a-button>
+              <a-button @click="quickType('INVOICE_UNLINKED')">仅看发票未关联</a-button>
+              <a-button @click="exportCsvReport">导出CSV</a-button>
+              <a-button @click="printCurrent">打印当前</a-button>
+              <a-input v-model:value="query.printRemark" allow-clear placeholder="打印备注" style="width: 180px" />
+              <a-button @click="go('/finance/reconcile/ledger-health')">财务一致性巡检</a-button>
+              <a-button @click="go('/finance/reconcile/center')">返回对账中心</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
     <StatefulBlock style="margin-top: 16px;" :loading="loading" :error="errorMessage" @retry="loadData">
-      <a-row :gutter="[12, 12]" style="margin-bottom: 12px;">
+      <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-bottom: 12px;">
         <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="异常总数" :value="filteredRows.length" /></a-card></a-col>
         <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="高风险数" :value="highRiskCount" /></a-card></a-col>
         <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="异常金额" :value="totalAmount" suffix="元" :precision="2" /></a-card></a-col>
@@ -75,6 +77,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'

@@ -112,7 +112,7 @@ export function useLogisticsTaskCenterRouteLayer(params: {
       if (TASK_CENTER_MANAGED_ROUTE_KEYS.has(key)) return
       unmanagedQuery[key] = value
     })
-    const extraQuery = {
+    const extraQuery: Record<string, string> = {
       ...unmanagedQuery,
       tab: params.activeTab.value,
       view: params.viewMode.value,

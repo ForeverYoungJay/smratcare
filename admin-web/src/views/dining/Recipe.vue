@@ -1,5 +1,11 @@
 <template>
   <PageContainer title="食谱管理" subTitle="支持单条维护，也支持按周期生成早中晚排餐课表">
+    <template #extra>
+      <a-space>
+        <a-button @click="generatePlannerBoard">刷新排餐课表</a-button>
+        <a-button type="primary" @click="openCreate">新增食谱</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="日期范围">
         <a-range-picker v-model:value="query.range" />
@@ -13,12 +19,7 @@
       <a-form-item label="状态">
         <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 140px" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="generatePlannerBoard">刷新排餐课表</a-button>
-          <a-button type="primary" @click="openCreate">新增食谱</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <a-card class="planner-card card-elevated" :bordered="false">
@@ -121,6 +122,8 @@
     </a-card>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -146,7 +149,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" title="食谱信息" :confirm-loading="saving" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="食谱信息" :confirm-loading="saving" @ok="submit">
       <a-form layout="vertical">
         <a-form-item label="食谱名称" required>
           <a-input v-model:value="form.recipeName" />

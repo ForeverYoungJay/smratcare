@@ -1,6 +1,7 @@
 <template>
   <PageContainer title="健康服务与医护账户一体化" subTitle="医护执行 + 老人账户联动总览">
     <StatefulBlock :loading="loading" :error="errorText" :empty="false" @retry="load">
+      <a-alert v-if="financeDenied" type="info" show-icon style="margin-bottom: 12px" message="当前账号没有财务权限，账户预警和流水不显示；医护部分正常展示。" />
       <a-card class="card-elevated risk-hero" :bordered="false" style="margin-bottom: 12px">
         <a-row :gutter="[12, 12]" align="middle">
           <a-col :xs="24" :xl="9">
@@ -35,7 +36,7 @@
         style="margin-bottom: 12px"
         :message="`协同提醒：余额预警 ${warningCount} 人，护理超时 ${medicalSummary.overdueCareTaskCount} 条，用药待执行 ${medicalSummary.todayMedicationPendingCount} 条。`"
       />
-      <a-row :gutter="16" style="margin-bottom: 16px">
+      <a-row class="business-stat-strip" :gutter="16" style="margin-bottom: 16px">
         <a-col :span="6"><a-card><a-statistic title="今日待执行医嘱" :value="medicalSummary.pendingMedicalOrderCount" /></a-card></a-col>
         <a-col :span="6"><a-card><a-statistic title="护理超时任务" :value="medicalSummary.overdueCareTaskCount" /></a-card></a-col>
         <a-col :span="6"><a-card><a-statistic title="余额预警人数" :value="warningCount" /></a-card></a-col>
@@ -44,11 +45,11 @@
 
       <a-card title="账户预警与医护协同" style="margin-bottom: 16px">
         <template #extra>
-          <a-space>
+          <ActionToolbar>
             <a-button @click="go('/finance/accounts/list')">老人账户</a-button>
             <a-button @click="go('/health/medication/medication-registration?date=today')">用药登记</a-button>
             <a-button type="primary" @click="go('/care/workbench/task-board?date=today')">护理任务看板</a-button>
-          </a-space>
+          </ActionToolbar>
         </template>
         <a-table :columns="warningColumns" :data-source="warningRows" :pagination="false" row-key="id" size="small">
           <template #bodyCell="{ column, record }">
@@ -67,6 +68,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
@@ -134,21 +136,25 @@ function go(path: string) {
   router.push(path)
 }
 
+const financeDenied = ref(false)
+
 async function load() {
   loading.value = true
   errorText.value = ''
   try {
-    const [medicalData, warningData, logData] = await Promise.all([
-      getMedicalCareWorkbenchSummary(),
-      getElderAccountWarnings(),
-      getElderAccountLogPage({ pageNo: 1, pageSize: 10 })
-    ])
+    const medicalData = await getMedicalCareWorkbenchSummary()
     medicalSummary.value = {
       ...createMedicalWorkbenchSummaryDefaults(),
       ...(medicalData || {})
     }
-    warningRows.value = warningData || []
-    const page = logData as PageResult<ElderAccountLog>
+    // 账户数据归财务权限：医务人员没有财务权限时只看医护部分，不让整页失败
+    const [warningData, logData] = await Promise.allSettled([
+      getElderAccountWarnings({ silent403: true }),
+      getElderAccountLogPage({ pageNo: 1, pageSize: 10 }, { silent403: true })
+    ])
+    financeDenied.value = warningData.status === 'rejected' || logData.status === 'rejected'
+    warningRows.value = warningData.status === 'fulfilled' ? warningData.value || [] : []
+    const page = logData.status === 'fulfilled' ? (logData.value as PageResult<ElderAccountLog>) : null
     logRows.value = page?.list || []
   } catch (error: any) {
     errorText.value = resolveMedicalError(error, '加载失败，请稍后重试')

@@ -106,7 +106,7 @@ class FeeManagementControllerTest {
             .header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code", is(0)))
-        .andExpect(jsonPath("$.data.list[0].id", notNullValue()));
+        .andExpect(jsonPath("$.data.records[0].id", notNullValue()));
   }
 
   @Test

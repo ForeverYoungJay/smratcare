@@ -8,7 +8,14 @@ import type {
   ServicePlanItem,
   ServiceBookingItem,
   NursingRecordItem,
-  NursingReportSummary
+  NursingReportSummary,
+  ServicePlanRevisionItem,
+  CareIncidentItem,
+  CareIncidentSummary,
+  CareIncidentActionRequest,
+  NursingRectificationItem,
+  NursingQualityMetrics,
+  NursingResidentItem
 } from '../types'
 
 export function getCaregiverGroupPage(params: any) {
@@ -83,8 +90,16 @@ export function getCareLevelPage(params: any) {
   return fetchPage<CareLevelItem>('/api/nursing/care-levels/page', params)
 }
 
-export function getCareLevelList(params?: any) {
-  return request.get<CareLevelItem[]>('/api/nursing/care-levels/list', { params })
+export function getCareLevelList(params?: any, config?: Record<string, any>) {
+  return request.get<CareLevelItem[]>('/api/nursing/care-levels/list', { params, ...config })
+}
+
+/** 护理等级只认护理部「护理等级」字典的名称：长者档案、护理收费标准都从这里选，账单才能按等级取到月费 */
+export async function getCareLevelNameOptions(current?: string) {
+  const list = await getCareLevelList(undefined, { silent403: true }).catch(() => [] as CareLevelItem[])
+  const names = (list || []).filter((item) => item.enabled !== 0).map((item) => String(item.levelName || '').trim()).filter(Boolean)
+  if (current && !names.includes(current)) names.push(current)
+  return Array.from(new Set(names)).map((value) => ({ value, label: value }))
 }
 
 export function createCareLevel(data: Partial<CareLevelItem>) {
@@ -141,4 +156,64 @@ export function getNursingRecordPage(params: any) {
 
 export function getNursingReportSummary(params?: any) {
   return request.get<NursingReportSummary>('/api/nursing/reports/summary', { params })
+}
+
+export function confirmShiftHandover(id: number) {
+  return request.post<ShiftHandoverItem>(`/api/nursing/handovers/${id}/confirm`)
+}
+
+export function approveServicePlan(id: number) {
+  return request.post<ServicePlanItem>(`/api/nursing/service-plans/${id}/approve`)
+}
+
+export function rejectServicePlan(id: number, reason: string) {
+  return request.post<ServicePlanItem>(`/api/nursing/service-plans/${id}/reject`, { reason })
+}
+
+export function getServicePlanRevisions(id: number) {
+  return request.get<ServicePlanRevisionItem[]>(`/api/nursing/service-plans/${id}/revisions`)
+}
+
+export function getIncidentPage(params: any) {
+  return fetchPage<CareIncidentItem>('/api/nursing/incidents/page', params)
+}
+
+export function getIncidentSummary(month: string) {
+  return request.get<CareIncidentSummary>('/api/nursing/incidents/summary', { params: { month } })
+}
+
+export function getIncident(id: number) {
+  return request.get<CareIncidentItem>(`/api/nursing/incidents/${id}`)
+}
+
+export function createIncident(data: Partial<CareIncidentItem>) {
+  return request.post<CareIncidentItem>('/api/nursing/incidents', data)
+}
+
+export function actOnIncident(id: number, data: CareIncidentActionRequest) {
+  return request.post<CareIncidentItem>(`/api/nursing/incidents/${id}/actions`, data)
+}
+
+export function getRectificationPage(params: any) {
+  return fetchPage<NursingRectificationItem>('/api/nursing/rectifications/page', params)
+}
+
+export function createRectification(data: Partial<NursingRectificationItem>) {
+  return request.post<NursingRectificationItem>('/api/nursing/rectifications', data)
+}
+
+export function updateRectification(id: number, data: Partial<NursingRectificationItem>) {
+  return request.put<NursingRectificationItem>(`/api/nursing/rectifications/${id}`, data)
+}
+
+export function reviewRectification(id: number, passed: boolean, reviewResult: string) {
+  return request.post<NursingRectificationItem>(`/api/nursing/rectifications/${id}/review`, { passed, reviewResult })
+}
+
+export function getQualityMetrics(params: { dateFrom: string; dateTo: string }) {
+  return request.get<NursingQualityMetrics>('/api/nursing/quality/metrics', { params })
+}
+
+export function getNursingResidentPage(params: { pageNo: number; pageSize: number; keyword?: string; reassessDue?: boolean }) {
+  return fetchPage<NursingResidentItem>('/api/nursing/residents/page', params)
 }

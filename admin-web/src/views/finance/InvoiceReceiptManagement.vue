@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="发票/收据管理" subTitle="按收款流水关联发票夹与收据凭证">
     <a-card class="card-elevated" :bordered="false">
-      <a-form layout="inline" :model="query" class="search-form">
+      <QueryBar layout="inline" :model="query" class="search-form" @finish="fetchData">
         <a-form-item label="日期">
           <a-date-picker v-model:value="query.date" style="width: 160px" />
         </a-form-item>
@@ -28,20 +28,22 @@
         <a-form-item label="打印备注">
           <a-input v-model:value="query.printRemark" allow-clear placeholder="例如：财务复核版" style="width: 180px" />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="fetchData">查询</a-button>
-            <a-button @click="quickFilter('UNLINKED')">仅看未关联</a-button>
-            <a-button @click="quickFilter('LINKED')">仅看已关联</a-button>
-            <a-button @click="exportCsvReport">导出CSV</a-button>
-            <a-button @click="printCurrent">打印当前结果</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
+        <template #actions>
+          <ActionToolbar>
+            <a-space>
+              <a-button type="primary" html-type="submit">查询</a-button>
+              <a-button @click="quickFilter('UNLINKED')">仅看未关联</a-button>
+              <a-button @click="quickFilter('LINKED')">仅看已关联</a-button>
+              <a-button @click="exportCsvReport">导出CSV</a-button>
+              <a-button @click="printCurrent">打印当前结果</a-button>
+              <a-button @click="reset">重置</a-button>
+            </a-space>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
-    <a-row :gutter="[12, 12]" style="margin-top: 16px;">
+    <a-row class="business-stat-strip" :gutter="[12, 12]" style="margin-top: 16px;">
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="流水笔数" :value="rows.length" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="总金额" :value="totalAmount" suffix="元" :precision="2" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="未关联笔数" :value="unlinkedCount" /></a-card></a-col>
@@ -75,7 +77,7 @@
           <template #default="{ row }">
             <div class="row-action-links">
               <a-button type="link" size="small" @click="go(`/finance/bill/${row.billId}`)" v-if="row.billId">查看账单</a-button>
-              <a-button type="link" size="small" @click="go('/finance/reconcile/invoice?filter=unlinked')" v-if="row.invoiceStatus === 'UNLINKED'">去关联</a-button>
+              <a-button type="link" size="small" @click="go('/finance/payments/register')" v-if="row.invoiceStatus === 'UNLINKED'">核对收款</a-button>
             </div>
           </template>
         </vxe-column>
@@ -95,10 +97,12 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { exportFinanceInvoiceReceiptCsv, getFinanceInvoiceReceiptPage } from '../../api/finance'
@@ -106,6 +110,7 @@ import type { FinanceInvoiceReceiptItem, PageResult } from '../../types'
 import { printTableReport } from '../../utils/print'
 
 const router = useRouter()
+const route = useRoute()
 const loading = ref(false)
 const rows = ref<FinanceInvoiceReceiptItem[]>([])
 const total = ref(0)
@@ -229,5 +234,8 @@ function printCurrent() {
   }
 }
 
-onMounted(fetchData)
+onMounted(() => {
+  if (route.query.filter === 'unlinked') query.invoiceStatus = 'UNLINKED'
+  fetchData()
+})
 </script>

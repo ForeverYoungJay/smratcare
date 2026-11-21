@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="老人管理" subTitle="档案维护与床位管理">
+    <template #extra>
+      <a-button type="primary" @click="openDrawer()">新增老人</a-button>
+    </template>
     <SearchForm :model="query" @search="onSearch" @reset="onReset">
       <a-form-item label="关键字">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="姓名(编号)" width="220px" />
@@ -11,12 +14,12 @@
           <a-select-option :value="3">离院</a-select-option>
         </a-select>
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openDrawer()">新增老人</a-button>
-      </template>
+
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="onSearch"
       rowKey="id"
       :columns="columns"
       :data-source="list"
@@ -76,7 +79,7 @@
       </div>
     </a-drawer>
 
-    <a-modal v-model:open="assignOpen" title="分配床位" @ok="submitAssign">
+    <a-modal :mask-closable="false" v-model:open="assignOpen" title="分配床位" @ok="submitAssign">
       <a-form layout="vertical">
         <a-form-item label="床位" required>
           <a-select v-model:value="assignForm.bedId" :options="bedOptions" />
@@ -87,7 +90,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="unbindOpen" title="解绑床位" @ok="submitUnbind">
+    <a-modal :mask-closable="false" v-model:open="unbindOpen" title="解绑床位" @ok="submitUnbind">
       <a-form layout="vertical">
         <a-form-item label="结束日期">
           <a-date-picker v-model:value="unbindForm.endDate" value-format="YYYY-MM-DD" style="width: 100%" />

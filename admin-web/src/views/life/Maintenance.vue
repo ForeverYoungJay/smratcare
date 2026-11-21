@@ -11,6 +11,8 @@
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -63,7 +65,7 @@
           {{ formatReportedAt(record.reportedAt) }}
         </template>
         <template v-else-if="column.key === 'action'">
-          <div class="row-action-links">
+          <div v-if="canHandle" class="row-action-links">
             <a-button
               v-if="record.status === 'OPEN'"
               type="link"
@@ -85,7 +87,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" :title="form.id ? '编辑报修' : '新增报修'" @ok="submit" :confirm-loading="saving" width="680px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" :title="form.id ? '编辑报修' : '新增报修'" @ok="submit" :confirm-loading="saving" width="680px">
       <a-form ref="formRef" layout="vertical" :model="form" :rules="rules">
         <a-form-item label="房间">
           <a-select
@@ -165,7 +167,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'
 import type { FormInstance } from 'ant-design-vue'
@@ -176,8 +178,13 @@ import DataTable from '../../components/DataTable.vue'
 import { getRoomList } from '../../api/bed'
 import { getMaintenancePage, createMaintenance, updateMaintenance, completeMaintenance, deleteMaintenance } from '../../api/life'
 import type { MaintenanceRequest, PageResult } from '../../types'
+import { useUserStore } from '../../stores/user'
 
 const route = useRoute()
+const userStore = useUserStore()
+// 接单/完工/编辑/删除只给后勤与管理层，其他岗位只能报修和查看
+const canHandle = computed(() => (userStore.roles || []).some((r) =>
+  ['LOGISTICS_EMPLOYEE', 'LOGISTICS_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'].includes(String(r).toUpperCase())))
 const loading = ref(false)
 const rows = ref<MaintenanceRequest[]>([])
 const roomOptions = ref<any[]>([])

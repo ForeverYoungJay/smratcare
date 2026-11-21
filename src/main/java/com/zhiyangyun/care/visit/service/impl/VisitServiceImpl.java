@@ -323,6 +323,7 @@ public class VisitServiceImpl implements VisitService {
         .eq(ElderFamily::getIsDeleted, 0)
         .eq(ElderFamily::getElderId, elderId)
         .eq(ElderFamily::getFamilyUserId, familyUserId)
+        .and(w -> w.isNull(ElderFamily::getValidUntil).or().ge(ElderFamily::getValidUntil, java.time.LocalDate.now()))
         .orderByDesc(ElderFamily::getIsPrimary)
         .orderByDesc(ElderFamily::getUpdateTime)
         .last("LIMIT 1"));

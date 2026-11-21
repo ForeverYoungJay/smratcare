@@ -39,10 +39,98 @@ import org.springframework.web.bind.annotation.RestController;
 public class OaTodoController {
   private final OaTodoMapper todoMapper;
   private final OaTaskMapper taskMapper;
+  private final com.zhiyangyun.care.auth.mapper.StaffMapper staffMapper;
+  private final com.zhiyangyun.care.audit.service.AuditLogService auditLogService;
+  private final com.zhiyangyun.care.audit.mapper.AuditLogMapper auditLogMapper;
+  private final com.zhiyangyun.care.oa.realtime.OaQuickChatWebSocketHandler socket;
 
-  public OaTodoController(OaTodoMapper todoMapper, OaTaskMapper taskMapper) {
+  public OaTodoController(OaTodoMapper todoMapper, OaTaskMapper taskMapper,
+      com.zhiyangyun.care.auth.mapper.StaffMapper staffMapper,
+      com.zhiyangyun.care.audit.service.AuditLogService auditLogService,
+      com.zhiyangyun.care.audit.mapper.AuditLogMapper auditLogMapper,
+      com.zhiyangyun.care.oa.realtime.OaQuickChatWebSocketHandler socket) {
     this.todoMapper = todoMapper;
     this.taskMapper = taskMapper;
+    this.staffMapper = staffMapper;
+    this.auditLogService = auditLogService;
+    this.auditLogMapper = auditLogMapper;
+    this.socket = socket;
+  }
+
+  public record TransferRequest(Long staffId, String note) {}
+
+  /** 转交：当前负责人或发起人可把待办交给本机构另一位在职同事，留痕并提醒新负责人 */
+  @PutMapping("/{id}/transfer")
+  public Result<OaTodo> transfer(@PathVariable Long id, @RequestBody TransferRequest request) {
+    OaTodo todo = findAccessibleTodo(id);
+    if (todo == null) {
+      throw new IllegalArgumentException("待办不存在或无权办理");
+    }
+    if ("DONE".equals(todo.getStatus())) {
+      throw new IllegalArgumentException("已完成的待办不能转交");
+    }
+    com.zhiyangyun.care.auth.entity.StaffAccount target = request.staffId() == null ? null : staffMapper.selectById(request.staffId());
+    if (target == null || !java.util.Objects.equals(target.getOrgId(), todo.getOrgId()) || !Integer.valueOf(1).equals(target.getStatus())) {
+      throw new IllegalArgumentException("只能转交给本机构在职员工");
+    }
+    if (java.util.Objects.equals(target.getId(), todo.getAssigneeId())) {
+      throw new IllegalArgumentException("已经是该同事负责");
+    }
+    String from = todo.getAssigneeName();
+    todo.setAssigneeId(target.getId());
+    todo.setAssigneeName(target.getRealName());
+    todoMapper.updateById(todo);
+    String note = request.note() == null || request.note().isBlank() ? "" : "：" + request.note().trim();
+    auditLogService.record(todo.getOrgId(), todo.getOrgId(), AuthContext.getStaffId(), AuthContext.getUsername(),
+        "TRANSFER", "OA_TODO", todo.getId(), "由 " + (from == null ? "未指定" : from) + " 转交给 " + target.getRealName() + note);
+    socket.sendToStaff(todo.getOrgId(), target.getId(), java.util.Map.of("eventType", "TODO_ASSIGNED",
+        "todoId", String.valueOf(todo.getId()), "title", String.valueOf(todo.getTitle())));
+    return Result.ok(todo);
+  }
+
+  /** 催办：只有发起人可以催办，提醒负责人并留痕；同一待办 30 分钟内只能催一次 */
+  @PostMapping("/{id}/urge")
+  public Result<Void> urge(@PathVariable Long id) {
+    OaTodo todo = findAccessibleTodo(id);
+    if (todo == null || !java.util.Objects.equals(todo.getCreatedBy(), AuthContext.getStaffId())) {
+      throw new IllegalArgumentException("只有发起人可以催办");
+    }
+    if ("DONE".equals(todo.getStatus()) || todo.getAssigneeId() == null) {
+      throw new IllegalArgumentException("该待办无需催办");
+    }
+    Long recent = auditLogMapper.selectCount(Wrappers.lambdaQuery(com.zhiyangyun.care.audit.entity.AuditLog.class)
+        .eq(com.zhiyangyun.care.audit.entity.AuditLog::getEntityType, "OA_TODO")
+        .eq(com.zhiyangyun.care.audit.entity.AuditLog::getEntityId, todo.getId())
+        .eq(com.zhiyangyun.care.audit.entity.AuditLog::getActionType, "URGE")
+        .ge(com.zhiyangyun.care.audit.entity.AuditLog::getCreateTime, LocalDateTime.now().minusMinutes(30)));
+    if (recent != null && recent > 0) {
+      throw new IllegalArgumentException("30 分钟内已催办过，请稍后再试");
+    }
+    auditLogService.record(todo.getOrgId(), todo.getOrgId(), AuthContext.getStaffId(), AuthContext.getUsername(),
+        "URGE", "OA_TODO", todo.getId(), "催办：" + todo.getTitle());
+    socket.sendToStaff(todo.getOrgId(), todo.getAssigneeId(), java.util.Map.of("eventType", "TODO_URGED",
+        "todoId", String.valueOf(todo.getId()), "title", String.valueOf(todo.getTitle())));
+    return Result.ok(null);
+  }
+
+  /** 处理历史：转交、催办等留痕（只对能看到该待办的人开放） */
+  @GetMapping("/{id}/history")
+  public Result<List<java.util.Map<String, Object>>> history(@PathVariable Long id) {
+    if (findAccessibleTodo(id) == null) {
+      throw new IllegalArgumentException("待办不存在或无权查看");
+    }
+    return Result.ok(auditLogMapper.selectList(Wrappers.lambdaQuery(com.zhiyangyun.care.audit.entity.AuditLog.class)
+            .eq(com.zhiyangyun.care.audit.entity.AuditLog::getEntityType, "OA_TODO")
+            .eq(com.zhiyangyun.care.audit.entity.AuditLog::getEntityId, id)
+            .orderByDesc(com.zhiyangyun.care.audit.entity.AuditLog::getCreateTime).last("LIMIT 50"))
+        .stream().map(log -> {
+          java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
+          row.put("action", log.getActionType());
+          row.put("actor", log.getActorName());
+          row.put("detail", log.getDetail());
+          row.put("time", log.getCreateTime());
+          return row;
+        }).toList());
   }
 
   @GetMapping("/page")

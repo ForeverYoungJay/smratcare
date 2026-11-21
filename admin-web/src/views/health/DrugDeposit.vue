@@ -1,19 +1,22 @@
 <template>
   <PageContainer title="药品缴存" subTitle="登记老人药品缴存情况">
+    <template #extra>
+      <a-space>
+        <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
+        <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
+        <a-button type="primary" @click="openCreate">新增缴存</a-button>
+      </a-space>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
       </a-form-item>
-      <template #extra>
-        <a-space>
-          <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
-          <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
-          <a-button type="primary" @click="openCreate">新增缴存</a-button>
-        </a-space>
-      </template>
+
     </SearchForm>
 
     <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData"
       rowKey="id"
       :columns="columns"
       :data-source="rows"
@@ -34,7 +37,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" title="药品缴存" @ok="submit" :confirm-loading="saving" width="680px">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="药品缴存" @ok="submit" :confirm-loading="saving" width="680px">
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">

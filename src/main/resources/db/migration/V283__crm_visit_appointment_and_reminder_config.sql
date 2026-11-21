@@ -1,0 +1,41 @@
+CREATE TABLE IF NOT EXISTS crm_visit_appointment (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  lead_id BIGINT NOT NULL COMMENT 'CRM线索ID',
+  appointment_time DATETIME NOT NULL COMMENT '预约参观时间',
+  visitor_name VARCHAR(64) NOT NULL COMMENT '来访联系人',
+  visitor_phone VARCHAR(32) DEFAULT NULL COMMENT '联系电话',
+  party_size INT NOT NULL DEFAULT 1 COMMENT '来访人数',
+  owner_staff_id BIGINT DEFAULT NULL COMMENT '负责员工ID',
+  owner_staff_name VARCHAR(64) DEFAULT NULL COMMENT '负责员工姓名',
+  status VARCHAR(32) NOT NULL DEFAULT 'SCHEDULED' COMMENT 'SCHEDULED/ARRIVED/COMPLETED/CANCELLED/NO_SHOW',
+  arrived_at DATETIME DEFAULT NULL COMMENT '实际到访时间',
+  completed_at DATETIME DEFAULT NULL COMMENT '参观完成时间',
+  visit_result VARCHAR(255) DEFAULT NULL COMMENT '参观结果',
+  cancel_reason VARCHAR(255) DEFAULT NULL COMMENT '取消原因',
+  next_follow_date DATE DEFAULT NULL COMMENT '下次跟进日期',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_crm_visit_tenant_time (tenant_id, is_deleted, appointment_time),
+  KEY idx_crm_visit_lead (tenant_id, lead_id, is_deleted),
+  KEY idx_crm_visit_owner (tenant_id, owner_staff_id, status, is_deleted)
+) COMMENT='CRM潜客预约参观';
+
+CREATE TABLE IF NOT EXISTS crm_contract_reminder_config (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否启用',
+  advance_days INT NOT NULL DEFAULT 30 COMMENT '提前提醒天数',
+  send_time VARCHAR(8) NOT NULL DEFAULT '09:00' COMMENT '计划发送时间 HH:mm',
+  template_content VARCHAR(255) NOT NULL COMMENT '短信模板',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  UNIQUE KEY uk_crm_contract_reminder_org (tenant_id, org_id, is_deleted)
+) COMMENT='CRM合同到期提醒配置';

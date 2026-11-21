@@ -21,6 +21,8 @@ public class Room {
   private String floorNo;
   private String roomNo;
   private String roomType;
+  /** 朝向 SOUTH / NORTH / EAST / WEST，用于平面图按走廊分列南北两侧。 */
+  private String orientation;
   private Integer sortNo;
   private Integer capacity;
   private Integer status;

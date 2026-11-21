@@ -41,6 +41,9 @@ class InventoryFlowTest {
 
   @Test
   void cancel_rolls_back_inventory() {
+    int before = batchMapper.selectList(Wrappers.lambdaQuery(InventoryBatch.class)
+        .eq(InventoryBatch::getProductId, 6003L))
+        .stream().mapToInt(batch -> batch.getQuantity() == null ? 0 : batch.getQuantity()).sum();
     var submit = new com.zhiyangyun.care.store.model.OrderPreviewRequest();
     submit.setElderId(4003L);
     submit.setProductId(6003L);
@@ -54,25 +57,39 @@ class InventoryFlowTest {
     long inCount = logMapper.selectCount(Wrappers.lambdaQuery(InventoryLog.class)
         .eq(InventoryLog::getRefOrderId, resp.getOrderId())
         .eq(InventoryLog::getChangeType, "IN"));
-    assertTrue(inCount > 0);
+    int after = batchMapper.selectList(Wrappers.lambdaQuery(InventoryBatch.class)
+        .eq(InventoryBatch::getProductId, 6003L))
+        .stream().mapToInt(batch -> batch.getQuantity() == null ? 0 : batch.getQuantity()).sum();
+    assertEquals(0L, inCount);
+    assertEquals(before, after);
   }
 
   @Test
-  void refund_creates_return_batch() {
+  void refund_restores_stock() {
+    int before = stockOf(6003L);
     var submit = new com.zhiyangyun.care.store.model.OrderPreviewRequest();
     submit.setElderId(4003L);
     submit.setProductId(6003L);
     submit.setQty(1);
     var resp = storeOrderService.submit(submit);
+    var fulfill = new com.zhiyangyun.care.store.model.OrderFulfillRequest();
+    fulfill.setOrderId(resp.getOrderId());
+    storeOrderService.fulfill(fulfill);
+    assertEquals(before - 1, stockOf(6003L));
 
     OrderRefundRequest refund = new OrderRefundRequest();
     refund.setOrderId(resp.getOrderId());
     storeOrderService.refund(refund);
 
-    long count = batchMapper.selectCount(Wrappers.lambdaQuery(InventoryBatch.class)
-        .like(InventoryBatch::getBatchNo, "RETURN-")
-        .eq(InventoryBatch::getProductId, 6003L));
-    assertTrue(count > 0);
+    // 退货回到原批次（原批次已删除时才新建 RETURN- 批次）
+    assertEquals(before, stockOf(6003L));
+  }
+
+  private int stockOf(Long productId) {
+    return batchMapper.selectList(Wrappers.lambdaQuery(InventoryBatch.class)
+            .eq(InventoryBatch::getProductId, productId)
+            .eq(InventoryBatch::getIsDeleted, 0))
+        .stream().mapToInt(b -> b.getQuantity() == null ? 0 : b.getQuantity()).sum();
   }
 
   @Test

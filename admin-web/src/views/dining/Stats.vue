@@ -15,7 +15,7 @@
       </a-form-item>
     </SearchForm>
 
-    <a-row :gutter="16" class="stats-row">
+    <a-row :gutter="16" class="stats-row business-stat-strip">
       <a-col :xs="24" :md="12" :xl="6">
         <a-card>
           <a-statistic title="订单总数" :value="summary.totalOrders" />

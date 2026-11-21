@@ -28,6 +28,9 @@ public class CareTaskTemplate {
 
   private Boolean enabled;
 
+  /** 服务项目清单，每行一项；执行时逐项勾选 */
+  private String serviceItems;
+
   private Long createdBy;
 
   @TableField("create_time")

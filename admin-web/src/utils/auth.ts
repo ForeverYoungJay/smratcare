@@ -1,3 +1,5 @@
+import { DEPARTMENT_ALL_ROLES, LEGACY_ROLE_ALIASES, ROLE_CODES } from '../access/policy'
+
 const TOKEN_KEY = 'zhiyangyun_token'
 const ROLES_KEY = 'zhiyangyun_roles'
 const PERMISSIONS_KEY = 'zhiyangyun_permissions'
@@ -21,20 +23,12 @@ export function normalizeRoles(roles: string[]): string[] {
     const code = String(role || '').trim().toUpperCase()
     if (code) normalized.add(code)
   })
-  if (normalized.has('OPERATOR')) {
-    normalized.add('MARKETING_EMPLOYEE')
-  }
-  if (normalized.has('MANAGER')) {
-    normalized.add('MARKETING_MINISTER')
-  }
-  const hasDepartmentRole = Array.from(normalized).some(
-    (code) => code.endsWith('_EMPLOYEE') || code.endsWith('_MINISTER')
-  )
+  Object.entries(LEGACY_ROLE_ALIASES).forEach(([legacyRole, aliases]) => {
+    if (normalized.has(legacyRole)) aliases.forEach((alias) => normalized.add(alias))
+  })
+  const hasDepartmentRole = DEPARTMENT_ALL_ROLES.some((code) => normalized.has(code))
   if (hasDepartmentRole) {
-    normalized.add('STAFF')
-  }
-  if (normalized.has('SYS_ADMIN') || normalized.has('DIRECTOR')) {
-    normalized.add('ADMIN')
+    normalized.add(ROLE_CODES.STAFF)
   }
   return Array.from(normalized)
 }

@@ -19,7 +19,7 @@
       </vxe-column>
     </vxe-table>
 
-    <a-modal v-model:open="editOpen" title="编辑" @ok="confirmEdit">
+    <a-modal :mask-closable="false" v-model:open="editOpen" title="编辑" @ok="confirmEdit">
       <a-form layout="vertical">
         <a-form-item label="姓名"><a-input v-model:value="editForm.name" /></a-form-item>
         <a-form-item label="年龄"><a-input-number v-model:value="editForm.age" style="width:100%" /></a-form-item>

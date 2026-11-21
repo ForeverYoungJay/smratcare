@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="老人出入统计" subTitle="机构维度老人出入院趋势">
     <template #extra>
-      <a-space>
+      <ActionToolbar>
         <a-button type="primary" @click="loadData">刷新</a-button>
         <a-button @click="exportCsvReport">导出报表</a-button>
         <a-dropdown>
@@ -16,7 +16,7 @@
             </a-menu>
           </template>
         </a-dropdown>
-      </a-space>
+      </ActionToolbar>
     </template>
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline">
@@ -102,6 +102,7 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
 import { computed, onMounted, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'

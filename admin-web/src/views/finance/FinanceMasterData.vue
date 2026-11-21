@@ -1,22 +1,30 @@
 <template>
   <PageContainer title="财务主数据配置中心" subTitle="费用科目、计费规则、支付渠道与审批流配置总览">
     <a-card class="card-elevated" :bordered="false">
-      <a-space wrap>
-        <a-date-picker v-model:value="query.month" picker="month" style="width: 150px" />
-        <a-button type="primary" @click="loadData">刷新</a-button>
-        <a-input v-model:value="query.printRemark" allow-clear placeholder="打印备注" style="width: 180px" />
-        <a-button @click="exportCurrent">导出当前</a-button>
-        <a-button @click="printCurrent">打印当前</a-button>
-        <a-button @click="go('/finance/bills/rules')">计费规则入口</a-button>
-        <a-button @click="go('/finance/accounts/warning-rules')">余额预警规则</a-button>
-        <a-button @click="go('/finance/allocation/subjects')">费用科目字典</a-button>
-        <a-button @click="go('/finance/config/payment-channels')">缴费渠道/收款账户</a-button>
-        <a-button @click="go('/finance/config/approval-flow')">权限与审批流配置</a-button>
-        <a-button @click="go('/finance/config/change-log')">配置变更记录</a-button>
-      </a-space>
+      <QueryBar :model="query" @finish="loadData">
+        <a-form-item label="月份">
+          <a-date-picker v-model:value="query.month" picker="month" style="width: 150px" />
+        </a-form-item>
+        <a-form-item label="打印备注">
+          <a-input v-model:value="query.printRemark" allow-clear placeholder="打印备注" style="width: 180px" />
+        </a-form-item>
+        <template #actions>
+          <ActionToolbar>
+            <a-button type="primary" html-type="submit">刷新</a-button>
+            <a-button @click="exportCurrent">导出当前</a-button>
+            <a-button @click="printCurrent">打印当前</a-button>
+            <a-button @click="go('/finance/bills/rules')">计费规则入口</a-button>
+            <a-button @click="go('/finance/accounts/warning-rules')">余额预警规则</a-button>
+            <a-button @click="go('/finance/allocation/subjects')">费用科目字典</a-button>
+            <a-button @click="go('/finance/config/payment-channels')">缴费渠道/收款账户</a-button>
+            <a-button @click="go('/finance/config/approval-flow')">权限与审批流配置</a-button>
+            <a-button @click="go('/finance/config/change-log')">配置变更记录</a-button>
+          </ActionToolbar>
+        </template>
+      </QueryBar>
     </a-card>
 
-    <a-row :gutter="[16, 16]" style="margin-top: 16px;">
+    <a-row class="business-stat-strip" :gutter="[16, 16]" style="margin-top: 16px;">
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="费用科目数" :value="overview?.feeSubjectCount || 0" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="计费规则数" :value="overview?.billingRuleCount || 0" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="支付渠道数" :value="overview?.paymentChannelCount || 0" /></a-card></a-col>
@@ -110,6 +118,8 @@
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from '../../components/ActionToolbar.vue'
+import QueryBar from '../../components/QueryBar.vue'
 import { onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
@@ -208,7 +218,7 @@ async function loadImpactPreview() {
     if (prefix === 'FEE_SUBJECT_') return 'FEE_SUBJECT_ROOM_FEE'
     if (prefix === 'PAYMENT_CHANNEL_') return 'PAYMENT_CHANNEL_WECHAT_ENABLED'
     if (prefix === 'ALLOC_') return 'ALLOC_ELECTRIC_BASE_PRICE'
-    return 'BILL_ROOM_BASE_PRICE'
+    return 'BED_FEE_MONTHLY'
   })
   impactLoading.value = true
   try {

@@ -14,5 +14,8 @@ public class OaNoticeRequest {
 
   private String status;
 
+  /** STAFF/FAMILY/ALL，默认 STAFF */
+  private String audience;
+
   private LocalDateTime publishTime;
 }

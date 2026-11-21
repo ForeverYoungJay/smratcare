@@ -35,4 +35,6 @@ public interface MarketingReportService {
       Long tenantId, Long currentStaffId, boolean adminView, String mode, String keyword, String consultantName, String consultantPhone,
       String elderName, String elderPhone, String consultDateFrom, String consultDateTo, String consultType,
       String mediaChannel, String infoSource, String customerTag, String marketerName);
+
+  com.zhiyangyun.care.crm.model.report.MarketingStaffActivityResponse staffActivity(Long tenantId, String dateFrom, String dateTo);
 }

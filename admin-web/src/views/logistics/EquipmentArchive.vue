@@ -1,5 +1,8 @@
 <template>
   <PageContainer title="设备档案" subTitle="独立设备台账（序列号、维保计划、状态）">
+    <template #extra>
+      <a-button type="primary" @click="openCreate">新增设备</a-button>
+    </template>
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="编码/名称/分类/位置/序列号" allow-clear />
@@ -7,13 +10,11 @@
       <a-form-item label="状态">
         <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 160px" />
       </a-form-item>
-      <template #extra>
-        <a-button type="primary" @click="openCreate">新增设备</a-button>
-      </template>
+
     </SearchForm>
 
     <a-card class="card-elevated" :bordered="false" style="margin-bottom: 12px">
-      <a-row :gutter="12">
+      <a-row class="business-stat-strip" :gutter="12">
         <a-col :span="6"><a-statistic title="设备总数" :value="summary.total" /></a-col>
         <a-col :span="6"><a-statistic title="启用中" :value="summary.enabled" /></a-col>
         <a-col :span="6"><a-statistic title="维保中" :value="summary.maintaining" /></a-col>
@@ -21,7 +22,9 @@
       </a-row>
     </a-card>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      :filter-model="query"
+      @clear-filters="fetchData" rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
           <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
@@ -36,7 +39,7 @@
       </template>
     </DataTable>
 
-    <a-modal v-model:open="editOpen" :title="form.id ? '编辑设备' : '新增设备'" :confirm-loading="saving" width="760px" @ok="submit">
+    <a-modal :mask-closable="false" v-model:open="editOpen" :title="form.id ? '编辑设备' : '新增设备'" :confirm-loading="saving" width="760px" @ok="submit">
       <a-form layout="vertical">
         <a-row :gutter="12">
           <a-col :span="12">

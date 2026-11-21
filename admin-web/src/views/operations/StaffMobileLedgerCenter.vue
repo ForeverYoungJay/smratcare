@@ -153,7 +153,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import {
   getOperationsStaffMobileHandovers,
@@ -167,8 +167,11 @@ import {
 } from '../../api/operations'
 
 const router = useRouter()
+const route = useRoute()
 const loading = ref(false)
-const activeTab = ref('tasks')
+// 支持 ?tab=tasks|receipts|handovers|incidents 直达对应页签
+const initialLedgerTab = String(route.query.tab || '')
+const activeTab = ref(['tasks', 'receipts', 'handovers', 'incidents'].includes(initialLedgerTab) ? initialLedgerTab : 'tasks')
 const module = ref('ALL')
 const tasks = ref<OperationsStaffMobileTask[]>([])
 const receipts = ref<OperationsStaffMobileTaskReceiptView[]>([])

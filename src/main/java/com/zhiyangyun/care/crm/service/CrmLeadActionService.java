@@ -3,6 +3,7 @@ package com.zhiyangyun.care.crm.service;
 import com.zhiyangyun.care.crm.model.action.CrmCallbackPlanExecuteRequest;
 import com.zhiyangyun.care.crm.model.action.CrmCallbackPlanRequest;
 import com.zhiyangyun.care.crm.model.action.CrmCallbackPlanResponse;
+import com.zhiyangyun.care.crm.model.action.CrmLeadFollowupRequest;
 import com.zhiyangyun.care.crm.model.action.CrmContractAttachmentRequest;
 import com.zhiyangyun.care.crm.model.action.CrmContractAttachmentResponse;
 import com.zhiyangyun.care.crm.model.action.CrmLeadBatchDeleteRequest;
@@ -11,6 +12,7 @@ import com.zhiyangyun.care.crm.model.action.CrmSmsTaskCreateRequest;
 import com.zhiyangyun.care.crm.model.action.CrmSmsTaskResponse;
 import com.zhiyangyun.care.crm.model.CrmLeadResponse;
 import java.util.List;
+import java.util.Map;
 
 public interface CrmLeadActionService {
   int batchUpdateStatus(Long tenantId, CrmLeadBatchStatusRequest request);
@@ -19,7 +21,10 @@ public interface CrmLeadActionService {
 
   CrmCallbackPlanResponse createCallbackPlan(Long tenantId, Long orgId, Long staffId, Long leadId, CrmCallbackPlanRequest request);
   List<CrmCallbackPlanResponse> listCallbackPlan(Long tenantId, Long leadId);
+  Map<Long, List<CrmCallbackPlanResponse>> listCallbackPlans(Long tenantId, List<Long> leadIds);
   CrmCallbackPlanResponse executeCallbackPlan(Long tenantId, Long planId, CrmCallbackPlanExecuteRequest request);
+  /** 记录已完成跟进并按需创建下次回访计划，返回已完成的记录 */
+  CrmCallbackPlanResponse recordFollowup(Long tenantId, Long orgId, Long staffId, Long leadId, CrmLeadFollowupRequest request);
 
   CrmContractAttachmentResponse createAttachment(Long tenantId, Long orgId, Long staffId, Long leadId, CrmContractAttachmentRequest request);
   List<CrmContractAttachmentResponse> listAttachment(Long tenantId, Long leadId);

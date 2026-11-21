@@ -4,13 +4,16 @@ import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
 import 'ant-design-vue/dist/reset.css'
 import './styles/global.less'
+import './styles/business-layout.less'
 import App from './App.vue'
 import router from './router'
 import { setupAntd } from './plugins/antd'
 import { ensureAdminPlugins, isAdminRoute } from './plugins/adminPlugins'
 import { permission, permissionCode } from './directives'
+import { setupMessageDedupe } from './utils/messageDedupe'
 
 dayjs.locale('zh-cn')
+setupMessageDedupe()
 
 const app = createApp(App)
 app.use(createPinia())

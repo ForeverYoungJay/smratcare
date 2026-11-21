@@ -1,13 +1,7 @@
-import { createApp } from 'vue'
-import dayjs from 'dayjs'
-import 'dayjs/locale/zh-cn'
+import { createApp, createSSRApp } from 'vue'
 import 'ant-design-vue/dist/reset.css'
 import './styles/home.less'
 import EnterpriseHome from './views/EnterpriseHome.vue'
-import { setupHomeAntd } from './plugins/homeAntd'
-
-dayjs.locale('zh-cn')
-
-const app = createApp(EnterpriseHome)
-setupHomeAntd(app)
+const prerendered = document.getElementById('home-app')?.hasAttribute('data-prerendered')
+const app = prerendered ? createSSRApp(EnterpriseHome) : createApp(EnterpriseHome)
 app.mount('#home-app')

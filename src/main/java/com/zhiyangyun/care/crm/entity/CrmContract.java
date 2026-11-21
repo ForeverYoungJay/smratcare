@@ -31,6 +31,11 @@ public class CrmContract {
   private LocalDate effectiveTo;
   private String marketerName;
   private String snapshotJson;
+  /** 合同类型：LONG_TERM 长期入住 / SHORT_TERM 短期托养 / TRIAL 试住 / DAY_CARE 日间照料 */
+  private String contractType;
+  /** 参考月费（元），仅作签约参考，实际收费以财务审批为准 */
+  private java.math.BigDecimal referenceMonthlyFee;
+  private LocalDate expectedAdmissionDate;
   private String reservationRoomNo;
   private Long reservationBedId;
   private String elderName;

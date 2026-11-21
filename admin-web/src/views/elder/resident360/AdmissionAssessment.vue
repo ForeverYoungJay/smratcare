@@ -63,17 +63,18 @@
           :hint="admissionLifecycleHint"
           style="margin-bottom: 12px"
         />
-        <a-space direction="vertical" style="width: 100%">
+        <ActionToolbar direction="vertical" style="width: 100%">
           <a-button block type="primary" :disabled="!selectedContract" @click="go(primaryActionPath)">{{ primaryActionText }}</a-button>
           <a-button block @click="go(historyPath)">查看历史评估报告</a-button>
           <a-button block :disabled="!selectedContract" @click="go(admissionPath)">回流入住办理（闭环）</a-button>
-        </a-space>
+        </ActionToolbar>
       </StatefulBlock>
     </a-card>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
+import ActionToolbar from "../../../components/ActionToolbar.vue"
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'

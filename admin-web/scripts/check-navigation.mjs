@@ -5,36 +5,39 @@ import esbuild from 'esbuild'
 
 const ROOT = process.cwd()
 const ROUTES_FILE = path.join(ROOT, 'src/router/routes.ts')
-const LEGACY_FILE = path.join(ROOT, 'src/router/legacyRedirects.ts')
-const MARKETING_FILE = path.join(ROOT, 'src/router/marketingRoutes.ts')
 const SRC_DIR = path.join(ROOT, 'src')
+const moduleCache = new Map()
 
 // 用 esbuild 把 TS 源码转成 CJS 后在沙箱执行；组件懒加载 () => import(...) 不会被调用，因此无需真实模块。
-// requireShim 负责解析被拆分出去的本地路由文件（legacyRedirects / marketingRoutes）。
-function loadModule(file, requireShim) {
+// requireShim 递归解析本地路由模块，使检查脚本不依赖 routes.ts 的物理拆分方式。
+function loadModule(file) {
   if (!fs.existsSync(file)) return {}
+  if (file.endsWith('.json')) return JSON.parse(fs.readFileSync(file, 'utf8'))
+  if (moduleCache.has(file)) return moduleCache.get(file).exports
   const source = fs.readFileSync(file, 'utf8')
   const { code } = esbuild.transformSync(source, { loader: 'ts', format: 'cjs' })
   const moduleObj = { exports: {} }
+  moduleCache.set(file, moduleObj)
+  const requireShim = (id) => {
+    if (id === '../utils/auth') return { getRoles: () => [] }
+    if (!id.startsWith('.')) return {}
+    const resolvedBase = path.resolve(path.dirname(file), id)
+    const resolved = [resolvedBase, `${resolvedBase}.ts`, `${resolvedBase}.json`].find((candidate) => fs.existsSync(candidate))
+    return resolved ? loadModule(resolved) : {}
+  }
   const sandbox = {
     module: moduleObj,
     exports: moduleObj.exports,
-    require: requireShim || (() => ({})),
-    Promise
+    require: requireShim,
+    Promise,
+    URL
   }
   vm.runInNewContext(code, sandbox, { timeout: 3000 })
   return moduleObj.exports || {}
 }
 
 function loadRoutes() {
-  const legacy = loadModule(LEGACY_FILE)
-  const marketing = loadModule(MARKETING_FILE)
-  const requireShim = (id) => {
-    if (id.includes('legacyRedirects')) return legacy
-    if (id.includes('marketingRoutes')) return marketing
-    return {}
-  }
-  return loadModule(ROUTES_FILE, requireShim).routes || []
+  return loadModule(ROUTES_FILE).routes || []
 }
 
 function flattenRoutes(routes, base = '') {
@@ -103,7 +106,8 @@ function normalizePath(input) {
   return input
     .split('#')[0]
     .split('?')[0]
-    .replace(/\$\{[^}]+\}/g, 'DYNAMIC')
+    .replace(/\/\$\{[^}]+\}/g, '/DYNAMIC')
+    .replace(/\$\{[^}]+\}/g, '')
 }
 
 function toRouteRegex(routePath) {
@@ -145,4 +149,3 @@ if (unresolved.length) {
     })
   process.exit(1)
 }
-
