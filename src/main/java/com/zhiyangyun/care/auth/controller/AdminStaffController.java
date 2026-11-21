@@ -248,10 +248,12 @@ public class AdminStaffController {
       @RequestParam(defaultValue = "1") long page,
       @RequestParam(defaultValue = "200") long size,
       @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) Long departmentId,
       @RequestParam(required = false, defaultValue = "true") boolean activeOnly) {
     Long orgId = AuthContext.getOrgId();
     var wrapper = Wrappers.lambdaQuery(StaffAccount.class)
         .eq(StaffAccount::getIsDeleted, 0)
+        .eq(departmentId != null, StaffAccount::getDepartmentId, departmentId)
         .eq(orgId != null, StaffAccount::getOrgId, orgId)
         .ne(StaffAccount::getUsername, HIDDEN_PLATFORM_USERNAME)
         .eq(activeOnly, StaffAccount::getStatus, 1);

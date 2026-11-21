@@ -44,8 +44,8 @@ class ChatFlowTest {
         {"94103", "ch_out", "张三", "94111", "NURSING_EMPLOYEE"},
         {"94104", "ch_hr", "行政部长", "94114", "HR_MINISTER"}};
     for (String[] u : users) {
-      jdbc.update("MERGE INTO staff (id, org_id, department_id, staff_no, username, password_hash, real_name, status) KEY(id) VALUES (?, 1, 10, ?, ?, ?, ?, 1)",
-          Long.valueOf(u[0]), "C" + u[0], u[1], HASH, u[2]);
+      jdbc.update("MERGE INTO staff (id, org_id, department_id, staff_no, username, password_hash, real_name, status) KEY(id) VALUES (?, 1, ?, ?, ?, ?, ?, 1)",
+          Long.valueOf(u[0]), "ch_fix".equals(u[1]) ? 20L : 10L, "C" + u[0], u[1], HASH, u[2]);
       jdbc.update("MERGE INTO role (id, org_id, role_name, role_code, status) KEY(id) VALUES (?, 1, ?, ?, 1)", Long.valueOf(u[3]), u[4], u[4]);
       jdbc.update("MERGE INTO staff_role (id, org_id, staff_id, role_id) KEY(id) VALUES (?, 1, ?, ?)", Long.valueOf(u[0]) + 100, Long.valueOf(u[0]), Long.valueOf(u[3]));
     }
@@ -92,6 +92,10 @@ class ChatFlowTest {
     mvc.perform(auth(get("/api/chat/conversations"), fix)).andExpect(jsonPath("$.data[0].unread", is("0")));
 
     // 群主移出李工后他立即失去访问权
+    // 按部门拉人：选项接口只返回该部门在职员工
+    JsonNode dept = data(mvc.perform(auth(get("/api/admin/staff/options").param("departmentId", "20"), nurse)).andReturn()).path("records");
+    assertThat(dept.findValuesAsText("departmentId")).containsOnly("20");
+    assertThat(dept.findValuesAsText("id")).contains("94102").doesNotContain("94101");
     mvc.perform(auth(post("/api/chat/conversations/" + convId + "/members"), fix).content("{\"remove\":[94101]}")).andExpect(status().isForbidden());
     mvc.perform(auth(post("/api/chat/conversations/" + convId + "/members"), nurse).content("{\"remove\":[94102]}")).andExpect(status().isOk());
     mvc.perform(auth(get("/api/chat/conversations/" + convId + "/messages"), fix)).andExpect(status().isForbidden());

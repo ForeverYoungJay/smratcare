@@ -70,6 +70,10 @@
           <a-radio-group v-model:value="createForm.type"><a-radio value="DIRECT">单聊</a-radio><a-radio value="GROUP">群聊</a-radio></a-radio-group>
         </a-form-item>
         <a-form-item v-if="createForm.type === 'GROUP'" label="群名称" required><a-input v-model:value="createForm.title" :maxlength="100" placeholder="如：护理后勤协同群" /></a-form-item>
+        <a-form-item v-if="createForm.type === 'GROUP'" label="按部门拉人">
+          <a-select :value="undefined" show-search :filter-option="false" :options="departmentOptions" :loading="deptAdding || departmentLoading"
+            placeholder="选择部门，加入该部门全部在职同事（可再逐个移除）" @search="searchDepartments" @focus="() => searchDepartments('')" @select="(d: unknown) => addDepartment(String(d), 'create')" />
+        </a-form-item>
         <a-form-item label="成员" required>
           <a-select v-model:value="createForm.memberIds" :mode="createForm.type === 'GROUP' ? 'multiple' : undefined" show-search :filter-option="false"
             :options="staffOptions" :loading="staffLoading" placeholder="搜索同事姓名" @search="searchStaff" @focus="() => !staffOptions.length && searchStaff('')" />
@@ -81,6 +85,10 @@
       <a-form layout="vertical">
         <a-form-item label="添加成员">
           <a-select v-model:value="addIds" mode="multiple" show-search :filter-option="false" :options="staffOptions" :loading="staffLoading" @search="searchStaff" />
+        </a-form-item>
+        <a-form-item v-if="true" label="按部门拉人">
+          <a-select :value="undefined" show-search :filter-option="false" :options="departmentOptions" :loading="deptAdding || departmentLoading"
+            placeholder="选择部门，加入该部门全部在职同事（可再逐个移除）" @search="searchDepartments" @focus="() => searchDepartments('')" @select="(d: unknown) => addDepartment(String(d), 'manage')" />
         </a-form-item>
         <a-form-item label="移出成员">
           <a-checkbox-group v-model:value="removeIds" :options="members.filter((m) => m.role !== 'OWNER').map((m) => ({ value: m.staffId, label: m.name }))" />
@@ -99,6 +107,8 @@ import { CheckSquareOutlined, MessageOutlined, PlusOutlined } from '@ant-design/
 import PageContainer from '../../components/PageContainer.vue'
 import { createConversation, getChatTasks, getConversations, getMembers, manageMembers, searchMessages, type ChatConversation, type ChatMember, type ChatMessage, type ChatTaskRow } from '../../api/chat'
 import { useStaffOptions } from '../../composables/useStaffOptions'
+import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
+import { getStaffOptionPage } from '../../api/rbac'
 import { TASK_STATUS, avatarText } from './chatModel'
 import ChatThread from './ChatThread.vue'
 import ChatTasksView from './ChatTasksView.vue'
@@ -106,7 +116,9 @@ import ChatTasksView from './ChatTasksView.vue'
 const FILTERS = [{ label: '全部会话', value: 'all' }, { label: '群聊', value: 'GROUP' }, { label: '单聊', value: 'DIRECT' }]
 const route = useRoute()
 const router = useRouter()
-const { staffOptions, staffLoading, searchStaff } = useStaffOptions({ pageSize: 50 })
+const { staffOptions, staffLoading, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 50 })
+const { departmentOptions, departmentLoading, searchDepartments } = useDepartmentOptions({ pageSize: 100 })
+const deptAdding = ref(false)
 
 const tab = computed(() => (route.query.tab === 'tasks' ? 'tasks' : 'chat'))
 const conversations = ref<ChatConversation[]>([])
@@ -174,6 +186,26 @@ async function createConv() {
     openConversation(String(id))
   } finally {
     creating.value = false
+  }
+}
+
+// shortcut: 每个部门最多取 300 人，超大部门再改为服务端按部门展开
+async function addDepartment(departmentId: string, target: 'create' | 'manage') {
+  deptAdding.value = true
+  try {
+    const page = await getStaffOptionPage({ departmentId, activeOnly: true, pageNo: 1, pageSize: 300 })
+    const existing = new Set(target === 'manage' ? members.value.map((m) => m.staffId) : [])
+    const ids = page.records.filter((s) => !existing.has(String(s.id))).map((s) => {
+      ensureSelectedStaff(s.id, s.realName)
+      return String(s.id)
+    })
+    const current = target === 'create' ? (Array.isArray(createForm.memberIds) ? createForm.memberIds : []) : addIds.value
+    const merged = [...new Set([...current, ...ids])]
+    if (target === 'create') createForm.memberIds = merged
+    else addIds.value = merged
+    message.success(ids.length ? `已加入 ${merged.length - current.length} 位同事` : '该部门没有可加入的在职同事')
+  } finally {
+    deptAdding.value = false
   }
 }
 

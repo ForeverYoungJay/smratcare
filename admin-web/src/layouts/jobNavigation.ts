@@ -12,7 +12,7 @@ const pages = (pairs: string[][], section: Section): JobEntry[] => links(pairs).
 /** 个人办公只在这一个分组里出现（所有岗位一致，7 个页面）；审批在「我的待办」里统一进入 */
 const OFFICE: JobEntry = {
   label: '我的办公', path: '', icon: 'UserOutlined', section: 'entry', children: links([
-    ['我的工作台', '/workbench/overview'], ['我的待办', '/workbench/todo'], ['考勤与请假', '/workbench/attendance'],
+    ['我的工作台', '/workbench/overview'], ['我的待办', '/workbench/todo'], ['协同消息', '/workbench/chat'], ['考勤与请假', '/workbench/attendance'],
     ['我的日程', '/workbench/schedule'], ['工作总结', '/workbench/reports'], ['我的工资与积分', '/workbench/payslips'],
     ['我的信息', '/workbench/my-info']
   ])
